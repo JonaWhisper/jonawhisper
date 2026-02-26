@@ -1,0 +1,285 @@
+import Foundation
+
+class ModelDownloader {
+    static let shared = ModelDownloader()
+    private init() {}
+
+    // URLSession-based download state
+    private var activeTask: URLSessionDownloadTask?
+    private var activeSession: URLSession?
+    private var activeDelegate: DownloadDelegate?
+
+    // Subprocess-based download state
+    private var activeProcess: Process?
+
+    private var activeModelId: String?
+
+    var activeDownloadModelId: String? { activeModelId }
+
+    private static let pendingDir: String = {
+        NSString(string: "~/.local/share/whisper-dictate").expandingTildeInPath
+    }()
+
+    private static func pendingDownloadPath() -> String {
+        "\(pendingDir)/.pending-download"
+    }
+
+    private static func resumeDataPath(for model: ASRModel) -> String {
+        let safeId = model.id.replacingOccurrences(of: ":", with: "-")
+        let dir = NSString(string: model.storageDir).expandingTildeInPath
+        return "\(dir)/.resume-\(safeId)"
+    }
+
+    func pendingDownloadModelId() -> String? {
+        let path = Self.pendingDownloadPath()
+        guard let data = FileManager.default.contents(atPath: path),
+              let modelId = String(data: data, encoding: .utf8) else { return nil }
+        guard let model = ASRModelCatalog.shared.model(byId: modelId) else {
+            try? FileManager.default.removeItem(atPath: path)
+            return nil
+        }
+        // Only require resume data for single file downloads
+        if case .singleFile = model.downloadType {
+            let resumePath = Self.resumeDataPath(for: model)
+            guard FileManager.default.fileExists(atPath: resumePath) else {
+                try? FileManager.default.removeItem(atPath: path)
+                return nil
+            }
+        }
+        return modelId
+    }
+
+    // MARK: - Download entry point
+
+    func download(_ model: ASRModel, progress: @escaping (Double) -> Void, completion: @escaping (Bool) -> Void) {
+        try? FileManager.default.createDirectory(atPath: Self.pendingDir, withIntermediateDirectories: true)
+        activeModelId = model.id
+        try? model.id.data(using: .utf8)?.write(to: URL(fileURLWithPath: Self.pendingDownloadPath()))
+
+        switch model.downloadType {
+        case .singleFile:
+            downloadWithURLSession(model, isZip: false, progress: progress, completion: completion)
+        case .zipArchive:
+            downloadWithURLSession(model, isZip: true, progress: progress, completion: completion)
+        case .huggingFaceRepo:
+            downloadWithSubprocess(
+                executable: "/usr/bin/env",
+                arguments: ["huggingface-cli", "download", model.url],
+                model: model, progress: progress, completion: completion
+            )
+        case .command(let executable, let arguments):
+            downloadWithSubprocess(
+                executable: executable, arguments: arguments,
+                model: model, progress: progress, completion: completion
+            )
+        case .remoteAPI:
+            completion(true)
+        }
+    }
+
+    // MARK: - URLSession download (single file + zip)
+
+    private func downloadWithURLSession(_ model: ASRModel, isZip: Bool, progress: @escaping (Double) -> Void, completion: @escaping (Bool) -> Void) {
+        let storageDir = NSString(string: model.storageDir).expandingTildeInPath
+        try? FileManager.default.createDirectory(atPath: storageDir, withIntermediateDirectories: true)
+
+        let delegate = DownloadDelegate(progress: progress) { [weak self] location in
+            guard let self = self else { return }
+            self.clearPendingState(for: model)
+
+            guard let location = location else {
+                completion(false)
+                return
+            }
+
+            do {
+                if isZip {
+                    let tmpZip = NSTemporaryDirectory() + UUID().uuidString + ".zip"
+                    try FileManager.default.moveItem(at: location, to: URL(fileURLWithPath: tmpZip))
+
+                    let unzip = Process()
+                    unzip.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+                    unzip.arguments = ["-o", tmpZip, "-d", storageDir]
+                    unzip.standardOutput = FileHandle.nullDevice
+                    unzip.standardError = FileHandle.nullDevice
+                    try unzip.run()
+                    unzip.waitUntilExit()
+                    try? FileManager.default.removeItem(atPath: tmpZip)
+
+                    guard unzip.terminationStatus == 0 else {
+                        Log.error("Failed to extract zip for model: \(model.id)")
+                        completion(false)
+                        return
+                    }
+                } else {
+                    let dest = URL(fileURLWithPath: model.localPath)
+                    if FileManager.default.fileExists(atPath: dest.path) {
+                        try FileManager.default.removeItem(at: dest)
+                    }
+                    try FileManager.default.moveItem(at: location, to: dest)
+                }
+                Log.info("Downloaded model: \(model.id)")
+                completion(true)
+            } catch {
+                Log.error("Failed to process model download: \(error)")
+                completion(false)
+            }
+        }
+
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        activeDelegate = delegate
+        activeSession = session
+
+        // Resume data only for single file downloads
+        if !isZip {
+            let resumePath = Self.resumeDataPath(for: model)
+            if let resumeData = FileManager.default.contents(atPath: resumePath) {
+                Log.info("Resuming download for model: \(model.id)")
+                let task = session.downloadTask(withResumeData: resumeData)
+                activeTask = task
+                task.resume()
+                return
+            }
+        }
+
+        guard let url = URL(string: model.url) else {
+            completion(false)
+            return
+        }
+        Log.info("Starting download for model: \(model.id)")
+        let task = session.downloadTask(with: url)
+        activeTask = task
+        task.resume()
+    }
+
+    // MARK: - Subprocess download (HuggingFace, custom commands)
+
+    private func downloadWithSubprocess(executable: String, arguments: [String], model: ASRModel, progress: @escaping (Double) -> Void, completion: @escaping (Bool) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+
+            self.activeProcess = process
+
+            // Simulated progress since we can't track subprocess progress
+            let progressQueue = DispatchQueue(label: "download-progress")
+            let timer = DispatchSource.makeTimerSource(queue: progressQueue)
+            var currentProgress = 0.0
+            timer.schedule(deadline: .now() + 1, repeating: 2.0)
+            timer.setEventHandler {
+                currentProgress = min(currentProgress + 0.05, 0.95)
+                DispatchQueue.main.async { progress(currentProgress) }
+            }
+            timer.resume()
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                Log.error("Download subprocess failed: \(error)")
+            }
+
+            timer.cancel()
+
+            let success = process.terminationStatus == 0
+            self.clearPendingState(for: model)
+
+            DispatchQueue.main.async {
+                if success {
+                    progress(1.0)
+                    Log.info("Downloaded model: \(model.id)")
+                } else {
+                    Log.error("Download failed for model: \(model.id)")
+                }
+                completion(success)
+            }
+        }
+    }
+
+    // MARK: - Cancel / cleanup
+
+    func saveResumeDataAndCancel() {
+        if let task = activeTask, let modelId = activeModelId,
+           let model = ASRModelCatalog.shared.model(byId: modelId) {
+            Log.info("Saving resume data for model: \(modelId)")
+            task.cancel { resumeData in
+                if let resumeData = resumeData {
+                    let path = Self.resumeDataPath(for: model)
+                    try? resumeData.write(to: URL(fileURLWithPath: path))
+                    Log.info("Resume data saved (\(resumeData.count) bytes)")
+                } else {
+                    Log.info("No resume data available")
+                }
+            }
+        } else if let process = activeProcess, process.isRunning {
+            Log.info("Cancelling subprocess download")
+            process.terminate()
+        }
+    }
+
+    func cancelDownload() {
+        guard let modelId = activeModelId,
+              let model = ASRModelCatalog.shared.model(byId: modelId) else { return }
+        activeTask?.cancel()
+        if let process = activeProcess, process.isRunning {
+            process.terminate()
+        }
+        clearPendingState(for: model)
+    }
+
+    func deleteModel(_ model: ASRModel) -> Bool {
+        guard model.isDownloaded else { return false }
+        do {
+            try FileManager.default.removeItem(atPath: model.localPath)
+            return true
+        } catch {
+            Log.error("Failed to delete model \(model.id): \(error)")
+            return false
+        }
+    }
+
+    private func clearPendingState(for model: ASRModel) {
+        try? FileManager.default.removeItem(atPath: Self.pendingDownloadPath())
+        try? FileManager.default.removeItem(atPath: Self.resumeDataPath(for: model))
+        activeTask = nil
+        activeSession = nil
+        activeDelegate = nil
+        activeProcess = nil
+        activeModelId = nil
+    }
+}
+
+// MARK: - Download delegate
+
+private class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+    let onProgress: (Double) -> Void
+    let onComplete: (URL?) -> Void
+
+    init(progress: @escaping (Double) -> Void, complete: @escaping (URL?) -> Void) {
+        self.onProgress = progress
+        self.onComplete = complete
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        onComplete(location)
+    }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        if totalBytesExpectedToWrite > 0 {
+            onProgress(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite))
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if error != nil {
+            Log.error("Download failed: \(error!)")
+            onComplete(nil)
+        }
+    }
+}
