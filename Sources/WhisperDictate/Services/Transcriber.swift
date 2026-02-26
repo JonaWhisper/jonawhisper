@@ -23,23 +23,3 @@ class Transcriber {
         }
     }
 }
-
-enum TranscriberError: LocalizedError {
-    case modelNotFound(String)
-    case engineNotFound(String)
-    case launchFailed(Error)
-    case processFailed(Int32, String)
-
-    var errorDescription: String? {
-        switch self {
-        case .modelNotFound(let path):
-            return "Model not found at \(path)"
-        case .engineNotFound(let engineId):
-            return "No engine found for \(engineId)"
-        case .launchFailed(let error):
-            return "Failed to launch: \(error.localizedDescription)"
-        case .processFailed(let code, let msg):
-            return "Process exited with code \(code): \(msg)"
-        }
-    }
-}

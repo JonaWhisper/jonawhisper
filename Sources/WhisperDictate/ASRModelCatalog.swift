@@ -55,7 +55,8 @@ class ASRModelCatalog {
 
     var selectedModel: ASRModel {
         model(byId: selectedModelId)
-            ?? model(byId: "whisper:large-v3-turbo")!
+            ?? model(byId: "whisper:large-v3-turbo")
+            ?? allModels.first!
     }
 
     var selectedLanguage: String {

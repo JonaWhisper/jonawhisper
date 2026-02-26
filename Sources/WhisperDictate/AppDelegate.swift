@@ -279,9 +279,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSSound(named: "Pop")?.play()
 
         // Add to queue
-        state.transcriptionQueue.append(audioURL)
-        pill.queueCount = state.transcriptionQueue.count
-        Log.info("Enqueued transcription (\(state.transcriptionQueue.count) in queue)")
+        let count = state.enqueue(audioURL)
+        pill.queueCount = count
+        Log.info("Enqueued transcription (\(count) in queue)")
 
         // Process queue if not already processing
         processNextInQueue(debounceTransition: true)
@@ -325,10 +325,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let model = ASRModelCatalog.shared.selectedModel
         guard model.isDownloaded else {
             // No usable model — discard queue and notify
-            let audioURL = state.transcriptionQueue.removeFirst()
-            try? FileManager.default.removeItem(at: audioURL)
-            pill.queueCount = state.transcriptionQueue.count
-            state.transcriptionQueue.removeAll()
+            if let audioURL = state.dequeue() {
+                try? FileManager.default.removeItem(at: audioURL)
+            }
+            state.transcriptionQueue = []
             pill.queueCount = 0
             NotificationService.show(title: "Modèle indisponible", body: "Le modèle \(model.label) n'est pas téléchargé. Ouvrez Modèles… pour en choisir un.")
             NSSound(named: "Basso")?.play()
@@ -342,8 +342,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         state.isTranscribing = true
-        let audioURL = state.transcriptionQueue.removeFirst()
-        pill.queueCount = state.transcriptionQueue.count
+        guard let audioURL = state.dequeue() else {
+            state.isTranscribing = false
+            return
+        }
+        pill.queueCount = state.queueCount
 
         if !state.isRecording {
             if debounceTransition {
