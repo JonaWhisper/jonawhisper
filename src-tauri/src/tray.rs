@@ -3,7 +3,7 @@ use crate::state::AppState;
 use std::sync::Arc;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
-    tray::{TrayIconBuilder, TrayIconEvent},
+    tray::TrayIconBuilder,
     AppHandle, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
@@ -170,15 +170,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .icon_as_template(true)
         .tooltip("WhisperDictate")
         .menu(&menu)
-        .on_tray_icon_event(|tray, event| {
-            // Rebuild menu on click to refresh device list
-            if let TrayIconEvent::Click { .. } = event {
-                let app = tray.app_handle();
-                if let Ok(new_menu) = build_menu(app) {
-                    let _ = tray.set_menu(Some(new_menu));
-                }
-            }
-        })
         .on_menu_event(move |app, event| {
             let id = event.id().0.as_str();
             match id {
