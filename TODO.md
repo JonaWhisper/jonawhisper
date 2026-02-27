@@ -3,7 +3,7 @@
 ## Bugs / Correctifs
 
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement (évite les conflits clipboard, pas de race condition)
-- [ ] **Post-processing : toutes les options reviennent à l'état par défaut** — Les toggles (hallucination filter, LLM enabled) se réinitialisent si on navigue entre sections ou ferme/rouvre Settings (optimistic update appliqué, à vérifier)
+- [x] **Post-processing : persistence des toggles** — Race condition fetchState/fetchSettings corrigée (séparation runtime state vs user settings)
 
 ## Fonctionnalités à implémenter
 
@@ -15,6 +15,11 @@
 
 - [x] **Pill réduite (80x32)** — Taille validée, animations proportionnées OK
 - [ ] **Indicateur visuel pendant la transcription dans le tray** — Feedback plus clair que la dictée est en cours de traitement
+- [ ] **Setup window : padding bouton Continuer** — Le bouton est collé au bas de la fenêtre, ajouter du padding
+- [ ] **Setup window : retirer texte redondant** — Le sous-titre "pour WhisperDictate" est superflu (déjà dans le titre)
+- [ ] **Setup window : auto-restart** — Redémarrer automatiquement l'app quand les permissions nécessitent un restart, au lieu du message "redémarrage peut-être nécessaire"
+- [ ] **Settings window : taille adaptative** — Ajuster la fenêtre au contenu (hauteur prioritaire, passer en colonnes si la hauteur d'écran est insuffisante)
+- [ ] **Refacto général** — Nettoyer le code après les nombreuses modifications récentes
 
 ## Technique / Infra
 
