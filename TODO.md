@@ -47,5 +47,7 @@
 
 ## Technique / Infra
 
+- [ ] **build.sh double exécution** — Le script semble s'exécuter deux fois, investiguer pourquoi
+- [ ] **Audit des approches et patterns** — Lister toutes les approches utilisées (channels, mutex, FFI, async, spawning, etc.), comparer aux best practices Rust/Tauri, identifier les incohérences et améliorations possibles
 - [ ] **Script de test visuel + screenshots** — Pouvoir lancer des flows de test (pill, settings, etc.) et capturer des screenshots automatiquement pour vérifier le rendu sans intervention manuelle
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)
