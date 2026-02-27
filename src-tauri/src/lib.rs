@@ -1,6 +1,7 @@
 mod audio;
 mod commands;
 mod engines;
+mod errors;
 mod platform;
 mod post_processor;
 mod process_runner;

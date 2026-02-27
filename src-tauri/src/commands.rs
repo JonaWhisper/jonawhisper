@@ -1,8 +1,9 @@
-use crate::engines::{self, EngineCatalog, EngineInfo, Language};
+use crate::audio;
 use crate::engines::downloader;
+use crate::engines::{self, EngineCatalog, EngineInfo, Language};
+use crate::errors::AppError;
 use crate::platform;
 use crate::state::{ApiServerConfig, AppState, HistoryEntry};
-use crate::audio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
@@ -48,12 +49,12 @@ pub async fn download_model_cmd(
     app: AppHandle,
     id: String,
     state: tauri::State<'_, Arc<AppState>>,
-) -> Result<bool, String> {
+) -> Result<bool, AppError> {
     let api_servers = state.api_servers.lock().unwrap().clone();
     let catalog = EngineCatalog::new(&api_servers);
     let model = catalog
         .model_by_id(&id)
-        .ok_or_else(|| format!("Model not found: {}", id))?;
+        .ok_or_else(|| AppError::Other(format!("Model not found: {}", id)))?;
 
     let state_clone = Arc::clone(&state);
     Ok(downloader::download_model(app, state_clone, model).await)
