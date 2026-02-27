@@ -12,7 +12,7 @@
 ## Refacto (Audit)
 
 - [ ] **17 Mutex individuels → grouper** — `state.rs` : regrouper en 2-3 groupes logiques (runtime, settings, history)
-- [ ] **Duplicate audio device listing** — `audio.rs` (cpal) et `audio_devices.rs` (CoreAudio). Consolider sur CoreAudio
+- [x] **Duplicate audio device listing** — ✅ Fixé : un seul AudioDevice (CoreAudio), filtré par cpal dans audio::list_usable_devices()
 - [x] **Regex recompilées en boucle** — ✅ Fixé : LazyLock pour hallucinations et dictation commands
 - [ ] **`unsafe impl Sync` sur RecordingState** — Fragile. Utiliser crossbeam channels ou garder le Mutex wrapper
 - [x] **`std::process::exit(0)` skip destructeurs** — ✅ Fixé : remplacé par `app.exit(0)`
