@@ -124,6 +124,9 @@ mod ca {
 pub fn list_input_devices() -> Vec<AudioDevice> {
     let default_id = get_default_input_device_id();
 
+    // SAFETY: CoreAudio property access via AudioObjectGetPropertyData(Size).
+    // All property addresses use well-known Apple constants. Returned device IDs
+    // are valid AudioObjectIDs for querying name, UID, and transport type.
     unsafe {
         // Get device count
         let mut size: u32 = 0;
@@ -181,6 +184,7 @@ fn get_default_input_device_id() -> u32 {
     }
 }
 
+/// SAFETY: device_id must be a valid AudioDeviceID from AudioObjectGetPropertyData.
 unsafe fn has_input_channels(device_id: u32) -> bool {
     let address = ca::AudioObjectPropertyAddress {
         mSelector: ca::kAudioDevicePropertyStreamConfiguration,
@@ -210,6 +214,8 @@ unsafe fn has_input_channels(device_id: u32) -> bool {
     total_channels > 0
 }
 
+/// SAFETY: device_id must be a valid AudioDeviceID. selector must be a valid property selector
+/// that returns a CFStringRef.
 unsafe fn get_string_property(device_id: u32, selector: u32) -> Option<String> {
     let address = ca::AudioObjectPropertyAddress {
         mSelector: selector,
@@ -275,6 +281,9 @@ static DEVICE_CHANGE_CALLBACK: Mutex<Option<Box<dyn Fn() + Send>>> = Mutex::new(
 pub fn start_device_change_listener(callback: impl Fn() + Send + 'static) {
     *DEVICE_CHANGE_CALLBACK.lock().unwrap() = Some(Box::new(callback));
 
+    // SAFETY: AudioObjectAddPropertyListener registers a C callback for device list changes.
+    // The callback reads from the static DEVICE_CHANGE_CALLBACK mutex. The listener lives
+    // for the process lifetime (CoreAudio retains it).
     unsafe {
         let address = ca::AudioObjectPropertyAddress {
             mSelector: ca::kAudioHardwarePropertyDevices,

@@ -13,19 +13,12 @@ pub struct HotkeyOption {
     pub label: &'static str,
 }
 
-#[allow(dead_code)]
 impl HotkeyOption {
-    // NX masks (unused but kept for reference)
-    const MASK_COMMAND: u64 = 0x00000100;
-    const MASK_ALTERNATE: u64 = 0x00000020;
-    const MASK_CONTROL: u64 = 0x00000001;
-    const MASK_SHIFT: u64 = 0x00000002;
-
-    // macOS CGEventFlags values (from IOKit/hidsystem)
-    const CG_MASK_COMMAND: u64 = 1 << 20; // 0x100000
-    const CG_MASK_ALTERNATE: u64 = 1 << 19; // 0x80000
-    const CG_MASK_CONTROL: u64 = 1 << 18; // 0x40000
-    const CG_MASK_SHIFT: u64 = 1 << 17; // 0x20000
+    // CGEventFlags masks (from CGEvent.h / IOKit/hidsystem)
+    const CG_MASK_COMMAND: u64 = 1 << 20; // kCGEventFlagMaskCommand = 0x100000
+    const CG_MASK_ALTERNATE: u64 = 1 << 19; // kCGEventFlagMaskAlternate = 0x80000
+    const CG_MASK_CONTROL: u64 = 1 << 18; // kCGEventFlagMaskControl = 0x40000
+    const CG_MASK_SHIFT: u64 = 1 << 17; // kCGEventFlagMaskShift = 0x20000
 
     pub const RIGHT_COMMAND: HotkeyOption = HotkeyOption {
         key_code: 0x36,
@@ -51,6 +44,7 @@ impl HotkeyOption {
         label: "Right Shift",
     };
 
+    #[allow(dead_code)] // will be used by hotkey settings UI
     pub const ALL: &'static [HotkeyOption] = &[
         Self::RIGHT_COMMAND,
         Self::RIGHT_OPTION,
@@ -67,6 +61,7 @@ impl HotkeyOption {
         }
     }
 
+    #[allow(dead_code)] // will be used by hotkey settings UI
     pub fn name(&self) -> &'static str {
         match self.key_code {
             0x3D => "right_option",
@@ -147,16 +142,18 @@ fn run_event_tap(
             return event;
         }
 
+        // SAFETY: Called from CGEventTap callback. `event` is a valid CGEventRef.
+        // CGEventGetIntegerValueField and CGEventGetFlags are CoreGraphics C functions.
+        // user_info is a leaked Box<Sender<HotkeyEvent>> — valid for the lifetime of the tap.
         unsafe {
-            // Get keycode from event
-            // CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode = 6)
             #[link(name = "CoreGraphics", kind = "framework")]
             extern "C" {
                 fn CGEventGetIntegerValueField(event: *mut c_void, field: u32) -> i64;
                 fn CGEventGetFlags(event: *mut c_void) -> u64;
             }
 
-            let key_code = CGEventGetIntegerValueField(event, 9) as u16; // kCGKeyboardEventKeycode = 9
+            // kCGKeyboardEventKeycode = 9 (CGEventField enum)
+            let key_code = CGEventGetIntegerValueField(event, 9) as u16;
             let flags = CGEventGetFlags(event);
 
             log::debug!("flagsChanged: keycode=0x{:02x} flags=0x{:x}", key_code, flags);
@@ -188,6 +185,10 @@ fn run_event_tap(
         event
     }
 
+    // SAFETY: CGEventTapCreate creates an active event tap for flagsChanged events.
+    // The callback pointer (tx_ptr) is a leaked Box<Sender> — lives until process exit.
+    // CFMachPortCreateRunLoopSource/CFRunLoopAddSource wire the tap into the current runloop.
+    // The loop re-enables the tap periodically (macOS may disable it on timeout).
     unsafe {
         #[link(name = "CoreGraphics", kind = "framework")]
         extern "C" {

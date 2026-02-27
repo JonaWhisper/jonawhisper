@@ -26,6 +26,8 @@ fn check_microphone_permission() -> PermissionStatus {
 
     // AVMediaTypeAudio = @"soun"
     let media_type = NSString::from_str("soun");
+    // SAFETY: AVCaptureDevice is an ObjC class with +authorizationStatusForMediaType: class method.
+    // Returns AVAuthorizationStatus (NSInteger). AVFoundation framework linked via build.rs.
     let status: isize =
         unsafe { msg_send![cls, authorizationStatusForMediaType: &*media_type] };
 
@@ -37,8 +39,10 @@ fn check_microphone_permission() -> PermissionStatus {
     }
 }
 
-/// Check accessibility via AXIsProcessTrusted.
+/// Check accessibility via AXIsProcessTrusted (ApplicationServices framework).
 fn check_accessibility_permission() -> PermissionStatus {
+    // SAFETY: AXIsProcessTrusted is a C function from ApplicationServices framework.
+    // Returns Boolean (true if process has accessibility permission).
     unsafe {
         #[link(name = "ApplicationServices", kind = "framework")]
         extern "C" {
@@ -57,16 +61,19 @@ fn check_accessibility_permission() -> PermissionStatus {
 /// We use listen-only (not active) to avoid interfering with event delivery to other apps.
 /// The actual hotkey monitor uses an active tap, but the permission requirement is the same.
 fn check_input_monitoring_permission() -> PermissionStatus {
-    unsafe {
-        extern "C" fn noop_callback(
-            _proxy: *mut c_void,
-            _event_type: u32,
-            event: *mut c_void,
-            _user_info: *mut c_void,
-        ) -> *mut c_void {
-            event
-        }
+    extern "C" fn noop_callback(
+        _proxy: *mut c_void,
+        _event_type: u32,
+        event: *mut c_void,
+        _user_info: *mut c_void,
+    ) -> *mut c_void {
+        event
+    }
 
+    // SAFETY: CGEventTapCreate is a CoreGraphics C function. We create a listen-only tap
+    // (options=1) that returns immediately. If tap creation fails (null), we lack permission.
+    // The returned CFMachPortRef is released immediately via CFRelease.
+    unsafe {
         #[link(name = "CoreGraphics", kind = "framework")]
         extern "C" {
             fn CGEventTapCreate(
@@ -82,7 +89,7 @@ fn check_input_monitoring_permission() -> PermissionStatus {
         let tap = CGEventTapCreate(
             1,           // kCGSessionEventTap
             0,           // kCGHeadInsertEventTap
-            1,           // kCGEventTapOptionListenOnly (safe — doesn't block other apps)
+            1,           // kCGEventTapOptionListenOnly
             1u64 << 12,  // CGEventMaskBit(kCGEventFlagsChanged)
             noop_callback,
             std::ptr::null_mut(),
@@ -137,6 +144,8 @@ fn request_microphone_access() {
         log::info!("Microphone access response: {}", granted.as_bool());
     });
 
+    // SAFETY: ObjC message send to AVCaptureDevice class method.
+    // The StackBlock is valid for the duration of this call (sync completion on macOS).
     unsafe {
         let _: () = msg_send![cls, requestAccessForMediaType: &*media_type, completionHandler: &block];
     }
@@ -144,6 +153,11 @@ fn request_microphone_access() {
 
 /// Trigger the accessibility permission prompt and open System Settings.
 fn request_accessibility_access() {
+    // SAFETY: All extern functions are from Apple's ApplicationServices/CoreFoundation frameworks.
+    // CFStringCreateWithCString creates a CFString from a C string.
+    // CFDictionaryCreate creates a dictionary with the "AXTrustedCheckOptionPrompt" key set to true.
+    // AXIsProcessTrustedWithOptions prompts the user for accessibility access.
+    // All CF objects are released after use.
     unsafe {
         #[link(name = "ApplicationServices", kind = "framework")]
         extern "C" {

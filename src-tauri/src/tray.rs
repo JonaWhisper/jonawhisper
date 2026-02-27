@@ -66,6 +66,9 @@ fn configure_pill_nswindow(win: &tauri::WebviewWindow) {
 
     let ns_win: *mut AnyObject = win.ns_window().unwrap() as *mut AnyObject;
 
+    // SAFETY: ns_win is a valid NSWindow pointer from Tauri's ns_window().
+    // All msg_send! calls use standard NSWindow/NSColor selectors.
+    // setLevel:3 = NSFloatingWindowLevel, collectionBehavior:17 = canJoinAllSpaces|stationary.
     unsafe {
         // isOpaque = false
         let _: () = msg_send![ns_win, setOpaque: false];
