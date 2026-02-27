@@ -226,7 +226,7 @@ class ModelManagerWindowController: NSWindowController {
 
     private func handleDeleteOnModel() -> Bool {
         guard let row = modelTableView?.selectedRow, row >= 0,
-              let model = modelFromRow(row) else { return false }
+              modelFromRow(row) != nil else { return false }
 
         let fakeButton = NSButton()
         fakeButton.tag = row
@@ -243,33 +243,33 @@ class ModelManagerWindowController: NSWindowController {
         pill?.showDownloading(model.label)
         modelTableView?.reloadData()
 
-        ModelDownloader.shared.download(model, progress: { [weak self] fraction in
-            DispatchQueue.main.async {
-                AppState.shared.downloadProgress = fraction
-                self?.pill?.updateDownloadProgress(fraction)
-                self?.updateProgressRow(for: model.id)
-            }
-        }, completion: { [weak self] success in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                AppState.shared.downloadingModelId = nil
-                AppState.shared.downloadProgress = 0
-                self.pill?.dismissDownload()
-
-                if success {
-                    ASRModelCatalog.shared.selectedModelId = model.id
-                    Log.info("Model \(model.id) downloaded and selected")
-                    NSSound(named: "Glass")?.play()
-                } else {
-                    Log.error("Failed to download model: \(model.id)")
-                    NSSound(named: "Basso")?.play()
+        Task { @MainActor [weak self] in
+            let success = await ModelDownloader.shared.download(model) { fraction in
+                DispatchQueue.main.async {
+                    AppState.shared.downloadProgress = fraction
+                    self?.pill?.updateDownloadProgress(fraction)
+                    self?.updateProgressRow(for: model.id)
                 }
-
-                let idx = max(0, self.engineTableView?.selectedRow ?? 0)
-                self.selectEngine(at: idx)
-                NotificationCenter.default.post(name: .modelDownloadCompleted, object: nil)
             }
-        })
+
+            guard let self = self else { return }
+            AppState.shared.downloadingModelId = nil
+            AppState.shared.downloadProgress = 0
+            self.pill?.dismissDownload()
+
+            if success {
+                ASRModelCatalog.shared.selectedModelId = model.id
+                Log.info("Model \(model.id) downloaded and selected")
+                NSSound(named: "Glass")?.play()
+            } else {
+                Log.error("Failed to download model: \(model.id)")
+                NSSound(named: "Basso")?.play()
+            }
+
+            let idx = max(0, self.engineTableView?.selectedRow ?? 0)
+            self.selectEngine(at: idx)
+            NotificationCenter.default.post(name: .modelDownloadCompleted, object: nil)
+        }
     }
 
     private func updateProgressRow(for modelId: String) {

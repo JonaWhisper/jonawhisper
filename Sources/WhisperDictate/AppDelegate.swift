@@ -357,13 +357,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        transcriber.transcribe(audioURL: audioURL) { [weak self] result in
+        Task { @MainActor [weak self] in
             guard let self = self else { return }
 
-            try? FileManager.default.removeItem(at: audioURL)
+            do {
+                let text = try await self.transcriber.transcribe(audioURL: audioURL)
+                try? FileManager.default.removeItem(at: audioURL)
 
-            switch result {
-            case .success(let text):
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
                     self.pasteService.paste(text: trimmed)
@@ -371,8 +371,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     NSSound(named: "Basso")?.play()
                 }
-
-            case .failure(let error):
+            } catch {
+                try? FileManager.default.removeItem(at: audioURL)
                 NSSound(named: "Basso")?.play()
                 Log.error("Transcription error: \(error)")
             }

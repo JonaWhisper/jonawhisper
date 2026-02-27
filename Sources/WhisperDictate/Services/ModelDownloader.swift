@@ -51,29 +51,37 @@ class ModelDownloader {
 
     // MARK: - Download entry point
 
-    func download(_ model: ASRModel, progress: @escaping (Double) -> Void, completion: @escaping (Bool) -> Void) {
+    func download(_ model: ASRModel, progress: @escaping (Double) -> Void) async -> Bool {
         try? FileManager.default.createDirectory(atPath: Self.pendingDir, withIntermediateDirectories: true)
         activeModelId = model.id
         try? model.id.data(using: .utf8)?.write(to: URL(fileURLWithPath: Self.pendingDownloadPath()))
 
-        switch model.downloadType {
-        case .singleFile:
-            downloadWithURLSession(model, isZip: false, progress: progress, completion: completion)
-        case .zipArchive:
-            downloadWithURLSession(model, isZip: true, progress: progress, completion: completion)
-        case .huggingFaceRepo:
-            downloadWithSubprocess(
-                executable: "/usr/bin/env",
-                arguments: ["huggingface-cli", "download", model.url],
-                model: model, progress: progress, completion: completion
-            )
-        case .command(let executable, let arguments):
-            downloadWithSubprocess(
-                executable: executable, arguments: arguments,
-                model: model, progress: progress, completion: completion
-            )
-        case .remoteAPI:
-            completion(true)
+        if case .remoteAPI = model.downloadType { return true }
+
+        return await withCheckedContinuation { continuation in
+            let complete: (Bool) -> Void = { success in
+                continuation.resume(returning: success)
+            }
+
+            switch model.downloadType {
+            case .singleFile:
+                self.downloadWithURLSession(model, isZip: false, progress: progress, completion: complete)
+            case .zipArchive:
+                self.downloadWithURLSession(model, isZip: true, progress: progress, completion: complete)
+            case .huggingFaceRepo:
+                self.downloadWithSubprocess(
+                    executable: "/usr/bin/env",
+                    arguments: ["huggingface-cli", "download", model.url],
+                    model: model, progress: progress, completion: complete
+                )
+            case .command(let executable, let arguments):
+                self.downloadWithSubprocess(
+                    executable: executable, arguments: arguments,
+                    model: model, progress: progress, completion: complete
+                )
+            case .remoteAPI:
+                complete(true)
+            }
         }
     }
 
@@ -189,15 +197,13 @@ class ModelDownloader {
             let success = process.terminationStatus == 0
             self.clearPendingState(for: model)
 
-            DispatchQueue.main.async {
-                if success {
-                    progress(1.0)
-                    Log.info("Downloaded model: \(model.id)")
-                } else {
-                    Log.error("Download failed for model: \(model.id)")
-                }
-                completion(success)
+            if success {
+                progress(1.0)
+                Log.info("Downloaded model: \(model.id)")
+            } else {
+                Log.error("Download failed for model: \(model.id)")
             }
+            completion(success)
         }
     }
 
