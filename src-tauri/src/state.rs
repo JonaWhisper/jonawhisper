@@ -133,7 +133,10 @@ impl Preferences {
             let _ = std::fs::create_dir_all(parent);
         }
         if let Ok(data) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::write(&path, data);
+            match std::fs::write(&path, &data) {
+                Ok(()) => log::info!("save_preferences: written to {}", path.display()),
+                Err(e) => log::error!("save_preferences: FAILED to write {}: {}", path.display(), e),
+            }
         }
     }
 }
@@ -169,6 +172,10 @@ impl Default for AppState {
 impl AppState {
     /// Save current preferences to disk.
     pub fn save_preferences(&self) {
+        log::info!("save_preferences: post_processing={}, hallucination_filter={}",
+            *self.post_processing_enabled.lock().unwrap(),
+            *self.hallucination_filter_enabled.lock().unwrap(),
+        );
         let prefs = Preferences {
             selected_model_id: self.selected_model_id.lock().unwrap().clone(),
             selected_language: self.selected_language.lock().unwrap().clone(),

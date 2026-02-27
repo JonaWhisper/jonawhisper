@@ -93,6 +93,11 @@ pub fn request_permission(kind: String) -> bool {
 
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
+    log::info!("get_settings: post_processing={}, hallucination_filter={}, llm_enabled={}",
+        *state.post_processing_enabled.lock().unwrap(),
+        *state.hallucination_filter_enabled.lock().unwrap(),
+        state.llm_config.lock().unwrap().enabled,
+    );
     let llm = state.llm_config.lock().unwrap();
     serde_json::json!({
         "app_locale": *state.app_locale.lock().unwrap(),
@@ -121,6 +126,7 @@ pub fn set_setting(
     state: tauri::State<'_, Arc<AppState>>,
     app: AppHandle,
 ) {
+    log::info!("set_setting: key={}, value={}", key, value);
     match key.as_str() {
         "app_locale" => *state.app_locale.lock().unwrap() = value,
         "post_processing_enabled" => {
@@ -145,6 +151,10 @@ pub fn set_setting(
         }
     }
     state.save_preferences();
+    log::info!("set_setting: saved. post_processing={}, hallucination_filter={}",
+        *state.post_processing_enabled.lock().unwrap(),
+        *state.hallucination_filter_enabled.lock().unwrap(),
+    );
     let _ = app.emit("settings-changed", &key);
 }
 

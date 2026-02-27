@@ -259,8 +259,8 @@ onUnmounted(() => {
           <div class="flex items-center justify-between gap-4">
             <Label class="text-sm shrink-0">{{ t('settings.postProcessing.enable') }}</Label>
             <Switch
-              :checked="store.postProcessingEnabled"
-              @update:checked="onPostProcessingChange"
+              :model-value="store.postProcessingEnabled"
+              @update:model-value="onPostProcessingChange"
             />
           </div>
 
@@ -271,15 +271,15 @@ onUnmounted(() => {
             <div class="flex items-center justify-between gap-4">
               <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
               <Switch
-                :checked="store.hallucinationFilterEnabled"
-                @update:checked="onHallucinationFilterChange"
+                :model-value="store.hallucinationFilterEnabled"
+                @update:model-value="onHallucinationFilterChange"
               />
             </div>
             <div class="flex items-center justify-between gap-4">
               <Label class="text-sm shrink-0">{{ t('settings.postProcessing.llm') }}</Label>
               <Switch
-                :checked="store.llmConfig.enabled"
-                @update:checked="onLlmEnabledChange"
+                :model-value="store.llmConfig.enabled"
+                @update:model-value="onLlmEnabledChange"
               />
             </div>
 
@@ -396,8 +396,8 @@ onUnmounted(() => {
             </div>
             <Switch
               class="shrink-0"
-              :checked="store.cancelShortcut === 'escape'"
-              @update:checked="(v: boolean) => onCancelShortcutChange(v ? 'escape' : 'none')"
+              :model-value="store.cancelShortcut === 'escape'"
+              @update:model-value="(v: boolean) => onCancelShortcutChange(v ? 'escape' : 'none')"
             />
           </div>
         </div>
