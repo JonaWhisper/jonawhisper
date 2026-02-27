@@ -17,6 +17,7 @@ const DOUBLE_TAP_MS: u64 = 500;
 const ERROR_DISPLAY_MS: u64 = 800;
 const SPECTRUM_INTERVAL_MS: u64 = 33;
 const ORPHAN_CLEANUP_SECS: u64 = 300;
+const CLIPBOARD_RESTORE_DELAY_MS: u64 = 300;
 
 // -- Audio commands for the dedicated audio thread --
 
@@ -205,7 +206,8 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         return;
     }
 
-    // Queue empty → restore clipboard and close pill
+    // Queue empty → wait for paste to be processed, then restore clipboard
+    tokio::time::sleep(Duration::from_millis(CLIPBOARD_RESTORE_DELAY_MS)).await;
     restore_saved_clipboard(app, state);
     if !*state.is_recording.lock().unwrap() {
         crate::tray::close_pill_window(app);
