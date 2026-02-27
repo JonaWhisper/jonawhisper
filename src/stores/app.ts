@@ -358,6 +358,7 @@ export const useAppStore = defineStore('app', () => {
 
     listen('transcription-error', () => {
       isTranscribing.value = false
+      queueCount.value = Math.max(0, queueCount.value - 1)
     })
 
     listen('transcription-cancelled', () => {

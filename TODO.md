@@ -2,8 +2,8 @@
 
 ## Bugs / Correctifs (Audit)
 
-- [ ] **CRITIQUE: Hotkey update tx dropped** — `_hotkey_update_tx` est ignoré dans `lib.rs:88`, changer le raccourci/cancel dans Settings n'a aucun effet jusqu'au redémarrage. Stocker le sender dans le state Tauri et envoyer `SetHotkey`/`SetCancelKey` depuis `set_setting`
-- [ ] **CRITIQUE: Device UID mismatch** — Le tray utilise CoreAudio UIDs réels, le recorder (`audio.rs`) match par nom cpal. La sélection de device retombe toujours sur le défaut. Unifier sur CoreAudio UIDs partout
+- [x] **CRITIQUE: Hotkey update tx dropped** — ✅ Fixé : sender stocké dans managed state, `set_setting` envoie `SetHotkey`/`SetCancelKey`
+- [x] **CRITIQUE: Device UID mismatch** — ✅ Fixé : unifié sur CoreAudio UIDs dans `audio.rs`
 - [ ] **TOCTOU races start/stop** — `is_recording` check-then-set sans garder le lock (`recording.rs:54-57, 77-80`). Garder le lock sur le check+set
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement
 - [ ] **`transcription-error` ne décrémente pas `queueCount`** — Le handler d'erreur oublie de décrémenter, `isBusy` reste true trop longtemps (`app.ts:359-361`)

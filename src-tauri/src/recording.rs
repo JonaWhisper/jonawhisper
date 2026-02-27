@@ -51,10 +51,13 @@ unsafe impl Sync for RecordingState {}
 // -- Recording lifecycle --
 
 pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
-    if *state.is_recording.lock().unwrap() {
-        return;
+    {
+        let mut is_recording = state.is_recording.lock().unwrap();
+        if *is_recording {
+            return;
+        }
+        *is_recording = true;
     }
-    *state.is_recording.lock().unwrap() = true;
     *state.transcription_cancelled.lock().unwrap() = false;
     rec.key_down_time = Some(Instant::now());
 
@@ -74,10 +77,13 @@ pub fn stop_recording_and_enqueue(
     state: &Arc<AppState>,
     rec: &mut RecordingState,
 ) {
-    if !*state.is_recording.lock().unwrap() {
-        return;
+    {
+        let mut is_recording = state.is_recording.lock().unwrap();
+        if !*is_recording {
+            return;
+        }
+        *is_recording = false;
     }
-    *state.is_recording.lock().unwrap() = false;
 
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
     let audio_path = match rec.audio_rx.recv() {
@@ -159,14 +165,16 @@ fn handle_short_tap(
 // -- Transcription queue processing --
 
 pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
-    if *state.is_transcribing.lock().unwrap() {
-        return;
+    {
+        let mut is_transcribing = state.is_transcribing.lock().unwrap();
+        if *is_transcribing {
+            return;
+        }
+        if state.transcription_queue.lock().unwrap().is_empty() {
+            return;
+        }
+        *is_transcribing = true;
     }
-    if state.transcription_queue.lock().unwrap().is_empty() {
-        return;
-    }
-
-    *state.is_transcribing.lock().unwrap() = true;
     let audio_path = match state.dequeue() {
         Some(p) => p,
         None => {
