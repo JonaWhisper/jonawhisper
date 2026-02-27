@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, type ASRModel, type EngineInfo } from '@/stores/app'
 import ModelCell from '@/components/ModelCell.vue'
@@ -30,12 +30,7 @@ const selectedEngineId = ref<string | null>(null)
 const showApiServerForm = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
-
-async function handleLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value === 'string') {
-    await store.selectLanguageAction(value)
-  }
-}
+const languageWarning = ref<string | null>(null)
 
 const filteredModels = computed(() => {
   if (!selectedEngineId.value) return store.models
@@ -46,8 +41,24 @@ const selectedEngineInfo = computed(() => {
   return store.engines.find(e => e.id === selectedEngineId.value)
 })
 
+// Languages filtered to the currently selected engine
+const availableLanguages = computed(() => {
+  const engine = store.engines.find(e => {
+    const model = store.models.find(m => m.id === store.selectedModelId)
+    return model && e.id === model.engine_id
+  })
+  if (!engine) return store.languages
+  return store.languages.filter(l => engine.supported_language_codes.includes(l.code))
+})
+
 function selectEngine(engine: EngineInfo) {
   selectedEngineId.value = engine.id
+}
+
+async function handleLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value === 'string') {
+    await store.selectLanguageAction(value)
+  }
 }
 
 async function handleDownload(model: ASRModel) {
@@ -55,6 +66,15 @@ async function handleDownload(model: ASRModel) {
 }
 
 async function handleSelect(model: ASRModel) {
+  // Check language compatibility before selecting
+  const engine = store.engines.find(e => e.id === model.engine_id)
+  if (engine && store.selectedLanguage !== 'auto') {
+    if (!engine.supported_language_codes.includes(store.selectedLanguage)) {
+      const langLabel = store.languages.find(l => l.code === store.selectedLanguage)?.label || store.selectedLanguage
+      languageWarning.value = t('modelManager.languageWarning', [langLabel])
+      await store.selectLanguageAction('auto')
+    }
+  }
   await store.selectModel(model.id)
 }
 
@@ -70,6 +90,13 @@ async function confirmDelete() {
   showDeleteConfirm.value = false
   deleteTarget.value = null
 }
+
+// Auto-dismiss language warning
+watch(languageWarning, (val) => {
+  if (val) {
+    setTimeout(() => { languageWarning.value = null }, 4000)
+  }
+})
 
 onMounted(async () => {
   await Promise.all([store.fetchEngines(), store.fetchModels(), store.fetchLanguages()])
@@ -132,7 +159,7 @@ onMounted(async () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem
-              v-for="lang in store.languages"
+              v-for="lang in availableLanguages"
               :key="lang.code"
               :value="lang.code"
             >
@@ -142,9 +169,21 @@ onMounted(async () => {
         </Select>
       </div>
 
-      <h2 class="text-lg font-semibold mb-4">
-        {{ selectedEngineInfo?.name || t('modelManager.models') }}
-      </h2>
+      <!-- Language warning -->
+      <div v-if="languageWarning" class="mb-4 px-3 py-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-sm">
+        {{ languageWarning }}
+      </div>
+
+      <!-- Engine header with install hint -->
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold">
+          {{ selectedEngineInfo?.name || t('modelManager.models') }}
+        </h2>
+        <div v-if="selectedEngineInfo && !selectedEngineInfo.available && selectedEngineInfo.install_hint" class="mt-1 text-sm text-muted-foreground">
+          {{ t('modelManager.installWith') }}
+          <code class="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">{{ selectedEngineInfo.install_hint }}</code>
+        </div>
+      </div>
 
       <div class="space-y-2">
         <ModelCell
@@ -161,7 +200,7 @@ onMounted(async () => {
       </div>
 
       <div v-if="filteredModels.length === 0" class="text-muted-foreground text-sm py-8 text-center">
-        {{ t('modelManager.notInstalled') }}
+        {{ t('modelManager.noModels') }}
       </div>
     </div>
 

@@ -91,6 +91,7 @@ pub struct EngineInfo {
     pub install_hint: String,
     pub available: bool,
     pub tool_name: Option<String>,
+    pub supported_language_codes: Vec<String>,
 }
 
 // -- Errors --
@@ -192,6 +193,7 @@ impl EngineCatalog {
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or(p)
                 }),
+                supported_language_codes: e.supported_languages().into_iter().map(|l| l.code).collect(),
             })
             .collect()
     }

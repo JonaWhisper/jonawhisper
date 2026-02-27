@@ -15,6 +15,7 @@ export interface EngineInfo {
   install_hint: string
   available: boolean
   tool_name: string | null
+  supported_language_codes: string[]
 }
 
 export interface ASRModel {
