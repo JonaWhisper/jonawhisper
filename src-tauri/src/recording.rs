@@ -188,7 +188,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
                         trimmed.to_string()
                     };
 
-                    paste::paste_text(&processed);
+                    paste::paste_text(app, &processed);
                     state.add_history(processed.clone());
                     platform::play_sound("Glass");
 
