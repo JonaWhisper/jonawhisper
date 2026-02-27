@@ -38,13 +38,9 @@ pub enum AudioReply {
 pub struct RecordingState {
     key_down_time: Option<Instant>,
     last_short_tap_time: Option<Instant>,
-    audio_tx: std::sync::mpsc::Sender<AudioCmd>,
-    audio_rx: std::sync::mpsc::Receiver<AudioReply>,
+    audio_tx: crossbeam_channel::Sender<AudioCmd>,
+    audio_rx: crossbeam_channel::Receiver<AudioReply>,
 }
-
-// SAFETY: The channel endpoints are Send+Sync safe
-unsafe impl Send for RecordingState {}
-unsafe impl Sync for RecordingState {}
 
 // -- Recording lifecycle --
 
@@ -370,16 +366,16 @@ pub fn cleanup_orphan_audio_files() {
 
 /// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error).
 type AudioThreadHandles = (
-    std::sync::mpsc::Sender<AudioCmd>,
+    crossbeam_channel::Sender<AudioCmd>,
     Arc<std::sync::Mutex<Vec<f32>>>,
-    std::sync::mpsc::Receiver<AudioReply>,
+    crossbeam_channel::Receiver<AudioReply>,
     Arc<AtomicBool>,
 );
 
 /// Spawns the dedicated audio thread (cpal::Stream is not Send).
 pub fn spawn_audio_thread() -> AudioThreadHandles {
-    let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<AudioCmd>();
-    let (reply_tx, reply_rx) = std::sync::mpsc::channel::<AudioReply>();
+    let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded::<AudioCmd>();
+    let (reply_tx, reply_rx) = crossbeam_channel::unbounded::<AudioReply>();
     let spectrum_data = Arc::new(std::sync::Mutex::new(vec![0.0f32; 12]));
     let spectrum_clone = spectrum_data.clone();
 
@@ -420,7 +416,7 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
 }
 
 pub fn spawn_hotkey_handler(
-    hotkey_rx: std::sync::mpsc::Receiver<hotkey::HotkeyEvent>,
+    hotkey_rx: crossbeam_channel::Receiver<hotkey::HotkeyEvent>,
     app: AppHandle,
     state: Arc<AppState>,
     rec_state: Arc<std::sync::Mutex<RecordingState>>,
@@ -464,7 +460,7 @@ pub fn spawn_hotkey_handler(
 pub fn spawn_spectrum_emitter(
     app: AppHandle,
     state: Arc<AppState>,
-    cmd_tx: std::sync::mpsc::Sender<AudioCmd>,
+    cmd_tx: crossbeam_channel::Sender<AudioCmd>,
     spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
 ) {
@@ -499,11 +495,11 @@ pub fn spawn_spectrum_emitter(
 }
 
 /// Wrapper around audio command sender for mic test (managed by Tauri).
-pub struct MicTestSender(pub std::sync::Mutex<std::sync::mpsc::Sender<AudioCmd>>);
+pub struct MicTestSender(pub std::sync::Mutex<crossbeam_channel::Sender<AudioCmd>>);
 
 pub fn new_recording_state(
-    cmd_tx: std::sync::mpsc::Sender<AudioCmd>,
-    reply_rx: std::sync::mpsc::Receiver<AudioReply>,
+    cmd_tx: crossbeam_channel::Sender<AudioCmd>,
+    reply_rx: crossbeam_channel::Receiver<AudioReply>,
 ) -> RecordingState {
     RecordingState {
         key_down_time: None,

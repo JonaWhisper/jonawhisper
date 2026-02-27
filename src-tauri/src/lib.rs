@@ -18,7 +18,7 @@ use tauri::Manager;
 
 /// Wrapper to store the hotkey update channel sender in Tauri managed state.
 pub struct HotkeyUpdateSender(
-    pub std::sync::Mutex<std::sync::mpsc::Sender<platform::hotkey::HotkeyUpdate>>,
+    pub std::sync::Mutex<crossbeam_channel::Sender<platform::hotkey::HotkeyUpdate>>,
 );
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

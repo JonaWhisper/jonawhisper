@@ -3,7 +3,7 @@
 //! by watching flagsChanged events — same approach as the Swift KeyMonitor.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 
 /// Hotkey options matching the Swift HotkeyOption
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -107,9 +107,9 @@ pub fn start_monitor(
     initial_hotkey: HotkeyOption,
     initial_cancel_key: u16,
     enabled: Arc<AtomicBool>,
-) -> (mpsc::Receiver<HotkeyEvent>, mpsc::Sender<HotkeyUpdate>) {
-    let (event_tx, event_rx) = mpsc::channel::<HotkeyEvent>();
-    let (update_tx, update_rx) = mpsc::channel::<HotkeyUpdate>();
+) -> (crossbeam_channel::Receiver<HotkeyEvent>, crossbeam_channel::Sender<HotkeyUpdate>) {
+    let (event_tx, event_rx) = crossbeam_channel::unbounded::<HotkeyEvent>();
+    let (update_tx, update_rx) = crossbeam_channel::unbounded::<HotkeyUpdate>();
 
     std::thread::spawn(move || {
         // Wait until monitoring is enabled (permissions confirmed)
@@ -127,8 +127,8 @@ pub fn start_monitor(
 fn run_event_tap(
     initial_hotkey: HotkeyOption,
     initial_cancel_key: u16,
-    event_tx: mpsc::Sender<HotkeyEvent>,
-    update_rx: mpsc::Receiver<HotkeyUpdate>,
+    event_tx: crossbeam_channel::Sender<HotkeyEvent>,
+    update_rx: crossbeam_channel::Receiver<HotkeyUpdate>,
 ) {
     use std::os::raw::c_void;
     use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
@@ -185,7 +185,7 @@ fn run_event_tap(
             if event_type == KEY_DOWN {
                 let cancel_code = CANCEL_KEY_CODE.load(Ordering::SeqCst);
                 if cancel_code != 0 && key_code == cancel_code {
-                    let tx = &*(user_info as *const mpsc::Sender<HotkeyEvent>);
+                    let tx = &*(user_info as *const crossbeam_channel::Sender<HotkeyEvent>);
                     log::debug!("Cancel key pressed (code=0x{:02x})", key_code);
                     let _ = tx.send(HotkeyEvent::CancelPressed);
                 }
@@ -200,7 +200,7 @@ fn run_event_tap(
             let expected_mask = FLAG_MASK.load(Ordering::SeqCst);
 
             if key_code == expected_code {
-                let tx = &*(user_info as *const mpsc::Sender<HotkeyEvent>);
+                let tx = &*(user_info as *const crossbeam_channel::Sender<HotkeyEvent>);
 
                 if (flags & expected_mask) != 0 {
                     // Key pressed
@@ -323,9 +323,9 @@ pub fn start_monitor(
     _initial_hotkey: HotkeyOption,
     _initial_cancel_key: u16,
     _enabled: Arc<AtomicBool>,
-) -> (mpsc::Receiver<HotkeyEvent>, mpsc::Sender<HotkeyUpdate>) {
-    let (_event_tx, event_rx) = mpsc::channel();
-    let (update_tx, _update_rx) = mpsc::channel();
+) -> (crossbeam_channel::Receiver<HotkeyEvent>, crossbeam_channel::Sender<HotkeyUpdate>) {
+    let (_event_tx, event_rx) = crossbeam_channel::unbounded();
+    let (update_tx, _update_rx) = crossbeam_channel::unbounded();
     log::warn!("Hotkey monitoring not implemented on this platform");
     (event_rx, update_tx)
 }
