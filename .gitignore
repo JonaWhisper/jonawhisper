@@ -25,3 +25,6 @@ dist-ssr
 
 # Build output
 build/
+
+# Rust build artifacts
+src-tauri/target/
