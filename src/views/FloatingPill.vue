@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
 const canvas = ref<HTMLCanvasElement | null>(null)
 let animFrame = 0
 let dotPhase = 0
+let unlistenMode: UnlistenFn | null = null
 
 type PillMode = 'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'
 
-const mode = computed<PillMode>(() => {
-  if (store.isRecording) return 'recording'
-  if (store.isTranscribing) return 'transcribing'
-  if (store.downloadingModelId) return 'downloading'
-  return 'idle'
-})
+const mode = ref<PillMode>('recording')
 
 const smoothedSpectrum = ref<number[]>(new Array(12).fill(0))
 
@@ -171,17 +168,21 @@ function drawError(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.stroke()
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Ensure transparent background for pill window
   document.documentElement.style.background = 'transparent'
   document.body.style.background = 'transparent'
   document.body.style.margin = '0'
   document.body.style.overflow = 'hidden'
+  unlistenMode = await listen<string>('pill-mode', (event) => {
+    mode.value = event.payload as PillMode
+  })
   animFrame = requestAnimationFrame(draw)
 })
 
 onUnmounted(() => {
   cancelAnimationFrame(animFrame)
+  unlistenMode?.()
 })
 </script>
 

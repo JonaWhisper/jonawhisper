@@ -52,6 +52,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
 
     platform::play_sound("Tink");
     crate::tray::open_pill_window(app);
+    let _ = app.emit("pill-mode", "recording");
     let _ = app.emit("recording-started", ());
 }
 
@@ -92,7 +93,13 @@ pub fn stop_recording_and_enqueue(
         }
         rec.last_short_tap_time = Some(Instant::now());
 
-        crate::tray::close_pill_window(app);
+        let is_transcribing = *state.is_transcribing.lock().unwrap();
+        let queue_empty = state.transcription_queue.lock().unwrap().is_empty();
+        if !is_transcribing && queue_empty {
+            crate::tray::close_pill_window(app);
+        } else {
+            let _ = app.emit("pill-mode", "transcribing");
+        }
         let _ = app.emit("recording-stopped", ());
         return;
     }
@@ -114,6 +121,8 @@ pub fn stop_recording_and_enqueue(
         "recording-stopped",
         serde_json::json!({ "queue_count": count }),
     );
+
+    let _ = app.emit("pill-mode", "transcribing");
 
     let app_clone = app.clone();
     let state_clone = Arc::clone(state);
@@ -205,14 +214,29 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
 
     *state.is_transcribing.lock().unwrap() = false;
 
-    if !had_error {
+    // Error → show error 800ms then close
+    if had_error {
+        let _ = app.emit("pill-mode", "error");
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            crate::tray::close_pill_window(&app_clone);
+        });
+        return;
+    }
+
+    // Success → continue queue or close
+    if !*state.transcription_cancelled.lock().unwrap()
+        && !state.transcription_queue.lock().unwrap().is_empty()
+    {
         let app_clone = app.clone();
         let state_clone = Arc::clone(state);
         Box::pin(process_next_in_queue(&app_clone, &state_clone)).await;
+        return;
     }
 
-    // Close pill when nothing left to do
-    if !*state.is_recording.lock().unwrap() && !*state.is_transcribing.lock().unwrap() {
+    // Queue empty, not recording → close pill
+    if !*state.is_recording.lock().unwrap() {
         crate::tray::close_pill_window(app);
     }
 }
@@ -223,8 +247,14 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
     }
     *state.transcription_cancelled.lock().unwrap() = true;
     platform::play_sound("Funk");
-    crate::tray::close_pill_window(app);
+    let _ = app.emit("pill-mode", "error");
     let _ = app.emit("transcription-cancelled", ());
+    // Close after 800ms error animation
+    let app_clone = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(800));
+        crate::tray::close_pill_window(&app_clone);
+    });
 }
 
 pub fn cleanup_orphan_audio_files() {
