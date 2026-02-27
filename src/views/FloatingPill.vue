@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
+import { emit } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
@@ -167,13 +168,15 @@ function drawError(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.stroke()
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Ensure transparent background for pill window
   document.documentElement.style.background = 'transparent'
   document.body.style.background = 'transparent'
   document.body.style.margin = '0'
   document.body.style.overflow = 'hidden'
   animFrame = requestAnimationFrame(draw)
+  // Signal to Rust that the webview is ready to be shown
+  await emit('pill-ready')
 })
 
 onUnmounted(() => {

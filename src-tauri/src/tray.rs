@@ -5,13 +5,12 @@ use std::sync::Arc;
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
-    AppHandle, Manager, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
 const PILL_WIDTH: f64 = 140.0;
 const PILL_HEIGHT: f64 = 56.0;
 const PILL_TOP_OFFSET: f64 = 40.0;
-const PILL_SHOW_DELAY_MS: u64 = 150;
 
 fn get_state(app: &AppHandle) -> Arc<AppState> {
     app.state::<Arc<AppState>>().inner().clone()
@@ -52,10 +51,9 @@ pub fn open_pill_window(app: &AppHandle) {
                 #[cfg(target_os = "macos")]
                 configure_pill_nswindow(&win);
 
-                // Delay show to let webview render (avoids white flash)
+                // Show when the webview signals it's ready (avoids white flash)
                 let handle_for_show = handle.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(PILL_SHOW_DELAY_MS));
+                handle.once("pill-ready", move |_| {
                     if let Some(w) = handle_for_show.get_webview_window("pill") {
                         let _ = w.show();
                     }
@@ -278,7 +276,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .icon(app.default_window_icon().unwrap().clone())
         .icon_as_template(true)
         .tooltip("WhisperDictate")
-        .menu(&menu)
         .on_menu_event(move |app, event| {
             let id = event.id().0.as_str();
             match id {
@@ -304,6 +301,11 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .build(app)?;
+
+    // Attach menu after build (avoids macOS first-click-closes quirk)
+    if let Some(tray) = app.tray_by_id("main") {
+        let _ = tray.set_menu(Some(menu));
+    }
 
     // Rebuild menu on audio device changes
     let app_handle = app.clone();
