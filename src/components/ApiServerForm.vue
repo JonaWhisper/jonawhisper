@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, type ApiServerConfig } from '../stores/app'
+import { useAppStore, type ApiServerConfig } from '@/stores/app'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -10,6 +20,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const open = ref(true)
 const name = ref('')
 const url = ref('')
 const apiKey = ref('')
@@ -38,69 +49,48 @@ async function save() {
   await store.addApiServer(config)
   emit('close')
 }
+
+function handleOpenChange(value: boolean) {
+  if (!value) emit('close')
+}
 </script>
 
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-background border border-border rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
-      <h3 class="text-lg font-semibold mb-4">{{ t('modelManager.addApiServer') }}</h3>
+  <Dialog :open="open" @update:open="handleOpenChange">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>{{ t('modelManager.addApiServer') }}</DialogTitle>
+      </DialogHeader>
 
       <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">{{ t('apiServer.name') }}</label>
-          <input
-            v-model="name"
-            :placeholder="t('apiServer.namePlaceholder')"
-            class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p v-if="errors.name" class="text-xs text-destructive mt-1">{{ errors.name }}</p>
+        <div class="space-y-2">
+          <Label>{{ t('apiServer.name') }}</Label>
+          <Input v-model="name" :placeholder="t('apiServer.namePlaceholder')" />
+          <p v-if="errors.name" class="text-xs text-destructive">{{ errors.name }}</p>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium mb-1">{{ t('apiServer.url') }}</label>
-          <input
-            v-model="url"
-            :placeholder="t('apiServer.urlPlaceholder')"
-            class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p v-if="errors.url" class="text-xs text-destructive mt-1">{{ errors.url }}</p>
+        <div class="space-y-2">
+          <Label>{{ t('apiServer.url') }}</Label>
+          <Input v-model="url" :placeholder="t('apiServer.urlPlaceholder')" />
+          <p v-if="errors.url" class="text-xs text-destructive">{{ errors.url }}</p>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium mb-1">{{ t('apiServer.apiKey') }}</label>
-          <input
-            v-model="apiKey"
-            type="password"
-            :placeholder="t('apiServer.apiKeyPlaceholder')"
-            class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+        <div class="space-y-2">
+          <Label>{{ t('apiServer.apiKey') }}</Label>
+          <Input v-model="apiKey" type="password" :placeholder="t('apiServer.apiKeyPlaceholder')" />
         </div>
 
-        <div>
-          <label class="block text-sm font-medium mb-1">{{ t('apiServer.model') }}</label>
-          <input
-            v-model="model"
-            :placeholder="t('apiServer.modelPlaceholder')"
-            class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p v-if="errors.model" class="text-xs text-destructive mt-1">{{ errors.model }}</p>
+        <div class="space-y-2">
+          <Label>{{ t('apiServer.model') }}</Label>
+          <Input v-model="model" :placeholder="t('apiServer.modelPlaceholder')" />
+          <p v-if="errors.model" class="text-xs text-destructive">{{ errors.model }}</p>
         </div>
       </div>
 
-      <div class="flex gap-2 justify-end mt-6">
-        <button
-          @click="emit('close')"
-          class="px-4 py-2 text-sm rounded-md border border-border hover:bg-accent transition-colors"
-        >
-          {{ t('modelManager.cancel') }}
-        </button>
-        <button
-          @click="save"
-          class="px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          {{ t('modelManager.save') }}
-        </button>
-      </div>
-    </div>
-  </div>
+      <DialogFooter>
+        <Button variant="outline" @click="emit('close')">{{ t('modelManager.cancel') }}</Button>
+        <Button @click="save">{{ t('modelManager.save') }}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

@@ -1,9 +1,27 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, type ASRModel, type EngineInfo } from '../stores/app'
-import ModelCell from '../components/ModelCell.vue'
-import ApiServerForm from '../components/ApiServerForm.vue'
+import { useAppStore, type ASRModel, type EngineInfo } from '@/stores/app'
+import ModelCell from '@/components/ModelCell.vue'
+import ApiServerForm from '@/components/ApiServerForm.vue'
+import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -13,8 +31,10 @@ const showApiServerForm = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
 
-async function handleLanguageChange(code: string) {
-  await store.selectLanguageAction(code)
+async function handleLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value === 'string') {
+    await store.selectLanguageAction(value)
+  }
 }
 
 const filteredModels = computed(() => {
@@ -47,11 +67,6 @@ async function confirmDelete() {
   if (deleteTarget.value) {
     await store.deleteModel(deleteTarget.value.id)
   }
-  showDeleteConfirm.value = false
-  deleteTarget.value = null
-}
-
-function cancelDelete() {
   showDeleteConfirm.value = false
   deleteTarget.value = null
 }
@@ -100,12 +115,9 @@ onMounted(async () => {
 
       <!-- Add API Server button -->
       <div class="p-3 mt-2">
-        <button
-          @click="showApiServerForm = true"
-          class="w-full text-sm px-3 py-1.5 rounded-md border border-border text-foreground hover:bg-accent transition-colors"
-        >
+        <Button variant="outline" size="sm" class="w-full" @click="showApiServerForm = true">
           + {{ t('modelManager.addApiServer') }}
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -114,19 +126,20 @@ onMounted(async () => {
       <!-- Language selector -->
       <div class="flex items-center gap-2 mb-4">
         <label class="text-sm font-medium text-muted-foreground">{{ t('modelManager.language') }}</label>
-        <select
-          :value="store.selectedLanguage"
-          @change="handleLanguageChange(($event.target as HTMLSelectElement).value)"
-          class="text-sm px-2 py-1 rounded-md border border-border bg-background text-foreground"
-        >
-          <option
-            v-for="lang in store.languages"
-            :key="lang.code"
-            :value="lang.code"
-          >
-            {{ lang.label }}
-          </option>
-        </select>
+        <Select :model-value="store.selectedLanguage" @update:model-value="handleLanguageChange">
+          <SelectTrigger class="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="lang in store.languages"
+              :key="lang.code"
+              :value="lang.code"
+            >
+              {{ lang.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <h2 class="text-lg font-semibold mb-4">
@@ -153,28 +166,22 @@ onMounted(async () => {
     </div>
 
     <!-- Delete confirmation dialog -->
-    <div v-if="showDeleteConfirm" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-background border border-border rounded-lg p-6 max-w-sm mx-4 shadow-xl">
-        <h3 class="text-lg font-semibold mb-2">{{ t('modelManager.deleteConfirm') }}</h3>
-        <p class="text-sm text-muted-foreground mb-4">
-          {{ t('modelManager.deleteConfirmDesc', [deleteTarget?.label || '']) }}
-        </p>
-        <div class="flex gap-2 justify-end">
-          <button
-            @click="cancelDelete"
-            class="px-4 py-2 text-sm rounded-md border border-border hover:bg-accent transition-colors"
-          >
-            {{ t('modelManager.cancel') }}
-          </button>
-          <button
-            @click="confirmDelete"
-            class="px-4 py-2 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-          >
+    <AlertDialog :open="showDeleteConfirm" @update:open="showDeleteConfirm = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('modelManager.deleteConfirm') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('modelManager.deleteConfirmDesc', [deleteTarget?.label || '']) }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="showDeleteConfirm = false">{{ t('modelManager.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction @click="confirmDelete" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             {{ t('modelManager.delete') }}
-          </button>
-        </div>
-      </div>
-    </div>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <!-- API Server form dialog -->
     <ApiServerForm
