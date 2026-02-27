@@ -18,15 +18,15 @@
 - [x] **`std::process::exit(0)` skip destructeurs** — ✅ Fixé : remplacé par `app.exit(0)`
 - [x] **`AudioReply::Spectrum` dead code** — ✅ Supprimé
 - [x] **Recursive async → while loop** — ✅ Fixé : boucle while dans process_next_in_queue
-- [ ] **`reqwest::Client` recréé à chaque appel LLM** — Créer un client partagé
-- [ ] **`VecDeque` pour la queue** — `state.rs:199`
+- [x] **`reqwest::Client` recréé à chaque appel LLM** — ✅ Fixé : LazyLock<reqwest::Client>
+- [x] **`VecDeque` pour la queue** — ✅ Fixé : VecDeque avec push_back/pop_front
 - [x] **`paste_text` bloque le runtime async** — ✅ Fixé : exécuté via spawn_blocking
 - [ ] **Guard double `init()`** — Protéger contre listeners dupliqués
 - [ ] **Download state dual ownership** — Choisir promise OU event, pas les deux
-- [ ] **Duplicate `spectrum-data` listener** — Event distinct pour mic test
+- [x] **Duplicate `spectrum-data` listener** — ✅ Fixé : event `mic-test-spectrum` séparé
 - [ ] **Optimistic update sans rollback** — Restaurer l'état si invoke échoue
 - [x] **Clés i18n mortes** — ✅ Supprimé `settings.postProcessing.llmConfigure`
-- [ ] **`selected_model_id`/`selected_language` redondant** — Dans get_settings ET get_app_state
+- [x] **`selected_model_id`/`selected_language` redondant** — ✅ Fixé : retiré de get_app_state, unique dans get_settings
 
 ## Fonctionnalités
 
