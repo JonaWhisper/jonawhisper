@@ -8,6 +8,9 @@
 ## UX / Polish
 
 - [ ] **README** — Écrire un README propre pour le repo (description, screenshots, install, usage, build)
+- [ ] **Model Manager : langue en haut** — Déplacer la sélection de langue en haut de la fenêtre (actuellement en bas, se perd quand la liste de modèles grandit)
+- [ ] **Model Manager : bouton ajouter serveur** — Mieux positionner le bouton d'ajout pour qu'il reste accessible avec une longue liste de modèles
+- [ ] **Model Manager : status moteurs installés** — Vérifier que les moteurs déjà installés affichent bien leur status (pas juste les non-installés qui montrent l'install hint)
 
 ## Fonctionnalités
 
@@ -15,6 +18,8 @@
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue sur disque
 - [ ] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches
 - [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique de providers. Chaque provider déclare ses capacités : transcription audio→texte, nettoyage texte→texte, ou les deux. Config serveur partagée (URL, clé API, modèle). Support local (Ollama, llama.cpp) en plus des API distantes.
+  - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et liste de modèles prédéfinis (dropdown), champs non-modifiables. Champs custom (URL, modèle libre) uniquement pour serveurs locaux/custom.
+  - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings (éviter la duplication du formulaire d'ajout de serveur)
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon micro intégré/AirPods/casque/USB
 
 ## Technique / Infra
