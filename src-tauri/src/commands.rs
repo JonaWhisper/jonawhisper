@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 /// Build an engine catalog from current state.
 fn catalog(state: &Arc<AppState>) -> EngineCatalog {
-    let api_servers = state.api_servers.lock().unwrap().clone();
+    let api_servers = state.settings.lock().unwrap().api_servers.clone();
     EngineCatalog::new(&api_servers)
 }
 
@@ -40,7 +40,7 @@ pub fn get_downloaded_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<engi
 
 #[tauri::command]
 pub fn select_model(id: String, state: tauri::State<'_, Arc<AppState>>) {
-    *state.selected_model_id.lock().unwrap() = id;
+    state.settings.lock().unwrap().selected_model_id = id;
     state.save_preferences();
 }
 
@@ -73,7 +73,7 @@ pub fn get_languages(state: tauri::State<'_, Arc<AppState>>) -> Vec<Language> {
 
 #[tauri::command]
 pub fn select_language(code: String, state: tauri::State<'_, Arc<AppState>>) {
-    *state.selected_language.lock().unwrap() = code;
+    state.settings.lock().unwrap().selected_language = code;
     state.save_preferences();
 }
 
@@ -93,28 +93,26 @@ pub fn request_permission(kind: String) -> bool {
 
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
+    let s = state.settings.lock().unwrap();
     log::info!("get_settings: post_processing={}, hallucination_filter={}, llm_enabled={}",
-        *state.post_processing_enabled.lock().unwrap(),
-        *state.hallucination_filter_enabled.lock().unwrap(),
-        state.llm_config.lock().unwrap().enabled,
+        s.post_processing_enabled, s.hallucination_filter_enabled, s.llm_config.enabled,
     );
-    let llm = state.llm_config.lock().unwrap();
     serde_json::json!({
-        "app_locale": *state.app_locale.lock().unwrap(),
-        "post_processing_enabled": *state.post_processing_enabled.lock().unwrap(),
-        "hallucination_filter_enabled": *state.hallucination_filter_enabled.lock().unwrap(),
-        "hotkey": *state.hotkey_option.lock().unwrap(),
-        "selected_input_device_uid": *state.selected_input_device_uid.lock().unwrap(),
-        "selected_model_id": *state.selected_model_id.lock().unwrap(),
-        "selected_language": *state.selected_language.lock().unwrap(),
-        "cancel_shortcut": *state.cancel_shortcut.lock().unwrap(),
-        "recording_mode": *state.recording_mode.lock().unwrap(),
+        "app_locale": s.app_locale,
+        "post_processing_enabled": s.post_processing_enabled,
+        "hallucination_filter_enabled": s.hallucination_filter_enabled,
+        "hotkey": s.hotkey_option,
+        "selected_input_device_uid": s.selected_input_device_uid,
+        "selected_model_id": s.selected_model_id,
+        "selected_language": s.selected_language,
+        "cancel_shortcut": s.cancel_shortcut,
+        "recording_mode": s.recording_mode,
         "llm_config": {
-            "enabled": llm.enabled,
-            "provider": llm.provider,
-            "api_url": llm.api_url,
-            "api_key": llm.api_key,
-            "model": llm.model,
+            "enabled": s.llm_config.enabled,
+            "provider": s.llm_config.provider,
+            "api_url": s.llm_config.api_url,
+            "api_key": s.llm_config.api_key,
+            "model": s.llm_config.model,
         },
     })
 }
@@ -130,42 +128,37 @@ pub fn set_setting(
     use crate::platform::hotkey;
 
     log::info!("set_setting: key={}, value={}", key, value);
+    {
+        let mut s = state.settings.lock().unwrap();
+        match key.as_str() {
+            "app_locale" => s.app_locale = value.clone(),
+            "post_processing_enabled" => s.post_processing_enabled = value == "true",
+            "hallucination_filter_enabled" => s.hallucination_filter_enabled = value == "true",
+            "hotkey" => s.hotkey_option = value.clone(),
+            "cancel_shortcut" => s.cancel_shortcut = value.clone(),
+            "recording_mode" => s.recording_mode = value.clone(),
+            "selected_input_device_uid" => {
+                s.selected_input_device_uid = if value.is_empty() { None } else { Some(value.clone()) };
+            }
+            _ => {
+                log::warn!("Unknown setting key: {}", key);
+                return;
+            }
+        }
+    }
+    // Send hotkey updates outside the settings lock
     match key.as_str() {
-        "app_locale" => *state.app_locale.lock().unwrap() = value,
-        "post_processing_enabled" => {
-            *state.post_processing_enabled.lock().unwrap() = value == "true";
-        }
-        "hallucination_filter_enabled" => {
-            *state.hallucination_filter_enabled.lock().unwrap() = value == "true";
-        }
         "hotkey" => {
-            *state.hotkey_option.lock().unwrap() = value.clone();
             let new_hotkey = hotkey::HotkeyOption::from_name(&value);
             let _ = hotkey_sender.0.lock().unwrap().send(hotkey::HotkeyUpdate::SetHotkey(new_hotkey));
         }
         "cancel_shortcut" => {
-            *state.cancel_shortcut.lock().unwrap() = value.clone();
             let new_cancel_key = hotkey::cancel_keys::from_name(&value);
             let _ = hotkey_sender.0.lock().unwrap().send(hotkey::HotkeyUpdate::SetCancelKey(new_cancel_key));
         }
-        "recording_mode" => *state.recording_mode.lock().unwrap() = value,
-        "selected_input_device_uid" => {
-            *state.selected_input_device_uid.lock().unwrap() = if value.is_empty() {
-                None
-            } else {
-                Some(value)
-            };
-        }
-        _ => {
-            log::warn!("Unknown setting key: {}", key);
-            return;
-        }
+        _ => {}
     }
     state.save_preferences();
-    log::info!("set_setting: saved. post_processing={}, hallucination_filter={}",
-        *state.post_processing_enabled.lock().unwrap(),
-        *state.hallucination_filter_enabled.lock().unwrap(),
-    );
     let _ = app.emit("settings-changed", &key);
 }
 
@@ -173,14 +166,14 @@ pub fn set_setting(
 
 #[tauri::command]
 pub fn start_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
-    let device_uid = state.selected_input_device_uid.lock().unwrap().clone();
-    *state.mic_testing.lock().unwrap() = true;
+    let device_uid = state.settings.lock().unwrap().selected_input_device_uid.clone();
+    state.runtime.lock().unwrap().mic_testing = true;
     let _ = sender.0.lock().unwrap().send(crate::recording::AudioCmd::StartMicTest { device_uid });
 }
 
 #[tauri::command]
 pub fn stop_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
-    *state.mic_testing.lock().unwrap() = false;
+    state.runtime.lock().unwrap().mic_testing = false;
     let _ = sender.0.lock().unwrap().send(crate::recording::AudioCmd::StopMicTest);
 }
 
@@ -192,7 +185,7 @@ pub fn set_llm_config(
     state: tauri::State<'_, Arc<AppState>>,
     app: AppHandle,
 ) {
-    *state.llm_config.lock().unwrap() = config;
+    state.settings.lock().unwrap().llm_config = config;
     state.save_preferences();
     let _ = app.emit("settings-changed", "llm_config");
 }
@@ -201,31 +194,31 @@ pub fn set_llm_config(
 
 #[tauri::command]
 pub fn get_history(state: tauri::State<'_, Arc<AppState>>) -> Vec<HistoryEntry> {
-    state.transcription_history.lock().unwrap().clone()
+    state.history.lock().unwrap().clone()
 }
 
 #[tauri::command]
 pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) {
-    state.transcription_history.lock().unwrap().clear();
+    state.history.lock().unwrap().clear();
 }
 
 // -- API Servers --
 
 #[tauri::command]
 pub fn add_api_server(config: ApiServerConfig, state: tauri::State<'_, Arc<AppState>>) {
-    state.api_servers.lock().unwrap().push(config);
+    state.settings.lock().unwrap().api_servers.push(config);
     state.save_preferences();
 }
 
 #[tauri::command]
 pub fn remove_api_server(id: String, state: tauri::State<'_, Arc<AppState>>) {
-    state.api_servers.lock().unwrap().retain(|s| s.id != id);
+    state.settings.lock().unwrap().api_servers.retain(|s| s.id != id);
     state.save_preferences();
 }
 
 #[tauri::command]
 pub fn get_api_servers(state: tauri::State<'_, Arc<AppState>>) -> Vec<ApiServerConfig> {
-    state.api_servers.lock().unwrap().clone()
+    state.settings.lock().unwrap().api_servers.clone()
 }
 
 // -- App lifecycle --
@@ -245,7 +238,7 @@ pub fn start_monitoring(
     }
 
     // Open model manager if no model is ready
-    let selected_id = state.selected_model_id.lock().unwrap().clone();
+    let selected_id = state.settings.lock().unwrap().selected_model_id.clone();
     let model_ready = catalog(&state)
         .model_by_id(&selected_id)
         .is_some_and(|m| m.is_downloaded());

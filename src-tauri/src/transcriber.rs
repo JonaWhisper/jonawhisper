@@ -6,9 +6,10 @@ pub fn transcribe(
     state: &AppState,
     audio_path: &Path,
 ) -> Result<String, EngineError> {
-    let model_id = state.selected_model_id.lock().unwrap().clone();
-    let language = state.selected_language.lock().unwrap().clone();
-    let api_servers = state.api_servers.lock().unwrap().clone();
+    let (model_id, language, api_servers) = {
+        let s = state.settings.lock().unwrap();
+        (s.selected_model_id.clone(), s.selected_language.clone(), s.api_servers.clone())
+    };
 
     let catalog = EngineCatalog::new(&api_servers);
 

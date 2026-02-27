@@ -50,16 +50,16 @@ unsafe impl Sync for RecordingState {}
 
 pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
     {
-        let mut is_recording = state.is_recording.lock().unwrap();
-        if *is_recording {
+        let mut rt = state.runtime.lock().unwrap();
+        if rt.is_recording {
             return;
         }
-        *is_recording = true;
+        rt.is_recording = true;
+        rt.transcription_cancelled = false;
     }
-    *state.transcription_cancelled.lock().unwrap() = false;
     rec.key_down_time = Some(Instant::now());
 
-    let device_uid = state.selected_input_device_uid.lock().unwrap().clone();
+    let device_uid = state.settings.lock().unwrap().selected_input_device_uid.clone();
     let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
     let _ = rec.audio_rx.recv();
 
@@ -76,11 +76,11 @@ pub fn stop_recording_and_enqueue(
     rec: &mut RecordingState,
 ) {
     {
-        let mut is_recording = state.is_recording.lock().unwrap();
-        if !*is_recording {
+        let mut rt = state.runtime.lock().unwrap();
+        if !rt.is_recording {
             return;
         }
-        *is_recording = false;
+        rt.is_recording = false;
     }
 
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
@@ -149,8 +149,11 @@ fn handle_short_tap(
     }
     rec.last_short_tap_time = Some(Instant::now());
 
-    let is_transcribing = *state.is_transcribing.lock().unwrap();
-    let queue_empty = state.transcription_queue.lock().unwrap().is_empty();
+    let rt = state.runtime.lock().unwrap();
+    let is_transcribing = rt.is_transcribing;
+    let queue_empty = rt.queue.is_empty();
+    drop(rt);
+
     if !is_transcribing && queue_empty {
         crate::tray::close_pill_window(app);
     } else {
@@ -165,19 +168,19 @@ fn handle_short_tap(
 pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     loop {
         {
-            let mut is_transcribing = state.is_transcribing.lock().unwrap();
-            if *is_transcribing {
+            let mut rt = state.runtime.lock().unwrap();
+            if rt.is_transcribing {
                 return;
             }
-            if state.transcription_queue.lock().unwrap().is_empty() {
+            if rt.queue.is_empty() {
                 return;
             }
-            *is_transcribing = true;
+            rt.is_transcribing = true;
         }
         let audio_path = match state.dequeue() {
             Some(p) => p,
             None => {
-                *state.is_transcribing.lock().unwrap() = false;
+                state.runtime.lock().unwrap().is_transcribing = false;
                 return;
             }
         };
@@ -189,7 +192,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
 
         let had_error = run_transcription(app, state, &audio_path).await;
         let _ = std::fs::remove_file(&audio_path);
-        *state.is_transcribing.lock().unwrap() = false;
+        state.runtime.lock().unwrap().is_transcribing = false;
 
         if had_error {
             show_error_then_close(app);
@@ -197,15 +200,16 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         }
 
         // Stop if cancelled or queue is empty
-        if *state.transcription_cancelled.lock().unwrap()
-            || state.transcription_queue.lock().unwrap().is_empty()
-        {
+        let rt = state.runtime.lock().unwrap();
+        if rt.transcription_cancelled || rt.queue.is_empty() {
             break;
         }
     }
 
-    if !*state.is_recording.lock().unwrap() {
-        *state.last_paste_had_content.lock().unwrap() = false;
+    let mut rt = state.runtime.lock().unwrap();
+    if !rt.is_recording {
+        rt.last_paste_had_content = false;
+        drop(rt);
         crate::tray::close_pill_window(app);
     }
 }
@@ -224,7 +228,7 @@ async fn run_transcription(
 
     match result {
         Ok(Ok(text)) => {
-            if *state.transcription_cancelled.lock().unwrap() {
+            if state.runtime.lock().unwrap().transcription_cancelled {
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
             }
@@ -260,11 +264,21 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         return;
     }
 
+    // Read settings once
+    let (pp_enabled, lang, hall_filter, llm_config) = {
+        let s = state.settings.lock().unwrap();
+        (
+            s.post_processing_enabled,
+            s.selected_language.clone(),
+            s.hallucination_filter_enabled,
+            s.llm_config.clone(),
+        )
+    };
+
     // Step 1: regex-based post-processing
-    let mut processed = if *state.post_processing_enabled.lock().unwrap() {
-        let lang = state.selected_language.lock().unwrap().clone();
+    let mut processed = if pp_enabled {
         let opts = post_processor::PostProcessOptions {
-            hallucination_filter: *state.hallucination_filter_enabled.lock().unwrap(),
+            hallucination_filter: hall_filter,
         };
         post_processor::process(trimmed, &lang, &opts)
     } else {
@@ -272,9 +286,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     };
 
     // Step 2: LLM cleanup (if enabled)
-    let llm_config = state.llm_config.lock().unwrap().clone();
     if llm_config.enabled {
-        let lang = state.selected_language.lock().unwrap().clone();
         match crate::llm_cleanup::cleanup_text(&processed, &lang, &llm_config).await {
             Ok(cleaned) => {
                 log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
@@ -287,7 +299,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Add a leading space when pasting consecutive results (queued recordings)
-    let needs_separator = *state.last_paste_had_content.lock().unwrap();
+    let needs_separator = state.runtime.lock().unwrap().last_paste_had_content;
     let paste_text = if needs_separator {
         format!(" {}", processed)
     } else {
@@ -299,7 +311,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         paste::paste_text(&app_for_paste, &paste_text);
     })
     .await;
-    *state.last_paste_had_content.lock().unwrap() = true;
+    state.runtime.lock().unwrap().last_paste_had_content = true;
     state.add_history(processed.clone());
     platform::play_sound("Glass");
 
@@ -324,8 +336,11 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
     while let Some(path) = state.dequeue() {
         let _ = std::fs::remove_file(&path);
     }
-    *state.transcription_cancelled.lock().unwrap() = true;
-    *state.last_paste_had_content.lock().unwrap() = false;
+    {
+        let mut rt = state.runtime.lock().unwrap();
+        rt.transcription_cancelled = true;
+        rt.last_paste_had_content = false;
+    }
     platform::play_sound("Funk");
     let _ = app.emit("transcription-cancelled", ());
     show_error_then_close(app);
@@ -413,33 +428,29 @@ pub fn spawn_hotkey_handler(
     std::thread::spawn(move || loop {
         match hotkey_rx.recv() {
             Ok(hotkey::HotkeyEvent::KeyDown) => {
-                let mode = state.recording_mode.lock().unwrap().clone();
+                let mode = state.settings.lock().unwrap().recording_mode.clone();
                 let mut rec = rec_state.lock().unwrap();
                 if mode == "toggle" {
-                    // Toggle: KeyDown starts or stops
-                    if *state.is_recording.lock().unwrap() {
+                    if state.runtime.lock().unwrap().is_recording {
                         stop_recording_and_enqueue(&app, &state, &mut rec);
                     } else {
                         start_recording(&app, &state, &mut rec);
                     }
                 } else {
-                    // Push-to-talk: KeyDown starts
                     start_recording(&app, &state, &mut rec);
                 }
             }
             Ok(hotkey::HotkeyEvent::KeyUp) => {
-                let mode = state.recording_mode.lock().unwrap().clone();
+                let mode = state.settings.lock().unwrap().recording_mode.clone();
                 if mode != "toggle" {
-                    // Push-to-talk: KeyUp stops
                     let mut rec = rec_state.lock().unwrap();
                     stop_recording_and_enqueue(&app, &state, &mut rec);
                 }
-                // Toggle: KeyUp is ignored
             }
             Ok(hotkey::HotkeyEvent::CancelPressed) => {
-                let is_transcribing = *state.is_transcribing.lock().unwrap();
-                let has_queue = !state.transcription_queue.lock().unwrap().is_empty();
-                if is_transcribing || has_queue {
+                let rt = state.runtime.lock().unwrap();
+                if rt.is_transcribing || !rt.queue.is_empty() {
+                    drop(rt);
                     log::info!("Cancel shortcut pressed, cancelling transcription");
                     cancel_transcription(&app, &state);
                 }
@@ -459,8 +470,11 @@ pub fn spawn_spectrum_emitter(
 ) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
-        let is_recording = *state.is_recording.lock().unwrap();
-        let is_mic_testing = *state.mic_testing.lock().unwrap();
+        let rt = state.runtime.lock().unwrap();
+        let is_recording = rt.is_recording;
+        let is_mic_testing = rt.mic_testing;
+        drop(rt);
+
         if !is_recording && !is_mic_testing {
             continue;
         }
@@ -468,7 +482,7 @@ pub fn spawn_spectrum_emitter(
         // Detect audio stream error (e.g. device disconnected)
         if stream_error.load(Ordering::SeqCst) {
             log::warn!("Audio stream error detected (device disconnected?), forcing stop");
-            *state.is_recording.lock().unwrap() = false;
+            state.runtime.lock().unwrap().is_recording = false;
             stream_error.store(false, Ordering::SeqCst);
 
             platform::play_sound("Basso");

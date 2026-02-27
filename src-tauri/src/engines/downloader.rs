@@ -30,8 +30,11 @@ pub async fn download_model(
     let _ = fs::create_dir_all(&pending_dir);
     let _ = fs::write(pending_download_path(), &model.id);
 
-    *state.downloading_model_id.lock().unwrap() = Some(model.id.clone());
-    *state.download_progress.lock().unwrap() = 0.0;
+    {
+        let mut dl = state.download.lock().unwrap();
+        dl.model_id = Some(model.id.clone());
+        dl.progress = 0.0;
+    }
 
     let success = match &model.download_type {
         DownloadType::RemoteAPI | DownloadType::System => true,
@@ -58,8 +61,11 @@ pub async fn download_model(
     };
 
     clear_pending_state(&model);
-    *state.downloading_model_id.lock().unwrap() = None;
-    *state.download_progress.lock().unwrap() = 0.0;
+    {
+        let mut dl = state.download.lock().unwrap();
+        dl.model_id = None;
+        dl.progress = 0.0;
+    }
 
     let _ = app.emit("download-complete", serde_json::json!({
         "model_id": model.id,
@@ -113,7 +119,7 @@ async fn download_single_file(
                 downloaded += bytes.len() as u64;
                 if total_size > 0 {
                     let progress = downloaded as f64 / total_size as f64;
-                    *state.download_progress.lock().unwrap() = progress;
+                    state.download.lock().unwrap().progress = progress;
                     let _ = app.emit("download-progress", serde_json::json!({
                         "model_id": model.id,
                         "progress": progress,
@@ -234,7 +240,7 @@ async fn download_with_subprocess(
     .unwrap_or(false);
 
     if result {
-        *state.download_progress.lock().unwrap() = 1.0;
+        state.download.lock().unwrap().progress = 1.0;
         let _ = app.emit("download-progress", serde_json::json!({
             "model_id": model.id,
             "progress": 1.0,

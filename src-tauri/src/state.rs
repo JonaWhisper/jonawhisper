@@ -12,27 +12,38 @@ pub struct HistoryEntry {
     pub timestamp: u64,
 }
 
+// -- Grouped state --
+
+/// Volatile runtime state (recording lifecycle, queue).
+#[derive(Default)]
+pub struct RuntimeState {
+    pub is_recording: bool,
+    pub is_transcribing: bool,
+    pub queue: VecDeque<PathBuf>,
+    pub transcription_cancelled: bool,
+    pub last_paste_had_content: bool,
+    pub mic_testing: bool,
+}
+
+/// Model download progress.
+pub struct DownloadState {
+    pub model_id: Option<String>,
+    pub progress: f64,
+}
+
+impl Default for DownloadState {
+    fn default() -> Self {
+        Self { model_id: None, progress: 0.0 }
+    }
+}
+
+// -- Main AppState --
+
 pub struct AppState {
-    pub is_recording: Mutex<bool>,
-    pub is_transcribing: Mutex<bool>,
-    pub transcription_queue: Mutex<VecDeque<PathBuf>>,
-    pub downloading_model_id: Mutex<Option<String>>,
-    pub download_progress: Mutex<f64>,
-    pub transcription_cancelled: Mutex<bool>,
-    pub selected_model_id: Mutex<String>,
-    pub selected_language: Mutex<String>,
-    pub post_processing_enabled: Mutex<bool>,
-    pub hotkey_option: Mutex<String>,
-    pub selected_input_device_uid: Mutex<Option<String>>,
-    pub transcription_history: Mutex<Vec<HistoryEntry>>,
-    pub api_servers: Mutex<Vec<ApiServerConfig>>,
-    pub app_locale: Mutex<String>,
-    pub hallucination_filter_enabled: Mutex<bool>,
-    pub cancel_shortcut: Mutex<String>,
-    pub recording_mode: Mutex<String>,
-    pub llm_config: Mutex<LlmConfig>,
-    pub mic_testing: Mutex<bool>,
-    pub last_paste_had_content: Mutex<bool>,
+    pub runtime: Mutex<RuntimeState>,
+    pub download: Mutex<DownloadState>,
+    pub settings: Mutex<Preferences>,
+    pub history: Mutex<Vec<HistoryEntry>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,26 +157,10 @@ impl Default for AppState {
     fn default() -> Self {
         let prefs = Preferences::load();
         Self {
-            is_recording: Mutex::new(false),
-            is_transcribing: Mutex::new(false),
-            transcription_queue: Mutex::new(VecDeque::new()),
-            downloading_model_id: Mutex::new(None),
-            download_progress: Mutex::new(0.0),
-            transcription_cancelled: Mutex::new(false),
-            selected_model_id: Mutex::new(prefs.selected_model_id),
-            selected_language: Mutex::new(prefs.selected_language),
-            post_processing_enabled: Mutex::new(prefs.post_processing_enabled),
-            hotkey_option: Mutex::new(prefs.hotkey_option),
-            selected_input_device_uid: Mutex::new(prefs.selected_input_device_uid),
-            transcription_history: Mutex::new(Vec::new()),
-            api_servers: Mutex::new(prefs.api_servers),
-            app_locale: Mutex::new(prefs.app_locale),
-            hallucination_filter_enabled: Mutex::new(prefs.hallucination_filter_enabled),
-            cancel_shortcut: Mutex::new(prefs.cancel_shortcut),
-            recording_mode: Mutex::new(prefs.recording_mode),
-            llm_config: Mutex::new(prefs.llm_config),
-            mic_testing: Mutex::new(false),
-            last_paste_had_content: Mutex::new(false),
+            runtime: Mutex::new(RuntimeState::default()),
+            download: Mutex::new(DownloadState::default()),
+            settings: Mutex::new(prefs),
+            history: Mutex::new(Vec::new()),
         }
     }
 }
@@ -173,53 +168,43 @@ impl Default for AppState {
 impl AppState {
     /// Save current preferences to disk.
     pub fn save_preferences(&self) {
+        let settings = self.settings.lock().unwrap();
         log::info!("save_preferences: post_processing={}, hallucination_filter={}",
-            *self.post_processing_enabled.lock().unwrap(),
-            *self.hallucination_filter_enabled.lock().unwrap(),
+            settings.post_processing_enabled,
+            settings.hallucination_filter_enabled,
         );
-        let prefs = Preferences {
-            selected_model_id: self.selected_model_id.lock().unwrap().clone(),
-            selected_language: self.selected_language.lock().unwrap().clone(),
-            post_processing_enabled: *self.post_processing_enabled.lock().unwrap(),
-            hotkey_option: self.hotkey_option.lock().unwrap().clone(),
-            selected_input_device_uid: self.selected_input_device_uid.lock().unwrap().clone(),
-            api_servers: self.api_servers.lock().unwrap().clone(),
-            app_locale: self.app_locale.lock().unwrap().clone(),
-            hallucination_filter_enabled: *self.hallucination_filter_enabled.lock().unwrap(),
-            cancel_shortcut: self.cancel_shortcut.lock().unwrap().clone(),
-            recording_mode: self.recording_mode.lock().unwrap().clone(),
-            llm_config: self.llm_config.lock().unwrap().clone(),
-        };
-        prefs.save();
+        settings.save();
     }
 
     pub fn enqueue(&self, path: PathBuf) -> usize {
-        let mut queue = self.transcription_queue.lock().unwrap();
-        queue.push_back(path);
-        queue.len()
+        let mut rt = self.runtime.lock().unwrap();
+        rt.queue.push_back(path);
+        rt.queue.len()
     }
 
     pub fn dequeue(&self) -> Option<PathBuf> {
-        self.transcription_queue.lock().unwrap().pop_front()
+        self.runtime.lock().unwrap().queue.pop_front()
     }
 
     pub fn queue_count(&self) -> usize {
-        self.transcription_queue.lock().unwrap().len()
+        self.runtime.lock().unwrap().queue.len()
     }
 
     /// Runtime state only — no user settings (those come from get_settings).
     pub fn to_frontend_json(&self) -> serde_json::Value {
+        let rt = self.runtime.lock().unwrap();
+        let dl = self.download.lock().unwrap();
         serde_json::json!({
-            "is_recording": *self.is_recording.lock().unwrap(),
-            "is_transcribing": *self.is_transcribing.lock().unwrap(),
-            "queue_count": self.queue_count(),
-            "downloading_model_id": *self.downloading_model_id.lock().unwrap(),
-            "download_progress": *self.download_progress.lock().unwrap(),
+            "is_recording": rt.is_recording,
+            "is_transcribing": rt.is_transcribing,
+            "queue_count": rt.queue.len(),
+            "downloading_model_id": dl.model_id,
+            "download_progress": dl.progress,
         })
     }
 
     pub fn add_history(&self, text: String) {
-        let mut history = self.transcription_history.lock().unwrap();
+        let mut history = self.history.lock().unwrap();
         let entry = HistoryEntry {
             text,
             timestamp: std::time::SystemTime::now()

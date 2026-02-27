@@ -180,7 +180,15 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 
     // Audio device submenu
     let devices = audio_devices::list_input_devices();
-    let selected_uid = state.selected_input_device_uid.lock().unwrap().clone();
+    let (selected_uid, selected_lang, api_servers, selected_model_id) = {
+        let s = state.settings.lock().unwrap();
+        (
+            s.selected_input_device_uid.clone(),
+            s.selected_language.clone(),
+            s.api_servers.clone(),
+            s.selected_model_id.clone(),
+        )
+    };
     let uid_valid = selected_uid
         .as_ref()
         .is_some_and(|uid| devices.iter().any(|d| &d.uid == uid));
@@ -218,7 +226,6 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 
     // Language submenu
     let languages = common_languages();
-    let selected_lang = state.selected_language.lock().unwrap().clone();
     let active_lang = languages
         .iter()
         .find(|l| l.code == selected_lang)
@@ -239,9 +246,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
     }
 
     // Model submenu
-    let api_servers = state.api_servers.lock().unwrap().clone();
     let downloaded = EngineCatalog::new(&api_servers).downloaded_models();
-    let selected_model_id = state.selected_model_id.lock().unwrap().clone();
     let active_model = downloaded
         .iter()
         .find(|m| m.id == selected_model_id)
@@ -297,11 +302,14 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 /// Update a preference from a menu selection and rebuild the tray menu.
 fn handle_selection(app: &AppHandle, prefix: &str, value: &str) {
     let state = get_state(app);
-    match prefix {
-        "device" => *state.selected_input_device_uid.lock().unwrap() = Some(value.to_string()),
-        "model" => *state.selected_model_id.lock().unwrap() = value.to_string(),
-        "lang" => *state.selected_language.lock().unwrap() = value.to_string(),
-        _ => return,
+    {
+        let mut s = state.settings.lock().unwrap();
+        match prefix {
+            "device" => s.selected_input_device_uid = Some(value.to_string()),
+            "model" => s.selected_model_id = value.to_string(),
+            "lang" => s.selected_language = value.to_string(),
+            _ => return,
+        }
     }
     state.save_preferences();
     log::info!("Selected {}: {}", prefix, value);
