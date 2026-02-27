@@ -1,19 +1,5 @@
-use serde::{Deserialize, Serialize};
+use super::{PermissionReport, PermissionStatus};
 use std::ffi::c_void;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PermissionReport {
-    pub microphone: PermissionStatus,
-    pub accessibility: PermissionStatus,
-    pub input_monitoring: PermissionStatus,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum PermissionStatus {
-    Granted,
-    Denied,
-    Undetermined,
-}
 
 pub fn check_permissions() -> PermissionReport {
     PermissionReport {
@@ -154,38 +140,29 @@ fn reset_tcc(service: &str) {
     }
 }
 
-/// Trigger the microphone permission dialog by briefly opening an audio input stream via cpal.
+/// Trigger the microphone permission dialog via AVCaptureDevice requestAccessForMediaType:.
 fn request_microphone_access() {
-    std::thread::spawn(|| {
-        use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+    use block2::StackBlock;
+    use objc2::msg_send;
+    use objc2::runtime::{AnyClass, Bool};
+    use objc2_foundation::NSString;
 
-        let host = cpal::default_host();
-        if let Some(device) = host.default_input_device() {
-            let config = cpal::StreamConfig {
-                channels: 1,
-                sample_rate: cpal::SampleRate(16000),
-                buffer_size: cpal::BufferSize::Default,
-            };
-            match device.build_input_stream(
-                &config,
-                |_data: &[f32], _info: &cpal::InputCallbackInfo| {},
-                |_err| {},
-                None,
-            ) {
-                Ok(stream) => {
-                    let _ = stream.play();
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    drop(stream);
-                    log::info!("Microphone permission requested via cpal stream");
-                }
-                Err(e) => {
-                    log::warn!("Could not open audio input for mic permission: {}", e);
-                }
-            }
-        } else {
-            log::warn!("No default input device found");
+    let cls = match AnyClass::get(c"AVCaptureDevice") {
+        Some(c) => c,
+        None => {
+            log::warn!("AVCaptureDevice class not found");
+            return;
         }
+    };
+
+    let media_type = NSString::from_str("soun");
+    let block = StackBlock::new(|granted: Bool| {
+        log::info!("Microphone access response: {}", granted.as_bool());
     });
+
+    unsafe {
+        let _: () = msg_send![cls, requestAccessForMediaType: &*media_type, completionHandler: &block];
+    }
 }
 
 /// Trigger the accessibility permission dialog via AXIsProcessTrustedWithOptions with prompt=true.

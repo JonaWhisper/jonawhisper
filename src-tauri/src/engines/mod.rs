@@ -4,6 +4,7 @@ pub mod mlx_whisper;
 pub mod vosk;
 pub mod moonshine;
 pub mod openai_api;
+pub mod downloader;
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};

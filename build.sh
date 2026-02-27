@@ -9,15 +9,6 @@ RELEASE_DIR="$SCRIPT_DIR/src-tauri/target/release"
 BUNDLE_DIR="$RELEASE_DIR/bundle"
 APP_PATH="$BUNDLE_DIR/macos/${APP_NAME}.app"
 
-# ── TCC Reset ──────────────────────────────────────────────
-echo "=== Resetting permissions (TCC) for ${BUNDLE_ID} ==="
-
-tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
-tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
-tccutil reset ListenEvent "$BUNDLE_ID" 2>/dev/null || true
-
-echo "  TCC entries cleared (stale ad-hoc signatures removed)"
-
 # ── Build ──────────────────────────────────────────────────
 echo ""
 echo "=== Building ${APP_NAME} (Tauri release) ==="

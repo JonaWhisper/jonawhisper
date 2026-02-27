@@ -1,26 +1,39 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PermissionStatus {
+    Granted,
+    Denied,
+    Undetermined,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PermissionReport {
+    pub microphone: PermissionStatus,
+    pub accessibility: PermissionStatus,
+    pub input_monitoring: PermissionStatus,
+}
+
+impl PermissionReport {
+    pub fn all_granted(&self) -> bool {
+        self.microphone == PermissionStatus::Granted
+            && self.accessibility == PermissionStatus::Granted
+            && self.input_monitoring == PermissionStatus::Granted
+    }
+}
+
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+pub mod hotkey;
+pub mod paste;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;
 
 #[cfg(not(target_os = "macos"))]
 pub mod stub {
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct PermissionReport {
-        pub microphone: PermissionStatus,
-        pub accessibility: PermissionStatus,
-        pub input_monitoring: PermissionStatus,
-    }
-
-    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-    pub enum PermissionStatus {
-        Granted,
-        Denied,
-        Undetermined,
-    }
+    use super::{PermissionReport, PermissionStatus};
 
     impl Default for PermissionReport {
         fn default() -> Self {

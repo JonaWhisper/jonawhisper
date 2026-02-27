@@ -2,8 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, type ASRModel, type EngineInfo } from '../stores/app'
-import ModelCell from './ModelCell.vue'
-import ApiServerForm from './ApiServerForm.vue'
+import ModelCell from '../components/ModelCell.vue'
+import ApiServerForm from '../components/ApiServerForm.vue'
 
 const { t } = useI18n()
 const store = useAppStore()
