@@ -23,7 +23,7 @@ fn get_state(app: &AppHandle) -> Arc<AppState> {
 // -- Window management --
 
 pub fn open_window(app: &AppHandle, label: &str, title: &str, url: &str, width: f64, height: f64) {
-    open_window_with_min(app, label, title, url, width, height, None)
+    open_window_with_min(app, label, title, url, width, height, None);
 }
 
 pub fn open_window_with_min(
@@ -36,6 +36,7 @@ pub fn open_window_with_min(
     min_size: Option<(f64, f64)>,
 ) {
     if let Some(window) = app.get_webview_window(label) {
+        activate_app();
         let _ = window.set_focus();
         return;
     }
@@ -49,8 +50,28 @@ pub fn open_window_with_min(
         builder = builder.min_inner_size(min_w, min_h);
     }
 
-    let _ = builder.build();
+    if let Ok(win) = builder.build() {
+        activate_app();
+        let _ = win.set_focus();
+    }
 }
+
+/// Activate the app so windows can become key/focused (needed for Accessory policy).
+#[cfg(target_os = "macos")]
+fn activate_app() {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    unsafe {
+        let ns_app: *mut AnyObject = msg_send![
+            objc2::runtime::AnyClass::get(c"NSApplication").unwrap(),
+            sharedApplication
+        ];
+        let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn activate_app() {}
 
 pub fn open_pill_window(app: &AppHandle) {
     if app.get_webview_window("pill").is_some() {
