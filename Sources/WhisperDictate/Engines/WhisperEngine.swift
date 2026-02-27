@@ -26,6 +26,7 @@ struct WhisperEngine: ASREngine {
     ]
 
     let supportedLanguages = kCommonWhisperLanguages
+    let installHint = "brew install whisper-cpp"
 
     private let executablePath: String?
 

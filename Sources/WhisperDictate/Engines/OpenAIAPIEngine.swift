@@ -51,6 +51,8 @@ struct OpenAIAPIEngine: ASREngine {
         ("de", "Deutsch"),
     ]
 
+    let installHint = ""
+
     func resolveExecutable() -> String? { "" }
 
     func transcribe(model: ASRModel, audioURL: URL, language: String) throws -> String {

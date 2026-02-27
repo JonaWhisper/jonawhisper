@@ -31,6 +31,7 @@ struct MLXWhisperEngine: ASREngine {
     ]
 
     let supportedLanguages = kCommonWhisperLanguages
+    let installHint = "pip install mlx-whisper"
 
     private let executablePath: String?
 

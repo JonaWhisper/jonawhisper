@@ -4,7 +4,7 @@ class ModelCellView: NSView {
     private var progressBar: NSProgressIndicator?
     private var progressLabel: NSTextField?
 
-    func configure(model: ASRModel, isSelected: Bool, isDownloading: Bool, progress: Double, anyDownloading: Bool, row: Int, target: ModelManagerWindowController) {
+    func configure(model: ASRModel, isSelected: Bool, isDownloading: Bool, progress: Double, anyDownloading: Bool, engineAvailable: Bool = true, row: Int, target: ModelManagerWindowController) {
         let radio = NSButton(frame: NSRect(x: 10, y: 14, width: 28, height: 28))
         radio.isBordered = false
         radio.image = NSImage(systemSymbolName: isSelected ? "circle.inset.filled" : "circle", accessibilityDescription: "Sélectionner")
@@ -80,7 +80,7 @@ class ModelCellView: NSView {
             dlButton.target = target
             dlButton.action = #selector(ModelManagerWindowController.downloadClicked(_:))
             dlButton.tag = row
-            dlButton.isEnabled = !anyDownloading
+            dlButton.isEnabled = !anyDownloading && engineAvailable
             addSubview(dlButton)
         }
 

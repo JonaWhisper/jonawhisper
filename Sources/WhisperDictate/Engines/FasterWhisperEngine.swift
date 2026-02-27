@@ -31,6 +31,7 @@ struct FasterWhisperEngine: ASREngine {
     ]
 
     let supportedLanguages = kCommonWhisperLanguages
+    let installHint = "pip install whisper-ctranslate2"
 
     private let executablePath: String?
 

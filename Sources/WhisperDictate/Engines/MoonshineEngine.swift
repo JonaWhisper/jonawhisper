@@ -27,6 +27,8 @@ struct MoonshineEngine: ASREngine {
         ("en", "English"),
     ]
 
+    let installHint = "pip install moonshine-voice"
+
     func resolveExecutable() -> String? {
         guard findExecutable("python3") != nil else { return nil }
         let process = Process()

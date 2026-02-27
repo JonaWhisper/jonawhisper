@@ -13,10 +13,13 @@ class ModelManagerWindowController: NSWindowController {
     private var state: AppState { AppState.shared }
 
     private var displayEngines: [ASREngine] = []
+    private var engineAvailable: [String: Bool] = [:]  // engineId -> is CLI installed
+    private var keyMonitor: Any?
 
     private enum ModelRow {
         case model(ASRModel)
         case addAPIServer
+        case engineUnavailable(installHint: String)
     }
     private var modelRows: [ModelRow] = []
 
@@ -46,6 +49,10 @@ class ModelManagerWindowController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        if let monitor = keyMonitor { NSEvent.removeMonitor(monitor) }
+    }
+
     static func showWindow() {
         shared.showWindow(nil)
         shared.window?.makeKeyAndOrderFront(nil)
@@ -66,14 +73,25 @@ class ModelManagerWindowController: NSWindowController {
         if !displayEngines.contains(where: { $0.engineId == "openai-api" }) {
             displayEngines.append(OpenAIAPIEngine())
         }
+        engineAvailable = [:]
+        for engine in displayEngines {
+            engineAvailable[engine.engineId] = engine.resolveExecutable() != nil
+        }
     }
 
     private func selectEngine(at index: Int) {
         guard index >= 0 && index < displayEngines.count else { return }
         let engine = displayEngines[index]
-        modelRows = engine.models.map { .model($0) }
+        let available = engineAvailable[engine.engineId] ?? false
+
         if engine.engineId == "openai-api" {
+            modelRows = engine.models.map { .model($0) }
             modelRows.append(.addAPIServer)
+        } else if available {
+            modelRows = engine.models.map { .model($0) }
+        } else {
+            modelRows = [.engineUnavailable(installHint: engine.installHint)]
+            modelRows += engine.models.map { .model($0) }
         }
         modelTableView?.reloadData()
     }
@@ -128,7 +146,7 @@ class ModelManagerWindowController: NSWindowController {
         let modelTable = NSTableView()
         modelTable.style = .fullWidth
         modelTable.headerView = nil
-        modelTable.selectionHighlightStyle = .none
+        modelTable.selectionHighlightStyle = .regular
         modelTable.intercellSpacing = NSSize(width: 0, height: 1)
         let modelCol = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("model"))
         modelCol.resizingMask = .autoresizingMask
@@ -144,6 +162,76 @@ class ModelManagerWindowController: NSWindowController {
 
         splitView.setPosition(185, ofDividerAt: 0)
         splitView.adjustSubviews()
+
+        // Keyboard shortcuts
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self, event.window === self.window else { return event }
+            return self.handleKeyDown(event) ? nil : event
+        }
+    }
+
+    private func handleKeyDown(_ event: NSEvent) -> Bool {
+        // Cmd+N → add API server
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "n" {
+            showAPIConfigSheet(existing: nil)
+            return true
+        }
+
+        // Cmd+W → close window
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" {
+            window?.close()
+            return true
+        }
+
+        guard !event.modifierFlags.contains(.command) else { return false }
+
+        let focusedOnModelTable = window?.firstResponder === modelTableView
+
+        switch event.keyCode {
+        case 36: // Enter
+            if focusedOnModelTable {
+                return handleEnterOnModel()
+            }
+        case 51: // Delete/Backspace
+            if focusedOnModelTable {
+                return handleDeleteOnModel()
+            }
+        case 48: // Tab → switch focus between engine/model tables
+            if focusedOnModelTable {
+                window?.makeFirstResponder(engineTableView)
+            } else {
+                window?.makeFirstResponder(modelTableView)
+            }
+            return true
+        default:
+            break
+        }
+
+        return false
+    }
+
+    private func handleEnterOnModel() -> Bool {
+        guard let row = modelTableView?.selectedRow, row >= 0,
+              let model = modelFromRow(row) else { return false }
+
+        if model.isDownloaded {
+            ASRModelCatalog.shared.selectedModelId = model.id
+            modelTableView?.reloadData()
+        } else if state.downloadingModelId == nil {
+            let available = engineAvailable[model.engineId] ?? false
+            if available { startDownload(model) }
+        }
+        return true
+    }
+
+    private func handleDeleteOnModel() -> Bool {
+        guard let row = modelTableView?.selectedRow, row >= 0,
+              let model = modelFromRow(row) else { return false }
+
+        let fakeButton = NSButton()
+        fakeButton.tag = row
+        deleteClicked(fakeButton)
+        return true
     }
 
     // MARK: - Download
@@ -433,6 +521,7 @@ extension ModelManagerWindowController: NSTableViewDelegate {
         if tableView === engineTableView { return 44 }
         switch modelRows[row] {
         case .addAPIServer: return 40
+        case .engineUnavailable: return 50
         case .model: return 56
         }
     }
@@ -440,23 +529,47 @@ extension ModelManagerWindowController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         if tableView === engineTableView {
             let engine = displayEngines[row]
+            let available = engineAvailable[engine.engineId] ?? false
             let cell = NSTableCellView(frame: NSRect(x: 0, y: 0, width: 180, height: 44))
 
             let title = NSTextField(labelWithString: engine.displayName)
             title.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-            title.frame = NSRect(x: 4, y: 22, width: 168, height: 18)
+            title.textColor = available ? .labelColor : .tertiaryLabelColor
+            title.frame = NSRect(x: 4, y: 22, width: 152, height: 18)
             cell.addSubview(title)
 
             let subtitle = NSTextField(labelWithString: toolSubtitle(for: engine))
             subtitle.font = NSFont.systemFont(ofSize: 11)
-            subtitle.textColor = .secondaryLabelColor
-            subtitle.frame = NSRect(x: 4, y: 4, width: 168, height: 16)
+            subtitle.textColor = available ? .secondaryLabelColor : .tertiaryLabelColor
+            subtitle.frame = NSRect(x: 4, y: 4, width: 152, height: 16)
             cell.addSubview(subtitle)
+
+            // Status dot
+            let dot = NSTextField(labelWithString: available ? "●" : "○")
+            dot.font = NSFont.systemFont(ofSize: 8)
+            dot.textColor = available ? .systemGreen : .tertiaryLabelColor
+            dot.frame = NSRect(x: 162, y: 22, width: 14, height: 18)
+            cell.addSubview(dot)
 
             return cell
         }
 
         switch modelRows[row] {
+        case .engineUnavailable(let installHint):
+            let container = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 50))
+            let icon = NSTextField(labelWithString: "⚠")
+            icon.font = NSFont.systemFont(ofSize: 14)
+            icon.frame = NSRect(x: 12, y: 18, width: 20, height: 20)
+            container.addSubview(icon)
+
+            let msg = NSTextField(labelWithString: "CLI non installé — \(installHint)")
+            msg.font = NSFont.systemFont(ofSize: 12)
+            msg.textColor = .secondaryLabelColor
+            msg.frame = NSRect(x: 34, y: 18, width: 400, height: 18)
+            msg.isSelectable = true
+            container.addSubview(msg)
+            return container
+
         case .addAPIServer:
             let container = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 40))
             let button = NSButton(frame: NSRect(x: 12, y: 8, width: 160, height: 24))
@@ -471,6 +584,7 @@ extension ModelManagerWindowController: NSTableViewDelegate {
         case .model(let model):
             let isSelected = model.id == ASRModelCatalog.shared.selectedModelId
             let isDownloading = model.id == state.downloadingModelId
+            let available = engineAvailable[model.engineId] ?? false
             let cell = ModelCellView(frame: NSRect(x: 0, y: 0, width: 460, height: 56))
             cell.configure(
                 model: model,
@@ -478,6 +592,7 @@ extension ModelManagerWindowController: NSTableViewDelegate {
                 isDownloading: isDownloading,
                 progress: isDownloading ? state.downloadProgress : 0,
                 anyDownloading: state.downloadingModelId != nil,
+                engineAvailable: available,
                 row: row,
                 target: self
             )

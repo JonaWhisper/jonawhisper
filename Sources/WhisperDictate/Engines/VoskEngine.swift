@@ -28,6 +28,8 @@ struct VoskEngine: ASREngine {
         ("fr", "Français"),
     ]
 
+    let installHint = "pip install vosk"
+
     private let executablePath: String?
 
     init() {

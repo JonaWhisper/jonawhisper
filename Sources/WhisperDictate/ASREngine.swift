@@ -56,6 +56,7 @@ protocol ASREngine {
     var displayName: String { get }
     var models: [ASRModel] { get }
     var supportedLanguages: [(code: String, label: String)] { get }
+    var installHint: String { get }
 
     func resolveExecutable() -> String?
     func transcribe(model: ASRModel, audioURL: URL, language: String) throws -> String
