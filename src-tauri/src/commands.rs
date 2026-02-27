@@ -37,6 +37,7 @@ pub fn get_downloaded_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<engi
 #[tauri::command]
 pub fn select_model(id: String, state: tauri::State<'_, Arc<AppState>>) {
     *state.selected_model_id.lock().unwrap() = id;
+    state.save_preferences();
 }
 
 #[tauri::command]
@@ -81,6 +82,7 @@ pub fn get_languages(state: tauri::State<'_, Arc<AppState>>) -> Vec<Language> {
 #[tauri::command]
 pub fn select_language(code: String, state: tauri::State<'_, Arc<AppState>>) {
     *state.selected_language.lock().unwrap() = code;
+    state.save_preferences();
 }
 
 #[tauri::command]
@@ -106,6 +108,7 @@ pub fn get_post_processing_enabled(state: tauri::State<'_, Arc<AppState>>) -> bo
 #[tauri::command]
 pub fn set_post_processing_enabled(enabled: bool, state: tauri::State<'_, Arc<AppState>>) {
     *state.post_processing_enabled.lock().unwrap() = enabled;
+    state.save_preferences();
 }
 
 #[tauri::command]
@@ -116,6 +119,7 @@ pub fn get_hotkey(state: tauri::State<'_, Arc<AppState>>) -> String {
 #[tauri::command]
 pub fn set_hotkey(hotkey: String, state: tauri::State<'_, Arc<AppState>>) {
     *state.hotkey_option.lock().unwrap() = hotkey;
+    state.save_preferences();
 }
 
 #[tauri::command]
@@ -131,11 +135,13 @@ pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) {
 #[tauri::command]
 pub fn add_api_server(config: ApiServerConfig, state: tauri::State<'_, Arc<AppState>>) {
     state.api_servers.lock().unwrap().push(config);
+    state.save_preferences();
 }
 
 #[tauri::command]
 pub fn remove_api_server(id: String, state: tauri::State<'_, Arc<AppState>>) {
     state.api_servers.lock().unwrap().retain(|s| s.id != id);
+    state.save_preferences();
 }
 
 #[tauri::command]

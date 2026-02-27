@@ -133,9 +133,15 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
     let devices = audio_devices::list_input_devices();
     let selected_uid = state.selected_input_device_uid.lock().unwrap().clone();
 
+    // If saved device no longer exists, fall back to system default
+    let uid_valid = selected_uid.as_ref().is_some_and(|uid| {
+        devices.iter().any(|d| &d.uid == uid)
+    });
+    let effective_uid = if uid_valid { selected_uid } else { None };
+
     let mut active_name = String::from("Microphone");
     for device in &devices {
-        let is_selected = match &selected_uid {
+        let is_selected = match &effective_uid {
             Some(uid) => uid == &device.uid,
             None => device.is_default,
         };
@@ -147,12 +153,13 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
     let mic_submenu = Submenu::with_id(app, "mic_submenu", &active_name, true)?;
 
     for device in &devices {
-        let is_selected = match &selected_uid {
+        let is_selected = match &effective_uid {
             Some(uid) => uid == &device.uid,
             None => device.is_default,
         };
         let icon = device.transport_type.icon();
-        let label = format!("{} {}", icon, device.name);
+        let default_tag = if device.is_default { " (Default)" } else { "" };
+        let label = format!("{} {}{}", icon, device.name, default_tag);
         let item = CheckMenuItem::with_id(
             app,
             format!("device_{}", device.uid),
@@ -279,12 +286,19 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     let uid = id.strip_prefix("device_").unwrap().to_string();
                     let state = get_state(app);
                     *state.selected_input_device_uid.lock().unwrap() = Some(uid.clone());
+                    state.save_preferences();
                     log::info!("Selected audio device: {}", uid);
+                    if let Ok(new_menu) = build_menu(app) {
+                        if let Some(tray) = app.tray_by_id("main") {
+                            let _ = tray.set_menu(Some(new_menu));
+                        }
+                    }
                 }
                 _ if id.starts_with("model_") => {
                     let model_id = id.strip_prefix("model_").unwrap().to_string();
                     let state = get_state(app);
                     *state.selected_model_id.lock().unwrap() = model_id.clone();
+                    state.save_preferences();
                     log::info!("Selected model: {}", model_id);
                     if let Ok(new_menu) = build_menu(app) {
                         if let Some(tray) = app.tray_by_id("main") {
@@ -296,8 +310,8 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     let code = id.strip_prefix("lang_").unwrap().to_string();
                     let state = get_state(app);
                     *state.selected_language.lock().unwrap() = code.clone();
+                    state.save_preferences();
                     log::info!("Selected language: {}", code);
-                    // Rebuild menu to update checkmarks and submenu title
                     if let Ok(new_menu) = build_menu(app) {
                         if let Some(tray) = app.tray_by_id("main") {
                             let _ = tray.set_menu(Some(new_menu));
