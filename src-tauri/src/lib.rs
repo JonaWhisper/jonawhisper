@@ -100,7 +100,7 @@ pub fn run() {
             // Spectrum emission (30fps)
             recording::spawn_spectrum_emitter(
                 app.handle().clone(),
-                app_state.clone(),
+                app_state,
                 cmd_tx,
                 spectrum_data,
             );

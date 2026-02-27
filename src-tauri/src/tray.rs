@@ -7,6 +7,11 @@ use tauri::{
     AppHandle, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
+/// Helper: get a cloned Arc<AppState> from the app handle.
+fn get_state(app: &AppHandle) -> Arc<AppState> {
+    app.state::<Arc<AppState>>().inner().clone()
+}
+
 pub fn open_window(app: &AppHandle, label: &str, title: &str, url: &str, width: f64, height: f64) {
     if let Some(window) = app.get_webview_window(label) {
         let _ = window.set_focus();
@@ -118,7 +123,7 @@ pub fn close_pill_window(app: &AppHandle) {
 }
 
 fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
-    let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+    let state = get_state(app);
 
     // Audio device submenu — title shows selected device name
     let devices = audio_devices::list_input_devices();
@@ -205,7 +210,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 _ if id.starts_with("device_") => {
                     let uid = id.strip_prefix("device_").unwrap().to_string();
-                    let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+                    let state = get_state(app);
                     *state.selected_input_device_uid.lock().unwrap() = Some(uid.clone());
                     log::info!("Selected audio device: {}", uid);
                 }
