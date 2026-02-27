@@ -31,8 +31,6 @@ pub enum AudioCmd {
 pub enum AudioReply {
     Started,
     Stopped { path: Option<std::path::PathBuf> },
-    #[allow(dead_code)] // value read via shared spectrum_data, not from the reply
-    Spectrum(Vec<f32>),
 }
 
 // -- Recording state (Send-safe, does not hold AudioRecorder) --
@@ -165,44 +163,45 @@ fn handle_short_tap(
 // -- Transcription queue processing --
 
 pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
-    {
-        let mut is_transcribing = state.is_transcribing.lock().unwrap();
-        if *is_transcribing {
+    loop {
+        {
+            let mut is_transcribing = state.is_transcribing.lock().unwrap();
+            if *is_transcribing {
+                return;
+            }
+            if state.transcription_queue.lock().unwrap().is_empty() {
+                return;
+            }
+            *is_transcribing = true;
+        }
+        let audio_path = match state.dequeue() {
+            Some(p) => p,
+            None => {
+                *state.is_transcribing.lock().unwrap() = false;
+                return;
+            }
+        };
+
+        let _ = app.emit(
+            "transcription-started",
+            serde_json::json!({ "queue_count": state.queue_count() }),
+        );
+
+        let had_error = run_transcription(app, state, &audio_path).await;
+        let _ = std::fs::remove_file(&audio_path);
+        *state.is_transcribing.lock().unwrap() = false;
+
+        if had_error {
+            show_error_then_close(app);
             return;
         }
-        if state.transcription_queue.lock().unwrap().is_empty() {
-            return;
+
+        // Stop if cancelled or queue is empty
+        if *state.transcription_cancelled.lock().unwrap()
+            || state.transcription_queue.lock().unwrap().is_empty()
+        {
+            break;
         }
-        *is_transcribing = true;
-    }
-    let audio_path = match state.dequeue() {
-        Some(p) => p,
-        None => {
-            *state.is_transcribing.lock().unwrap() = false;
-            return;
-        }
-    };
-
-    let _ = app.emit(
-        "transcription-started",
-        serde_json::json!({ "queue_count": state.queue_count() }),
-    );
-
-    let had_error = run_transcription(app, state, &audio_path).await;
-    let _ = std::fs::remove_file(&audio_path);
-    *state.is_transcribing.lock().unwrap() = false;
-
-    if had_error {
-        show_error_then_close(app);
-        return;
-    }
-
-    // Continue processing queue if not cancelled
-    if !*state.transcription_cancelled.lock().unwrap()
-        && !state.transcription_queue.lock().unwrap().is_empty()
-    {
-        Box::pin(process_next_in_queue(app, &Arc::clone(state))).await;
-        return;
     }
 
     if !*state.is_recording.lock().unwrap() {

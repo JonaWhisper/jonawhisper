@@ -460,7 +460,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .on_menu_event(move |app, event| {
             let id = event.id().0.as_str();
             match id {
-                "quit" => std::process::exit(0),
+                "quit" => app.exit(0),
                 "model_manager" => {
                     open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
                 }

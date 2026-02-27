@@ -98,7 +98,6 @@
   "settings.postProcessing.enable": "Activer le post-traitement",
   "settings.postProcessing.hallucinations": "Filtrage des hallucinations",
   "settings.postProcessing.llm": "Nettoyage par IA (LLM)",
-  "settings.postProcessing.llmConfigure": "Configurer…",
   "settings.llm.provider": "Fournisseur",
   "settings.llm.provider.openai": "Compatible OpenAI",
   "settings.llm.provider.anthropic": "Anthropic",
