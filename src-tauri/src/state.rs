@@ -142,6 +142,20 @@ impl AppState {
         self.transcription_queue.lock().unwrap().len()
     }
 
+    pub fn to_frontend_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "is_recording": *self.is_recording.lock().unwrap(),
+            "is_transcribing": *self.is_transcribing.lock().unwrap(),
+            "queue_count": self.queue_count(),
+            "downloading_model_id": *self.downloading_model_id.lock().unwrap(),
+            "download_progress": *self.download_progress.lock().unwrap(),
+            "selected_model_id": *self.selected_model_id.lock().unwrap(),
+            "selected_language": *self.selected_language.lock().unwrap(),
+            "post_processing_enabled": *self.post_processing_enabled.lock().unwrap(),
+            "hotkey": *self.hotkey_option.lock().unwrap(),
+        })
+    }
+
     pub fn add_history(&self, text: String) {
         let mut history = self.transcription_history.lock().unwrap();
         let entry = HistoryEntry {

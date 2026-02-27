@@ -10,6 +10,14 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
+// -- Timing constants --
+
+const SHORT_TAP_MS: u64 = 300;
+const DOUBLE_TAP_MS: u64 = 500;
+const ERROR_DISPLAY_MS: u64 = 800;
+const SPECTRUM_INTERVAL_MS: u64 = 33;
+const ORPHAN_CLEANUP_SECS: u64 = 300;
+
 // -- Audio commands for the dedicated audio thread --
 
 pub enum AudioCmd {
@@ -38,6 +46,8 @@ pub struct RecordingState {
 unsafe impl Send for RecordingState {}
 unsafe impl Sync for RecordingState {}
 
+// -- Recording lifecycle --
+
 pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
     if *state.is_recording.lock().unwrap() {
         return;
@@ -48,7 +58,6 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
 
     let device_uid = state.selected_input_device_uid.lock().unwrap().clone();
     let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
-    // Wait for ack
     let _ = rec.audio_rx.recv();
 
     platform::play_sound("Tink");
@@ -72,40 +81,15 @@ pub fn stop_recording_and_enqueue(
         Ok(AudioReply::Stopped { path }) => path,
         _ => None,
     };
-    log::info!("stop_recording: audio_path={:?}", audio_path.as_ref().map(|p| p.display().to_string()));
 
-    // Detect short tap (< 300ms)
-    let is_short_tap = rec
-        .key_down_time
-        .map(|t| t.elapsed() < Duration::from_millis(300))
-        .unwrap_or(false);
+    let held_duration = rec.key_down_time.map(|t| t.elapsed());
     rec.key_down_time = None;
-    log::info!("stop_recording: is_short_tap={}", is_short_tap);
+    let is_short_tap = held_duration
+        .map(|d| d < Duration::from_millis(SHORT_TAP_MS))
+        .unwrap_or(false);
 
     if is_short_tap {
-        if let Some(ref path) = audio_path {
-            let _ = std::fs::remove_file(path);
-        }
-
-        if let Some(last) = rec.last_short_tap_time {
-            if last.elapsed() < Duration::from_millis(500) {
-                rec.last_short_tap_time = None;
-                cancel_transcription(app, state);
-                return;
-            }
-        }
-        rec.last_short_tap_time = Some(Instant::now());
-
-        let is_transcribing = *state.is_transcribing.lock().unwrap();
-        let queue_empty = state.transcription_queue.lock().unwrap().is_empty();
-        if !is_transcribing && queue_empty {
-            log::info!("stop_recording: short tap, nothing in progress → closing pill");
-            crate::tray::close_pill_window(app);
-        } else {
-            log::info!("stop_recording: short tap, transcription in progress → keeping pill");
-            let _ = app.emit("pill-mode", "transcribing");
-        }
-        let _ = app.emit("recording-stopped", ());
+        handle_short_tap(app, state, rec, audio_path);
         return;
     }
 
@@ -114,7 +98,7 @@ pub fn stop_recording_and_enqueue(
     let audio_path = match audio_path {
         Some(p) => p,
         None => {
-            log::warn!("stop_recording: no audio file produced, closing pill");
+            log::warn!("No audio file produced, closing pill");
             crate::tray::close_pill_window(app);
             let _ = app.emit("recording-stopped", ());
             return;
@@ -128,8 +112,6 @@ pub fn stop_recording_and_enqueue(
         "recording-stopped",
         serde_json::json!({ "queue_count": count }),
     );
-
-    log::info!("stop_recording: enqueued, emitting pill-mode=transcribing");
     let _ = app.emit("pill-mode", "transcribing");
 
     // Save clipboard once before the paste batch starts
@@ -148,17 +130,46 @@ pub fn stop_recording_and_enqueue(
     });
 }
 
+fn handle_short_tap(
+    app: &AppHandle,
+    state: &Arc<AppState>,
+    rec: &mut RecordingState,
+    audio_path: Option<std::path::PathBuf>,
+) {
+    if let Some(ref path) = audio_path {
+        let _ = std::fs::remove_file(path);
+    }
+
+    // Double-tap: cancel transcription
+    if let Some(last) = rec.last_short_tap_time {
+        if last.elapsed() < Duration::from_millis(DOUBLE_TAP_MS) {
+            rec.last_short_tap_time = None;
+            cancel_transcription(app, state);
+            return;
+        }
+    }
+    rec.last_short_tap_time = Some(Instant::now());
+
+    let is_transcribing = *state.is_transcribing.lock().unwrap();
+    let queue_empty = state.transcription_queue.lock().unwrap().is_empty();
+    if !is_transcribing && queue_empty {
+        crate::tray::close_pill_window(app);
+    } else {
+        let _ = app.emit("pill-mode", "transcribing");
+    }
+    let _ = app.emit("recording-stopped", ());
+}
+
+// -- Transcription queue processing --
+
 pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     if *state.is_transcribing.lock().unwrap() {
-        log::info!("process_next_in_queue: already transcribing, skipping");
         return;
     }
     if state.transcription_queue.lock().unwrap().is_empty() {
-        log::info!("process_next_in_queue: queue empty, skipping");
         return;
     }
 
-    log::info!("process_next_in_queue: starting transcription");
     *state.is_transcribing.lock().unwrap() = true;
     let audio_path = match state.dequeue() {
         Some(p) => p,
@@ -173,88 +184,21 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         serde_json::json!({ "queue_count": state.queue_count() }),
     );
 
-    let state_clone = Arc::clone(state);
-    let audio_path_clone = audio_path.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        transcriber::transcribe(&state_clone, &audio_path_clone)
-    })
-    .await;
-
+    let had_error = run_transcription(app, state, &audio_path).await;
     let _ = std::fs::remove_file(&audio_path);
-
-    let had_error;
-    match result {
-        Ok(Ok(text)) => {
-            had_error = false;
-            if *state.transcription_cancelled.lock().unwrap() {
-                log::info!("Transcription result discarded (cancelled)");
-            } else {
-                let trimmed = text.trim();
-                if !trimmed.is_empty() {
-                    let processed = if *state.post_processing_enabled.lock().unwrap() {
-                        let lang = state.selected_language.lock().unwrap().clone();
-                        post_processor::process(trimmed, &lang)
-                    } else {
-                        trimmed.to_string()
-                    };
-
-                    paste::paste_text(app, &processed);
-                    state.add_history(processed.clone());
-                    platform::play_sound("Glass");
-
-                    let _ = app.emit(
-                        "transcription-complete",
-                        serde_json::json!({ "text": processed }),
-                    );
-                } else {
-                    platform::play_sound("Basso");
-                    let _ = app.emit("transcription-complete", serde_json::json!({ "text": "" }));
-                }
-            }
-        }
-        Ok(Err(e)) => {
-            had_error = true;
-            log::error!("Transcription error: {}", e);
-            platform::play_sound("Basso");
-            let _ = app.emit(
-                "transcription-error",
-                serde_json::json!({ "error": e.to_string() }),
-            );
-        }
-        Err(e) => {
-            had_error = true;
-            log::error!("Transcription task panicked: {}", e);
-            platform::play_sound("Basso");
-            let _ = app.emit(
-                "transcription-error",
-                serde_json::json!({ "error": "Internal error" }),
-            );
-        }
-    }
-
     *state.is_transcribing.lock().unwrap() = false;
 
-    log::info!("process_next_in_queue: transcription done, had_error={}", had_error);
-
-    // Error → show error 800ms then close
     if had_error {
         restore_saved_clipboard(app, state);
-        let _ = app.emit("pill-mode", "error");
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(800)).await;
-            crate::tray::close_pill_window(&app_clone);
-        });
+        show_error_then_close(app);
         return;
     }
 
-    // Success → continue queue or close
+    // Continue processing queue if not cancelled
     if !*state.transcription_cancelled.lock().unwrap()
         && !state.transcription_queue.lock().unwrap().is_empty()
     {
-        let app_clone = app.clone();
-        let state_clone = Arc::clone(state);
-        Box::pin(process_next_in_queue(&app_clone, &state_clone)).await;
+        Box::pin(process_next_in_queue(app, &Arc::clone(state))).await;
         return;
     }
 
@@ -265,7 +209,84 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     }
 }
 
-/// Restore the clipboard content that was saved before the paste batch.
+async fn run_transcription(
+    app: &AppHandle,
+    state: &Arc<AppState>,
+    audio_path: &std::path::Path,
+) -> bool {
+    let state_clone = Arc::clone(state);
+    let path = audio_path.to_path_buf();
+    let result = tokio::task::spawn_blocking(move || {
+        transcriber::transcribe(&state_clone, &path)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(text)) => {
+            if *state.transcription_cancelled.lock().unwrap() {
+                log::info!("Transcription result discarded (cancelled)");
+                return false;
+            }
+            handle_transcription_result(app, state, &text);
+            false
+        }
+        Ok(Err(e)) => {
+            log::error!("Transcription error: {}", e);
+            platform::play_sound("Basso");
+            let _ = app.emit(
+                "transcription-error",
+                serde_json::json!({ "error": e.to_string() }),
+            );
+            true
+        }
+        Err(e) => {
+            log::error!("Transcription task panicked: {}", e);
+            platform::play_sound("Basso");
+            let _ = app.emit(
+                "transcription-error",
+                serde_json::json!({ "error": "Internal error" }),
+            );
+            true
+        }
+    }
+}
+
+fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        platform::play_sound("Basso");
+        let _ = app.emit("transcription-complete", serde_json::json!({ "text": "" }));
+        return;
+    }
+
+    let processed = if *state.post_processing_enabled.lock().unwrap() {
+        let lang = state.selected_language.lock().unwrap().clone();
+        post_processor::process(trimmed, &lang)
+    } else {
+        trimmed.to_string()
+    };
+
+    paste::paste_text(app, &processed);
+    state.add_history(processed.clone());
+    platform::play_sound("Glass");
+
+    let _ = app.emit(
+        "transcription-complete",
+        serde_json::json!({ "text": processed }),
+    );
+}
+
+// -- Cleanup helpers --
+
+fn show_error_then_close(app: &AppHandle) {
+    let _ = app.emit("pill-mode", "error");
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(ERROR_DISPLAY_MS)).await;
+        crate::tray::close_pill_window(&app_clone);
+    });
+}
+
 fn restore_saved_clipboard(app: &AppHandle, state: &Arc<AppState>) {
     let saved = state.saved_clipboard.lock().unwrap().take();
     if saved.is_some() {
@@ -281,20 +302,14 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
     *state.transcription_cancelled.lock().unwrap() = true;
     restore_saved_clipboard(app, state);
     platform::play_sound("Funk");
-    let _ = app.emit("pill-mode", "error");
     let _ = app.emit("transcription-cancelled", ());
-    // Close after 800ms error animation
-    let app_clone = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(800));
-        crate::tray::close_pill_window(&app_clone);
-    });
+    show_error_then_close(app);
 }
 
 pub fn cleanup_orphan_audio_files() {
     let tmp_dir = std::env::temp_dir();
     if let Ok(entries) = std::fs::read_dir(&tmp_dir) {
-        let cutoff = std::time::SystemTime::now() - Duration::from_secs(300);
+        let cutoff = std::time::SystemTime::now() - Duration::from_secs(ORPHAN_CLEANUP_SECS);
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
             if name.starts_with("whisper_dictate_") && name.ends_with(".wav") {
@@ -310,6 +325,8 @@ pub fn cleanup_orphan_audio_files() {
         }
     }
 }
+
+// -- Thread spawning --
 
 /// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error).
 type AudioThreadHandles = (
@@ -344,7 +361,6 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
                 Ok(AudioCmd::GetSpectrum) => {
                     let s = recorder.get_spectrum();
                     *spectrum_clone.lock().unwrap() = s.clone();
-                    // Don't send reply — spectrum data is read via shared spectrum_data
                 }
                 Err(_) => break,
             }
@@ -354,7 +370,6 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
     (cmd_tx, spectrum_data, reply_rx, stream_error)
 }
 
-/// Spawns the hotkey event processing thread.
 pub fn spawn_hotkey_handler(
     hotkey_rx: std::sync::mpsc::Receiver<hotkey::HotkeyEvent>,
     app: AppHandle,
@@ -364,12 +379,10 @@ pub fn spawn_hotkey_handler(
     std::thread::spawn(move || loop {
         match hotkey_rx.recv() {
             Ok(hotkey::HotkeyEvent::KeyDown) => {
-                log::info!("Hotkey KeyDown received");
                 let mut rec = rec_state.lock().unwrap();
                 start_recording(&app, &state, &mut rec);
             }
             Ok(hotkey::HotkeyEvent::KeyUp) => {
-                log::info!("Hotkey KeyUp received");
                 let mut rec = rec_state.lock().unwrap();
                 stop_recording_and_enqueue(&app, &state, &mut rec);
             }
@@ -378,8 +391,7 @@ pub fn spawn_hotkey_handler(
     });
 }
 
-/// Spawns the spectrum emission timer (30fps).
-/// Also monitors the stream_error flag to detect device disconnection.
+/// Spawns the spectrum emission timer (30fps) and monitors stream errors.
 pub fn spawn_spectrum_emitter(
     app: AppHandle,
     state: Arc<AppState>,
@@ -388,38 +400,30 @@ pub fn spawn_spectrum_emitter(
     stream_error: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_millis(33));
-        if *state.is_recording.lock().unwrap() {
-            // Detect audio stream error (e.g. device disconnected)
-            if stream_error.load(Ordering::SeqCst) {
-                log::warn!("Audio stream error detected (device disconnected?), forcing stop");
-                *state.is_recording.lock().unwrap() = false;
-                stream_error.store(false, Ordering::SeqCst);
-
-                // Show error on pill, then close after 800ms
-                platform::play_sound("Basso");
-                let _ = app.emit("pill-mode", "error");
-                let _ = app.emit("recording-stopped", ());
-
-                // Restore clipboard if we saved it
-                restore_saved_clipboard(&app, &state);
-
-                let app_clone = app.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(800));
-                    crate::tray::close_pill_window(&app_clone);
-                });
-                continue;
-            }
-
-            let spectrum = spectrum_data.lock().unwrap().clone();
-            let _ = cmd_tx.send(AudioCmd::GetSpectrum);
-            let _ = app.emit("spectrum-data", spectrum);
+        std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
+        if !*state.is_recording.lock().unwrap() {
+            continue;
         }
+
+        // Detect audio stream error (e.g. device disconnected)
+        if stream_error.load(Ordering::SeqCst) {
+            log::warn!("Audio stream error detected (device disconnected?), forcing stop");
+            *state.is_recording.lock().unwrap() = false;
+            stream_error.store(false, Ordering::SeqCst);
+
+            platform::play_sound("Basso");
+            let _ = app.emit("recording-stopped", ());
+            restore_saved_clipboard(&app, &state);
+            show_error_then_close(&app);
+            continue;
+        }
+
+        let spectrum = spectrum_data.lock().unwrap().clone();
+        let _ = cmd_tx.send(AudioCmd::GetSpectrum);
+        let _ = app.emit("spectrum-data", spectrum);
     });
 }
 
-/// Creates a new RecordingState from audio thread channels.
 pub fn new_recording_state(
     cmd_tx: std::sync::mpsc::Sender<AudioCmd>,
     reply_rx: std::sync::mpsc::Receiver<AudioReply>,
