@@ -29,6 +29,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         set { UserDefaults.standard.set(newValue, forKey: "postProcessingEnabled") }
     }
 
+    // Setup window
+    private var setupWindowController: SetupWindowController?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: ["postProcessingEnabled": true])
         cleanupOrphanAudioFiles()
@@ -42,12 +45,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         PermissionChecker.check { [weak self] report in
             report.log()
-            if report.inputMonitoring == .granted {
+            if report.microphone == .granted && report.accessibility == .granted && report.inputMonitoring == .granted {
                 self?.setupKeyMonitor()
                 Log.info("Ready")
             } else {
                 self?.setMenuBarIcon("mic.slash")
-                Log.info("Waiting for Input Monitoring permission...")
+                self?.showSetupWindow()
             }
         }
 
@@ -253,6 +256,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !state.isRecording && !state.isTranscribing && state.transcriptionQueue.isEmpty {
             pill.dismiss()
         }
+    }
+
+    private func showSetupWindow() {
+        Log.info("Showing permission setup window")
+        let setup = SetupWindowController()
+        setup.onComplete = { [weak self] in
+            self?.setupWindowController = nil
+            self?.setupKeyMonitor()
+            self?.setMenuBarIcon("mic.fill")
+            Log.info("Setup complete — Ready")
+        }
+        setup.showWindow(nil)
+        setup.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        setupWindowController = setup
     }
 
     private func setupKeyMonitor() {

@@ -128,7 +128,7 @@ class PermissionChecker {
     }
 
     /// Test input monitoring by creating a passive event tap
-    private static func checkInputMonitoring() -> Bool {
+    static func checkInputMonitoring() -> Bool {
         let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,

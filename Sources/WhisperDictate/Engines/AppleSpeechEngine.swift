@@ -1,4 +1,4 @@
-import Foundation
+import Cocoa
 import Speech
 
 struct AppleSpeechEngine: ASREngine {
@@ -65,6 +65,16 @@ struct AppleSpeechEngine: ASREngine {
         }
 
         if let error = resultError, resultText == nil {
+            let nsError = error as NSError
+            if nsError.domain == "kLSRErrorDomain" && nsError.code == 201 {
+                DispatchQueue.main.async {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Siri-Settings.extension")!)
+                }
+                throw TranscriberError.engineUnavailable(
+                    engineId: engineId,
+                    installHint: "Activez Siri dans Réglages Système > Siri et Spotlight"
+                )
+            }
             throw TranscriberError.launchFailed(error)
         }
 

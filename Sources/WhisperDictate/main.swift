@@ -16,7 +16,4 @@ sigSource.setEventHandler {
 }
 sigSource.resume()
 
-// Check and request all permissions, auto-restart if Input Monitoring is granted
-PermissionChecker.requestAllAndVerify()
-
 app.run()
