@@ -427,7 +427,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
                 }
                 "settings" => {
-                    open_window(app, "settings", "Settings", "/settings", 500.0, 520.0);
+                    open_window(app, "settings", "Settings", "/settings", 580.0, 420.0);
                 }
                 "setup" => {
                     open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
