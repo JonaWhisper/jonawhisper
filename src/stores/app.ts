@@ -88,6 +88,20 @@ interface AppStatePayload {
   selected_language: string
   post_processing_enabled: boolean
   hotkey: string
+  app_locale: string
+  hallucination_filter_enabled: boolean
+  cancel_shortcut: string
+}
+
+export interface SettingsPayload {
+  app_locale: string
+  post_processing_enabled: boolean
+  hallucination_filter_enabled: boolean
+  hotkey: string
+  cancel_shortcut: string
+  selected_input_device_uid: string | null
+  selected_model_id: string
+  selected_language: string
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -100,6 +114,9 @@ export const useAppStore = defineStore('app', () => {
   const selectedModelId = ref('whisper:large-v3-turbo')
   const selectedLanguage = ref('auto')
   const postProcessingEnabled = ref(true)
+  const hallucinationFilterEnabled = ref(true)
+  const appLocale = ref('auto')
+  const cancelShortcut = ref('escape')
   const hotkey = ref('right_command')
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
@@ -170,6 +187,9 @@ export const useAppStore = defineStore('app', () => {
       selectedModelId.value = state.selected_model_id
       selectedLanguage.value = state.selected_language
       postProcessingEnabled.value = state.post_processing_enabled
+      hallucinationFilterEnabled.value = state.hallucination_filter_enabled
+      appLocale.value = state.app_locale
+      cancelShortcut.value = state.cancel_shortcut
       hotkey.value = state.hotkey
     } catch (e) { console.error('fetchState failed:', e) }
   }
@@ -231,6 +251,34 @@ export const useAppStore = defineStore('app', () => {
       await invoke('set_hotkey', { hotkey: key })
       hotkey.value = key
     } catch (e) { console.error('setHotkey failed:', e) }
+  }
+
+  async function fetchSettings() {
+    try {
+      const s = await invoke<SettingsPayload>('get_settings')
+      appLocale.value = s.app_locale
+      postProcessingEnabled.value = s.post_processing_enabled
+      hallucinationFilterEnabled.value = s.hallucination_filter_enabled
+      hotkey.value = s.hotkey
+      cancelShortcut.value = s.cancel_shortcut
+    } catch (e) { console.error('fetchSettings failed:', e) }
+  }
+
+  async function setSetting(key: string, value: string) {
+    try {
+      await invoke('set_setting', { key, value })
+      // Update local state
+      switch (key) {
+        case 'app_locale': appLocale.value = value; break
+        case 'post_processing_enabled': postProcessingEnabled.value = value === 'true'; break
+        case 'hallucination_filter_enabled': hallucinationFilterEnabled.value = value === 'true'; break
+        case 'hotkey': hotkey.value = value; break
+        case 'cancel_shortcut': cancelShortcut.value = value; break
+        case 'selected_input_device_uid':
+          // Refresh devices to reflect change
+          break
+      }
+    } catch (e) { console.error('setSetting failed:', e) }
   }
 
   async function startMonitoring() {
@@ -358,7 +406,8 @@ export const useAppStore = defineStore('app', () => {
     isRecording, isTranscribing, queueCount,
     downloadingModelId, downloadProgress,
     selectedModelId, selectedLanguage,
-    postProcessingEnabled, hotkey, spectrumData, pillMode,
+    postProcessingEnabled, hallucinationFilterEnabled, appLocale,
+    cancelShortcut, hotkey, spectrumData, pillMode,
     engines, models, languages, history,
     audioDevices, permissions, apiServers,
     // Computed
@@ -370,6 +419,7 @@ export const useAppStore = defineStore('app', () => {
     selectModel, selectLanguageAction,
     downloadModel, deleteModel,
     setPostProcessing, setHotkey,
+    fetchSettings, setSetting,
     clearHistoryAction, requestPermission,
     startMonitoring,
     addApiServer, removeApiServer,

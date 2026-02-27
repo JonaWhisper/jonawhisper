@@ -72,22 +72,44 @@ impl HotkeyOption {
     }
 }
 
+/// Cancel shortcut key codes.
+pub mod cancel_keys {
+    pub const ESCAPE: u16 = 0x35;
+    pub const NONE: u16 = 0; // disabled
+
+    pub fn from_name(name: &str) -> u16 {
+        match name {
+            "escape" => ESCAPE,
+            _ => NONE,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum HotkeyEvent {
     KeyDown,
     KeyUp,
+    CancelPressed,
+}
+
+/// Messages to update hotkey configuration at runtime.
+#[allow(dead_code)] // will be used when Settings sends live updates
+pub enum HotkeyUpdate {
+    SetHotkey(HotkeyOption),
+    SetCancelKey(u16),
 }
 
 /// Start monitoring the hotkey on a background thread.
-/// Returns a receiver for hotkey events and a sender to update the hotkey option.
+/// Returns a receiver for hotkey events and a sender to update the hotkey/cancel key.
 /// The monitoring thread waits for `enabled` to become true before creating the CGEvent tap.
 #[cfg(target_os = "macos")]
 pub fn start_monitor(
     initial_hotkey: HotkeyOption,
+    initial_cancel_key: u16,
     enabled: Arc<AtomicBool>,
-) -> (mpsc::Receiver<HotkeyEvent>, mpsc::Sender<HotkeyOption>) {
+) -> (mpsc::Receiver<HotkeyEvent>, mpsc::Sender<HotkeyUpdate>) {
     let (event_tx, event_rx) = mpsc::channel::<HotkeyEvent>();
-    let (hotkey_tx, hotkey_rx) = mpsc::channel::<HotkeyOption>();
+    let (update_tx, update_rx) = mpsc::channel::<HotkeyUpdate>();
 
     std::thread::spawn(move || {
         // Wait until monitoring is enabled (permissions confirmed)
@@ -95,17 +117,18 @@ pub fn start_monitor(
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
         log::info!("Hotkey monitoring enabled, starting event tap");
-        run_event_tap(initial_hotkey, event_tx, hotkey_rx);
+        run_event_tap(initial_hotkey, initial_cancel_key, event_tx, update_rx);
     });
 
-    (event_rx, hotkey_tx)
+    (event_rx, update_tx)
 }
 
 #[cfg(target_os = "macos")]
 fn run_event_tap(
     initial_hotkey: HotkeyOption,
+    initial_cancel_key: u16,
     event_tx: mpsc::Sender<HotkeyEvent>,
-    hotkey_rx: mpsc::Receiver<HotkeyOption>,
+    update_rx: mpsc::Receiver<HotkeyUpdate>,
 ) {
     use std::os::raw::c_void;
     use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
@@ -114,10 +137,12 @@ fn run_event_tap(
     static KEY_CODE: AtomicU16 = AtomicU16::new(0x36);
     static FLAG_MASK: AtomicU64 = AtomicU64::new(HotkeyOption::CG_MASK_COMMAND);
     static KEY_HELD: AtomicBool = AtomicBool::new(false);
+    static CANCEL_KEY_CODE: AtomicU16 = AtomicU16::new(0x35); // Escape
 
     KEY_CODE.store(initial_hotkey.key_code, Ordering::SeqCst);
     FLAG_MASK.store(initial_hotkey.flag_mask, Ordering::SeqCst);
     KEY_HELD.store(false, Ordering::SeqCst);
+    CANCEL_KEY_CODE.store(initial_cancel_key, Ordering::SeqCst);
 
     // Store event_tx in a Box leaked into a raw pointer for the callback
     let tx_ptr = Box::into_raw(Box::new(event_tx.clone())) as *mut c_void;
@@ -129,6 +154,7 @@ fn run_event_tap(
         user_info: *mut c_void,
     ) -> *mut c_void {
         // CGEventType values
+        const KEY_DOWN: u32 = 10;
         const FLAGS_CHANGED: u32 = 12;
         const TAP_DISABLED_BY_TIMEOUT: u32 = 0xFFFFFFFE;
         const TAP_DISABLED_BY_USER: u32 = 0xFFFFFFFF;
@@ -138,7 +164,7 @@ fn run_event_tap(
             return event;
         }
 
-        if event_type != FLAGS_CHANGED {
+        if event_type != FLAGS_CHANGED && event_type != KEY_DOWN {
             return event;
         }
 
@@ -154,8 +180,20 @@ fn run_event_tap(
 
             // kCGKeyboardEventKeycode = 9 (CGEventField enum)
             let key_code = CGEventGetIntegerValueField(event, 9) as u16;
-            let flags = CGEventGetFlags(event);
 
+            // Handle cancel key (keyDown only)
+            if event_type == KEY_DOWN {
+                let cancel_code = CANCEL_KEY_CODE.load(Ordering::SeqCst);
+                if cancel_code != 0 && key_code == cancel_code {
+                    let tx = &*(user_info as *const mpsc::Sender<HotkeyEvent>);
+                    log::debug!("Cancel key pressed (code=0x{:02x})", key_code);
+                    let _ = tx.send(HotkeyEvent::CancelPressed);
+                }
+                return event;
+            }
+
+            // Handle modifier hotkey (flagsChanged)
+            let flags = CGEventGetFlags(event);
             log::debug!("flagsChanged: keycode=0x{:02x} flags=0x{:x}", key_code, flags);
 
             let expected_code = KEY_CODE.load(Ordering::SeqCst);
@@ -185,7 +223,7 @@ fn run_event_tap(
         event
     }
 
-    // SAFETY: CGEventTapCreate creates an active event tap for flagsChanged events.
+    // SAFETY: CGEventTapCreate creates an active event tap for flagsChanged + keyDown events.
     // The callback pointer (tx_ptr) is a leaked Box<Sender> — lives until process exit.
     // CFMachPortCreateRunLoopSource/CFRunLoopAddSource wire the tap into the current runloop.
     // The loop re-enables the tap periodically (macOS may disable it on timeout).
@@ -229,8 +267,8 @@ fn run_event_tap(
             static kCFRunLoopDefaultMode: *const c_void;
         }
 
-        // CGEventMask for flagsChanged (bit 12)
-        let event_mask: u64 = 1 << 12;
+        // CGEventMask for keyDown (bit 10) + flagsChanged (bit 12)
+        let event_mask: u64 = (1 << 10) | (1 << 12);
 
         let tap = CGEventTapCreate(
             1, // cgSessionEventTap
@@ -261,12 +299,20 @@ fn run_event_tap(
             // Re-enable tap in case macOS disabled it
             CGEventTapEnable(tap, true);
 
-            // Check if hotkey was updated
-            if let Ok(new_hotkey) = hotkey_rx.try_recv() {
-                KEY_CODE.store(new_hotkey.key_code, Ordering::SeqCst);
-                FLAG_MASK.store(new_hotkey.flag_mask, Ordering::SeqCst);
-                KEY_HELD.store(false, Ordering::SeqCst);
-                log::info!("Hotkey changed to {}", new_hotkey.label);
+            // Check for updates
+            while let Ok(update) = update_rx.try_recv() {
+                match update {
+                    HotkeyUpdate::SetHotkey(new_hotkey) => {
+                        KEY_CODE.store(new_hotkey.key_code, Ordering::SeqCst);
+                        FLAG_MASK.store(new_hotkey.flag_mask, Ordering::SeqCst);
+                        KEY_HELD.store(false, Ordering::SeqCst);
+                        log::info!("Hotkey changed to {}", new_hotkey.label);
+                    }
+                    HotkeyUpdate::SetCancelKey(code) => {
+                        CANCEL_KEY_CODE.store(code, Ordering::SeqCst);
+                        log::info!("Cancel shortcut changed to keycode=0x{:02x}", code);
+                    }
+                }
             }
         }
     }
@@ -275,10 +321,11 @@ fn run_event_tap(
 #[cfg(not(target_os = "macos"))]
 pub fn start_monitor(
     _initial_hotkey: HotkeyOption,
+    _initial_cancel_key: u16,
     _enabled: Arc<AtomicBool>,
-) -> (mpsc::Receiver<HotkeyEvent>, mpsc::Sender<HotkeyOption>) {
-    let (event_tx, event_rx) = mpsc::channel();
-    let (hotkey_tx, _hotkey_rx) = mpsc::channel();
+) -> (mpsc::Receiver<HotkeyEvent>, mpsc::Sender<HotkeyUpdate>) {
+    let (_event_tx, event_rx) = mpsc::channel();
+    let (update_tx, _update_rx) = mpsc::channel();
     log::warn!("Hotkey monitoring not implemented on this platform");
-    (event_rx, hotkey_tx)
+    (event_rx, update_tx)
 }

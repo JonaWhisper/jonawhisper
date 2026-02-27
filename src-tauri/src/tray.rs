@@ -231,17 +231,6 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
         None::<&str>,
     )?)?;
 
-    // Post-processing toggle
-    let pp_enabled = *state.post_processing_enabled.lock().unwrap();
-    let post_processing = CheckMenuItem::with_id(
-        app,
-        "post_processing",
-        "Post-processing",
-        true,
-        pp_enabled,
-        None::<&str>,
-    )?;
-
     let menu = Menu::with_items(
         app,
         &[
@@ -250,8 +239,8 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             &mic_submenu,
             &model_submenu,
             &lang_submenu,
-            &post_processing,
             &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "settings", "Settings\u{2026}", true, None::<&str>)?,
             &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             #[cfg(debug_assertions)]
@@ -435,16 +424,11 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 "model_manager" => {
                     open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
                 }
+                "settings" => {
+                    open_window(app, "settings", "Settings", "/settings", 500.0, 520.0);
+                }
                 "setup" => {
                     open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
-                }
-                "post_processing" => {
-                    let state = get_state(app);
-                    let mut enabled = state.post_processing_enabled.lock().unwrap();
-                    *enabled = !*enabled;
-                    log::info!("Post-processing: {}", *enabled);
-                    drop(enabled);
-                    state.save_preferences();
                 }
                 "test_pill" => {
                     let app_clone = app.clone();

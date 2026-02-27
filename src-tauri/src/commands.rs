@@ -123,6 +123,53 @@ pub fn set_hotkey(hotkey: String, state: tauri::State<'_, Arc<AppState>>) {
     state.save_preferences();
 }
 
+#[tauri::command]
+pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
+    serde_json::json!({
+        "app_locale": *state.app_locale.lock().unwrap(),
+        "post_processing_enabled": *state.post_processing_enabled.lock().unwrap(),
+        "hallucination_filter_enabled": *state.hallucination_filter_enabled.lock().unwrap(),
+        "hotkey": *state.hotkey_option.lock().unwrap(),
+        "selected_input_device_uid": *state.selected_input_device_uid.lock().unwrap(),
+        "selected_model_id": *state.selected_model_id.lock().unwrap(),
+        "selected_language": *state.selected_language.lock().unwrap(),
+        "cancel_shortcut": *state.cancel_shortcut.lock().unwrap(),
+    })
+}
+
+#[tauri::command]
+pub fn set_setting(
+    key: String,
+    value: String,
+    state: tauri::State<'_, Arc<AppState>>,
+    app: AppHandle,
+) {
+    match key.as_str() {
+        "app_locale" => *state.app_locale.lock().unwrap() = value,
+        "post_processing_enabled" => {
+            *state.post_processing_enabled.lock().unwrap() = value == "true";
+        }
+        "hallucination_filter_enabled" => {
+            *state.hallucination_filter_enabled.lock().unwrap() = value == "true";
+        }
+        "hotkey" => *state.hotkey_option.lock().unwrap() = value,
+        "cancel_shortcut" => *state.cancel_shortcut.lock().unwrap() = value,
+        "selected_input_device_uid" => {
+            *state.selected_input_device_uid.lock().unwrap() = if value.is_empty() {
+                None
+            } else {
+                Some(value)
+            };
+        }
+        _ => {
+            log::warn!("Unknown setting key: {}", key);
+            return;
+        }
+    }
+    state.save_preferences();
+    let _ = app.emit("settings-changed", &key);
+}
+
 // -- History --
 
 #[tauri::command]

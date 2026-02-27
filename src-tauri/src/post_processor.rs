@@ -11,8 +11,16 @@ static RE_SPACE_AFTER_OPEN: LazyLock<Regex> =
 static RE_CAPITALIZE_AFTER_SENTENCE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"([.?!]\s+|\n)(\p{Ll})").unwrap());
 
-pub fn process(text: &str, language: &str) -> String {
-    let mut result = strip_hallucinations(text);
+pub struct PostProcessOptions {
+    pub hallucination_filter: bool,
+}
+
+pub fn process(text: &str, language: &str, opts: &PostProcessOptions) -> String {
+    let mut result = if opts.hallucination_filter {
+        strip_hallucinations(text)
+    } else {
+        text.to_string()
+    };
     if result.trim().is_empty() {
         return String::new();
     }
@@ -184,41 +192,53 @@ fn capitalize_after_sentence_endings(text: &str) -> String {
 mod tests {
     use super::*;
 
+    fn default_opts() -> PostProcessOptions {
+        PostProcessOptions { hallucination_filter: true }
+    }
+
     #[test]
     fn test_french_commands() {
-        let result = process("bonjour virgule comment allez-vous point d'interrogation", "fr");
+        let result = process("bonjour virgule comment allez-vous point d'interrogation", "fr", &default_opts());
         assert_eq!(result, "Bonjour, comment allez-vous?");
     }
 
     #[test]
     fn test_english_commands() {
-        let result = process("hello comma how are you question mark", "en");
+        let result = process("hello comma how are you question mark", "en", &default_opts());
         assert_eq!(result, "Hello, how are you?");
     }
 
     #[test]
     fn test_auto_detect_french() {
-        let result = process("le chat est dans la maison", "auto");
+        let result = process("le chat est dans la maison", "auto", &default_opts());
         assert!(result.starts_with("Le"));
     }
 
     #[test]
     fn test_capitalization() {
-        let result = process("hello. world", "en");
+        let result = process("hello. world", "en", &default_opts());
         assert_eq!(result, "Hello. World");
     }
 
     #[test]
     fn test_hallucination_filter() {
-        assert_eq!(process("Sous-titrage Société Radio-Canada", "fr"), "");
-        assert_eq!(process("sous-titrage", "fr"), "");
-        assert_eq!(process("Thank you for watching", "en"), "");
-        assert_eq!(process("...", "en"), "");
+        let opts = default_opts();
+        assert_eq!(process("Sous-titrage Société Radio-Canada", "fr", &opts), "");
+        assert_eq!(process("sous-titrage", "fr", &opts), "");
+        assert_eq!(process("Thank you for watching", "en", &opts), "");
+        assert_eq!(process("...", "en", &opts), "");
+    }
+
+    #[test]
+    fn test_hallucination_filter_disabled() {
+        let opts = PostProcessOptions { hallucination_filter: false };
+        let result = process("sous-titrage", "fr", &opts);
+        assert!(!result.is_empty());
     }
 
     #[test]
     fn test_hallucination_embedded() {
-        let result = process("bonjour sous-titrage tout le monde", "fr");
+        let result = process("bonjour sous-titrage tout le monde", "fr", &default_opts());
         assert!(result.contains("Bonjour"));
         assert!(!result.to_lowercase().contains("sous-titrage"));
     }

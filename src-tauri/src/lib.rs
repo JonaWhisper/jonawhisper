@@ -52,6 +52,8 @@ pub fn run() {
             commands::add_api_server,
             commands::remove_api_server,
             commands::get_api_servers,
+            commands::get_settings,
+            commands::set_setting,
             commands::get_app_state,
             commands::simulate_pill_test,
         ])
@@ -77,11 +79,13 @@ pub fn run() {
             let monitor_enabled = Arc::new(AtomicBool::new(false));
             app.manage(monitor_enabled.clone());
 
-            // Start CGEvent tap hotkey monitor
+            // Start CGEvent tap hotkey monitor (with cancel key support)
             let hotkey_name = app_state.hotkey_option.lock().unwrap().clone();
             let initial_hotkey = platform::hotkey::HotkeyOption::from_name(&hotkey_name);
+            let cancel_name = app_state.cancel_shortcut.lock().unwrap().clone();
+            let initial_cancel_key = platform::hotkey::cancel_keys::from_name(&cancel_name);
             let (hotkey_rx, _hotkey_update_tx) =
-                platform::hotkey::start_monitor(initial_hotkey, monitor_enabled.clone());
+                platform::hotkey::start_monitor(initial_hotkey, initial_cancel_key, monitor_enabled.clone());
 
             // Hotkey event processing thread
             recording::spawn_hotkey_handler(

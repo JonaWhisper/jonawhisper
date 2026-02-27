@@ -25,6 +25,9 @@ pub struct AppState {
     pub selected_input_device_uid: Mutex<Option<String>>,
     pub transcription_history: Mutex<Vec<HistoryEntry>>,
     pub api_servers: Mutex<Vec<ApiServerConfig>>,
+    pub app_locale: Mutex<String>,
+    pub hallucination_filter_enabled: Mutex<bool>,
+    pub cancel_shortcut: Mutex<String>,
     /// Clipboard content saved before a paste batch, restored when queue drains.
     pub saved_clipboard: Mutex<Option<String>>,
 }
@@ -53,12 +56,20 @@ pub struct Preferences {
     pub selected_input_device_uid: Option<String>,
     #[serde(default)]
     pub api_servers: Vec<ApiServerConfig>,
+    #[serde(default = "default_auto")]
+    pub app_locale: String,
+    #[serde(default = "default_true")]
+    pub hallucination_filter_enabled: bool,
+    #[serde(default = "default_cancel_shortcut")]
+    pub cancel_shortcut: String,
 }
 
 fn default_model_id() -> String { "whisper:large-v3-turbo".to_string() }
 fn default_language() -> String { "auto".to_string() }
 fn default_true() -> bool { true }
 fn default_hotkey() -> String { "right_command".to_string() }
+fn default_auto() -> String { "auto".to_string() }
+fn default_cancel_shortcut() -> String { "escape".to_string() }
 
 fn prefs_path() -> PathBuf {
     dirs::home_dir()
@@ -104,6 +115,9 @@ impl Default for AppState {
             selected_input_device_uid: Mutex::new(prefs.selected_input_device_uid),
             transcription_history: Mutex::new(Vec::new()),
             api_servers: Mutex::new(prefs.api_servers),
+            app_locale: Mutex::new(prefs.app_locale),
+            hallucination_filter_enabled: Mutex::new(prefs.hallucination_filter_enabled),
+            cancel_shortcut: Mutex::new(prefs.cancel_shortcut),
             saved_clipboard: Mutex::new(None),
         }
     }
@@ -119,6 +133,9 @@ impl AppState {
             hotkey_option: self.hotkey_option.lock().unwrap().clone(),
             selected_input_device_uid: self.selected_input_device_uid.lock().unwrap().clone(),
             api_servers: self.api_servers.lock().unwrap().clone(),
+            app_locale: self.app_locale.lock().unwrap().clone(),
+            hallucination_filter_enabled: *self.hallucination_filter_enabled.lock().unwrap(),
+            cancel_shortcut: self.cancel_shortcut.lock().unwrap().clone(),
         };
         prefs.save();
     }
@@ -153,6 +170,9 @@ impl AppState {
             "selected_language": *self.selected_language.lock().unwrap(),
             "post_processing_enabled": *self.post_processing_enabled.lock().unwrap(),
             "hotkey": *self.hotkey_option.lock().unwrap(),
+            "app_locale": *self.app_locale.lock().unwrap(),
+            "hallucination_filter_enabled": *self.hallucination_filter_enabled.lock().unwrap(),
+            "cancel_shortcut": *self.cancel_shortcut.lock().unwrap(),
         })
     }
 

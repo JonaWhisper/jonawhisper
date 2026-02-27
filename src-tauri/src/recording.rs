@@ -266,7 +266,10 @@ fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &st
 
     let processed = if *state.post_processing_enabled.lock().unwrap() {
         let lang = state.selected_language.lock().unwrap().clone();
-        post_processor::process(trimmed, &lang)
+        let opts = post_processor::PostProcessOptions {
+            hallucination_filter: *state.hallucination_filter_enabled.lock().unwrap(),
+        };
+        post_processor::process(trimmed, &lang, &opts)
     } else {
         trimmed.to_string()
     };
@@ -390,6 +393,14 @@ pub fn spawn_hotkey_handler(
             Ok(hotkey::HotkeyEvent::KeyUp) => {
                 let mut rec = rec_state.lock().unwrap();
                 stop_recording_and_enqueue(&app, &state, &mut rec);
+            }
+            Ok(hotkey::HotkeyEvent::CancelPressed) => {
+                let is_transcribing = *state.is_transcribing.lock().unwrap();
+                let has_queue = !state.transcription_queue.lock().unwrap().is_empty();
+                if is_transcribing || has_queue {
+                    log::info!("Cancel shortcut pressed, cancelling transcription");
+                    cancel_transcription(&app, &state);
+                }
             }
             Err(_) => break,
         }
