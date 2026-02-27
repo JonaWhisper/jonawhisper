@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::path::PathBuf;
 
-const PREFS_DIR: &str = ".local/share/whisper-dictate";
+const APP_DIR_NAME: &str = "WhisperDictate";
 const PREFS_FILE: &str = "preferences.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,8 +29,8 @@ pub struct AppState {
     pub hallucination_filter_enabled: Mutex<bool>,
     pub cancel_shortcut: Mutex<String>,
     pub recording_mode: Mutex<String>,
-    /// Clipboard content saved before a paste batch, restored when queue drains.
-    pub saved_clipboard: Mutex<Option<String>>,
+    pub llm_config: Mutex<LlmConfig>,
+    pub mic_testing: Mutex<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +41,34 @@ pub struct ApiServerConfig {
     pub api_key: String,
     pub model: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_llm_provider")]
+    pub provider: String,
+    #[serde(default)]
+    pub api_url: String,
+    #[serde(default)]
+    pub api_key: String,
+    #[serde(default)]
+    pub model: String,
+}
+
+impl Default for LlmConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            provider: default_llm_provider(),
+            api_url: String::new(),
+            api_key: String::new(),
+            model: String::new(),
+        }
+    }
+}
+
+fn default_llm_provider() -> String { "openai".to_string() }
 
 /// Persistent preferences (subset of AppState that survives restarts).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -65,6 +93,8 @@ pub struct Preferences {
     pub cancel_shortcut: String,
     #[serde(default = "default_recording_mode")]
     pub recording_mode: String,
+    #[serde(default)]
+    pub llm_config: LlmConfig,
 }
 
 fn default_model_id() -> String { "whisper:large-v3-turbo".to_string() }
@@ -75,11 +105,16 @@ fn default_auto() -> String { "auto".to_string() }
 fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 
+/// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
+/// or %APPDATA%/WhisperDictate/ (Windows).
+pub fn config_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default())
+        .join(APP_DIR_NAME)
+}
+
 fn prefs_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join(PREFS_DIR)
-        .join(PREFS_FILE)
+    config_dir().join(PREFS_FILE)
 }
 
 impl Preferences {
@@ -123,7 +158,8 @@ impl Default for AppState {
             hallucination_filter_enabled: Mutex::new(prefs.hallucination_filter_enabled),
             cancel_shortcut: Mutex::new(prefs.cancel_shortcut),
             recording_mode: Mutex::new(prefs.recording_mode),
-            saved_clipboard: Mutex::new(None),
+            llm_config: Mutex::new(prefs.llm_config),
+            mic_testing: Mutex::new(false),
         }
     }
 }
@@ -142,6 +178,7 @@ impl AppState {
             hallucination_filter_enabled: *self.hallucination_filter_enabled.lock().unwrap(),
             cancel_shortcut: self.cancel_shortcut.lock().unwrap().clone(),
             recording_mode: self.recording_mode.lock().unwrap().clone(),
+            llm_config: self.llm_config.lock().unwrap().clone(),
         };
         prefs.save();
     }

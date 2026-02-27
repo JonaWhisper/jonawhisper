@@ -93,6 +93,7 @@ pub fn request_permission(kind: String) -> bool {
 
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
+    let llm = state.llm_config.lock().unwrap();
     serde_json::json!({
         "app_locale": *state.app_locale.lock().unwrap(),
         "post_processing_enabled": *state.post_processing_enabled.lock().unwrap(),
@@ -103,6 +104,13 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "selected_language": *state.selected_language.lock().unwrap(),
         "cancel_shortcut": *state.cancel_shortcut.lock().unwrap(),
         "recording_mode": *state.recording_mode.lock().unwrap(),
+        "llm_config": {
+            "enabled": llm.enabled,
+            "provider": llm.provider,
+            "api_url": llm.api_url,
+            "api_key": llm.api_key,
+            "model": llm.model,
+        },
     })
 }
 
@@ -138,6 +146,34 @@ pub fn set_setting(
     }
     state.save_preferences();
     let _ = app.emit("settings-changed", &key);
+}
+
+// -- Mic Test --
+
+#[tauri::command]
+pub fn start_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
+    let device_uid = state.selected_input_device_uid.lock().unwrap().clone();
+    *state.mic_testing.lock().unwrap() = true;
+    let _ = sender.0.lock().unwrap().send(crate::recording::AudioCmd::StartMicTest { device_uid });
+}
+
+#[tauri::command]
+pub fn stop_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
+    *state.mic_testing.lock().unwrap() = false;
+    let _ = sender.0.lock().unwrap().send(crate::recording::AudioCmd::StopMicTest);
+}
+
+// -- LLM Config --
+
+#[tauri::command]
+pub fn set_llm_config(
+    config: crate::state::LlmConfig,
+    state: tauri::State<'_, Arc<AppState>>,
+    app: AppHandle,
+) {
+    *state.llm_config.lock().unwrap() = config;
+    state.save_preferences();
+    let _ = app.emit("settings-changed", "llm_config");
 }
 
 // -- History --

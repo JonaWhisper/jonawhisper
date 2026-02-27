@@ -2,6 +2,7 @@ mod audio;
 mod commands;
 mod engines;
 mod errors;
+mod llm_cleanup;
 mod platform;
 mod post_processor;
 mod process_runner;
@@ -48,7 +49,10 @@ pub fn run() {
             commands::get_api_servers,
             commands::get_settings,
             commands::set_setting,
+            commands::set_llm_config,
             commands::get_app_state,
+            commands::start_mic_test,
+            commands::stop_mic_test,
             commands::simulate_pill_test,
         ])
         .setup(move |app| {
@@ -62,6 +66,9 @@ pub fn run() {
             // Audio thread (cpal::Stream is not Send)
             let (cmd_tx, spectrum_data, reply_rx, stream_error) =
                 recording::spawn_audio_thread();
+
+            // Mic test sender (clone before cmd_tx is moved)
+            app.manage(recording::MicTestSender(std::sync::Mutex::new(cmd_tx.clone())));
 
             // Recording state (Send-safe: only channels, no cpal::Stream)
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
