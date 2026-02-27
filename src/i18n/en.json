@@ -50,6 +50,7 @@
   "modelManager.selected": "Selected",
   "modelManager.notInstalled": "Engine not installed",
   "modelManager.addApiServer": "Add API Server",
+  "modelManager.language": "Language",
   "modelManager.cancel": "Cancel",
   "modelManager.save": "Save",
   "apiServer.name": "Server Name",

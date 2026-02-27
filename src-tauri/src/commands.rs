@@ -150,7 +150,11 @@ pub fn get_api_servers(state: tauri::State<'_, Arc<AppState>>) -> Vec<ApiServerC
 }
 
 #[tauri::command]
-pub fn start_monitoring(app: AppHandle, enabled: tauri::State<'_, Arc<AtomicBool>>) {
+pub fn start_monitoring(
+    app: AppHandle,
+    enabled: tauri::State<'_, Arc<AtomicBool>>,
+    state: tauri::State<'_, Arc<AppState>>,
+) {
     if !enabled.load(Ordering::SeqCst) {
         enabled.store(true, Ordering::SeqCst);
         log::info!("Monitoring enabled by start_monitoring command");
@@ -158,6 +162,25 @@ pub fn start_monitoring(app: AppHandle, enabled: tauri::State<'_, Arc<AtomicBool
     // Close the setup window from the backend (avoids app exit on last window close)
     if let Some(win) = app.get_webview_window("setup") {
         let _ = win.destroy();
+    }
+
+    // If the selected model isn't ready, open model manager so user can download one
+    let api_servers = state.api_servers.lock().unwrap().clone();
+    let catalog = engines::EngineCatalog::new(&api_servers);
+    let selected_id = state.selected_model_id.lock().unwrap().clone();
+    let model_ready = catalog
+        .model_by_id(&selected_id)
+        .is_some_and(|m| m.is_downloaded());
+
+    if !model_ready {
+        crate::tray::open_window(
+            &app,
+            "model-manager",
+            "Model Manager",
+            "/model-manager",
+            700.0,
+            500.0,
+        );
     }
 }
 

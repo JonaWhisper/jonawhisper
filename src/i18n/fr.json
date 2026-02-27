@@ -50,6 +50,7 @@
   "modelManager.selected": "Sélectionné",
   "modelManager.notInstalled": "Moteur non installé",
   "modelManager.addApiServer": "Ajouter un serveur API",
+  "modelManager.language": "Langue",
   "modelManager.cancel": "Annuler",
   "modelManager.save": "Enregistrer",
   "apiServer.name": "Nom du serveur",

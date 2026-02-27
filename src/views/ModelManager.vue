@@ -13,6 +13,10 @@ const showApiServerForm = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
 
+async function handleLanguageChange(code: string) {
+  await store.selectLanguageAction(code)
+}
+
 const filteredModels = computed(() => {
   if (!selectedEngineId.value) return store.models
   return store.models.filter(m => m.engine_id === selectedEngineId.value)
@@ -53,8 +57,7 @@ function cancelDelete() {
 }
 
 onMounted(async () => {
-  await store.fetchEngines()
-  await store.fetchModels()
+  await Promise.all([store.fetchEngines(), store.fetchModels(), store.fetchLanguages()])
   if (store.engines.length > 0 && !selectedEngineId.value) {
     selectedEngineId.value = store.engines[0]?.id ?? null
   }
@@ -108,6 +111,24 @@ onMounted(async () => {
 
     <!-- Model list -->
     <div class="flex-1 overflow-y-auto p-4">
+      <!-- Language selector -->
+      <div class="flex items-center gap-2 mb-4">
+        <label class="text-sm font-medium text-muted-foreground">{{ t('modelManager.language') }}</label>
+        <div class="flex gap-1 flex-wrap">
+          <button
+            v-for="lang in store.languages"
+            :key="lang.code"
+            @click="handleLanguageChange(lang.code)"
+            class="px-2.5 py-1 text-xs rounded-md border transition-colors"
+            :class="lang.code === store.selectedLanguage
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'border-border text-foreground hover:bg-accent'"
+          >
+            {{ lang.label }}
+          </button>
+        </div>
+      </div>
+
       <h2 class="text-lg font-semibold mb-4">
         {{ selectedEngineInfo?.name || t('modelManager.models') }}
       </h2>

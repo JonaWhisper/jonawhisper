@@ -1,8 +1,8 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createRouter, createWebHistory } from 'vue-router'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
+import router from './router'
 import en from './i18n/en.json'
 import fr from './i18n/fr.json'
 import './assets/main.css'
@@ -12,16 +12,6 @@ const i18n = createI18n({
   locale: navigator.language.startsWith('fr') ? 'fr' : 'en',
   fallbackLocale: 'en',
   messages: { en, fr },
-})
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [
-    { path: '/', redirect: '/pill' },
-    { path: '/pill', component: () => import('./components/FloatingPill.vue') },
-    { path: '/model-manager', component: () => import('./components/ModelManager.vue') },
-    { path: '/setup', component: () => import('./components/SetupWizard.vue') },
-  ],
 })
 
 const pinia = createPinia()
