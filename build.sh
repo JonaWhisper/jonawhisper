@@ -25,7 +25,7 @@ echo ""
 echo "=== Building ${APP_NAME} (Tauri ${MODE_LABEL}) ==="
 
 cd "$SCRIPT_DIR"
-npx tauri build --bundles app $TAURI_FLAGS 2>&1
+npx tauri build --bundles app $TAURI_FLAGS
 
 if [ ! -d "$APP_PATH" ]; then
     echo "ERROR: App bundle not found at $APP_PATH"

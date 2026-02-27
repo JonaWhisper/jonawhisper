@@ -7,7 +7,6 @@
 
 ## UX / Polish
 
-- [ ] **Settings window : taille adaptative** — Hauteur prioritaire, colonnes si besoin
 - [ ] **README** — Écrire un README propre pour le repo (description, screenshots, install, usage, build)
 
 ## Fonctionnalités
@@ -21,7 +20,7 @@
 ## Technique / Infra
 
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
-- [ ] **build.sh double exécution** — Le script semble s'exécuter deux fois, investiguer pourquoi
+- [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo, en plus du changelog dans les releases GitHub
 - [ ] **Audit des approches et patterns** — Lister toutes les approches utilisées (channels, mutex, FFI, async, spawning, etc.), comparer aux best practices Rust/Tauri, identifier doublons (ex: config+code), incohérences et améliorations possibles
 - [ ] **Audit event listeners / doublons** — Vérifier qu'on n'a pas de doubles `on`/`listen` à plusieurs endroits (config Tauri + code Rust), comme le problème qu'on avait eu avec le tray icon
 - [ ] **Script de test visuel + screenshots** — Pouvoir lancer des flows de test (pill, settings, etc.) et capturer des screenshots automatiquement pour vérifier le rendu sans intervention manuelle
