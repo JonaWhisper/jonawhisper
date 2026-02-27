@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '../stores/app'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -42,9 +41,8 @@ async function grant(kind: string) {
 }
 
 async function handleContinue() {
+  // start_monitoring also closes the setup window from the backend
   await store.startMonitoring()
-  const win = getCurrentWindow()
-  await win.close()
 }
 
 onMounted(() => {
