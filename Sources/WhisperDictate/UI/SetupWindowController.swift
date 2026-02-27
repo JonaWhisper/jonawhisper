@@ -11,18 +11,18 @@ class SetupWindowController: NSWindowController {
     private var continueButton: NSButton!
     private var pollTimer: Timer?
 
-    private static let steps: [(name: String, desc: String, settingsURL: String)] = [
-        ("Microphone",
-         "Enregistrer votre voix pour la transcription",
+    private static let steps: [(nameKey: String, descKey: String, settingsURL: String)] = [
+        ("setup.mic",
+         "setup.mic.desc",
          "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"),
-        ("Accessibilité",
-         "Coller le texte transcrit dans l'app active",
+        ("setup.accessibility",
+         "setup.accessibility.desc",
          "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"),
-        ("Surveillance de l'entrée",
-         "Détecter la touche Commande droite",
+        ("setup.inputMonitoring",
+         "setup.inputMonitoring.desc",
          "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"),
-        ("Notifications",
-         "Afficher les messages d'erreur",
+        ("setup.notifications",
+         "setup.notifications.desc",
          "x-apple.systempreferences:com.apple.Notifications-Settings.extension"),
     ]
 
@@ -55,13 +55,13 @@ class SetupWindowController: NSWindowController {
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
 
-        let title = NSTextField(labelWithString: "Configuration des permissions")
+        let title = NSTextField(labelWithString: NSLocalizedString("setup.title", comment: ""))
         title.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
         title.alignment = .center
         title.frame = NSRect(x: 0, y: 332, width: 460, height: 24)
         contentView.addSubview(title)
 
-        let subtitle = NSTextField(labelWithString: "Accordez les permissions nécessaires au fonctionnement.")
+        let subtitle = NSTextField(labelWithString: NSLocalizedString("setup.subtitle", comment: ""))
         subtitle.font = NSFont.systemFont(ofSize: 12)
         subtitle.textColor = .secondaryLabelColor
         subtitle.alignment = .center
@@ -88,13 +88,13 @@ class SetupWindowController: NSWindowController {
             statusIcons.append(icon)
 
             // Name
-            let name = NSTextField(labelWithString: step.name)
+            let name = NSTextField(labelWithString: NSLocalizedString(step.nameKey, comment: ""))
             name.font = NSFont.systemFont(ofSize: 13, weight: .medium)
             name.frame = NSRect(x: 68, y: y + 20, width: 230, height: 18)
             contentView.addSubview(name)
 
             // Description
-            let desc = NSTextField(labelWithString: step.desc)
+            let desc = NSTextField(labelWithString: NSLocalizedString(step.descKey, comment: ""))
             desc.font = NSFont.systemFont(ofSize: 11)
             desc.textColor = .secondaryLabelColor
             desc.frame = NSRect(x: 68, y: y + 2, width: 250, height: 16)
@@ -102,7 +102,7 @@ class SetupWindowController: NSWindowController {
 
             // Action button
             let btn = NSButton(frame: NSRect(x: 340, y: y + 10, width: 100, height: 24))
-            btn.title = "Accorder"
+            btn.title = NSLocalizedString("setup.grant", comment: "")
             btn.bezelStyle = .rounded
             btn.controlSize = .small
             btn.target = self
@@ -119,7 +119,7 @@ class SetupWindowController: NSWindowController {
 
         // Continue button
         continueButton = NSButton(frame: NSRect(x: 340, y: 14, width: 100, height: 28))
-        continueButton.title = "Continuer"
+        continueButton.title = NSLocalizedString("setup.continue", comment: "")
         continueButton.bezelStyle = .rounded
         continueButton.keyEquivalent = "\r"
         continueButton.target = self
@@ -128,7 +128,7 @@ class SetupWindowController: NSWindowController {
         contentView.addSubview(continueButton)
 
         // Optional hint
-        let hint = NSTextField(labelWithString: "Notifications est optionnel")
+        let hint = NSTextField(labelWithString: NSLocalizedString("setup.optional", comment: ""))
         hint.font = NSFont.systemFont(ofSize: 10)
         hint.textColor = .tertiaryLabelColor
         hint.frame = NSRect(x: 20, y: 18, width: 200, height: 14)
@@ -213,10 +213,10 @@ class SetupWindowController: NSWindowController {
                     self.statusIcons[i].textColor = granted ? .systemGreen : .tertiaryLabelColor
 
                     if granted {
-                        self.actionButtons[i].title = "Accordé ✓"
+                        self.actionButtons[i].title = NSLocalizedString("setup.granted", comment: "")
                         self.actionButtons[i].isEnabled = false
                     } else {
-                        self.actionButtons[i].title = "Accorder"
+                        self.actionButtons[i].title = NSLocalizedString("setup.grant", comment: "")
                         self.actionButtons[i].isEnabled = true
                     }
                 }

@@ -30,7 +30,7 @@ class ModelManagerWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Modèles"
+        window.title = NSLocalizedString("modelMgr.title", comment: "")
         window.center()
         window.isReleasedWhenClosed = false
 
@@ -262,11 +262,15 @@ class ModelManagerWindowController: NSWindowController {
                 ASRModelCatalog.shared.selectedModelId = model.id
                 Log.info("Model \(model.id) downloaded and selected")
                 NSSound(named: "Glass")?.play()
-                NotificationService.show(title: "Modèle prêt", body: "\(model.label) est téléchargé et sélectionné.")
+                NotificationService.show(
+                    title: NSLocalizedString("notif.modelReady.title", comment: ""),
+                    body: String(format: NSLocalizedString("notif.modelReady.body", comment: ""), model.label))
             } else {
                 Log.error("Failed to download model: \(model.id)")
                 NSSound(named: "Basso")?.play()
-                NotificationService.show(title: "Échec du téléchargement", body: "Le modèle \(model.label) n'a pas pu être téléchargé. Vérifiez votre connexion.")
+                NotificationService.show(
+                    title: NSLocalizedString("notif.downloadFailed.title", comment: ""),
+                    body: String(format: NSLocalizedString("notif.downloadFailed.body", comment: ""), model.label))
             }
 
             let idx = max(0, self.engineTableView?.selectedRow ?? 0)
@@ -310,11 +314,11 @@ class ModelManagerWindowController: NSWindowController {
         if model.isRemoteAPI {
             let configId = model.filename
             let alert = NSAlert()
-            alert.messageText = "Supprimer le serveur \(model.label) ?"
-            alert.informativeText = "La configuration de ce serveur API sera supprimée."
+            alert.messageText = String(format: NSLocalizedString("modelMgr.deleteServer.title", comment: ""), model.label)
+            alert.informativeText = NSLocalizedString("modelMgr.deleteServer.body", comment: "")
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Supprimer")
-            alert.addButton(withTitle: "Annuler")
+            alert.addButton(withTitle: NSLocalizedString("modelMgr.delete", comment: ""))
+            alert.addButton(withTitle: NSLocalizedString("modelMgr.cancel", comment: ""))
 
             guard let window = self.window else { return }
             alert.beginSheetModal(for: window) { [weak self] response in
@@ -333,11 +337,11 @@ class ModelManagerWindowController: NSWindowController {
         }
 
         let alert = NSAlert()
-        alert.messageText = "Supprimer \(model.label) ?"
-        alert.informativeText = "Le fichier du modèle sera supprimé. Vous pourrez le re-télécharger plus tard."
+        alert.messageText = String(format: NSLocalizedString("modelMgr.deleteModel.title", comment: ""), model.label)
+        alert.informativeText = NSLocalizedString("modelMgr.deleteModel.body", comment: "")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Supprimer")
-        alert.addButton(withTitle: "Annuler")
+        alert.addButton(withTitle: NSLocalizedString("modelMgr.delete", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("modelMgr.cancel", comment: ""))
 
         guard let window = self.window else { return }
         alert.beginSheetModal(for: window) { [weak self] response in
@@ -374,11 +378,19 @@ class ModelManagerWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        sheet.title = existing != nil ? "Modifier le serveur API" : "Ajouter un serveur API"
+        sheet.title = existing != nil
+            ? NSLocalizedString("modelMgr.editServer", comment: "")
+            : NSLocalizedString("modelMgr.addServerTitle", comment: "")
 
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 280))
 
-        let labels = ["Nom :", "URL de base :", "Clé API :", "ID du modèle :", "Nom du modèle :"]
+        let labels = [
+            NSLocalizedString("modelMgr.fieldName", comment: ""),
+            NSLocalizedString("modelMgr.fieldBaseURL", comment: ""),
+            NSLocalizedString("modelMgr.fieldAPIKey", comment: ""),
+            NSLocalizedString("modelMgr.fieldModelId", comment: ""),
+            NSLocalizedString("modelMgr.fieldModelLabel", comment: ""),
+        ]
         let placeholders = ["Mon serveur", "http://localhost:8080/v1", "sk-... (optionnel)", "whisper-1", "Whisper 1"]
         let defaults = [
             existing?.name ?? "",
@@ -398,7 +410,7 @@ class ModelManagerWindowController: NSWindowController {
             label.alignment = .right
             content.addSubview(label)
 
-            if labels[i] == "Clé API :" {
+            if i == 2 { // API Key field
                 let secure = NSSecureTextField(frame: NSRect(x: 136, y: y - 4, width: 244, height: 24))
                 secure.placeholderString = placeholders[i]
                 secure.stringValue = defaults[i]
@@ -416,7 +428,7 @@ class ModelManagerWindowController: NSWindowController {
         }
 
         let cancelBtn = NSButton(frame: NSRect(x: 210, y: 12, width: 80, height: 28))
-        cancelBtn.title = "Annuler"
+        cancelBtn.title = NSLocalizedString("modelMgr.cancel", comment: "")
         cancelBtn.bezelStyle = .rounded
         cancelBtn.keyEquivalent = "\u{1b}"
         cancelBtn.target = self
@@ -424,7 +436,9 @@ class ModelManagerWindowController: NSWindowController {
         content.addSubview(cancelBtn)
 
         let saveBtn = NSButton(frame: NSRect(x: 300, y: 12, width: 80, height: 28))
-        saveBtn.title = existing != nil ? "Modifier" : "Ajouter"
+        saveBtn.title = existing != nil
+            ? NSLocalizedString("modelMgr.edit", comment: "")
+            : NSLocalizedString("modelMgr.add", comment: "")
         saveBtn.bezelStyle = .rounded
         saveBtn.keyEquivalent = "\r"
         content.addSubview(saveBtn)
@@ -565,7 +579,7 @@ extension ModelManagerWindowController: NSTableViewDelegate {
             icon.frame = NSRect(x: 12, y: 18, width: 20, height: 20)
             container.addSubview(icon)
 
-            let msg = NSTextField(labelWithString: "CLI non installé — \(installHint)")
+            let msg = NSTextField(labelWithString: String(format: NSLocalizedString("modelMgr.cliNotInstalled", comment: ""), installHint))
             msg.font = NSFont.systemFont(ofSize: 12)
             msg.textColor = .secondaryLabelColor
             msg.frame = NSRect(x: 34, y: 18, width: 400, height: 18)
@@ -576,7 +590,7 @@ extension ModelManagerWindowController: NSTableViewDelegate {
         case .addAPIServer:
             let container = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 40))
             let button = NSButton(frame: NSRect(x: 12, y: 8, width: 160, height: 24))
-            button.title = "Ajouter un serveur…"
+            button.title = NSLocalizedString("modelMgr.addServer", comment: "")
             button.bezelStyle = .rounded
             button.controlSize = .small
             button.target = self

@@ -6,10 +6,10 @@ struct HotkeyOption: Equatable {
     let flagMask: CGEventFlags
     let label: String
 
-    static let rightCommand = HotkeyOption(keyCode: 0x36, flagMask: .maskCommand, label: "⌘ Commande droit")
-    static let rightOption  = HotkeyOption(keyCode: 0x3D, flagMask: .maskAlternate, label: "⌥ Option droit")
-    static let rightControl = HotkeyOption(keyCode: 0x3E, flagMask: .maskControl, label: "⌃ Contrôle droit")
-    static let rightShift   = HotkeyOption(keyCode: 0x3C, flagMask: .maskShift, label: "⇧ Shift droit")
+    static let rightCommand = HotkeyOption(keyCode: 0x36, flagMask: .maskCommand, label: NSLocalizedString("hotkey.rightCommand", comment: ""))
+    static let rightOption  = HotkeyOption(keyCode: 0x3D, flagMask: .maskAlternate, label: NSLocalizedString("hotkey.rightOption", comment: ""))
+    static let rightControl = HotkeyOption(keyCode: 0x3E, flagMask: .maskControl, label: NSLocalizedString("hotkey.rightControl", comment: ""))
+    static let rightShift   = HotkeyOption(keyCode: 0x3C, flagMask: .maskShift, label: NSLocalizedString("hotkey.rightShift", comment: ""))
 
     static let all: [HotkeyOption] = [.rightCommand, .rightOption, .rightControl, .rightShift]
 
@@ -66,8 +66,8 @@ class KeyMonitor {
             Log.error("Failed to create event tap. Input Monitoring permission required.")
             DispatchQueue.main.async {
                 let alert = NSAlert()
-                alert.messageText = "Surveillance du clavier requise"
-                alert.informativeText = "WhisperDictate a besoin de la permission « Surveillance de l'entrée » pour détecter la touche \(self.hotkey.label).\n\nAccordez l'accès dans Réglages Système > Confidentialité et sécurité > Surveillance de l'entrée, puis relancez l'app."
+                alert.messageText = NSLocalizedString("alert.inputMonitoring.title", comment: "")
+                alert.informativeText = String(format: NSLocalizedString("alert.inputMonitoring.body", comment: ""), self.hotkey.label)
                 alert.alertStyle = .warning
                 alert.runModal()
             }

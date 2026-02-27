@@ -28,7 +28,7 @@ struct AppleSpeechEngine: ASREngine {
         guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
             throw TranscriberError.engineUnavailable(
                 engineId: engineId,
-                installHint: "Autorisez la reconnaissance vocale dans Réglages Système > Confidentialité > Reconnaissance vocale"
+                installHint: NSLocalizedString("error.authorizeSpeech", comment: "")
             )
         }
 
@@ -36,7 +36,7 @@ struct AppleSpeechEngine: ASREngine {
         guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
             throw TranscriberError.engineUnavailable(
                 engineId: engineId,
-                installHint: "Reconnaissance vocale non disponible pour \(locale.identifier)"
+                installHint: String(format: NSLocalizedString("error.speechUnavailable", comment: ""), locale.identifier)
             )
         }
 
@@ -61,7 +61,7 @@ struct AppleSpeechEngine: ASREngine {
         }
 
         if semaphore.wait(timeout: .now() + 60) == .timedOut {
-            throw TranscriberError.processFailed(0, "Timeout de la reconnaissance vocale")
+            throw TranscriberError.processFailed(0, NSLocalizedString("error.speechTimeout", comment: ""))
         }
 
         if let error = resultError, resultText == nil {
@@ -72,7 +72,7 @@ struct AppleSpeechEngine: ASREngine {
                 }
                 throw TranscriberError.engineUnavailable(
                     engineId: engineId,
-                    installHint: "Activez Siri dans Réglages Système > Siri et Spotlight"
+                    installHint: NSLocalizedString("error.enableSiri", comment: "")
                 )
             }
             throw TranscriberError.launchFailed(error)

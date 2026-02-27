@@ -37,6 +37,11 @@ if [ -f "$SCRIPT_DIR/Resources/AppIcon.icns" ]; then
     cp "$SCRIPT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/"
 fi
 
+# Copy localization bundles
+for lproj in "$SCRIPT_DIR/Resources/"*.lproj; do
+    [ -d "$lproj" ] && cp -R "$lproj" "$APP_DIR/Contents/Resources/"
+done
+
 echo "=== Code signing ==="
 
 IDENTITY=$(security find-identity -v -p codesigning | head -1 | sed 's/.*"\(.*\)"/\1/')

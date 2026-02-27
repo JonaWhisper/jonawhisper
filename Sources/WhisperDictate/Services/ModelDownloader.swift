@@ -175,20 +175,42 @@ class ModelDownloader {
             process.executableURL = URL(fileURLWithPath: executable)
             process.arguments = arguments
             process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
+
+            // Capture stderr to parse tqdm progress
+            let stderrPipe = Pipe()
+            process.standardError = stderrPipe
 
             self.lock.withLock { self._activeProcess = process }
 
-            // Simulated progress since we can't track subprocess progress
-            let progressQueue = DispatchQueue(label: "download-progress")
-            let timer = DispatchSource.makeTimerSource(queue: progressQueue)
-            var currentProgress = 0.0
-            timer.schedule(deadline: .now() + 1, repeating: 2.0)
-            timer.setEventHandler {
-                currentProgress = min(currentProgress + 0.05, 0.95)
-                DispatchQueue.main.async { progress(currentProgress) }
+            // Read stderr in background and parse progress
+            var lastReported = 0.0
+            let readQueue = DispatchQueue(label: "download-stderr")
+            readQueue.async {
+                let handle = stderrPipe.fileHandleForReading
+                var buffer = Data()
+                while true {
+                    let chunk = handle.availableData
+                    if chunk.isEmpty { break }
+                    buffer.append(chunk)
+
+                    // Parse on \r or \n boundaries (tqdm uses \r for progress updates)
+                    guard let text = String(data: buffer, encoding: .utf8) else { continue }
+                    let lines = text.components(separatedBy: CharacterSet(charactersIn: "\r\n"))
+
+                    // Keep the last incomplete fragment in buffer
+                    if let last = lines.last {
+                        buffer = last.data(using: .utf8) ?? Data()
+                    }
+
+                    // Parse percentage from completed lines
+                    for line in lines.dropLast() {
+                        if let pct = Self.parseProgress(line), pct > lastReported {
+                            lastReported = pct
+                            DispatchQueue.main.async { progress(pct) }
+                        }
+                    }
+                }
             }
-            timer.resume()
 
             do {
                 try process.run()
@@ -196,8 +218,6 @@ class ModelDownloader {
             } catch {
                 Log.error("Download subprocess failed: \(error)")
             }
-
-            timer.cancel()
 
             let success = process.terminationStatus == 0
             self.clearPendingState(for: model)
@@ -210,6 +230,15 @@ class ModelDownloader {
             }
             completion(success)
         }
+    }
+
+    /// Parse tqdm-style progress output: "Fetching 5 files:  45%|████" → 0.45
+    private static func parseProgress(_ line: String) -> Double? {
+        // Match patterns like "45%" or "100%"
+        guard let range = line.range(of: #"(\d+)%"#, options: .regularExpression) else { return nil }
+        let match = line[range].dropLast() // remove the %
+        guard let pct = Int(match) else { return nil }
+        return Double(pct) / 100.0
     }
 
     // MARK: - Cancel / cleanup

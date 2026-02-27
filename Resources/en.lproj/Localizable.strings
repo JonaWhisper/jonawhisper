@@ -1,0 +1,97 @@
+/* Menu */
+"menu.microphone" = "Microphone";
+"menu.language" = "Language";
+"menu.model" = "Model";
+"menu.shortcut" = "Shortcut";
+"menu.postProcessing" = "Post-processing";
+"menu.history" = "History";
+"menu.quit" = "Quit";
+"menu.language.format" = "Language: %@";
+"menu.model.format" = "Model: %@";
+"menu.model.unavailable" = "⚠ Model unavailable";
+"menu.shortcut.format" = "Shortcut: %@";
+"menu.noModel" = "No models installed";
+"menu.manageModels" = "Manage models…";
+"menu.noHistory" = "No transcriptions";
+"menu.clearHistory" = "Clear history";
+
+/* Hotkeys */
+"hotkey.rightCommand" = "⌘ Right Command";
+"hotkey.rightOption" = "⌥ Right Option";
+"hotkey.rightControl" = "⌃ Right Control";
+"hotkey.rightShift" = "⇧ Right Shift";
+
+/* Alerts */
+"alert.inputMonitoring.title" = "Keyboard monitoring required";
+"alert.inputMonitoring.body" = "WhisperDictate needs Input Monitoring permission to detect the %@ key.\n\nGrant access in System Settings > Privacy & Security > Input Monitoring, then relaunch the app.";
+
+/* Notifications */
+"notif.micDisconnected.title" = "Microphone disconnected";
+"notif.micDisconnected.body" = "Recording has been stopped. The default microphone will be used.";
+"notif.modelUnavailable.title" = "Model unavailable";
+"notif.modelUnavailable.body" = "Model %@ is not downloaded. Open Models… to choose one.";
+"notif.modelReady.title" = "Model ready";
+"notif.modelReady.body" = "%@ is downloaded and selected.";
+"notif.downloadFailed.title" = "Download failed";
+"notif.downloadFailed.body" = "Model %@ could not be downloaded. Check your connection.";
+"notif.transcriptionError.title" = "Transcription error";
+
+/* Transcriber errors */
+"error.modelUnavailable.title" = "Model unavailable";
+"error.modelUnavailable.body" = "The model is not downloaded. Open Models… to download it.";
+"error.engineNotFound.title" = "Engine not found";
+"error.engineNotFound.body" = "Engine \"%@\" is not registered.";
+"error.engineUnavailable.title" = "Engine not installed";
+"error.engineUnavailable.body" = "Install it with: %@";
+"error.launchFailed.title" = "Launch error";
+"error.processFailed.title" = "Transcription error";
+"error.processFailed.default" = "The process failed.";
+"error.speechTimeout" = "Speech recognition timed out";
+"error.enableSiri" = "Enable Siri in System Settings > Siri & Spotlight";
+"error.authorizeSpeech" = "Authorize speech recognition in System Settings > Privacy > Speech Recognition";
+"error.speechUnavailable" = "Speech recognition unavailable for %@";
+
+/* Languages */
+"lang.auto" = "Automatic";
+"lang.fr" = "Français";
+"lang.en" = "English";
+"lang.es" = "Español";
+"lang.de" = "Deutsch";
+
+/* Model manager */
+"modelMgr.title" = "Models";
+"modelMgr.deleteServer.title" = "Delete server %@?";
+"modelMgr.deleteServer.body" = "This API server configuration will be deleted.";
+"modelMgr.deleteModel.title" = "Delete %@?";
+"modelMgr.deleteModel.body" = "The model file will be deleted. You can re-download it later.";
+"modelMgr.delete" = "Delete";
+"modelMgr.cancel" = "Cancel";
+"modelMgr.add" = "Add";
+"modelMgr.edit" = "Edit";
+"modelMgr.addServer" = "Add a server…";
+"modelMgr.editServer" = "Edit API server";
+"modelMgr.addServerTitle" = "Add an API server";
+"modelMgr.downloaded" = "✓ Downloaded";
+"modelMgr.download" = "Download";
+"modelMgr.cliNotInstalled" = "CLI not installed — %@";
+"modelMgr.fieldName" = "Name:";
+"modelMgr.fieldBaseURL" = "Base URL:";
+"modelMgr.fieldAPIKey" = "API Key:";
+"modelMgr.fieldModelId" = "Model ID:";
+"modelMgr.fieldModelLabel" = "Model name:";
+
+/* Setup window */
+"setup.title" = "Permission setup";
+"setup.subtitle" = "Grant the required permissions to use WhisperDictate.";
+"setup.mic" = "Microphone";
+"setup.mic.desc" = "Record your voice for transcription";
+"setup.accessibility" = "Accessibility";
+"setup.accessibility.desc" = "Paste transcribed text into the active app";
+"setup.inputMonitoring" = "Input Monitoring";
+"setup.inputMonitoring.desc" = "Detect the right Command key";
+"setup.notifications" = "Notifications";
+"setup.notifications.desc" = "Show error messages";
+"setup.grant" = "Grant";
+"setup.granted" = "Granted ✓";
+"setup.continue" = "Continue";
+"setup.optional" = "Notifications is optional";

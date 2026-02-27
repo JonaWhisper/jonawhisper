@@ -67,14 +67,14 @@ class ModelCellView: NSView {
             addSubview(pctLabel)
             self.progressLabel = pctLabel
         } else if model.isDownloaded {
-            let check = NSTextField(labelWithString: "✓ Téléchargé")
+            let check = NSTextField(labelWithString: NSLocalizedString("modelMgr.downloaded", comment: ""))
             check.font = NSFont.systemFont(ofSize: 11)
             check.textColor = .systemGreen
             check.frame = NSRect(x: 280, y: 20, width: 100, height: 16)
             addSubview(check)
         } else {
             let dlButton = NSButton(frame: NSRect(x: 280, y: 16, width: 95, height: 24))
-            dlButton.title = "Télécharger"
+            dlButton.title = NSLocalizedString("modelMgr.download", comment: "")
             dlButton.bezelStyle = .rounded
             dlButton.controlSize = .small
             dlButton.target = target

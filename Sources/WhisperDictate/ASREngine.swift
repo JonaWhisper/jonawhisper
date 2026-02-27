@@ -83,22 +83,25 @@ enum TranscriberError: LocalizedError {
         }
     }
 
-    /// User-facing notification message in French
+    /// User-facing notification message (localized)
     var userMessage: (title: String, body: String) {
         switch self {
         case .modelNotFound:
-            return ("Modèle indisponible", "Le modèle n'est pas téléchargé. Ouvrez « Modèles… » pour le télécharger.")
+            return (NSLocalizedString("error.modelUnavailable.title", comment: ""),
+                    NSLocalizedString("error.modelUnavailable.body", comment: ""))
         case .engineNotFound(let id):
-            return ("Moteur introuvable", "Le moteur « \(id) » n'est pas enregistré.")
+            return (NSLocalizedString("error.engineNotFound.title", comment: ""),
+                    String(format: NSLocalizedString("error.engineNotFound.body", comment: ""), id))
         case .engineUnavailable(_, let hint):
-            return ("Moteur non installé", "Installez-le avec : \(hint)")
+            return (NSLocalizedString("error.engineUnavailable.title", comment: ""),
+                    String(format: NSLocalizedString("error.engineUnavailable.body", comment: ""), hint))
         case .launchFailed(let error):
             let desc = (error as NSError).localizedDescription
-            return ("Erreur de lancement", desc)
+            return (NSLocalizedString("error.launchFailed.title", comment: ""), desc)
         case .processFailed(_, let stderr):
-            let msg = stderr.isEmpty ? "Le processus a échoué." : stderr
+            let msg = stderr.isEmpty ? NSLocalizedString("error.processFailed.default", comment: "") : stderr
             let truncated = msg.count > 200 ? String(msg.prefix(200)) + "…" : msg
-            return ("Erreur de transcription", truncated)
+            return (NSLocalizedString("error.processFailed.title", comment: ""), truncated)
         }
     }
 }
@@ -106,11 +109,11 @@ enum TranscriberError: LocalizedError {
 // MARK: - Common languages
 
 let kCommonWhisperLanguages: [(code: String, label: String)] = [
-    ("auto", "Automatique"),
-    ("fr", "Français"),
-    ("en", "English"),
-    ("es", "Español"),
-    ("de", "Deutsch"),
+    ("auto", NSLocalizedString("lang.auto", comment: "")),
+    ("fr", NSLocalizedString("lang.fr", comment: "")),
+    ("en", NSLocalizedString("lang.en", comment: "")),
+    ("es", NSLocalizedString("lang.es", comment: "")),
+    ("de", NSLocalizedString("lang.de", comment: "")),
 ]
 
 // MARK: - Executable lookup helper

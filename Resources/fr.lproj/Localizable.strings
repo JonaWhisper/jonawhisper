@@ -1,0 +1,97 @@
+/* Menu */
+"menu.microphone" = "Microphone";
+"menu.language" = "Langue";
+"menu.model" = "Modèle";
+"menu.shortcut" = "Raccourci";
+"menu.postProcessing" = "Post-traitement";
+"menu.history" = "Historique";
+"menu.quit" = "Quitter";
+"menu.language.format" = "Langue: %@";
+"menu.model.format" = "Modèle: %@";
+"menu.model.unavailable" = "⚠ Modèle indisponible";
+"menu.shortcut.format" = "Raccourci: %@";
+"menu.noModel" = "Aucun modèle installé";
+"menu.manageModels" = "Gérer les modèles…";
+"menu.noHistory" = "Aucune transcription";
+"menu.clearHistory" = "Effacer l'historique";
+
+/* Hotkeys */
+"hotkey.rightCommand" = "⌘ Commande droit";
+"hotkey.rightOption" = "⌥ Option droit";
+"hotkey.rightControl" = "⌃ Contrôle droit";
+"hotkey.rightShift" = "⇧ Shift droit";
+
+/* Alerts */
+"alert.inputMonitoring.title" = "Surveillance du clavier requise";
+"alert.inputMonitoring.body" = "WhisperDictate a besoin de la permission « Surveillance de l'entrée » pour détecter la touche %@.\n\nAccordez l'accès dans Réglages Système > Confidentialité et sécurité > Surveillance de l'entrée, puis relancez l'app.";
+
+/* Notifications */
+"notif.micDisconnected.title" = "Micro déconnecté";
+"notif.micDisconnected.body" = "L'enregistrement a été arrêté. Le micro par défaut sera utilisé.";
+"notif.modelUnavailable.title" = "Modèle indisponible";
+"notif.modelUnavailable.body" = "Le modèle %@ n'est pas téléchargé. Ouvrez Modèles… pour en choisir un.";
+"notif.modelReady.title" = "Modèle prêt";
+"notif.modelReady.body" = "%@ est téléchargé et sélectionné.";
+"notif.downloadFailed.title" = "Échec du téléchargement";
+"notif.downloadFailed.body" = "Le modèle %@ n'a pas pu être téléchargé. Vérifiez votre connexion.";
+"notif.transcriptionError.title" = "Erreur de transcription";
+
+/* Transcriber errors */
+"error.modelUnavailable.title" = "Modèle indisponible";
+"error.modelUnavailable.body" = "Le modèle n'est pas téléchargé. Ouvrez « Modèles… » pour le télécharger.";
+"error.engineNotFound.title" = "Moteur introuvable";
+"error.engineNotFound.body" = "Le moteur « %@ » n'est pas enregistré.";
+"error.engineUnavailable.title" = "Moteur non installé";
+"error.engineUnavailable.body" = "Installez-le avec : %@";
+"error.launchFailed.title" = "Erreur de lancement";
+"error.processFailed.title" = "Erreur de transcription";
+"error.processFailed.default" = "Le processus a échoué.";
+"error.speechTimeout" = "Timeout de la reconnaissance vocale";
+"error.enableSiri" = "Activez Siri dans Réglages Système > Siri et Spotlight";
+"error.authorizeSpeech" = "Autorisez la reconnaissance vocale dans Réglages Système > Confidentialité > Reconnaissance vocale";
+"error.speechUnavailable" = "Reconnaissance vocale non disponible pour %@";
+
+/* Languages */
+"lang.auto" = "Automatique";
+"lang.fr" = "Français";
+"lang.en" = "English";
+"lang.es" = "Español";
+"lang.de" = "Deutsch";
+
+/* Model manager */
+"modelMgr.title" = "Modèles";
+"modelMgr.deleteServer.title" = "Supprimer le serveur %@ ?";
+"modelMgr.deleteServer.body" = "La configuration de ce serveur API sera supprimée.";
+"modelMgr.deleteModel.title" = "Supprimer %@ ?";
+"modelMgr.deleteModel.body" = "Le fichier du modèle sera supprimé. Vous pourrez le re-télécharger plus tard.";
+"modelMgr.delete" = "Supprimer";
+"modelMgr.cancel" = "Annuler";
+"modelMgr.add" = "Ajouter";
+"modelMgr.edit" = "Modifier";
+"modelMgr.addServer" = "Ajouter un serveur…";
+"modelMgr.editServer" = "Modifier le serveur API";
+"modelMgr.addServerTitle" = "Ajouter un serveur API";
+"modelMgr.downloaded" = "✓ Téléchargé";
+"modelMgr.download" = "Télécharger";
+"modelMgr.cliNotInstalled" = "CLI non installé — %@";
+"modelMgr.fieldName" = "Nom :";
+"modelMgr.fieldBaseURL" = "URL de base :";
+"modelMgr.fieldAPIKey" = "Clé API :";
+"modelMgr.fieldModelId" = "ID du modèle :";
+"modelMgr.fieldModelLabel" = "Nom du modèle :";
+
+/* Setup window */
+"setup.title" = "Configuration des permissions";
+"setup.subtitle" = "Accordez les permissions nécessaires au fonctionnement.";
+"setup.mic" = "Microphone";
+"setup.mic.desc" = "Enregistrer votre voix pour la transcription";
+"setup.accessibility" = "Accessibilité";
+"setup.accessibility.desc" = "Coller le texte transcrit dans l'app active";
+"setup.inputMonitoring" = "Surveillance de l'entrée";
+"setup.inputMonitoring.desc" = "Détecter la touche Commande droite";
+"setup.notifications" = "Notifications";
+"setup.notifications.desc" = "Afficher les messages d'erreur";
+"setup.grant" = "Accorder";
+"setup.granted" = "Accordé ✓";
+"setup.continue" = "Continuer";
+"setup.optional" = "Notifications est optionnel";

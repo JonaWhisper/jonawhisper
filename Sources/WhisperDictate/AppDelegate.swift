@@ -83,39 +83,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "WhisperDictate", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
 
-        micItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
+        micItem = NSMenuItem(title: NSLocalizedString("menu.microphone", comment: ""), action: nil, keyEquivalent: "")
         micSubmenu = NSMenu()
         micItem.submenu = micSubmenu
         menu.addItem(micItem)
 
-        langItem = NSMenuItem(title: "Langue", action: nil, keyEquivalent: "")
+        langItem = NSMenuItem(title: NSLocalizedString("menu.language", comment: ""), action: nil, keyEquivalent: "")
         langSubmenu = NSMenu()
         langItem.submenu = langSubmenu
         menu.addItem(langItem)
 
-        modelItem = NSMenuItem(title: "Modèle", action: nil, keyEquivalent: "")
+        modelItem = NSMenuItem(title: NSLocalizedString("menu.model", comment: ""), action: nil, keyEquivalent: "")
         modelSubmenu = NSMenu()
         modelItem.submenu = modelSubmenu
         menu.addItem(modelItem)
 
-        hotkeyItem = NSMenuItem(title: "Raccourci", action: nil, keyEquivalent: "")
+        hotkeyItem = NSMenuItem(title: NSLocalizedString("menu.shortcut", comment: ""), action: nil, keyEquivalent: "")
         hotkeySubmenu = NSMenu()
         hotkeyItem.submenu = hotkeySubmenu
         menu.addItem(hotkeyItem)
 
         menu.addItem(NSMenuItem.separator())
 
-        postProcessItem = NSMenuItem(title: "Post-traitement", action: #selector(togglePostProcessing), keyEquivalent: "")
+        postProcessItem = NSMenuItem(title: NSLocalizedString("menu.postProcessing", comment: ""), action: #selector(togglePostProcessing), keyEquivalent: "")
         postProcessItem.target = self
         menu.addItem(postProcessItem)
 
-        historyItem = NSMenuItem(title: "Historique", action: nil, keyEquivalent: "")
+        historyItem = NSMenuItem(title: NSLocalizedString("menu.history", comment: ""), action: nil, keyEquivalent: "")
         historySubmenu = NSMenu()
         historyItem.submenu = historySubmenu
         menu.addItem(historyItem)
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: NSLocalizedString("menu.quit", comment: ""), action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
@@ -156,7 +156,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             micSubmenu.addItem(noDevices)
         }
 
-        micItem.title = activeName ?? "Microphone"
+        micItem.title = activeName ?? NSLocalizedString("menu.microphone", comment: "")
         if let activeDevice = devices.first(where: { d in
             if let savedUID = savedUID { return d.uid == savedUID }
             return d.id == currentDefault
@@ -196,7 +196,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             langSubmenu.addItem(item)
         }
 
-        langItem.title = "Langue: \(activeLabel)"
+        langItem.title = String(format: NSLocalizedString("menu.language.format", comment: ""), activeLabel)
     }
 
     @objc private func selectLang(_ sender: NSMenuItem) {
@@ -229,21 +229,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if downloaded.isEmpty {
-            let none = NSMenuItem(title: "Aucun modèle installé", action: nil, keyEquivalent: "")
+            let none = NSMenuItem(title: NSLocalizedString("menu.noModel", comment: ""), action: nil, keyEquivalent: "")
             none.isEnabled = false
             modelSubmenu.addItem(none)
         }
 
         modelSubmenu.addItem(NSMenuItem.separator())
 
-        let manage = NSMenuItem(title: "Gérer les modèles…", action: #selector(openModelManager), keyEquivalent: "")
+        let manage = NSMenuItem(title: NSLocalizedString("menu.manageModels", comment: ""), action: #selector(openModelManager), keyEquivalent: "")
         manage.target = self
         modelSubmenu.addItem(manage)
 
         if let selected = downloaded.first(where: { $0.id == current }) {
-            modelItem.title = "Modèle: \(selected.label)"
+            modelItem.title = String(format: NSLocalizedString("menu.model.format", comment: ""), selected.label)
         } else {
-            modelItem.title = "⚠ Modèle indisponible"
+            modelItem.title = NSLocalizedString("menu.model.unavailable", comment: "")
         }
     }
 
@@ -275,7 +275,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             hotkeySubmenu.addItem(item)
         }
 
-        hotkeyItem.title = "Raccourci: \(current.label)"
+        hotkeyItem.title = String(format: NSLocalizedString("menu.shortcut.format", comment: ""), current.label)
     }
 
     @objc private func selectHotkey(_ sender: NSMenuItem) {
@@ -291,7 +291,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         historySubmenu.removeAllItems()
 
         if transcriptionHistory.isEmpty {
-            let empty = NSMenuItem(title: "Aucune transcription", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: NSLocalizedString("menu.noHistory", comment: ""), action: nil, keyEquivalent: "")
             empty.isEnabled = false
             historySubmenu.addItem(empty)
             return
@@ -315,7 +315,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         historySubmenu.addItem(NSMenuItem.separator())
-        let clear = NSMenuItem(title: "Effacer l'historique", action: #selector(clearHistory), keyEquivalent: "")
+        let clear = NSMenuItem(title: NSLocalizedString("menu.clearHistory", comment: ""), action: #selector(clearHistory), keyEquivalent: "")
         clear.target = self
         historySubmenu.addItem(clear)
     }
@@ -339,8 +339,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             stopRecordingAndEnqueue()
             NSSound(named: "Basso")?.play()
             NotificationService.show(
-                title: "Micro déconnecté",
-                body: "L'enregistrement a été arrêté. Le micro par défaut sera utilisé."
+                title: NSLocalizedString("notif.micDisconnected.title", comment: ""),
+                body: NSLocalizedString("notif.micDisconnected.body", comment: "")
             )
         }
     }
@@ -512,7 +512,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             state.transcriptionQueue = []
             pill.queueCount = 0
-            NotificationService.show(title: "Modèle indisponible", body: "Le modèle \(model.label) n'est pas téléchargé. Ouvrez Modèles… pour en choisir un.")
+            NotificationService.show(
+                title: NSLocalizedString("notif.modelUnavailable.title", comment: ""),
+                body: String(format: NSLocalizedString("notif.modelUnavailable.body", comment: ""), model.label)
+            )
             NSSound(named: "Basso")?.play()
             if !state.isRecording && !state.isDownloading {
                 pill.dismiss()
@@ -576,7 +579,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let msg = te.userMessage
                     NotificationService.show(title: msg.title, body: msg.body)
                 } else {
-                    NotificationService.show(title: "Erreur de transcription", body: error.localizedDescription)
+                    NotificationService.show(title: NSLocalizedString("notif.transcriptionError.title", comment: ""), body: error.localizedDescription)
                 }
             }
 
