@@ -15,6 +15,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var modelItem: NSMenuItem!
     private var modelSubmenu: NSMenu!
     private var postProcessItem: NSMenuItem!
+    private var hotkeyItem: NSMenuItem!
+    private var hotkeySubmenu: NSMenu!
+    private var historyItem: NSMenuItem!
+    private var historySubmenu: NSMenu!
+
+    // Transcription history
+    private static let maxHistory = 20
+    private var transcriptionHistory: [(text: String, date: Date)] = []
 
     // Queue system
     private var pendingTranscribingTransition: DispatchWorkItem?
@@ -90,11 +98,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         modelItem.submenu = modelSubmenu
         menu.addItem(modelItem)
 
+        hotkeyItem = NSMenuItem(title: "Raccourci", action: nil, keyEquivalent: "")
+        hotkeySubmenu = NSMenu()
+        hotkeyItem.submenu = hotkeySubmenu
+        menu.addItem(hotkeyItem)
+
         menu.addItem(NSMenuItem.separator())
 
         postProcessItem = NSMenuItem(title: "Post-traitement", action: #selector(togglePostProcessing), keyEquivalent: "")
         postProcessItem.target = self
         menu.addItem(postProcessItem)
+
+        historyItem = NSMenuItem(title: "Historique", action: nil, keyEquivalent: "")
+        historySubmenu = NSMenu()
+        historyItem.submenu = historySubmenu
+        menu.addItem(historyItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
@@ -237,6 +255,81 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openModelManager() {
         ModelManagerWindowController.showWindow()
+    }
+
+    // MARK: - Hotkey menu
+
+    private func refreshHotkeyMenu() {
+        hotkeySubmenu.removeAllItems()
+        let current = keyMonitor?.hotkey ?? HotkeyOption.saved
+
+        for option in HotkeyOption.all {
+            let item = NSMenuItem(
+                title: option.label,
+                action: #selector(selectHotkey(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = option.keyCode
+            item.state = option == current ? .on : .off
+            hotkeySubmenu.addItem(item)
+        }
+
+        hotkeyItem.title = "Raccourci: \(current.label)"
+    }
+
+    @objc private func selectHotkey(_ sender: NSMenuItem) {
+        guard let keyCode = sender.representedObject as? UInt16,
+              let option = HotkeyOption.all.first(where: { $0.keyCode == keyCode }) else { return }
+        keyMonitor?.restart(with: option)
+        Log.info("Hotkey changed to \(option.label)")
+    }
+
+    // MARK: - History menu
+
+    private func refreshHistoryMenu() {
+        historySubmenu.removeAllItems()
+
+        if transcriptionHistory.isEmpty {
+            let empty = NSMenuItem(title: "Aucune transcription", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            historySubmenu.addItem(empty)
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+
+        for (i, entry) in transcriptionHistory.enumerated() {
+            let time = formatter.string(from: entry.date)
+            let preview = entry.text.prefix(50).replacingOccurrences(of: "\n", with: " ")
+            let suffix = entry.text.count > 50 ? "…" : ""
+            let item = NSMenuItem(
+                title: "[\(time)] \(preview)\(suffix)",
+                action: #selector(copyHistoryItem(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.tag = i
+            historySubmenu.addItem(item)
+        }
+
+        historySubmenu.addItem(NSMenuItem.separator())
+        let clear = NSMenuItem(title: "Effacer l'historique", action: #selector(clearHistory), keyEquivalent: "")
+        clear.target = self
+        historySubmenu.addItem(clear)
+    }
+
+    @objc private func copyHistoryItem(_ sender: NSMenuItem) {
+        guard sender.tag >= 0 && sender.tag < transcriptionHistory.count else { return }
+        let text = transcriptionHistory[sender.tag].text
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        NSSound(named: "Tink")?.play()
+    }
+
+    @objc private func clearHistory() {
+        transcriptionHistory.removeAll()
     }
 
     @objc private func audioDevicesChanged() {
@@ -468,6 +561,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         ? TextPostProcessor.process(trimmed, language: ASRModelCatalog.shared.selectedLanguage)
                         : trimmed
                     self.pasteService.paste(text: processed)
+                    self.addToHistory(processed)
                     NSSound(named: "Glass")?.play()
                 } else {
                     NSSound(named: "Basso")?.play()
@@ -515,6 +609,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         postProcessingEnabled = !postProcessingEnabled
     }
 
+    private func addToHistory(_ text: String) {
+        transcriptionHistory.insert((text: text, date: Date()), at: 0)
+        if transcriptionHistory.count > Self.maxHistory {
+            transcriptionHistory.removeLast()
+        }
+    }
+
     private func setMenuBarIcon(_ symbolName: String) {
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "WhisperDictate")
@@ -556,6 +657,8 @@ extension AppDelegate: NSMenuDelegate {
         refreshMicMenu()
         refreshLangMenu()
         refreshModelMenu()
+        refreshHotkeyMenu()
+        refreshHistoryMenu()
         postProcessItem.state = postProcessingEnabled ? .on : .off
     }
 }

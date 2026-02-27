@@ -32,6 +32,11 @@ cp "$BINARY" "$APP_DIR/Contents/MacOS/$APP_NAME"
 # Copy Info.plist
 cp "$SCRIPT_DIR/Info.plist" "$APP_DIR/Contents/"
 
+# Copy app icon
+if [ -f "$SCRIPT_DIR/Resources/AppIcon.icns" ]; then
+    cp "$SCRIPT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/"
+fi
+
 echo "=== Code signing ==="
 
 IDENTITY=$(security find-identity -v -p codesigning | head -1 | sed 's/.*"\(.*\)"/\1/')

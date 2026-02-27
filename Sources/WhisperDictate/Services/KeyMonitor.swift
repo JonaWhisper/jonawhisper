@@ -1,7 +1,37 @@
 import Cocoa
 
-/// Monitors the right Command key via a CGEvent tap.
-/// keyDown fires when right Command is pressed alone,
+/// Available hotkey options for push-to-talk
+struct HotkeyOption: Equatable {
+    let keyCode: UInt16
+    let flagMask: CGEventFlags
+    let label: String
+
+    static let rightCommand = HotkeyOption(keyCode: 0x36, flagMask: .maskCommand, label: "⌘ Commande droit")
+    static let rightOption  = HotkeyOption(keyCode: 0x3D, flagMask: .maskAlternate, label: "⌥ Option droit")
+    static let rightControl = HotkeyOption(keyCode: 0x3E, flagMask: .maskControl, label: "⌃ Contrôle droit")
+    static let rightShift   = HotkeyOption(keyCode: 0x3C, flagMask: .maskShift, label: "⇧ Shift droit")
+
+    static let all: [HotkeyOption] = [.rightCommand, .rightOption, .rightControl, .rightShift]
+
+    private static let hotkeyKey = "hotkeyKeyCode"
+
+    static var saved: HotkeyOption {
+        let code = UserDefaults.standard.object(forKey: hotkeyKey) as? Int
+        guard let code = code else { return .rightCommand }
+        return all.first { Int($0.keyCode) == code } ?? .rightCommand
+    }
+
+    static func save(_ option: HotkeyOption) {
+        UserDefaults.standard.set(Int(option.keyCode), forKey: hotkeyKey)
+    }
+
+    static func == (lhs: HotkeyOption, rhs: HotkeyOption) -> Bool {
+        lhs.keyCode == rhs.keyCode
+    }
+}
+
+/// Monitors a configurable modifier key via a CGEvent tap.
+/// keyDown fires when the key is pressed alone,
 /// keyUp fires when it's released (only if we were "active").
 class KeyMonitor {
     private let onKeyDown: () -> Void
@@ -9,12 +39,12 @@ class KeyMonitor {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var retainedSelfPtr: UnsafeMutableRawPointer?
-    private var rightCmdHeld = false
+    private var keyHeld = false
 
-    // Right Command keycode
-    private static let kVK_RightCommand: UInt16 = 0x36
+    var hotkey: HotkeyOption
 
     init(onKeyDown: @escaping () -> Void, onKeyUp: @escaping () -> Void) {
+        self.hotkey = HotkeyOption.saved
         self.onKeyDown = onKeyDown
         self.onKeyUp = onKeyUp
     }
@@ -22,7 +52,6 @@ class KeyMonitor {
     func start() {
         let eventMask: CGEventMask = (1 << CGEventType.flagsChanged.rawValue)
 
-        // Store self in a pointer for the C callback (released in stop())
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
         self.retainedSelfPtr = selfPtr
 
@@ -35,14 +64,10 @@ class KeyMonitor {
             userInfo: selfPtr
         ) else {
             Log.error("Failed to create event tap. Input Monitoring permission required.")
-            Log.error("Go to System Settings > Privacy & Security > Input Monitoring")
-
-            // Prompt for input monitoring access
-            // The system will show a prompt when we try to create the tap and fail
             DispatchQueue.main.async {
                 let alert = NSAlert()
                 alert.messageText = "Surveillance du clavier requise"
-                alert.informativeText = "WhisperDictate a besoin de la permission « Surveillance de l'entrée » pour détecter la touche Commande droite.\n\nAccordez l'accès dans Réglages Système > Confidentialité et sécurité > Surveillance de l'entrée, puis relancez l'app."
+                alert.informativeText = "WhisperDictate a besoin de la permission « Surveillance de l'entrée » pour détecter la touche \(self.hotkey.label).\n\nAccordez l'accès dans Réglages Système > Confidentialité et sécurité > Surveillance de l'entrée, puis relancez l'app."
                 alert.alertStyle = .warning
                 alert.runModal()
             }
@@ -50,13 +75,12 @@ class KeyMonitor {
         }
 
         self.eventTap = tap
-
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         self.runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
-        Log.info("Key monitor started (right Command key)")
+        Log.info("Key monitor started (\(hotkey.label))")
     }
 
     func stop() {
@@ -72,6 +96,15 @@ class KeyMonitor {
         }
         eventTap = nil
         runLoopSource = nil
+        keyHeld = false
+    }
+
+    /// Restart with a new hotkey
+    func restart(with option: HotkeyOption) {
+        stop()
+        hotkey = option
+        HotkeyOption.save(option)
+        start()
     }
 
     /// C-compatible callback for CGEvent tap
@@ -79,7 +112,6 @@ class KeyMonitor {
         guard let userInfo = userInfo else { return Unmanaged.passUnretained(event) }
         let monitor = Unmanaged<KeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
 
-        // If the tap gets disabled (e.g. system timeout), re-enable it
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap = monitor.eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
@@ -94,28 +126,21 @@ class KeyMonitor {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
 
-        if keyCode == Int64(kVK_RightCommand) {
-            if flags.contains(.maskCommand) {
-                // Right Command pressed
-                if !monitor.rightCmdHeld {
-                    monitor.rightCmdHeld = true
+        if keyCode == Int64(monitor.hotkey.keyCode) {
+            if flags.contains(monitor.hotkey.flagMask) {
+                if !monitor.keyHeld {
+                    monitor.keyHeld = true
                     DispatchQueue.main.async {
                         monitor.onKeyDown()
                     }
                 }
             } else {
-                // Right Command released
-                if monitor.rightCmdHeld {
-                    monitor.rightCmdHeld = false
+                if monitor.keyHeld {
+                    monitor.keyHeld = false
                     DispatchQueue.main.async {
                         monitor.onKeyUp()
                     }
                 }
-            }
-        } else {
-            // Another modifier was pressed while right cmd is held — cancel
-            if monitor.rightCmdHeld {
-                // Don't cancel, just let it pass through
             }
         }
 
