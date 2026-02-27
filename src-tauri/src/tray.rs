@@ -4,7 +4,7 @@ use crate::state::AppState;
 use std::sync::Arc;
 use tauri::{
     image::Image,
-    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
+    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
@@ -164,13 +164,13 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             None => device.is_default,
         };
         let default_tag = if device.is_default { " (Default)" } else { "" };
-        let label = format!("{} {}{}", device.transport_type.icon(), device.name, default_tag);
-        mic_submenu.append(&CheckMenuItem::with_id(
+        let check = if is_selected { "✓ " } else { "   " };
+        let label = format!("{}{} {}{}", check, device.transport_type.icon(), device.name, default_tag);
+        mic_submenu.append(&MenuItem::with_id(
             app,
             format!("device_{}", device.uid),
             &label,
             true,
-            is_selected,
             None::<&str>,
         )?)?;
     }
@@ -189,12 +189,13 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 
     let lang_submenu = Submenu::with_id(app, "lang_submenu", &active_lang, true)?;
     for lang in &languages {
-        lang_submenu.append(&CheckMenuItem::with_id(
+        let check = if lang.code == selected_lang { "✓ " } else { "   " };
+        let label = format!("{}{}", check, lang.label);
+        lang_submenu.append(&MenuItem::with_id(
             app,
             format!("lang_{}", lang.code),
-            &lang.label,
+            &label,
             true,
-            lang.code == selected_lang,
             None::<&str>,
         )?)?;
     }
@@ -211,12 +212,13 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 
     let model_submenu = Submenu::with_id(app, "model_submenu", &active_model, true)?;
     for model in &downloaded {
-        model_submenu.append(&CheckMenuItem::with_id(
+        let check = if model.id == selected_model_id { "✓ " } else { "   " };
+        let label = format!("{}{}", check, model.label);
+        model_submenu.append(&MenuItem::with_id(
             app,
             format!("model_{}", model.id),
-            &model.label,
+            &label,
             true,
-            model.id == selected_model_id,
             None::<&str>,
         )?)?;
     }
