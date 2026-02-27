@@ -96,8 +96,8 @@ impl ASREngine for FasterWhisperEngine {
 
         let stem = audio_path.file_stem().unwrap_or_default().to_string_lossy();
         let txt_path = format!("/tmp/{}.txt", stem);
-        std::fs::read_to_string(&txt_path)
+        Ok(std::fs::read_to_string(&txt_path)
             .map(|s| s.trim().to_string())
-            .or_else(|_| Ok(result.stdout))
+            .unwrap_or(result.stdout))
     }
 }

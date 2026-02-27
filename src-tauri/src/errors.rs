@@ -4,8 +4,6 @@ use crate::engines::EngineError;
 pub enum AppError {
     #[error("Engine error: {0}")]
     Engine(#[from] EngineError),
-    #[error("Audio error: {0}")]
-    Audio(String),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]

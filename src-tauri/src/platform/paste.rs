@@ -1,6 +1,5 @@
 /// Clipboard write + Cmd+V simulation for pasting transcribed text.
-/// macOS-specific implementation using CGEvent.
-
+/// macOS-specific: uses pbcopy + CGEvent Cmd+V.
 #[cfg(target_os = "macos")]
 pub fn paste_text(text: &str) {
     {

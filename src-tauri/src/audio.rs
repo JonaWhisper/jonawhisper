@@ -282,9 +282,9 @@ fn process_samples(
         let new_spectrum = compute_spectrum(&samples);
 
         let mut spec = spectrum.lock().unwrap();
-        for i in 0..NUM_BANDS {
-            let old_weight = 1.0 - SPECTRUM_SMOOTHING;
-            spec[i] = spec[i] * old_weight + new_spectrum[i] * SPECTRUM_SMOOTHING;
+        let old_weight = 1.0 - SPECTRUM_SMOOTHING;
+        for (s, &ns) in spec.iter_mut().zip(new_spectrum.iter()) {
+            *s = *s * old_weight + ns * SPECTRUM_SMOOTHING;
         }
     }
 }
@@ -308,13 +308,13 @@ fn compute_spectrum(samples: &[f32]) -> Vec<f32> {
         .collect();
 
     // Map to logarithmic bands
-    let mut bands = vec![0.0f32; NUM_BANDS];
+    let mut bands = [0.0f32; NUM_BANDS];
     let min_freq = 80.0f32;
     let max_freq = (SAMPLE_RATE as f32) / 2.0;
     let log_min = min_freq.ln();
     let log_max = max_freq.ln();
 
-    for i in 0..NUM_BANDS {
+    for (i, band) in bands.iter_mut().enumerate() {
         let lo = ((log_min + (log_max - log_min) * i as f32 / NUM_BANDS as f32).exp()
             / max_freq * half as f32) as usize;
         let hi = ((log_min + (log_max - log_min) * (i + 1) as f32 / NUM_BANDS as f32).exp()
@@ -327,18 +327,18 @@ fn compute_spectrum(samples: &[f32]) -> Vec<f32> {
         let avg = sum / (hi - lo) as f32;
 
         // Normalize to 0..1 range (approximate)
-        bands[i] = (avg * 4.0).min(1.0);
+        *band = (avg * 4.0).min(1.0);
     }
 
     // Reorder bands symmetrically (center outward) like the Swift version
-    let mut reordered = vec![0.0f32; NUM_BANDS];
+    let mut reordered = [0.0f32; NUM_BANDS];
     let mid = NUM_BANDS / 2;
-    for i in 0..NUM_BANDS {
+    for (i, val) in reordered.iter_mut().enumerate() {
         let src = if i % 2 == 0 { mid - 1 - i / 2 } else { mid + i / 2 };
         if src < NUM_BANDS {
-            reordered[i] = bands[src];
+            *val = bands[src];
         }
     }
 
-    reordered
+    reordered.to_vec()
 }

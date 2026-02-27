@@ -94,8 +94,8 @@ impl ASREngine for MLXWhisperEngine {
         // mlx_whisper writes to a .txt file in output_dir
         let stem = audio_path.file_stem().unwrap_or_default().to_string_lossy();
         let txt_path = format!("/tmp/{}.txt", stem);
-        std::fs::read_to_string(&txt_path)
+        Ok(std::fs::read_to_string(&txt_path)
             .map(|s| s.trim().to_string())
-            .or_else(|_| Ok(result.stdout))
+            .unwrap_or(result.stdout))
     }
 }

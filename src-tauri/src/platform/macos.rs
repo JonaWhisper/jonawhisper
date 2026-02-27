@@ -188,7 +188,7 @@ fn request_accessibility_access() {
         // kCFStringEncodingUTF8 = 0x08000100
         let key = CFStringCreateWithCString(
             std::ptr::null(),
-            b"AXTrustedCheckOptionPrompt\0".as_ptr(),
+            c"AXTrustedCheckOptionPrompt".as_ptr() as *const u8,
             0x08000100,
         );
 

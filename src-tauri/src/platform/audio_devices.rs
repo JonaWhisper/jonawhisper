@@ -2,6 +2,7 @@ use std::ffi::c_void;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum AudioTransportType {
     BuiltIn,
     USB,
