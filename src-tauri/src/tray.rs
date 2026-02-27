@@ -256,6 +256,10 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             &lang_submenu,
             &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
+            #[cfg(debug_assertions)]
+            &MenuItem::with_id(app, "test_pill", "Test Pill States", true, None::<&str>)?,
+            #[cfg(debug_assertions)]
+            &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "Quit", true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
@@ -289,6 +293,12 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 "setup" => {
                     open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
+                }
+                "test_pill" => {
+                    let app_clone = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::commands::simulate_pill_test(app_clone, Some(3)).await;
+                    });
                 }
                 _ if id.starts_with("device_") => {
                     let uid = id.strip_prefix("device_").unwrap().to_string();

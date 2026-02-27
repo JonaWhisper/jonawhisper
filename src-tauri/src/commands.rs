@@ -6,7 +6,7 @@ use crate::platform;
 use crate::state::{ApiServerConfig, AppState, HistoryEntry};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[tauri::command]
 pub fn get_audio_devices() -> Vec<audio::AudioDevice> {
@@ -182,6 +182,59 @@ pub fn start_monitoring(
             500.0,
         );
     }
+}
+
+/// Simulate the pill state machine for visual testing.
+/// Runs: recording (with fake spectrum) → transcribing → complete → repeat.
+#[tauri::command]
+pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
+    use std::time::Duration;
+    let rounds = count.unwrap_or(2);
+
+    for round in 0..rounds {
+        log::info!("Simulation round {}/{}", round + 1, rounds);
+
+        // Open pill + recording mode
+        crate::tray::open_pill_window(&app);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let _ = app.emit("pill-mode", "recording");
+        let _ = app.emit("recording-started", ());
+
+        // Fake spectrum data for 2 seconds (30fps)
+        for frame in 0..60u32 {
+            let spectrum: Vec<f32> = (0..12)
+                .map(|i| {
+                    let phase = (frame as f32 * 0.15) + (i as f32 * 0.5);
+                    (phase.sin() * 0.5 + 0.5) * 0.8
+                })
+                .collect();
+            let _ = app.emit("spectrum-data", &spectrum);
+            tokio::time::sleep(Duration::from_millis(33)).await;
+        }
+
+        // Stop recording → transcribing
+        let _ = app.emit("recording-stopped", serde_json::json!({ "queue_count": rounds - round }));
+        let _ = app.emit("pill-mode", "transcribing");
+        let _ = app.emit("transcription-started", serde_json::json!({ "queue_count": rounds - round - 1 }));
+
+        // Transcribing dots for 2 seconds
+        tokio::time::sleep(Duration::from_millis(2000)).await;
+
+        // Complete
+        let _ = app.emit("transcription-complete", serde_json::json!({ "text": format!("Simulation round {}", round + 1) }));
+
+        if round < rounds - 1 {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+
+    // Show error state briefly
+    let _ = app.emit("pill-mode", "error");
+    tokio::time::sleep(Duration::from_millis(800)).await;
+
+    // Close pill
+    crate::tray::close_pill_window(&app);
+    log::info!("Simulation complete");
 }
 
 #[tauri::command]

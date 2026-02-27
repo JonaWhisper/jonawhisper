@@ -53,6 +53,7 @@ pub fn run() {
             commands::remove_api_server,
             commands::get_api_servers,
             commands::get_app_state,
+            commands::simulate_pill_test,
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
