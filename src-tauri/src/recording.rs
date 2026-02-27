@@ -5,6 +5,7 @@ use crate::platform;
 use crate::post_processor;
 use crate::state::AppState;
 use crate::transcriber;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
@@ -310,20 +311,26 @@ pub fn cleanup_orphan_audio_files() {
     }
 }
 
-/// Spawns the dedicated audio thread (cpal::Stream is not Send).
-/// Returns (cmd_tx, spectrum_data) for communicating with the thread.
-pub fn spawn_audio_thread() -> (
+/// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error).
+type AudioThreadHandles = (
     std::sync::mpsc::Sender<AudioCmd>,
     Arc<std::sync::Mutex<Vec<f32>>>,
     std::sync::mpsc::Receiver<AudioReply>,
-) {
+    Arc<AtomicBool>,
+);
+
+/// Spawns the dedicated audio thread (cpal::Stream is not Send).
+pub fn spawn_audio_thread() -> AudioThreadHandles {
     let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<AudioCmd>();
     let (reply_tx, reply_rx) = std::sync::mpsc::channel::<AudioReply>();
     let spectrum_data = Arc::new(std::sync::Mutex::new(vec![0.0f32; 12]));
     let spectrum_clone = spectrum_data.clone();
 
+    let stream_error = Arc::new(AtomicBool::new(false));
+    let stream_error_clone = Arc::clone(&stream_error);
+
     std::thread::spawn(move || {
-        let mut recorder = audio::AudioRecorder::new();
+        let mut recorder = audio::AudioRecorder::new(stream_error_clone);
         loop {
             match cmd_rx.recv() {
                 Ok(AudioCmd::StartRecording { device_uid }) => {
@@ -344,7 +351,7 @@ pub fn spawn_audio_thread() -> (
         }
     });
 
-    (cmd_tx, spectrum_data, reply_rx)
+    (cmd_tx, spectrum_data, reply_rx, stream_error)
 }
 
 /// Spawns the hotkey event processing thread.
@@ -372,15 +379,39 @@ pub fn spawn_hotkey_handler(
 }
 
 /// Spawns the spectrum emission timer (30fps).
+/// Also monitors the stream_error flag to detect device disconnection.
 pub fn spawn_spectrum_emitter(
     app: AppHandle,
     state: Arc<AppState>,
     cmd_tx: std::sync::mpsc::Sender<AudioCmd>,
     spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
+    stream_error: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(33));
         if *state.is_recording.lock().unwrap() {
+            // Detect audio stream error (e.g. device disconnected)
+            if stream_error.load(Ordering::SeqCst) {
+                log::warn!("Audio stream error detected (device disconnected?), forcing stop");
+                *state.is_recording.lock().unwrap() = false;
+                stream_error.store(false, Ordering::SeqCst);
+
+                // Show error on pill, then close after 800ms
+                platform::play_sound("Basso");
+                let _ = app.emit("pill-mode", "error");
+                let _ = app.emit("recording-stopped", ());
+
+                // Restore clipboard if we saved it
+                restore_saved_clipboard(&app, &state);
+
+                let app_clone = app.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(800));
+                    crate::tray::close_pill_window(&app_clone);
+                });
+                continue;
+            }
+
             let spectrum = spectrum_data.lock().unwrap().clone();
             let _ = cmd_tx.send(AudioCmd::GetSpectrum);
             let _ = app.emit("spectrum-data", spectrum);

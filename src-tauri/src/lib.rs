@@ -64,7 +64,8 @@ pub fn run() {
             tray::setup_tray(app.handle())?;
 
             // Audio thread (cpal::Stream is not Send)
-            let (cmd_tx, spectrum_data, reply_rx) = recording::spawn_audio_thread();
+            let (cmd_tx, spectrum_data, reply_rx, stream_error) =
+                recording::spawn_audio_thread();
 
             // Recording state (Send-safe: only channels, no cpal::Stream)
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
@@ -98,12 +99,13 @@ pub fn run() {
                 tray::open_window(app.handle(), "setup", "Setup", "/setup", 420.0, 380.0);
             }
 
-            // Spectrum emission (30fps)
+            // Spectrum emission (30fps) + stream error detection
             recording::spawn_spectrum_emitter(
                 app.handle().clone(),
                 app_state,
                 cmd_tx,
                 spectrum_data,
+                stream_error,
             );
 
             Ok(())

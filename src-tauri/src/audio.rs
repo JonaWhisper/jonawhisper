@@ -4,6 +4,7 @@ use hound::{WavSpec, WavWriter};
 use rustfft::{num_complex::Complex, FftPlanner};
 use std::io::BufWriter;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 const SAMPLE_RATE: u32 = 16000;
@@ -17,6 +18,7 @@ pub struct AudioRecorder {
     current_file: Arc<Mutex<Option<PathBuf>>>,
     spectrum: Arc<Mutex<Vec<f32>>>,
     fft_buffer: Arc<Mutex<Vec<f32>>>,
+    stream_error: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -27,13 +29,14 @@ pub struct AudioDevice {
 }
 
 impl AudioRecorder {
-    pub fn new() -> Self {
+    pub fn new(stream_error: Arc<AtomicBool>) -> Self {
         Self {
             stream: None,
             writer: Arc::new(Mutex::new(None)),
             current_file: Arc::new(Mutex::new(None)),
             spectrum: Arc::new(Mutex::new(vec![0.0; NUM_BANDS])),
             fft_buffer: Arc::new(Mutex::new(Vec::with_capacity(FFT_SIZE))),
+            stream_error,
         }
     }
 
@@ -149,6 +152,7 @@ impl AudioRecorder {
         *self.writer.lock().unwrap() = Some(writer);
         *self.spectrum.lock().unwrap() = vec![0.0; NUM_BANDS];
         *self.fft_buffer.lock().unwrap() = Vec::with_capacity(FFT_SIZE);
+        self.stream_error.store(false, Ordering::SeqCst);
 
         let writer_clone = Arc::clone(&self.writer);
         let fft_buffer_clone = Arc::clone(&self.fft_buffer);
@@ -163,6 +167,7 @@ impl AudioRecorder {
 
         let stream = match sample_format {
             SampleFormat::F32 => {
+                let error_flag = Arc::clone(&self.stream_error);
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
@@ -170,7 +175,10 @@ impl AudioRecorder {
                         let resampled = resample(&mono, rate, SAMPLE_RATE);
                         process_samples(&resampled, &writer_clone, &fft_buffer_clone, &spectrum_clone);
                     },
-                    |err| log::error!("Audio stream error: {}", err),
+                    move |err| {
+                        log::error!("Audio stream error: {}", err);
+                        error_flag.store(true, Ordering::SeqCst);
+                    },
                     None,
                 )
             }
@@ -178,6 +186,7 @@ impl AudioRecorder {
                 let writer_clone2 = Arc::clone(&self.writer);
                 let fft_buffer_clone2 = Arc::clone(&self.fft_buffer);
                 let spectrum_clone2 = Arc::clone(&self.spectrum);
+                let error_flag = Arc::clone(&self.stream_error);
                 device.build_input_stream(
                     &config,
                     move |data: &[i16], _: &cpal::InputCallbackInfo| {
@@ -186,7 +195,10 @@ impl AudioRecorder {
                         let resampled = resample(&mono, rate, SAMPLE_RATE);
                         process_samples(&resampled, &writer_clone2, &fft_buffer_clone2, &spectrum_clone2);
                     },
-                    |err| log::error!("Audio stream error: {}", err),
+                    move |err| {
+                        log::error!("Audio stream error: {}", err);
+                        error_flag.store(true, Ordering::SeqCst);
+                    },
                     None,
                 )
             }
