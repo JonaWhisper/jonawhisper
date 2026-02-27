@@ -62,8 +62,9 @@ function draw() {
     drawError(ctx, cw, ch)
   }
 
-  // Queue badge
-  if (store.queueCount > 1) {
+  // Queue badge — show total pending (queued + currently transcribing)
+  const pending = store.queueCount + (store.isTranscribing ? 1 : 0)
+  if (pending > 1) {
     const badgeSize = 16
     const bx = cw - badgeSize / 2 - 2
     const by = badgeSize / 2 + 2
@@ -75,7 +76,7 @@ function draw() {
     ctx.font = 'bold 10px -apple-system, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(String(store.queueCount), bx, by)
+    ctx.fillText(String(pending), bx, by)
   }
 
   animFrame = requestAnimationFrame(draw)
