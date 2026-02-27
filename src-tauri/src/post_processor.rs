@@ -12,7 +12,10 @@ static RE_CAPITALIZE_AFTER_SENTENCE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"([.?!]\s+|\n)(\p{Ll})").unwrap());
 
 pub fn process(text: &str, language: &str) -> String {
-    let mut result = text.to_string();
+    let mut result = strip_hallucinations(text);
+    if result.trim().is_empty() {
+        return String::new();
+    }
 
     let lang = resolve_language(language, &result);
     result = apply_dictation_commands(&result, &lang);
@@ -25,6 +28,58 @@ pub fn process(text: &str, language: &str) -> String {
             let upper: String = first.to_uppercase().collect();
             result = format!("{}{}", upper, &result[first.len_utf8()..]);
         }
+    }
+
+    result
+}
+
+/// Known Whisper hallucination phrases that appear on silence/noise.
+const HALLUCINATIONS: &[&str] = &[
+    "sous-titrage société radio-canada",
+    "sous-titrage st",
+    "sous titrage société radio canada",
+    "soustitrage société radio-canada",
+    "sous-titrage",
+    "sous-titres par",
+    "subtitles by",
+    "amara.org",
+    "thank you for watching",
+    "thanks for watching",
+    "merci d'avoir regardé",
+    "merci pour votre écoute",
+    "please subscribe",
+    "like and subscribe",
+    "www.",
+    "http",
+    "bye.",
+    "bye bye.",
+    "bye-bye.",
+    "au revoir.",
+    "à bientôt.",
+    "♪",
+    "...",
+    "…",
+];
+
+/// Strip known Whisper hallucination phrases from text.
+/// If only hallucinations remain, returns empty string.
+fn strip_hallucinations(text: &str) -> String {
+    let mut result = text.to_string();
+    let lower = result.to_lowercase();
+
+    // If the entire text (trimmed, case-insensitive) matches a hallucination, discard it
+    let trimmed_lower = lower.trim().trim_matches('.').trim();
+    for h in HALLUCINATIONS {
+        if trimmed_lower == *h {
+            log::info!("Filtered hallucination: {:?}", text.trim());
+            return String::new();
+        }
+    }
+
+    // Remove hallucination phrases embedded in longer text
+    for h in HALLUCINATIONS {
+        let re = Regex::new(&format!("(?i){}", regex::escape(h))).unwrap();
+        result = re.replace_all(&result, "").to_string();
     }
 
     result
@@ -151,5 +206,20 @@ mod tests {
     fn test_capitalization() {
         let result = process("hello. world", "en");
         assert_eq!(result, "Hello. World");
+    }
+
+    #[test]
+    fn test_hallucination_filter() {
+        assert_eq!(process("Sous-titrage Société Radio-Canada", "fr"), "");
+        assert_eq!(process("sous-titrage", "fr"), "");
+        assert_eq!(process("Thank you for watching", "en"), "");
+        assert_eq!(process("...", "en"), "");
+    }
+
+    #[test]
+    fn test_hallucination_embedded() {
+        let result = process("bonjour sous-titrage tout le monde", "fr");
+        assert!(result.contains("Bonjour"));
+        assert!(!result.to_lowercase().contains("sous-titrage"));
     }
 }
