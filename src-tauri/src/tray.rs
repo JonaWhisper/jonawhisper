@@ -1,4 +1,4 @@
-use crate::engines::common_languages;
+use crate::engines::{common_languages, EngineCatalog};
 use crate::platform::audio_devices;
 use crate::state::AppState;
 use std::sync::Arc;
@@ -140,7 +140,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             None => device.is_default,
         };
         if is_selected {
-            active_name = device.name.clone();
+            active_name = format!("{} {}", device.transport_type.icon(), device.name);
         }
     }
 
@@ -194,14 +194,51 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
         lang_submenu.append(&item)?;
     }
 
+    // Model submenu — only downloaded models, title shows selected
+    let api_servers = state.api_servers.lock().unwrap().clone();
+    let catalog = EngineCatalog::new(&api_servers);
+    let downloaded = catalog.downloaded_models();
+    let selected_model_id = state.selected_model_id.lock().unwrap().clone();
+
+    let mut active_model_label = String::from("Model");
+    for model in &downloaded {
+        if model.id == selected_model_id {
+            active_model_label = model.label.clone();
+        }
+    }
+
+    let model_submenu = Submenu::with_id(app, "model_submenu", &active_model_label, true)?;
+    for model in &downloaded {
+        let is_selected = model.id == selected_model_id;
+        let item = CheckMenuItem::with_id(
+            app,
+            format!("model_{}", model.id),
+            &model.label,
+            true,
+            is_selected,
+            None::<&str>,
+        )?;
+        model_submenu.append(&item)?;
+    }
+    if !downloaded.is_empty() {
+        model_submenu.append(&PredefinedMenuItem::separator(app)?)?;
+    }
+    model_submenu.append(&MenuItem::with_id(
+        app,
+        "model_manager",
+        "Manage Models\u{2026}",
+        true,
+        None::<&str>,
+    )?)?;
+
     let menu = Menu::with_items(
         app,
         &[
             &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &mic_submenu,
+            &model_submenu,
             &lang_submenu,
-            &MenuItem::with_id(app, "model_manager", "Manage Models\u{2026}", true, None::<&str>)?,
             &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "Quit WhisperDictate", true, Some("CmdOrCtrl+Q"))?,
@@ -243,6 +280,17 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     let state = get_state(app);
                     *state.selected_input_device_uid.lock().unwrap() = Some(uid.clone());
                     log::info!("Selected audio device: {}", uid);
+                }
+                _ if id.starts_with("model_") => {
+                    let model_id = id.strip_prefix("model_").unwrap().to_string();
+                    let state = get_state(app);
+                    *state.selected_model_id.lock().unwrap() = model_id.clone();
+                    log::info!("Selected model: {}", model_id);
+                    if let Ok(new_menu) = build_menu(app) {
+                        if let Some(tray) = app.tray_by_id("main") {
+                            let _ = tray.set_menu(Some(new_menu));
+                        }
+                    }
                 }
                 _ if id.starts_with("lang_") => {
                     let code = id.strip_prefix("lang_").unwrap().to_string();
