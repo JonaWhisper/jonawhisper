@@ -25,11 +25,38 @@ impl PermissionReport {
 #[cfg(target_os = "macos")]
 pub mod macos;
 
+#[cfg(target_os = "macos")]
+pub mod audio_devices;
+
 pub mod hotkey;
 pub mod paste;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;
+
+#[cfg(not(target_os = "macos"))]
+pub mod audio_devices {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub enum AudioTransportType { Unknown }
+
+    impl AudioTransportType {
+        pub fn icon(&self) -> &'static str { "\u{1F3A4}" }
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct AudioDevice {
+        pub id: u32,
+        pub name: String,
+        pub uid: String,
+        pub transport_type: AudioTransportType,
+        pub is_default: bool,
+    }
+
+    pub fn list_input_devices() -> Vec<AudioDevice> { vec![] }
+    pub fn start_device_change_listener(_callback: impl Fn() + Send + 'static) {}
+}
 
 #[cfg(not(target_os = "macos"))]
 pub mod stub {

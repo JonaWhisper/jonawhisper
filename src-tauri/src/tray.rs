@@ -1,4 +1,4 @@
-use crate::audio;
+use crate::platform::audio_devices;
 use crate::state::AppState;
 use std::sync::Arc;
 use tauri::{
@@ -117,29 +117,11 @@ pub fn close_pill_window(app: &AppHandle) {
     });
 }
 
-fn device_icon(name: &str) -> &'static str {
-    let lower = name.to_lowercase();
-    if lower.contains("airpods") {
-        "\u{1F3A7}" // 🎧
-    } else if lower.contains("bluetooth") || lower.contains("beats") || lower.contains("bose")
-        || lower.contains("sony") || lower.contains("jabra") || lower.contains("jbl")
-    {
-        "\u{1F3A7}" // 🎧
-    } else if lower.contains("usb") || lower.contains("yeti") || lower.contains("scarlett")
-        || lower.contains("focusrite") || lower.contains("rode") || lower.contains("blue")
-        || lower.contains("elgato")
-    {
-        "\u{1F399}\u{FE0F}" // 🎙️
-    } else {
-        "\u{1F3A4}" // 🎤 built-in / default
-    }
-}
-
 fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
     let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
 
     // Audio device submenu — title shows selected device name
-    let devices = audio::AudioRecorder::list_devices();
+    let devices = audio_devices::list_input_devices();
     let selected_uid = state.selected_input_device_uid.lock().unwrap().clone();
 
     let mut active_name = String::from("Microphone");
@@ -160,7 +142,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             Some(uid) => uid == &device.uid,
             None => device.is_default,
         };
-        let icon = device_icon(&device.name);
+        let icon = device.transport_type.icon();
         let label = format!("{} {}", icon, device.name);
         let item = CheckMenuItem::with_id(
             app,
@@ -197,7 +179,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu = build_menu(app)?;
 
-    let _tray = TrayIconBuilder::new()
+    let tray = TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
         .icon_as_template(true)
         .tooltip("WhisperDictate")
@@ -231,6 +213,15 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .build(app)?;
+
+    // Listen for audio device changes and rebuild menu
+    let app_handle = app.clone();
+    audio_devices::start_device_change_listener(move || {
+        log::info!("Audio devices changed, rebuilding tray menu");
+        if let Ok(new_menu) = build_menu(&app_handle) {
+            let _ = tray.set_menu(Some(new_menu));
+        }
+    });
 
     Ok(())
 }
