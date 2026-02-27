@@ -71,6 +71,7 @@ pub fn stop_recording_and_enqueue(
         Ok(AudioReply::Stopped { path }) => path,
         _ => None,
     };
+    log::info!("stop_recording: audio_path={:?}", audio_path.as_ref().map(|p| p.display().to_string()));
 
     // Detect short tap (< 300ms)
     let is_short_tap = rec
@@ -78,6 +79,7 @@ pub fn stop_recording_and_enqueue(
         .map(|t| t.elapsed() < Duration::from_millis(300))
         .unwrap_or(false);
     rec.key_down_time = None;
+    log::info!("stop_recording: is_short_tap={}", is_short_tap);
 
     if is_short_tap {
         if let Some(ref path) = audio_path {
@@ -96,8 +98,10 @@ pub fn stop_recording_and_enqueue(
         let is_transcribing = *state.is_transcribing.lock().unwrap();
         let queue_empty = state.transcription_queue.lock().unwrap().is_empty();
         if !is_transcribing && queue_empty {
+            log::info!("stop_recording: short tap, nothing in progress → closing pill");
             crate::tray::close_pill_window(app);
         } else {
+            log::info!("stop_recording: short tap, transcription in progress → keeping pill");
             let _ = app.emit("pill-mode", "transcribing");
         }
         let _ = app.emit("recording-stopped", ());
@@ -109,6 +113,8 @@ pub fn stop_recording_and_enqueue(
     let audio_path = match audio_path {
         Some(p) => p,
         None => {
+            log::warn!("stop_recording: no audio file produced, closing pill");
+            crate::tray::close_pill_window(app);
             let _ = app.emit("recording-stopped", ());
             return;
         }
@@ -122,6 +128,7 @@ pub fn stop_recording_and_enqueue(
         serde_json::json!({ "queue_count": count }),
     );
 
+    log::info!("stop_recording: enqueued, emitting pill-mode=transcribing");
     let _ = app.emit("pill-mode", "transcribing");
 
     let app_clone = app.clone();
@@ -133,12 +140,15 @@ pub fn stop_recording_and_enqueue(
 
 pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     if *state.is_transcribing.lock().unwrap() {
+        log::info!("process_next_in_queue: already transcribing, skipping");
         return;
     }
     if state.transcription_queue.lock().unwrap().is_empty() {
+        log::info!("process_next_in_queue: queue empty, skipping");
         return;
     }
 
+    log::info!("process_next_in_queue: starting transcription");
     *state.is_transcribing.lock().unwrap() = true;
     let audio_path = match state.dequeue() {
         Some(p) => p,
@@ -213,6 +223,8 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     }
 
     *state.is_transcribing.lock().unwrap() = false;
+
+    log::info!("process_next_in_queue: transcription done, had_error={}", had_error);
 
     // Error → show error 800ms then close
     if had_error {
@@ -304,7 +316,7 @@ pub fn spawn_audio_thread() -> (
                 Ok(AudioCmd::GetSpectrum) => {
                     let s = recorder.get_spectrum();
                     *spectrum_clone.lock().unwrap() = s.clone();
-                    let _ = reply_tx.send(AudioReply::Spectrum(s));
+                    // Don't send reply — spectrum data is read via shared spectrum_data
                 }
                 Err(_) => break,
             }

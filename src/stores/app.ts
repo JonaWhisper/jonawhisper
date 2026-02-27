@@ -101,6 +101,7 @@ export const useAppStore = defineStore('app', () => {
   const postProcessingEnabled = ref(true)
   const hotkey = ref('right_command')
   const spectrumData = ref<number[]>(new Array(12).fill(0))
+  const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
 
   const engines = ref<EngineInfo[]>([])
   const models = ref<ASRModel[]>([])
@@ -313,6 +314,10 @@ export const useAppStore = defineStore('app', () => {
       queueCount.value = 0
     })
 
+    listen<string>('pill-mode', (event: Event<string>) => {
+      pillMode.value = event.payload as typeof pillMode.value
+    })
+
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
       if (event.payload?.progress !== undefined) {
         downloadProgress.value = event.payload.progress
@@ -352,7 +357,7 @@ export const useAppStore = defineStore('app', () => {
     isRecording, isTranscribing, queueCount,
     downloadingModelId, downloadProgress,
     selectedModelId, selectedLanguage,
-    postProcessingEnabled, hotkey, spectrumData,
+    postProcessingEnabled, hotkey, spectrumData, pillMode,
     engines, models, languages, history,
     audioDevices, permissions, apiServers,
     // Computed

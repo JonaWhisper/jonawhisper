@@ -1,3 +1,4 @@
+use crate::engines::common_languages;
 use crate::platform::audio_devices;
 use crate::state::AppState;
 use std::sync::Arc;
@@ -168,12 +169,38 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
         mic_submenu.append(&empty)?;
     }
 
+    // Language submenu — title shows selected language
+    let languages = common_languages();
+    let selected_lang = state.selected_language.lock().unwrap().clone();
+
+    let mut active_lang_label = String::from("Language");
+    for lang in &languages {
+        if lang.code == selected_lang {
+            active_lang_label = lang.label.clone();
+        }
+    }
+
+    let lang_submenu = Submenu::with_id(app, "lang_submenu", &active_lang_label, true)?;
+    for lang in &languages {
+        let is_selected = lang.code == selected_lang;
+        let item = CheckMenuItem::with_id(
+            app,
+            format!("lang_{}", lang.code),
+            &lang.label,
+            true,
+            is_selected,
+            None::<&str>,
+        )?;
+        lang_submenu.append(&item)?;
+    }
+
     let menu = Menu::with_items(
         app,
         &[
             &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &mic_submenu,
+            &lang_submenu,
             &MenuItem::with_id(app, "model_manager", "Manage Models\u{2026}", true, None::<&str>)?,
             &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
@@ -187,7 +214,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu = build_menu(app)?;
 
-    let tray = TrayIconBuilder::new()
+    let tray = TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
         .icon_as_template(true)
         .tooltip("WhisperDictate")
@@ -216,6 +243,18 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     let state = get_state(app);
                     *state.selected_input_device_uid.lock().unwrap() = Some(uid.clone());
                     log::info!("Selected audio device: {}", uid);
+                }
+                _ if id.starts_with("lang_") => {
+                    let code = id.strip_prefix("lang_").unwrap().to_string();
+                    let state = get_state(app);
+                    *state.selected_language.lock().unwrap() = code.clone();
+                    log::info!("Selected language: {}", code);
+                    // Rebuild menu to update checkmarks and submenu title
+                    if let Ok(new_menu) = build_menu(app) {
+                        if let Some(tray) = app.tray_by_id("main") {
+                            let _ = tray.set_menu(Some(new_menu));
+                        }
+                    }
                 }
                 _ => {}
             }
