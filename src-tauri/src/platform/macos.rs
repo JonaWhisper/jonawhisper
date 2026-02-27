@@ -97,46 +97,23 @@ fn check_input_monitoring_permission() -> PermissionStatus {
     }
 }
 
-/// Bundle ID must match tauri.conf.json "identifier"
-const BUNDLE_ID: &str = "com.local.whisper-dictate";
-
 pub fn request_permission(kind: &str) -> bool {
     match kind {
         "microphone" => {
-            // Reset stale TCC entry (ad-hoc signature changes between builds)
-            reset_tcc("Microphone");
             request_microphone_access();
             true
         }
         "accessibility" => {
-            reset_tcc("Accessibility");
             request_accessibility_access();
             true
         }
         "input_monitoring" => {
-            reset_tcc("ListenEvent");
             let _ = std::process::Command::new("open")
                 .args(["x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"])
                 .output();
             true
         }
         _ => false,
-    }
-}
-
-/// Clear stale TCC entries for our bundle ID so macOS re-evaluates the current code signature.
-fn reset_tcc(service: &str) {
-    let output = std::process::Command::new("tccutil")
-        .args(["reset", service, BUNDLE_ID])
-        .output();
-    match output {
-        Ok(o) => {
-            if !o.status.success() {
-                log::debug!("tccutil reset {} {}: {:?}", service, BUNDLE_ID,
-                    String::from_utf8_lossy(&o.stderr));
-            }
-        }
-        Err(e) => log::debug!("tccutil failed: {}", e),
     }
 }
 
@@ -165,7 +142,7 @@ fn request_microphone_access() {
     }
 }
 
-/// Trigger the accessibility permission dialog via AXIsProcessTrustedWithOptions with prompt=true.
+/// Trigger the accessibility permission prompt and open System Settings.
 fn request_accessibility_access() {
     unsafe {
         #[link(name = "ApplicationServices", kind = "framework")]
@@ -213,10 +190,22 @@ fn request_accessibility_access() {
             &kCFTypeDictionaryValueCallBacks as *const u8 as *const c_void,
         );
 
-        AXIsProcessTrustedWithOptions(dict);
+        let trusted = AXIsProcessTrustedWithOptions(dict);
         CFRelease(dict);
         CFRelease(key);
+
+        if !trusted {
+            open_privacy_settings("Privacy_Accessibility");
+        }
     }
+}
+
+fn open_privacy_settings(anchor: &str) {
+    let url = format!(
+        "x-apple.systempreferences:com.apple.preference.security?{}",
+        anchor
+    );
+    let _ = std::process::Command::new("open").arg(url).spawn();
 }
 
 pub fn play_sound(name: &str) {

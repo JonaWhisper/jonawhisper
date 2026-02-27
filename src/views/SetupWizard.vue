@@ -42,9 +42,7 @@ async function grant(kind: string) {
 }
 
 async function handleContinue() {
-  // Permissions confirmed — enable monitoring and fetch audio devices
   await store.startMonitoring()
-  await store.fetchAudioDevices()
   const win = getCurrentWindow()
   await win.close()
 }
