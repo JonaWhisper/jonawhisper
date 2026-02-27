@@ -76,6 +76,24 @@ class FloatingPill: NSObject {
         }
     }
 
+    func showError() {
+        DispatchQueue.main.async {
+            self.stopTimer()
+            if self.window == nil {
+                self.createWindow()
+            }
+            self.pillView?.mode = .error
+            self.pillView?.needsDisplay = true
+            self.window?.orderFrontRegardless()
+            self.window?.animator().alphaValue = 1
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard let self = self, self.pillView?.mode == .error else { return }
+                self.dismiss()
+            }
+        }
+    }
+
     func dismiss() {
         DispatchQueue.main.async {
             self.stopTimer()

@@ -5,6 +5,7 @@ class PillView: NSView {
         case recording
         case transcribing
         case downloading
+        case error
     }
 
     var mode: Mode = .recording
@@ -33,6 +34,8 @@ class PillView: NSView {
             drawTranscribing(in: rect)
         case .downloading:
             drawDownloading(in: rect)
+        case .error:
+            drawError(in: rect)
         }
 
         if downloadProgress > 0 {
@@ -125,6 +128,25 @@ class PillView: NSView {
         let progressPath = NSBezierPath(roundedRect: progressRect, xRadius: barHeight / 2, yRadius: barHeight / 2)
         NSColor(white: 0.9, alpha: 1.0).setFill()
         progressPath.fill()
+    }
+
+    private func drawError(in rect: NSRect) {
+        let size: CGFloat = 10
+        let centerX = rect.midX
+        let centerY = rect.midY
+        let half = size / 2
+
+        let path = NSBezierPath()
+        path.lineWidth = 2.5
+        path.lineCapStyle = .round
+
+        path.move(to: NSPoint(x: centerX - half, y: centerY - half))
+        path.line(to: NSPoint(x: centerX + half, y: centerY + half))
+        path.move(to: NSPoint(x: centerX + half, y: centerY - half))
+        path.line(to: NSPoint(x: centerX - half, y: centerY + half))
+
+        NSColor(red: 1.0, green: 0.35, blue: 0.35, alpha: 0.9).setStroke()
+        path.stroke()
     }
 
     private func drawTranscribing(in rect: NSRect) {

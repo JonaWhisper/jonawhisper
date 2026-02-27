@@ -15,7 +15,7 @@ struct AppleSpeechEngine: ASREngine {
     let installHint = ""
 
     func resolveExecutable() -> String? {
-        SFSpeechRecognizer()?.isAvailable == true ? "system" : nil
+        "system" // Speech framework always available on macOS 13+
     }
 
     func transcribe(model: ASRModel, audioURL: URL, language: String) throws -> String {

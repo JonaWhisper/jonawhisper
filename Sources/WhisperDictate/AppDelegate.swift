@@ -14,11 +14,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var langSubmenu: NSMenu!
     private var modelItem: NSMenuItem!
     private var modelSubmenu: NSMenu!
+    private var postProcessItem: NSMenuItem!
 
     // Queue system
     private var pendingTranscribingTransition: DispatchWorkItem?
 
+    // Double-tap cancel
+    private var lastKeyDownTime: Date?
+    private var lastShortTapTime: Date?
+
+    // Post-processing
+    private var postProcessingEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "postProcessingEnabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "postProcessingEnabled") }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UserDefaults.standard.register(defaults: ["postProcessingEnabled": true])
         cleanupOrphanAudioFiles()
         AudioDeviceManager.applySavedDevice()
         AudioDeviceManager.startDeviceChangeListener()
@@ -74,6 +86,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         modelSubmenu = NSMenu()
         modelItem.submenu = modelSubmenu
         menu.addItem(modelItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        postProcessItem = NSMenuItem(title: "Post-traitement", action: #selector(togglePostProcessing), keyEquivalent: "")
+        postProcessItem.target = self
+        menu.addItem(postProcessItem)
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
@@ -254,6 +272,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startRecording() {
         guard !state.isRecording else { return }
         state.isRecording = true
+        state.transcriptionCancelled = false
+        lastKeyDownTime = Date()
 
         // Cancel pending transition to transcribing dots
         pendingTranscribingTransition?.cancel()
@@ -279,7 +299,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard state.isRecording else { return }
         state.isRecording = false
 
-        guard let audioURL = recorder.stopRecording() else {
+        let audioURL = recorder.stopRecording()
+
+        // Detect short tap (< 300ms press duration)
+        let isShortTap: Bool
+        if let downTime = lastKeyDownTime {
+            isShortTap = Date().timeIntervalSince(downTime) < 0.3
+        } else {
+            isShortTap = false
+        }
+        lastKeyDownTime = nil
+
+        if isShortTap {
+            // Discard audio from short tap
+            if let url = audioURL { try? FileManager.default.removeItem(at: url) }
+
+            if let lastTap = lastShortTapTime, Date().timeIntervalSince(lastTap) < 0.5 {
+                // Double-tap → cancel transcription
+                lastShortTapTime = nil
+                cancelTranscription()
+                return
+            }
+            lastShortTapTime = Date()
+
+            // Single short tap — maintain current UI state
+            if !state.isTranscribing && state.transcriptionQueue.isEmpty && !state.isDownloading {
+                pill.dismiss()
+            } else if state.isTranscribing {
+                scheduleTranscribingTransition()
+            }
+            DispatchQueue.main.async { self.setMenuBarIcon("mic.fill") }
+            return
+        }
+
+        lastShortTapTime = nil
+
+        guard let audioURL = audioURL else {
             Log.info("No audio recorded")
             if !state.isTranscribing && state.transcriptionQueue.isEmpty && !state.isDownloading {
                 pill.dismiss()
@@ -376,18 +431,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
 
+            var hadError = false
+
             do {
                 let text = try await self.transcriber.transcribe(audioURL: audioURL)
                 try? FileManager.default.removeItem(at: audioURL)
 
+                guard !self.state.transcriptionCancelled else {
+                    Log.info("Transcription result discarded (cancelled)")
+                    self.state.isTranscribing = false
+                    self.processNextInQueue()
+                    return
+                }
+
                 let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !trimmed.isEmpty {
-                    self.pasteService.paste(text: trimmed)
+                    let processed = self.postProcessingEnabled
+                        ? TextPostProcessor.process(trimmed, language: ASRModelCatalog.shared.selectedLanguage)
+                        : trimmed
+                    self.pasteService.paste(text: processed)
                     NSSound(named: "Glass")?.play()
                 } else {
                     NSSound(named: "Basso")?.play()
                 }
             } catch {
+                hadError = true
                 try? FileManager.default.removeItem(at: audioURL)
                 NSSound(named: "Basso")?.play()
                 Log.error("Transcription error: \(error)")
@@ -401,8 +469,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
 
             self.state.isTranscribing = false
-            self.processNextInQueue()
+
+            if hadError && self.state.transcriptionQueue.isEmpty && !self.state.isRecording {
+                self.pill.showError()
+                DispatchQueue.main.async { self.setMenuBarIcon("mic.fill") }
+            } else {
+                self.processNextInQueue()
+            }
         }
+    }
+
+    private func cancelTranscription() {
+        // Clear the queue
+        while let url = state.dequeue() {
+            try? FileManager.default.removeItem(at: url)
+        }
+        pill.queueCount = 0
+        state.transcriptionCancelled = true
+
+        Log.info("Transcription cancelled (double-tap)")
+        NSSound(named: "Funk")?.play()
+        pill.showError()
+        DispatchQueue.main.async { self.setMenuBarIcon("mic.fill") }
+    }
+
+    @objc private func togglePostProcessing() {
+        postProcessingEnabled = !postProcessingEnabled
     }
 
     private func setMenuBarIcon(_ symbolName: String) {
@@ -446,5 +538,6 @@ extension AppDelegate: NSMenuDelegate {
         refreshMicMenu()
         refreshLangMenu()
         refreshModelMenu()
+        postProcessItem.state = postProcessingEnabled ? .on : .off
     }
 }

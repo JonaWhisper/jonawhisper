@@ -11,6 +11,7 @@ class AppState {
     private var _transcriptionQueue: [URL] = []
     private var _downloadingModelId: String?
     private var _downloadProgress: Double = 0
+    private var _transcriptionCancelled = false
 
     var isRecording: Bool {
         get { lock.withLock { _isRecording } }
@@ -35,6 +36,11 @@ class AppState {
     var downloadProgress: Double {
         get { lock.withLock { _downloadProgress } }
         set { lock.withLock { _downloadProgress = newValue } }
+    }
+
+    var transcriptionCancelled: Bool {
+        get { lock.withLock { _transcriptionCancelled } }
+        set { lock.withLock { _transcriptionCancelled = newValue } }
     }
 
     var isDownloading: Bool { downloadingModelId != nil }
