@@ -50,6 +50,12 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         if rt.is_recording {
             return;
         }
+        // Cancel mic test if running
+        if rt.mic_testing {
+            rt.mic_testing = false;
+            let _ = rec.audio_tx.send(AudioCmd::StopMicTest);
+            let _ = app.emit("mic-test-stopped", ());
+        }
         rt.is_recording = true;
         rt.transcription_cancelled = false;
     }
