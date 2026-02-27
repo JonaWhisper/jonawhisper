@@ -9,6 +9,7 @@
 
 - [ ] **Système de raccourcis personnalisés** — Permettre de choisir n'importe quelle combinaison de touches (pas juste un dropdown de 4 options). Enregistrer un raccourci custom via un "press to record" UI
 - [ ] **LLM post-processing : modèle local** — Support d'un modèle local (llama.cpp ou subprocess) en plus des API distantes (OpenAI/Anthropic)
+- [ ] **Optimisation capture audio par type de device** — Adapter le traitement audio selon le type d'appareil (micro intégré Mac, AirPods, casque, micro fixe/USB). Possibilités : gain/amplification, noise gate, réduction de bruit, normalisation. Détecter le type de device et appliquer un profil adapté automatiquement
 
 ## UX / Polish
 
