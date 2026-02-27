@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import type { LlmConfig } from '@/stores/app'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { i18n } from '@/main'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -14,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
+import SpectrumBars from '@/components/SpectrumBars.vue'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -31,8 +34,7 @@ const sections = [
 
 // Mic test
 const isTesting = ref(false)
-const micLevel = ref(0)
-let testTimeout: ReturnType<typeof setTimeout> | null = null
+const testSpectrum = ref<number[]>(new Array(12).fill(0))
 let spectrumUnlisten: (() => void) | null = null
 
 const hotkeyOptions = [
@@ -80,39 +82,106 @@ async function onRecordingModeChange(mode: string) {
   await store.setSetting('recording_mode', mode)
 }
 
+// Selected device UID: use the stored preference, or the default device UID
+const selectedDeviceUid = computed(() => {
+  const settings = store.audioDevices
+  const stored = settings.find(d => d.uid === store.selectedInputDeviceUid)
+  if (stored) return stored.uid
+  const def = settings.find(d => d.is_default)
+  return def?.uid ?? ''
+})
+
 async function onDeviceChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('selected_input_device_uid', value === '__default__' ? '' : value)
+  // If selecting the default device, store empty string (= use system default)
+  const defaultDevice = store.audioDevices.find(d => d.is_default)
+  const uid = (defaultDevice && value === defaultDevice.uid) ? '' : value
+  await store.setSetting('selected_input_device_uid', uid)
+}
+
+// LLM config — local refs for form fields, synced with store on mount
+const llmProvider = ref('openai')
+const llmApiUrl = ref('')
+const llmApiKey = ref('')
+const llmModel = ref('')
+const llmSaved = ref(false)
+
+const llmApiUrlPlaceholder = computed(() =>
+  llmProvider.value === 'anthropic'
+    ? t('settings.llm.apiUrl.placeholder.anthropic')
+    : t('settings.llm.apiUrl.placeholder.openai')
+)
+
+const llmModelPlaceholder = computed(() =>
+  llmProvider.value === 'anthropic'
+    ? t('settings.llm.model.placeholder.anthropic')
+    : t('settings.llm.model.placeholder.openai')
+)
+
+function loadLlmFormFields() {
+  const c = store.llmConfig
+  llmProvider.value = c.provider || 'openai'
+  llmApiUrl.value = c.api_url || ''
+  llmApiKey.value = c.api_key || ''
+  llmModel.value = c.model || ''
+}
+
+async function onLlmEnabledChange(enabled: boolean) {
+  const config: LlmConfig = {
+    enabled,
+    provider: llmProvider.value,
+    api_url: llmApiUrl.value,
+    api_key: llmApiKey.value,
+    model: llmModel.value,
+  }
+  await store.setLlmConfig(config)
+}
+
+function onLlmProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  llmProvider.value = value
+}
+
+async function saveLlmConfig() {
+  const config: LlmConfig = {
+    enabled: store.llmConfig.enabled,
+    provider: llmProvider.value,
+    api_url: llmApiUrl.value,
+    api_key: llmApiKey.value,
+    model: llmModel.value,
+  }
+  await store.setLlmConfig(config)
+  llmSaved.value = true
+  setTimeout(() => { llmSaved.value = false }, 1500)
 }
 
 async function startMicTest() {
   if (isTesting.value) return
   isTesting.value = true
-  micLevel.value = 0
+  testSpectrum.value = new Array(12).fill(0)
+
+  await invoke('start_mic_test')
 
   spectrumUnlisten = await listen<number[]>('spectrum-data', (event) => {
     if (!isTesting.value) return
     const bands = event.payload
-    const avg = bands.reduce((a, b) => a + b, 0) / bands.length
-    micLevel.value = Math.min(100, Math.round(avg * 100))
+    const smoothed = [...testSpectrum.value]
+    for (let i = 0; i < smoothed.length; i++) {
+      const newVal = i < bands.length ? (bands[i] ?? 0) : 0
+      smoothed[i] = (smoothed[i] ?? 0) * 0.45 + newVal * 0.55
+    }
+    testSpectrum.value = smoothed
   })
-
-  testTimeout = setTimeout(() => {
-    stopMicTest()
-  }, 3000)
 }
 
-function stopMicTest() {
+async function stopMicTest() {
   isTesting.value = false
-  micLevel.value = 0
+  testSpectrum.value = new Array(12).fill(0)
   if (spectrumUnlisten) {
     spectrumUnlisten()
     spectrumUnlisten = null
   }
-  if (testTimeout) {
-    clearTimeout(testTimeout)
-    testTimeout = null
-  }
+  await invoke('stop_mic_test')
 }
 
 onMounted(async () => {
@@ -120,6 +189,7 @@ onMounted(async () => {
     store.fetchSettings(),
     store.fetchAudioDevices(),
   ])
+  loadLlmFormFields()
 })
 
 onUnmounted(() => {
@@ -206,9 +276,65 @@ onUnmounted(() => {
               />
             </div>
             <div class="flex items-center justify-between gap-4">
-              <Label class="text-sm text-muted-foreground shrink-0">{{ t('settings.postProcessing.llm') }}</Label>
-              <Button variant="outline" size="sm" disabled class="shrink-0">
-                {{ t('settings.postProcessing.llmConfigure') }}
+              <Label class="text-sm shrink-0">{{ t('settings.postProcessing.llm') }}</Label>
+              <Switch
+                :checked="store.llmConfig.enabled"
+                @update:checked="onLlmEnabledChange"
+              />
+            </div>
+
+            <!-- LLM config form -->
+            <div
+              v-if="store.llmConfig.enabled"
+              class="space-y-3 pl-4 border-l-2 border-border"
+            >
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
+                <Select :model-value="llmProvider" @update:model-value="onLlmProviderChange">
+                  <SelectTrigger class="w-full h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openai">{{ t('settings.llm.provider.openai') }}</SelectItem>
+                    <SelectItem value="anthropic">{{ t('settings.llm.provider.anthropic') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.apiUrl') }}</Label>
+                <Input
+                  v-model="llmApiUrl"
+                  :placeholder="llmApiUrlPlaceholder"
+                  class="h-8 text-sm"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.apiKey') }}</Label>
+                <Input
+                  v-model="llmApiKey"
+                  type="password"
+                  :placeholder="t('settings.llm.apiKey.placeholder')"
+                  class="h-8 text-sm"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+                <Input
+                  v-model="llmModel"
+                  :placeholder="llmModelPlaceholder"
+                  class="h-8 text-sm"
+                />
+              </div>
+
+              <Button
+                size="sm"
+                class="w-full"
+                @click="saveLlmConfig"
+              >
+                {{ llmSaved ? t('settings.llm.saved') : t('settings.llm.save') }}
               </Button>
             </div>
           </div>
@@ -285,22 +411,19 @@ onUnmounted(() => {
           <div class="space-y-1.5">
             <Label class="text-sm font-medium">{{ t('settings.microphone') }}</Label>
             <Select
-              :model-value="store.audioDevices.find(d => d.is_default)?.uid ?? '__default__'"
+              :model-value="selectedDeviceUid"
               @update:model-value="onDeviceChange"
             >
               <SelectTrigger class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__default__">
-                  {{ t('settings.microphone.default') }}
-                </SelectItem>
                 <SelectItem
                   v-for="device in store.audioDevices"
                   :key="device.uid"
                   :value="device.uid"
                 >
-                  {{ device.name }}
+                  {{ device.name }}{{ device.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -313,10 +436,10 @@ onUnmounted(() => {
               class="shrink-0"
               @click="isTesting ? stopMicTest() : startMicTest()"
             >
-              {{ isTesting ? t('settings.microphone.testing') : t('settings.microphone.test') }}
+              {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
             </Button>
             <div v-if="isTesting" class="flex-1">
-              <Progress :model-value="micLevel" class="h-2" />
+              <SpectrumBars :spectrum="testSpectrum" size="md" />
             </div>
           </div>
         </div>

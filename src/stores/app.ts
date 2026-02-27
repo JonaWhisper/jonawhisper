@@ -94,6 +94,14 @@ interface AppStatePayload {
   recording_mode: string
 }
 
+export interface LlmConfig {
+  enabled: boolean
+  provider: string
+  api_url: string
+  api_key: string
+  model: string
+}
+
 export interface SettingsPayload {
   app_locale: string
   post_processing_enabled: boolean
@@ -104,6 +112,7 @@ export interface SettingsPayload {
   selected_input_device_uid: string | null
   selected_model_id: string
   selected_language: string
+  llm_config: LlmConfig
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -120,7 +129,9 @@ export const useAppStore = defineStore('app', () => {
   const appLocale = ref('auto')
   const cancelShortcut = ref('escape')
   const recordingMode = ref('push_to_talk')
+  const selectedInputDeviceUid = ref<string | null>(null)
   const hotkey = ref('right_command')
+  const llmConfig = ref<LlmConfig>({ enabled: false, provider: 'openai', api_url: '', api_key: '', model: '' })
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
 
@@ -252,8 +263,10 @@ export const useAppStore = defineStore('app', () => {
       postProcessingEnabled.value = s.post_processing_enabled
       hallucinationFilterEnabled.value = s.hallucination_filter_enabled
       hotkey.value = s.hotkey
+      selectedInputDeviceUid.value = s.selected_input_device_uid
       cancelShortcut.value = s.cancel_shortcut
       recordingMode.value = s.recording_mode
+      if (s.llm_config) llmConfig.value = s.llm_config
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -269,7 +282,7 @@ export const useAppStore = defineStore('app', () => {
         case 'cancel_shortcut': cancelShortcut.value = value; break
         case 'recording_mode': recordingMode.value = value; break
         case 'selected_input_device_uid':
-          // Refresh devices to reflect change
+          selectedInputDeviceUid.value = value || null
           break
       }
     } catch (e) { console.error('setSetting failed:', e) }
@@ -278,6 +291,13 @@ export const useAppStore = defineStore('app', () => {
   async function startMonitoring() {
     try { await invoke('start_monitoring') }
     catch (e) { console.error('startMonitoring failed:', e) }
+  }
+
+  async function setLlmConfig(config: LlmConfig) {
+    try {
+      await invoke('set_llm_config', { config })
+      llmConfig.value = config
+    } catch (e) { console.error('setLlmConfig failed:', e) }
   }
 
   async function clearHistoryAction() {
@@ -400,8 +420,9 @@ export const useAppStore = defineStore('app', () => {
     isRecording, isTranscribing, queueCount,
     downloadingModelId, downloadProgress,
     selectedModelId, selectedLanguage,
-    postProcessingEnabled, hallucinationFilterEnabled, appLocale,
+    postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
+    llmConfig,
     engines, models, languages, history,
     audioDevices, permissions, apiServers,
     // Computed
@@ -412,7 +433,7 @@ export const useAppStore = defineStore('app', () => {
     fetchApiServers, fetchState,
     selectModel, selectLanguageAction,
     downloadModel, deleteModel,
-    fetchSettings, setSetting,
+    fetchSettings, setSetting, setLlmConfig,
     clearHistoryAction, requestPermission,
     startMonitoring,
     addApiServer, removeApiServer,
