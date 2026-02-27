@@ -271,20 +271,20 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function setSetting(key: string, value: string) {
+    // Update local state immediately (optimistic) so UI reflects change instantly
+    switch (key) {
+      case 'app_locale': appLocale.value = value; break
+      case 'post_processing_enabled': postProcessingEnabled.value = value === 'true'; break
+      case 'hallucination_filter_enabled': hallucinationFilterEnabled.value = value === 'true'; break
+      case 'hotkey': hotkey.value = value; break
+      case 'cancel_shortcut': cancelShortcut.value = value; break
+      case 'recording_mode': recordingMode.value = value; break
+      case 'selected_input_device_uid':
+        selectedInputDeviceUid.value = value || null
+        break
+    }
     try {
       await invoke('set_setting', { key, value })
-      // Update local state
-      switch (key) {
-        case 'app_locale': appLocale.value = value; break
-        case 'post_processing_enabled': postProcessingEnabled.value = value === 'true'; break
-        case 'hallucination_filter_enabled': hallucinationFilterEnabled.value = value === 'true'; break
-        case 'hotkey': hotkey.value = value; break
-        case 'cancel_shortcut': cancelShortcut.value = value; break
-        case 'recording_mode': recordingMode.value = value; break
-        case 'selected_input_device_uid':
-          selectedInputDeviceUid.value = value || null
-          break
-      }
     } catch (e) { console.error('setSetting failed:', e) }
   }
 
@@ -294,9 +294,9 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function setLlmConfig(config: LlmConfig) {
+    llmConfig.value = config  // Optimistic update
     try {
       await invoke('set_llm_config', { config })
-      llmConfig.value = config
     } catch (e) { console.error('setLlmConfig failed:', e) }
   }
 

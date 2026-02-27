@@ -30,15 +30,15 @@ function draw() {
   const ctx = c.getContext('2d')
   if (!ctx) return
 
+  // Derive canvas size from the window (single source of truth is tray.rs PILL_WIDTH/HEIGHT)
   const dpr = window.devicePixelRatio || 1
-  c.width = 140 * dpr
-  c.height = 56 * dpr
-  c.style.width = '140px'
-  c.style.height = '56px'
+  const cw = window.innerWidth
+  const ch = window.innerHeight
+  c.width = cw * dpr
+  c.height = ch * dpr
+  c.style.width = `${cw}px`
+  c.style.height = `${ch}px`
   ctx.scale(dpr, dpr)
-
-  const cw = 140
-  const ch = 56
 
   // Clear
   ctx.clearRect(0, 0, cw, ch)
@@ -66,15 +66,16 @@ function draw() {
   // Queue badge — show total pending (queued + currently transcribing)
   const pending = store.queueCount + (store.isTranscribing ? 1 : 0)
   if (pending > 1) {
-    const badgeSize = 16
+    const badgeSize = Math.round(ch * 0.4)
     const bx = cw - badgeSize / 2 - 2
     const by = badgeSize / 2 + 2
+    const fontSize = Math.max(7, Math.round(ch * 0.28))
     ctx.beginPath()
     ctx.arc(bx, by, badgeSize / 2, 0, Math.PI * 2)
     ctx.fillStyle = '#ef4444'
     ctx.fill()
     ctx.fillStyle = '#fff'
-    ctx.font = 'bold 10px -apple-system, sans-serif'
+    ctx.font = `bold ${fontSize}px -apple-system, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(String(pending), bx, by)
@@ -86,8 +87,8 @@ function draw() {
 function drawSpectrum(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const bars = smoothedSpectrum.value
   const barCount = bars.length
-  const barWidth = 4
-  const gap = 3
+  const barWidth = Math.max(2, Math.round(w * 0.035))
+  const gap = Math.max(1, Math.round(w * 0.025))
   const totalWidth = barCount * barWidth + (barCount - 1) * gap
   const startX = (w - totalWidth) / 2
   const maxHeight = h * 0.6
@@ -108,8 +109,8 @@ function drawSpectrum(ctx: CanvasRenderingContext2D, w: number, h: number) {
 function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number) {
   dotPhase += 0.05
   const dotCount = 3
-  const dotSize = 5
-  const gap = 10
+  const dotSize = Math.max(3, Math.round(h * 0.12))
+  const gap = Math.max(4, Math.round(w * 0.08))
   const totalWidth = dotCount * dotSize + (dotCount - 1) * gap
   const startX = (w - totalWidth) / 2
 
@@ -128,7 +129,7 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number) {
 
 function drawProgress(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const barWidth = w * 0.7
-  const barHeight = 4
+  const barHeight = Math.max(2, Math.round(h * 0.1))
   const x = (w - barWidth) / 2
   const y = h / 2 - barHeight / 2
 
@@ -149,12 +150,12 @@ function drawProgress(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 function drawError(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const size = 16
+  const size = Math.round(h * 0.45)
   const cx = w / 2
   const cy = h / 2
 
   ctx.strokeStyle = '#ef4444'
-  ctx.lineWidth = 3
+  ctx.lineWidth = Math.max(1.5, h * 0.07)
   ctx.lineCap = 'round'
 
   ctx.beginPath()
@@ -186,7 +187,7 @@ onUnmounted(() => {
 
 <template>
   <div class="pill-window flex items-center justify-center w-full h-full">
-    <canvas ref="canvas" width="140" height="56" />
+    <canvas ref="canvas" />
   </div>
 </template>
 

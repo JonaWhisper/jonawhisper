@@ -9,8 +9,8 @@ use tauri::{
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
-const PILL_WIDTH: f64 = 140.0;
-const PILL_HEIGHT: f64 = 56.0;
+const PILL_WIDTH: f64 = 80.0;
+const PILL_HEIGHT: f64 = 32.0;
 const PILL_TOP_OFFSET: f64 = 40.0;
 
 // Tray icon size (44px for @2x Retina)

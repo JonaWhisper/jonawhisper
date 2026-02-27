@@ -429,16 +429,16 @@ onUnmounted(() => {
             </Select>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="space-y-3">
             <Button
               variant="outline"
               size="sm"
-              class="shrink-0"
+              class="w-20"
               @click="isTesting ? stopMicTest() : startMicTest()"
             >
               {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
             </Button>
-            <div v-if="isTesting" class="flex-1">
+            <div v-if="isTesting" class="rounded-md border border-border bg-muted/30 px-3 py-2">
               <SpectrumBars :spectrum="testSpectrum" size="md" />
             </div>
           </div>
