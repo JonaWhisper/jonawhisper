@@ -6,6 +6,7 @@ enum ASRDownloadType {
     case zipArchive
     case command(executable: String, arguments: [String])
     case remoteAPI
+    case system // Built-in, no download needed
 }
 
 struct ASRModel {
@@ -39,6 +40,7 @@ struct ASRModel {
 
     var isDownloaded: Bool {
         if case .remoteAPI = downloadType { return true }
+        if case .system = downloadType { return true }
         if let marker = downloadMarker {
             return FileManager.default.fileExists(atPath: "\(localPath)/\(marker)")
         }

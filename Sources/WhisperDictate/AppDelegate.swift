@@ -19,11 +19,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingTranscribingTransition: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        cleanupOrphanAudioFiles()
         AudioDeviceManager.applySavedDevice()
+        AudioDeviceManager.startDeviceChangeListener()
         ModelManagerWindowController.shared.pill = pill
         setupMenuBar()
 
         NotificationCenter.default.addObserver(self, selector: #selector(downloadDidComplete), name: .modelDownloadCompleted, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(audioDevicesChanged), name: .audioDevicesChanged, object: nil)
 
         PermissionChecker.check { [weak self] report in
             report.log()
@@ -215,6 +218,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ModelManagerWindowController.showWindow()
     }
 
+    @objc private func audioDevicesChanged() {
+        guard !AudioDeviceManager.isSavedDeviceConnected() else { return }
+        Log.info("Saved mic disconnected")
+        if state.isRecording {
+            stopRecordingAndEnqueue()
+            NSSound(named: "Basso")?.play()
+            NotificationService.show(
+                title: "Micro déconnecté",
+                body: "L'enregistrement a été arrêté. Le micro par défaut sera utilisé."
+            )
+        }
+    }
+
     @objc private func downloadDidComplete() {
         if !state.isRecording && !state.isTranscribing && state.transcriptionQueue.isEmpty {
             pill.dismiss()
@@ -401,6 +417,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Log.info("Resuming pending download: \(model.id)")
         ModelManagerWindowController.shared.startDownload(model)
+    }
+
+    private func cleanupOrphanAudioFiles() {
+        let tmpDir = FileManager.default.temporaryDirectory
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: tmpDir, includingPropertiesForKeys: [.contentModificationDateKey]
+        ) else { return }
+        let cutoff = Date().addingTimeInterval(-300)
+        for file in files where file.lastPathComponent.hasPrefix("whisper_dictate_") && file.pathExtension == "wav" {
+            if let vals = try? file.resourceValues(forKeys: [.contentModificationDateKey]),
+               let modified = vals.contentModificationDate, modified < cutoff {
+                try? FileManager.default.removeItem(at: file)
+                Log.info("Cleaned orphan audio: \(file.lastPathComponent)")
+            }
+        }
     }
 
     @objc private func quit() {

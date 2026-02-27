@@ -59,6 +59,7 @@ class ModelDownloader {
         try? model.id.data(using: .utf8)?.write(to: URL(fileURLWithPath: Self.pendingDownloadPath()))
 
         if case .remoteAPI = model.downloadType { return true }
+        if case .system = model.downloadType { return true }
 
         return await withCheckedContinuation { continuation in
             let complete: (Bool) -> Void = { success in
@@ -81,7 +82,7 @@ class ModelDownloader {
                     executable: executable, arguments: arguments,
                     model: model, progress: progress, completion: complete
                 )
-            case .remoteAPI:
+            case .remoteAPI, .system:
                 complete(true)
             }
         }

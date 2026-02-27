@@ -26,5 +26,7 @@
     <string>WhisperDictate needs microphone access to record your voice for transcription.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>WhisperDictate needs to paste transcribed text into the active application.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>WhisperDictate utilise la reconnaissance vocale pour transcrire vos enregistrements.</string>
 </dict>
 </plist>

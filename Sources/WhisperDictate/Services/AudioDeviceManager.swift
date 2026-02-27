@@ -209,4 +209,30 @@ class AudioDeviceManager {
             Log.info("Saved mic not found (uid: \(savedUID)), using system default")
         }
     }
+
+    /// Check if the saved device is still connected
+    static func isSavedDeviceConnected() -> Bool {
+        guard let savedUID = getSavedDeviceUID() else { return true }
+        return listInputDevices().contains { $0.uid == savedUID }
+    }
+
+    /// Listen for audio device connect/disconnect and post notification
+    static func startDeviceChangeListener() {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            DispatchQueue.main
+        ) { _, _ in
+            NotificationCenter.default.post(name: .audioDevicesChanged, object: nil)
+        }
+    }
+}
+
+extension Notification.Name {
+    static let audioDevicesChanged = Notification.Name("audioDevicesChanged")
 }

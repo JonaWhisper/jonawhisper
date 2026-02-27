@@ -4,6 +4,7 @@ class ASRModelCatalog {
     static let shared = ASRModelCatalog()
 
     private let localEngines: [ASREngine] = [
+        AppleSpeechEngine(),
         WhisperEngine(),
         MLXWhisperEngine(),
         FasterWhisperEngine(),

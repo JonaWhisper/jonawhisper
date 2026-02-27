@@ -16,6 +16,7 @@ let package = Package(
                 .linkedFramework("CoreAudio"),
                 .linkedFramework("CoreGraphics"),
                 .linkedFramework("UserNotifications"),
+                .linkedFramework("Speech"),
             ]
         )
     ]

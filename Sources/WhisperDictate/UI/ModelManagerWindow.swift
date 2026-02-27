@@ -103,6 +103,7 @@ class ModelManagerWindowController: NSWindowController {
         case "faster-whisper": return "whisper-ctranslate2"
         case "vosk": return "vosk-transcriber"
         case "moonshine": return "moonshine_voice"
+        case "apple-speech": return "SFSpeechRecognizer"
         case "openai-api": return "HTTP API"
         default: return engine.engineId
         }
