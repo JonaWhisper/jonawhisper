@@ -85,8 +85,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="mt-3 space-y-2">
-      <p class="text-[11px] text-muted-foreground text-center leading-snug">{{ t('setup.note') }}</p>
+    <div class="mt-3 pb-2">
       <Button class="w-full" :disabled="!canContinue" @click="handleContinue">
         {{ t('setup.continue') }}
       </Button>
