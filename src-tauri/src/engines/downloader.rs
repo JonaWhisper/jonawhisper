@@ -18,12 +18,6 @@ fn pending_download_path() -> PathBuf {
         .join(".pending-download")
 }
 
-fn resume_data_path(model: &ASRModel) -> PathBuf {
-    let safe_id = model.id.replace(':', "-");
-    let expanded = shellexpand::tilde(&model.storage_dir);
-    PathBuf::from(expanded.as_ref()).join(format!(".resume-{}", safe_id))
-}
-
 pub async fn download_model(
     app: AppHandle,
     state: Arc<AppState>,
@@ -262,9 +256,8 @@ pub fn delete_model(model: &ASRModel) -> bool {
     }
 }
 
-fn clear_pending_state(model: &ASRModel) {
+fn clear_pending_state(_model: &ASRModel) {
     let _ = fs::remove_file(pending_download_path());
-    let _ = fs::remove_file(resume_data_path(model));
 }
 
 fn uuid_simple() -> String {
