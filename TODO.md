@@ -19,4 +19,4 @@
 ## Technique / Infra
 
 - [ ] **Windows support** — Les stubs platform existent, implémenter les vrais bindings Windows (hotkey, permissions, paste, audio devices)
-- [ ] **Push des commits** — 12+ commits locaux en avance sur origin
+- [x] **Push des commits** — 17 commits pushés
