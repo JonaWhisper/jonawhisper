@@ -13,7 +13,7 @@
 
 ## UX / Polish
 
-- [ ] **Tester la pill réduite (80x32)** — Vérifier que les animations (spectrum, dots, progress, error, badge) sont lisibles et proportionnées
+- [x] **Pill réduite (80x32)** — Taille validée, animations proportionnées OK
 - [ ] **Indicateur visuel pendant la transcription dans le tray** — Feedback plus clair que la dictée est en cours de traitement
 
 ## Technique / Infra
