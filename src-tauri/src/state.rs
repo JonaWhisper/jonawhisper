@@ -202,6 +202,7 @@ impl AppState {
         self.transcription_queue.lock().unwrap().len()
     }
 
+    /// Runtime state only — no user settings (those come from get_settings).
     pub fn to_frontend_json(&self) -> serde_json::Value {
         serde_json::json!({
             "is_recording": *self.is_recording.lock().unwrap(),
@@ -211,12 +212,6 @@ impl AppState {
             "download_progress": *self.download_progress.lock().unwrap(),
             "selected_model_id": *self.selected_model_id.lock().unwrap(),
             "selected_language": *self.selected_language.lock().unwrap(),
-            "post_processing_enabled": *self.post_processing_enabled.lock().unwrap(),
-            "hotkey": *self.hotkey_option.lock().unwrap(),
-            "app_locale": *self.app_locale.lock().unwrap(),
-            "hallucination_filter_enabled": *self.hallucination_filter_enabled.lock().unwrap(),
-            "cancel_shortcut": *self.cancel_shortcut.lock().unwrap(),
-            "recording_mode": *self.recording_mode.lock().unwrap(),
         })
     }
 

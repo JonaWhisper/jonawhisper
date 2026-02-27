@@ -86,12 +86,6 @@ interface AppStatePayload {
   download_progress: number
   selected_model_id: string
   selected_language: string
-  post_processing_enabled: boolean
-  hotkey: string
-  app_locale: string
-  hallucination_filter_enabled: boolean
-  cancel_shortcut: string
-  recording_mode: string
 }
 
 export interface LlmConfig {
@@ -200,12 +194,6 @@ export const useAppStore = defineStore('app', () => {
       downloadProgress.value = state.download_progress
       selectedModelId.value = state.selected_model_id
       selectedLanguage.value = state.selected_language
-      postProcessingEnabled.value = state.post_processing_enabled
-      hallucinationFilterEnabled.value = state.hallucination_filter_enabled
-      appLocale.value = state.app_locale
-      cancelShortcut.value = state.cancel_shortcut
-      recordingMode.value = state.recording_mode
-      hotkey.value = state.hotkey
     } catch (e) { console.error('fetchState failed:', e) }
   }
 
@@ -406,6 +394,7 @@ export const useAppStore = defineStore('app', () => {
     setupListeners()
     await Promise.all([
       fetchState(),
+      fetchSettings(),
       fetchEngines(),
       fetchModels(),
       fetchLanguages(),
