@@ -5,16 +5,27 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_NAME="WhisperDictate"
 BUNDLE_ID="com.local.whisper-dictate"
 DIST_DIR="$SCRIPT_DIR/build"
-RELEASE_DIR="$SCRIPT_DIR/src-tauri/target/release"
-BUNDLE_DIR="$RELEASE_DIR/bundle"
+
+# Debug or release mode
+BUILD_MODE="${1:-release}"
+if [ "$BUILD_MODE" = "debug" ]; then
+    TARGET_DIR="$SCRIPT_DIR/src-tauri/target/debug"
+    TAURI_FLAGS="--debug"
+    MODE_LABEL="debug"
+else
+    TARGET_DIR="$SCRIPT_DIR/src-tauri/target/release"
+    TAURI_FLAGS=""
+    MODE_LABEL="release"
+fi
+BUNDLE_DIR="$TARGET_DIR/bundle"
 APP_PATH="$BUNDLE_DIR/macos/${APP_NAME}.app"
 
 # ── Build ──────────────────────────────────────────────────
 echo ""
-echo "=== Building ${APP_NAME} (Tauri release) ==="
+echo "=== Building ${APP_NAME} (Tauri ${MODE_LABEL}) ==="
 
 cd "$SCRIPT_DIR"
-npx tauri build --bundles app 2>&1
+npx tauri build --bundles app $TAURI_FLAGS 2>&1
 
 if [ ! -d "$APP_PATH" ]; then
     echo "ERROR: App bundle not found at $APP_PATH"

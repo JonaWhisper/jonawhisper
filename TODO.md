@@ -46,4 +46,5 @@
 
 ## Technique / Infra
 
+- [ ] **Script de test visuel + screenshots** — Pouvoir lancer des flows de test (pill, settings, etc.) et capturer des screenshots automatiquement pour vérifier le rendu sans intervention manuelle
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)
