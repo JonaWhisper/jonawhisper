@@ -1,18 +1,24 @@
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
-/// Clipboard write + paste key simulation.
-/// Uses tauri-plugin-clipboard-manager for cross-platform clipboard access.
-/// The key simulation (Cmd+V / Ctrl+V) remains platform-specific.
-/// Saves and restores the previous clipboard content.
+/// Save the current clipboard text content.
+/// Returns the saved text, or None if clipboard is empty or non-text.
+pub fn save_clipboard(app: &AppHandle) -> Option<String> {
+    app.clipboard().read_text().ok()
+}
+
+/// Restore previously saved clipboard content.
+pub fn restore_clipboard(app: &AppHandle, content: Option<String>) {
+    if let Some(text) = content {
+        let _ = app.clipboard().write_text(text);
+    }
+}
+
+/// Write text to clipboard and simulate paste keystroke.
+/// Does NOT save/restore clipboard — caller manages that via
+/// save_clipboard/restore_clipboard around a batch of pastes.
 pub fn paste_text(app: &AppHandle, text: &str) {
-    let clipboard = app.clipboard();
-
-    // Save current clipboard content
-    let previous = clipboard.read_text().ok();
-
-    // Write transcribed text to clipboard
-    if let Err(e) = clipboard.write_text(text) {
+    if let Err(e) = app.clipboard().write_text(text) {
         log::error!("Failed to write to clipboard: {}", e);
         return;
     }
@@ -20,14 +26,10 @@ pub fn paste_text(app: &AppHandle, text: &str) {
     // Small delay to ensure clipboard is ready
     std::thread::sleep(std::time::Duration::from_millis(50));
 
-    // Simulate paste keystroke (platform-specific)
     simulate_paste();
 
-    // Restore previous clipboard content after paste completes
-    if let Some(prev) = previous {
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let _ = clipboard.write_text(prev);
-    }
+    // Allow paste to complete before next operation
+    std::thread::sleep(std::time::Duration::from_millis(50));
 }
 
 /// Simulate Cmd+V on macOS.

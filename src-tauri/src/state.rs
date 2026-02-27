@@ -25,6 +25,8 @@ pub struct AppState {
     pub selected_input_device_uid: Mutex<Option<String>>,
     pub transcription_history: Mutex<Vec<HistoryEntry>>,
     pub api_servers: Mutex<Vec<ApiServerConfig>>,
+    /// Clipboard content saved before a paste batch, restored when queue drains.
+    pub saved_clipboard: Mutex<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,6 +104,7 @@ impl Default for AppState {
             selected_input_device_uid: Mutex::new(prefs.selected_input_device_uid),
             transcription_history: Mutex::new(Vec::new()),
             api_servers: Mutex::new(prefs.api_servers),
+            saved_clipboard: Mutex::new(None),
         }
     }
 }

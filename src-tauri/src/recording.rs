@@ -131,6 +131,15 @@ pub fn stop_recording_and_enqueue(
     log::info!("stop_recording: enqueued, emitting pill-mode=transcribing");
     let _ = app.emit("pill-mode", "transcribing");
 
+    // Save clipboard once before the paste batch starts
+    {
+        let mut saved = state.saved_clipboard.lock().unwrap();
+        if saved.is_none() {
+            *saved = paste::save_clipboard(app);
+            log::info!("Clipboard saved before paste batch");
+        }
+    }
+
     let app_clone = app.clone();
     let state_clone = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
@@ -228,6 +237,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
 
     // Error → show error 800ms then close
     if had_error {
+        restore_saved_clipboard(app, state);
         let _ = app.emit("pill-mode", "error");
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -247,9 +257,19 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         return;
     }
 
-    // Queue empty, not recording → close pill
+    // Queue empty → restore clipboard and close pill
+    restore_saved_clipboard(app, state);
     if !*state.is_recording.lock().unwrap() {
         crate::tray::close_pill_window(app);
+    }
+}
+
+/// Restore the clipboard content that was saved before the paste batch.
+fn restore_saved_clipboard(app: &AppHandle, state: &Arc<AppState>) {
+    let saved = state.saved_clipboard.lock().unwrap().take();
+    if saved.is_some() {
+        paste::restore_clipboard(app, saved);
+        log::info!("Clipboard restored after paste batch");
     }
 }
 
@@ -258,6 +278,7 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
         let _ = std::fs::remove_file(&path);
     }
     *state.transcription_cancelled.lock().unwrap() = true;
+    restore_saved_clipboard(app, state);
     platform::play_sound("Funk");
     let _ = app.emit("pill-mode", "error");
     let _ = app.emit("transcription-cancelled", ());
