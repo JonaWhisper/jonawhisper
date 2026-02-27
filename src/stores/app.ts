@@ -4,8 +4,10 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type Event } from '@tauri-apps/api/event'
 
 export interface AudioDevice {
+  id: number
   name: string
   uid: string
+  transport_type: string
   is_default: boolean
 }
 

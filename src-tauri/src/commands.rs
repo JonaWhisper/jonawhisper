@@ -17,8 +17,8 @@ fn catalog(state: &Arc<AppState>) -> EngineCatalog {
 // -- Audio --
 
 #[tauri::command]
-pub fn get_audio_devices() -> Vec<audio::AudioDevice> {
-    audio::AudioRecorder::list_devices()
+pub fn get_audio_devices() -> Vec<crate::platform::audio_devices::AudioDevice> {
+    audio::list_usable_devices()
 }
 
 // -- Engines & Models --

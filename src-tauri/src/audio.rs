@@ -12,6 +12,20 @@ const NUM_BANDS: usize = 12;
 const FFT_SIZE: usize = 1024;
 const SPECTRUM_SMOOTHING: f32 = 0.55; // new data weight (old = 1 - this)
 
+/// List input devices from CoreAudio, filtered to only those cpal can use for recording.
+pub fn list_usable_devices() -> Vec<crate::platform::audio_devices::AudioDevice> {
+    let host = cpal::default_host();
+    let cpal_names: Vec<String> = host
+        .input_devices()
+        .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+        .unwrap_or_default();
+
+    crate::platform::audio_devices::list_input_devices()
+        .into_iter()
+        .filter(|d| cpal_names.iter().any(|n| n == &d.name))
+        .collect()
+}
+
 pub struct AudioRecorder {
     stream: Option<cpal::Stream>,
     writer: Arc<Mutex<Option<WavWriter<BufWriter<std::fs::File>>>>>,
@@ -19,13 +33,6 @@ pub struct AudioRecorder {
     spectrum: Arc<Mutex<Vec<f32>>>,
     fft_buffer: Arc<Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AudioDevice {
-    pub name: String,
-    pub uid: String,
-    pub is_default: bool,
 }
 
 impl AudioRecorder {
@@ -38,26 +45,6 @@ impl AudioRecorder {
             fft_buffer: Arc::new(Mutex::new(Vec::with_capacity(FFT_SIZE))),
             stream_error,
         }
-    }
-
-    pub fn list_devices() -> Vec<AudioDevice> {
-        // Use CoreAudio to get real UIDs, then only include devices that cpal can also see
-        // (so we know they are usable for recording).
-        let host = cpal::default_host();
-        let cpal_names: Vec<String> = host
-            .input_devices()
-            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
-            .unwrap_or_default();
-
-        crate::platform::audio_devices::list_input_devices()
-            .into_iter()
-            .filter(|ca_dev| cpal_names.iter().any(|n| n == &ca_dev.name))
-            .map(|ca_dev| AudioDevice {
-                name: ca_dev.name,
-                uid: ca_dev.uid,
-                is_default: ca_dev.is_default,
-            })
-            .collect()
     }
 
     pub fn start_recording(&mut self, device_uid: Option<&str>) -> bool {
