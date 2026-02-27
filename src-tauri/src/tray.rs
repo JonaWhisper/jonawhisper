@@ -1,6 +1,9 @@
+use crate::audio;
+use crate::state::AppState;
+use std::sync::Arc;
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::TrayIconBuilder,
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
+    tray::{TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
@@ -114,49 +117,95 @@ pub fn close_pill_window(app: &AppHandle) {
     });
 }
 
-pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let quit = MenuItem::with_id(app, "quit", "Quit WhisperDictate", true, Some("CmdOrCtrl+Q"))?;
-    let model_manager =
-        MenuItem::with_id(app, "model_manager", "Manage Models\u{2026}", true, None::<&str>)?;
-    let setup = MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?;
-    let separator = PredefinedMenuItem::separator(app)?;
-    let separator2 = PredefinedMenuItem::separator(app)?;
+fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
+    let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+
+    // Audio device submenu
+    let mic_submenu = Submenu::with_id(app, "mic_submenu", "Microphone", true)?;
+    let devices = audio::AudioRecorder::list_devices();
+    let selected_uid = state.selected_input_device_uid.lock().unwrap().clone();
+
+    for device in &devices {
+        let is_selected = match &selected_uid {
+            Some(uid) => uid == &device.uid,
+            None => device.is_default,
+        };
+        let item = CheckMenuItem::with_id(
+            app,
+            format!("device_{}", device.uid),
+            &device.name,
+            true,
+            is_selected,
+            None::<&str>,
+        )?;
+        mic_submenu.append(&item)?;
+    }
+
+    if devices.is_empty() {
+        let empty = MenuItem::with_id(app, "no_devices", "No input devices", false, None::<&str>)?;
+        mic_submenu.append(&empty)?;
+    }
 
     let menu = Menu::with_items(
         app,
         &[
             &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
-            &separator,
-            &model_manager,
-            &setup,
-            &separator2,
-            &quit,
+            &PredefinedMenuItem::separator(app)?,
+            &mic_submenu,
+            &MenuItem::with_id(app, "model_manager", "Manage Models\u{2026}", true, None::<&str>)?,
+            &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "quit", "Quit WhisperDictate", true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
+
+    Ok(menu)
+}
+
+pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    let menu = build_menu(app)?;
 
     let _tray = TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
         .icon_as_template(true)
         .tooltip("WhisperDictate")
         .menu(&menu)
-        .on_menu_event(move |app, event| match event.id().as_ref() {
-            "quit" => {
-                std::process::exit(0);
+        .on_tray_icon_event(|tray, event| {
+            // Rebuild menu on click to refresh device list
+            if let TrayIconEvent::Click { .. } = event {
+                let app = tray.app_handle();
+                if let Ok(new_menu) = build_menu(app) {
+                    let _ = tray.set_menu(Some(new_menu));
+                }
             }
-            "model_manager" => {
-                open_window(
-                    app,
-                    "model-manager",
-                    "Model Manager",
-                    "/model-manager",
-                    700.0,
-                    500.0,
-                );
+        })
+        .on_menu_event(move |app, event| {
+            let id = event.id().0.as_str();
+            match id {
+                "quit" => {
+                    std::process::exit(0);
+                }
+                "model_manager" => {
+                    open_window(
+                        app,
+                        "model-manager",
+                        "Model Manager",
+                        "/model-manager",
+                        700.0,
+                        500.0,
+                    );
+                }
+                "setup" => {
+                    open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
+                }
+                _ if id.starts_with("device_") => {
+                    let uid = id.strip_prefix("device_").unwrap().to_string();
+                    let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
+                    *state.selected_input_device_uid.lock().unwrap() = Some(uid.clone());
+                    log::info!("Selected audio device: {}", uid);
+                }
+                _ => {}
             }
-            "setup" => {
-                open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
-            }
-            _ => {}
         })
         .build(app)?;
 
