@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { listen, type Event } from '@tauri-apps/api/event'
 
 export interface AudioDevice {
   name: string
@@ -54,6 +54,41 @@ export interface PermissionReport {
   input_monitoring: string
 }
 
+// Tauri event payload types
+interface RecordingStoppedPayload {
+  queue_count?: number
+}
+
+interface TranscriptionStartedPayload {
+  queue_count?: number
+}
+
+interface TranscriptionCompletePayload {
+  text?: string
+}
+
+interface DownloadProgressPayload {
+  model_id?: string
+  progress?: number
+}
+
+interface DownloadCompletePayload {
+  model_id: string
+  success: boolean
+}
+
+interface AppStatePayload {
+  is_recording: boolean
+  is_transcribing: boolean
+  queue_count: number
+  downloading_model_id: string | null
+  download_progress: number
+  selected_model_id: string
+  selected_language: string
+  post_processing_enabled: boolean
+  hotkey: string
+}
+
 export const useAppStore = defineStore('app', () => {
   // State
   const isRecording = ref(false)
@@ -88,140 +123,174 @@ export const useAppStore = defineStore('app', () => {
 
   // Actions
   async function fetchEngines() {
-    engines.value = await invoke('get_engines')
+    try { engines.value = await invoke('get_engines') }
+    catch (e) { console.error('fetchEngines failed:', e) }
   }
 
   async function fetchModels() {
-    models.value = await invoke('get_models')
+    try { models.value = await invoke('get_models') }
+    catch (e) { console.error('fetchModels failed:', e) }
   }
 
   async function fetchLanguages() {
-    languages.value = await invoke('get_languages')
+    try { languages.value = await invoke('get_languages') }
+    catch (e) { console.error('fetchLanguages failed:', e) }
   }
 
   async function fetchAudioDevices() {
-    audioDevices.value = await invoke('get_audio_devices')
+    try { audioDevices.value = await invoke('get_audio_devices') }
+    catch (e) { console.error('fetchAudioDevices failed:', e) }
   }
 
   async function fetchPermissions() {
-    permissions.value = await invoke('get_permissions')
+    try { permissions.value = await invoke('get_permissions') }
+    catch (e) { console.error('fetchPermissions failed:', e) }
   }
 
   async function fetchHistory() {
-    history.value = await invoke('get_history')
+    try { history.value = await invoke('get_history') }
+    catch (e) { console.error('fetchHistory failed:', e) }
   }
 
   async function fetchApiServers() {
-    apiServers.value = await invoke('get_api_servers')
+    try { apiServers.value = await invoke('get_api_servers') }
+    catch (e) { console.error('fetchApiServers failed:', e) }
   }
 
   async function fetchState() {
-    const state: any = await invoke('get_app_state')
-    isRecording.value = state.is_recording
-    isTranscribing.value = state.is_transcribing
-    queueCount.value = state.queue_count
-    downloadingModelId.value = state.downloading_model_id
-    downloadProgress.value = state.download_progress
-    selectedModelId.value = state.selected_model_id
-    selectedLanguage.value = state.selected_language
-    postProcessingEnabled.value = state.post_processing_enabled
-    hotkey.value = state.hotkey
+    try {
+      const state = await invoke<AppStatePayload>('get_app_state')
+      isRecording.value = state.is_recording
+      isTranscribing.value = state.is_transcribing
+      queueCount.value = state.queue_count
+      downloadingModelId.value = state.downloading_model_id
+      downloadProgress.value = state.download_progress
+      selectedModelId.value = state.selected_model_id
+      selectedLanguage.value = state.selected_language
+      postProcessingEnabled.value = state.post_processing_enabled
+      hotkey.value = state.hotkey
+    } catch (e) { console.error('fetchState failed:', e) }
   }
 
   async function selectModel(id: string) {
-    await invoke('select_model', { id })
-    selectedModelId.value = id
+    try {
+      await invoke('select_model', { id })
+      selectedModelId.value = id
+    } catch (e) { console.error('selectModel failed:', e) }
   }
 
   async function selectLanguageAction(code: string) {
-    await invoke('select_language', { code })
-    selectedLanguage.value = code
+    try {
+      await invoke('select_language', { code })
+      selectedLanguage.value = code
+    } catch (e) { console.error('selectLanguageAction failed:', e) }
   }
 
   async function downloadModel(id: string) {
     downloadingModelId.value = id
     downloadProgress.value = 0
-    const success = await invoke('download_model_cmd', { id })
-    downloadingModelId.value = null
-    downloadProgress.value = 0
-    if (success) {
-      await fetchModels()
+    try {
+      const success = await invoke<boolean>('download_model_cmd', { id })
+      if (success) {
+        await fetchModels()
+      }
+      return success
+    } catch (e) {
+      console.error('downloadModel failed:', e)
+      return false
+    } finally {
+      downloadingModelId.value = null
+      downloadProgress.value = 0
     }
-    return success
   }
 
   async function deleteModel(id: string) {
-    const success = await invoke('delete_model_cmd', { id })
-    if (success) {
-      await fetchModels()
+    try {
+      const success = await invoke<boolean>('delete_model_cmd', { id })
+      if (success) {
+        await fetchModels()
+      }
+      return success
+    } catch (e) {
+      console.error('deleteModel failed:', e)
+      return false
     }
-    return success
   }
 
   async function setPostProcessing(enabled: boolean) {
-    await invoke('set_post_processing_enabled', { enabled })
-    postProcessingEnabled.value = enabled
+    try {
+      await invoke('set_post_processing_enabled', { enabled })
+      postProcessingEnabled.value = enabled
+    } catch (e) { console.error('setPostProcessing failed:', e) }
   }
 
   async function setHotkey(key: string) {
-    await invoke('set_hotkey', { hotkey: key })
-    hotkey.value = key
+    try {
+      await invoke('set_hotkey', { hotkey: key })
+      hotkey.value = key
+    } catch (e) { console.error('setHotkey failed:', e) }
   }
 
   async function startMonitoring() {
-    await invoke('start_monitoring')
+    try { await invoke('start_monitoring') }
+    catch (e) { console.error('startMonitoring failed:', e) }
   }
 
   async function clearHistoryAction() {
-    await invoke('clear_history')
-    history.value = []
+    try {
+      await invoke('clear_history')
+      history.value = []
+    } catch (e) { console.error('clearHistory failed:', e) }
   }
 
   async function requestPermission(kind: string) {
-    await invoke('request_permission', { kind })
-    // Poll permissions after a short delay
-    setTimeout(fetchPermissions, 1500)
+    try { await invoke('request_permission', { kind }) }
+    catch (e) { console.error('requestPermission failed:', e) }
   }
 
   async function addApiServer(config: ApiServerConfig) {
-    await invoke('add_api_server', { config })
-    await fetchApiServers()
-    await fetchEngines()
-    await fetchModels()
+    try {
+      await invoke('add_api_server', { config })
+      await fetchApiServers()
+      await fetchEngines()
+      await fetchModels()
+    } catch (e) { console.error('addApiServer failed:', e) }
   }
 
   async function removeApiServer(id: string) {
-    await invoke('remove_api_server', { id })
-    await fetchApiServers()
-    await fetchEngines()
-    await fetchModels()
+    try {
+      await invoke('remove_api_server', { id })
+      await fetchApiServers()
+      await fetchEngines()
+      await fetchModels()
+    } catch (e) { console.error('removeApiServer failed:', e) }
   }
 
-  // Event listeners
+  // Event listeners (store is a singleton — listeners live for the app's lifetime)
   function setupListeners() {
     listen('recording-started', () => {
       isRecording.value = true
     })
 
-    listen('recording-stopped', (event: any) => {
+    listen<RecordingStoppedPayload>('recording-stopped', (event: Event<RecordingStoppedPayload>) => {
       isRecording.value = false
       if (event.payload?.queue_count !== undefined) {
         queueCount.value = event.payload.queue_count
       }
     })
 
-    listen('spectrum-data', (event: any) => {
-      spectrumData.value = event.payload as number[]
+    listen<number[]>('spectrum-data', (event: Event<number[]>) => {
+      spectrumData.value = event.payload
     })
 
-    listen('transcription-started', (event: any) => {
+    listen<TranscriptionStartedPayload>('transcription-started', (event: Event<TranscriptionStartedPayload>) => {
       isTranscribing.value = true
       if (event.payload?.queue_count !== undefined) {
         queueCount.value = event.payload.queue_count
       }
     })
 
-    listen('transcription-complete', (event: any) => {
+    listen<TranscriptionCompletePayload>('transcription-complete', (event: Event<TranscriptionCompletePayload>) => {
       isTranscribing.value = false
       queueCount.value = Math.max(0, queueCount.value - 1)
       if (event.payload?.text) {
@@ -244,7 +313,7 @@ export const useAppStore = defineStore('app', () => {
       queueCount.value = 0
     })
 
-    listen('download-progress', (event: any) => {
+    listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
       if (event.payload?.progress !== undefined) {
         downloadProgress.value = event.payload.progress
       }
@@ -253,7 +322,7 @@ export const useAppStore = defineStore('app', () => {
       }
     })
 
-    listen('download-complete', (_event: any) => {
+    listen<DownloadCompletePayload>('download-complete', () => {
       downloadingModelId.value = null
       downloadProgress.value = 0
       fetchModels()
