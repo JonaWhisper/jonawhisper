@@ -261,9 +261,11 @@ class ModelManagerWindowController: NSWindowController {
                 ASRModelCatalog.shared.selectedModelId = model.id
                 Log.info("Model \(model.id) downloaded and selected")
                 NSSound(named: "Glass")?.play()
+                NotificationService.show(title: "Modèle prêt", body: "\(model.label) est téléchargé et sélectionné.")
             } else {
                 Log.error("Failed to download model: \(model.id)")
                 NSSound(named: "Basso")?.play()
+                NotificationService.show(title: "Échec du téléchargement", body: "Le modèle \(model.label) n'a pas pu être téléchargé. Vérifiez votre connexion.")
             }
 
             let idx = max(0, self.engineTableView?.selectedRow ?? 0)

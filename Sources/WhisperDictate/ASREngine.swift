@@ -67,6 +67,7 @@ protocol ASREngine {
 enum TranscriberError: LocalizedError {
     case modelNotFound(String)
     case engineNotFound(String)
+    case engineUnavailable(engineId: String, installHint: String)
     case launchFailed(Error)
     case processFailed(Int32, String)
 
@@ -74,8 +75,28 @@ enum TranscriberError: LocalizedError {
         switch self {
         case .modelNotFound(let path): return "Model not found at \(path)"
         case .engineNotFound(let id): return "No engine found for \(id)"
+        case .engineUnavailable(let id, _): return "Engine \(id) is not installed"
         case .launchFailed(let error): return "Failed to launch: \(error.localizedDescription)"
         case .processFailed(let code, let msg): return "Process exited with code \(code): \(msg)"
+        }
+    }
+
+    /// User-facing notification message in French
+    var userMessage: (title: String, body: String) {
+        switch self {
+        case .modelNotFound:
+            return ("Modèle indisponible", "Le modèle n'est pas téléchargé. Ouvrez « Modèles… » pour le télécharger.")
+        case .engineNotFound(let id):
+            return ("Moteur introuvable", "Le moteur « \(id) » n'est pas enregistré.")
+        case .engineUnavailable(_, let hint):
+            return ("Moteur non installé", "Installez-le avec : \(hint)")
+        case .launchFailed(let error):
+            let desc = (error as NSError).localizedDescription
+            return ("Erreur de lancement", desc)
+        case .processFailed(_, let stderr):
+            let msg = stderr.isEmpty ? "Le processus a échoué." : stderr
+            let truncated = msg.count > 200 ? String(msg.prefix(200)) + "…" : msg
+            return ("Erreur de transcription", truncated)
         }
     }
 }

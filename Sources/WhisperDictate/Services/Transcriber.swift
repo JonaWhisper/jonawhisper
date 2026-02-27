@@ -11,6 +11,9 @@ class Transcriber {
         guard let engine = catalog.engine(for: model) else {
             throw TranscriberError.engineNotFound(model.engineId)
         }
+        if engine.resolveExecutable() == nil && !model.isRemoteAPI {
+            throw TranscriberError.engineUnavailable(engineId: engine.engineId, installHint: engine.installHint)
+        }
         let language = catalog.selectedLanguage
 
         return try await Task.detached(priority: .userInitiated) {

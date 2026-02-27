@@ -375,6 +375,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 try? FileManager.default.removeItem(at: audioURL)
                 NSSound(named: "Basso")?.play()
                 Log.error("Transcription error: \(error)")
+
+                if let te = error as? TranscriberError {
+                    let msg = te.userMessage
+                    NotificationService.show(title: msg.title, body: msg.body)
+                } else {
+                    NotificationService.show(title: "Erreur de transcription", body: error.localizedDescription)
+                }
             }
 
             self.state.isTranscribing = false
