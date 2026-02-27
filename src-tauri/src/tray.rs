@@ -49,7 +49,15 @@ pub fn open_pill_window(app: &AppHandle) {
                 {
                     configure_pill_nswindow(&win);
                 }
-                let _ = win.show();
+                // Delay show to let webview render with transparent background
+                // (avoids white flash on first appearance)
+                let handle_for_show = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    if let Some(w) = handle_for_show.get_webview_window("pill") {
+                        let _ = w.show();
+                    }
+                });
                 log::info!("Pill window created");
             }
             Err(e) => log::error!("Failed to create pill window: {}", e),

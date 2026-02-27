@@ -114,19 +114,19 @@ onMounted(async () => {
       <!-- Language selector -->
       <div class="flex items-center gap-2 mb-4">
         <label class="text-sm font-medium text-muted-foreground">{{ t('modelManager.language') }}</label>
-        <div class="flex gap-1 flex-wrap">
-          <button
+        <select
+          :value="store.selectedLanguage"
+          @change="handleLanguageChange(($event.target as HTMLSelectElement).value)"
+          class="text-sm px-2 py-1 rounded-md border border-border bg-background text-foreground"
+        >
+          <option
             v-for="lang in store.languages"
             :key="lang.code"
-            @click="handleLanguageChange(lang.code)"
-            class="px-2.5 py-1 text-xs rounded-md border transition-colors"
-            :class="lang.code === store.selectedLanguage
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'border-border text-foreground hover:bg-accent'"
+            :value="lang.code"
           >
             {{ lang.label }}
-          </button>
-        </div>
+          </option>
+        </select>
       </div>
 
       <h2 class="text-lg font-semibold mb-4">
