@@ -134,6 +134,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "selected_model_id": *state.selected_model_id.lock().unwrap(),
         "selected_language": *state.selected_language.lock().unwrap(),
         "cancel_shortcut": *state.cancel_shortcut.lock().unwrap(),
+        "recording_mode": *state.recording_mode.lock().unwrap(),
     })
 }
 
@@ -154,6 +155,7 @@ pub fn set_setting(
         }
         "hotkey" => *state.hotkey_option.lock().unwrap() = value,
         "cancel_shortcut" => *state.cancel_shortcut.lock().unwrap() = value,
+        "recording_mode" => *state.recording_mode.lock().unwrap() = value,
         "selected_input_device_uid" => {
             *state.selected_input_device_uid.lock().unwrap() = if value.is_empty() {
                 None

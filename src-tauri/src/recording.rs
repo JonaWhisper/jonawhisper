@@ -387,12 +387,28 @@ pub fn spawn_hotkey_handler(
     std::thread::spawn(move || loop {
         match hotkey_rx.recv() {
             Ok(hotkey::HotkeyEvent::KeyDown) => {
+                let mode = state.recording_mode.lock().unwrap().clone();
                 let mut rec = rec_state.lock().unwrap();
-                start_recording(&app, &state, &mut rec);
+                if mode == "toggle" {
+                    // Toggle: KeyDown starts or stops
+                    if *state.is_recording.lock().unwrap() {
+                        stop_recording_and_enqueue(&app, &state, &mut rec);
+                    } else {
+                        start_recording(&app, &state, &mut rec);
+                    }
+                } else {
+                    // Push-to-talk: KeyDown starts
+                    start_recording(&app, &state, &mut rec);
+                }
             }
             Ok(hotkey::HotkeyEvent::KeyUp) => {
-                let mut rec = rec_state.lock().unwrap();
-                stop_recording_and_enqueue(&app, &state, &mut rec);
+                let mode = state.recording_mode.lock().unwrap().clone();
+                if mode != "toggle" {
+                    // Push-to-talk: KeyUp stops
+                    let mut rec = rec_state.lock().unwrap();
+                    stop_recording_and_enqueue(&app, &state, &mut rec);
+                }
+                // Toggle: KeyUp is ignored
             }
             Ok(hotkey::HotkeyEvent::CancelPressed) => {
                 let is_transcribing = *state.is_transcribing.lock().unwrap();

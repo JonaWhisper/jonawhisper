@@ -91,6 +91,7 @@ interface AppStatePayload {
   app_locale: string
   hallucination_filter_enabled: boolean
   cancel_shortcut: string
+  recording_mode: string
 }
 
 export interface SettingsPayload {
@@ -99,6 +100,7 @@ export interface SettingsPayload {
   hallucination_filter_enabled: boolean
   hotkey: string
   cancel_shortcut: string
+  recording_mode: string
   selected_input_device_uid: string | null
   selected_model_id: string
   selected_language: string
@@ -117,6 +119,7 @@ export const useAppStore = defineStore('app', () => {
   const hallucinationFilterEnabled = ref(true)
   const appLocale = ref('auto')
   const cancelShortcut = ref('escape')
+  const recordingMode = ref('push_to_talk')
   const hotkey = ref('right_command')
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
@@ -190,6 +193,7 @@ export const useAppStore = defineStore('app', () => {
       hallucinationFilterEnabled.value = state.hallucination_filter_enabled
       appLocale.value = state.app_locale
       cancelShortcut.value = state.cancel_shortcut
+      recordingMode.value = state.recording_mode
       hotkey.value = state.hotkey
     } catch (e) { console.error('fetchState failed:', e) }
   }
@@ -261,6 +265,7 @@ export const useAppStore = defineStore('app', () => {
       hallucinationFilterEnabled.value = s.hallucination_filter_enabled
       hotkey.value = s.hotkey
       cancelShortcut.value = s.cancel_shortcut
+      recordingMode.value = s.recording_mode
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -274,6 +279,7 @@ export const useAppStore = defineStore('app', () => {
         case 'hallucination_filter_enabled': hallucinationFilterEnabled.value = value === 'true'; break
         case 'hotkey': hotkey.value = value; break
         case 'cancel_shortcut': cancelShortcut.value = value; break
+        case 'recording_mode': recordingMode.value = value; break
         case 'selected_input_device_uid':
           // Refresh devices to reflect change
           break
@@ -407,7 +413,7 @@ export const useAppStore = defineStore('app', () => {
     downloadingModelId, downloadProgress,
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale,
-    cancelShortcut, hotkey, spectrumData, pillMode,
+    cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
     engines, models, languages, history,
     audioDevices, permissions, apiServers,
     // Computed

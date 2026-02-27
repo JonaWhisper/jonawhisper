@@ -28,6 +28,7 @@ pub struct AppState {
     pub app_locale: Mutex<String>,
     pub hallucination_filter_enabled: Mutex<bool>,
     pub cancel_shortcut: Mutex<String>,
+    pub recording_mode: Mutex<String>,
     /// Clipboard content saved before a paste batch, restored when queue drains.
     pub saved_clipboard: Mutex<Option<String>>,
 }
@@ -62,6 +63,8 @@ pub struct Preferences {
     pub hallucination_filter_enabled: bool,
     #[serde(default = "default_cancel_shortcut")]
     pub cancel_shortcut: String,
+    #[serde(default = "default_recording_mode")]
+    pub recording_mode: String,
 }
 
 fn default_model_id() -> String { "whisper:large-v3-turbo".to_string() }
@@ -70,6 +73,7 @@ fn default_true() -> bool { true }
 fn default_hotkey() -> String { "right_command".to_string() }
 fn default_auto() -> String { "auto".to_string() }
 fn default_cancel_shortcut() -> String { "escape".to_string() }
+fn default_recording_mode() -> String { "push_to_talk".to_string() }
 
 fn prefs_path() -> PathBuf {
     dirs::home_dir()
@@ -118,6 +122,7 @@ impl Default for AppState {
             app_locale: Mutex::new(prefs.app_locale),
             hallucination_filter_enabled: Mutex::new(prefs.hallucination_filter_enabled),
             cancel_shortcut: Mutex::new(prefs.cancel_shortcut),
+            recording_mode: Mutex::new(prefs.recording_mode),
             saved_clipboard: Mutex::new(None),
         }
     }
@@ -136,6 +141,7 @@ impl AppState {
             app_locale: self.app_locale.lock().unwrap().clone(),
             hallucination_filter_enabled: *self.hallucination_filter_enabled.lock().unwrap(),
             cancel_shortcut: self.cancel_shortcut.lock().unwrap().clone(),
+            recording_mode: self.recording_mode.lock().unwrap().clone(),
         };
         prefs.save();
     }
@@ -173,6 +179,7 @@ impl AppState {
             "app_locale": *self.app_locale.lock().unwrap(),
             "hallucination_filter_enabled": *self.hallucination_filter_enabled.lock().unwrap(),
             "cancel_shortcut": *self.cancel_shortcut.lock().unwrap(),
+            "recording_mode": *self.recording_mode.lock().unwrap(),
         })
     }
 

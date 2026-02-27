@@ -76,6 +76,10 @@ async function onCancelShortcutChange(value: string | number | bigint | Record<s
   await store.setSetting('cancel_shortcut', value)
 }
 
+async function onRecordingModeChange(mode: string) {
+  await store.setSetting('recording_mode', mode)
+}
+
 async function onDeviceChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   await store.setSetting('selected_input_device_uid', value === '__default__' ? '' : value)
@@ -216,6 +220,31 @@ onUnmounted(() => {
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.shortcuts') }}</h2>
 
         <div class="space-y-4">
+          <!-- Recording mode toggle -->
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">{{ t('settings.shortcut.mode') }}</Label>
+            <div class="inline-flex rounded-md border border-border overflow-hidden">
+              <button
+                class="px-3 py-1.5 text-sm transition-colors"
+                :class="store.recordingMode === 'push_to_talk'
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'hover:bg-accent/50 text-muted-foreground'"
+                @click="onRecordingModeChange('push_to_talk')"
+              >
+                {{ t('settings.shortcut.mode.pushToTalk') }}
+              </button>
+              <button
+                class="px-3 py-1.5 text-sm border-l border-border transition-colors"
+                :class="store.recordingMode === 'toggle'
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'hover:bg-accent/50 text-muted-foreground'"
+                @click="onRecordingModeChange('toggle')"
+              >
+                {{ t('settings.shortcut.mode.toggle') }}
+              </button>
+            </div>
+          </div>
+
           <div class="space-y-1.5">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.record') }}</Label>
             <Select :model-value="store.hotkey" @update:model-value="onHotkeyChange">
