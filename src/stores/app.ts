@@ -73,11 +73,6 @@ interface DownloadProgressPayload {
   progress?: number
 }
 
-interface DownloadCompletePayload {
-  model_id: string
-  success: boolean
-}
-
 interface AppStatePayload {
   is_recording: boolean
   is_transcribing: boolean
@@ -256,8 +251,20 @@ export const useAppStore = defineStore('app', () => {
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
-  async function setSetting(key: string, value: string) {
-    // Update local state immediately (optimistic) so UI reflects change instantly
+  function getSettingValue(key: string): string {
+    switch (key) {
+      case 'app_locale': return appLocale.value
+      case 'post_processing_enabled': return String(postProcessingEnabled.value)
+      case 'hallucination_filter_enabled': return String(hallucinationFilterEnabled.value)
+      case 'hotkey': return hotkey.value
+      case 'cancel_shortcut': return cancelShortcut.value
+      case 'recording_mode': return recordingMode.value
+      case 'selected_input_device_uid': return selectedInputDeviceUid.value ?? ''
+      default: return ''
+    }
+  }
+
+  function applySettingLocally(key: string, value: string) {
     switch (key) {
       case 'app_locale': appLocale.value = value; break
       case 'post_processing_enabled': postProcessingEnabled.value = value === 'true'; break
@@ -265,13 +272,19 @@ export const useAppStore = defineStore('app', () => {
       case 'hotkey': hotkey.value = value; break
       case 'cancel_shortcut': cancelShortcut.value = value; break
       case 'recording_mode': recordingMode.value = value; break
-      case 'selected_input_device_uid':
-        selectedInputDeviceUid.value = value || null
-        break
+      case 'selected_input_device_uid': selectedInputDeviceUid.value = value || null; break
     }
+  }
+
+  async function setSetting(key: string, value: string) {
+    const prev = getSettingValue(key)
+    applySettingLocally(key, value)
     try {
       await invoke('set_setting', { key, value })
-    } catch (e) { console.error('setSetting failed:', e) }
+    } catch (e) {
+      console.error('setSetting failed, rolling back:', e)
+      applySettingLocally(key, prev)
+    }
   }
 
   async function startMonitoring() {
@@ -280,10 +293,14 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function setLlmConfig(config: LlmConfig) {
-    llmConfig.value = config  // Optimistic update
+    const prev = { ...llmConfig.value }
+    llmConfig.value = config
     try {
       await invoke('set_llm_config', { config })
-    } catch (e) { console.error('setLlmConfig failed:', e) }
+    } catch (e) {
+      console.error('setLlmConfig failed, rolling back:', e)
+      llmConfig.value = prev
+    }
   }
 
   async function clearHistoryAction() {
@@ -377,19 +394,16 @@ export const useAppStore = defineStore('app', () => {
       }
     })
 
-    listen<DownloadCompletePayload>('download-complete', () => {
-      downloadingModelId.value = null
-      downloadProgress.value = 0
-      fetchModels()
-    })
-
     listen('permission-changed', () => {
       fetchPermissions()
     })
   }
 
   // Initialize (don't fetch audio devices here — that triggers mic permission dialog on macOS 14+)
+  let initialized = false
   async function init() {
+    if (initialized) return
+    initialized = true
     setupListeners()
     await Promise.all([
       fetchState(),
