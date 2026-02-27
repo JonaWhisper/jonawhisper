@@ -84,8 +84,6 @@ interface AppStatePayload {
   queue_count: number
   downloading_model_id: string | null
   download_progress: number
-  selected_model_id: string
-  selected_language: string
 }
 
 export interface LlmConfig {
@@ -192,8 +190,6 @@ export const useAppStore = defineStore('app', () => {
       queueCount.value = state.queue_count
       downloadingModelId.value = state.downloading_model_id
       downloadProgress.value = state.download_progress
-      selectedModelId.value = state.selected_model_id
-      selectedLanguage.value = state.selected_language
     } catch (e) { console.error('fetchState failed:', e) }
   }
 
@@ -254,6 +250,8 @@ export const useAppStore = defineStore('app', () => {
       selectedInputDeviceUid.value = s.selected_input_device_uid
       cancelShortcut.value = s.cancel_shortcut
       recordingMode.value = s.recording_mode
+      selectedModelId.value = s.selected_model_id
+      selectedLanguage.value = s.selected_language
       if (s.llm_config) llmConfig.value = s.llm_config
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
@@ -395,6 +393,7 @@ export const useAppStore = defineStore('app', () => {
     setupListeners()
     await Promise.all([
       fetchState(),
+      fetchSettings(),
       fetchEngines(),
       fetchModels(),
       fetchLanguages(),

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::path::PathBuf;
 
@@ -14,7 +15,7 @@ pub struct HistoryEntry {
 pub struct AppState {
     pub is_recording: Mutex<bool>,
     pub is_transcribing: Mutex<bool>,
-    pub transcription_queue: Mutex<Vec<PathBuf>>,
+    pub transcription_queue: Mutex<VecDeque<PathBuf>>,
     pub downloading_model_id: Mutex<Option<String>>,
     pub download_progress: Mutex<f64>,
     pub transcription_cancelled: Mutex<bool>,
@@ -147,7 +148,7 @@ impl Default for AppState {
         Self {
             is_recording: Mutex::new(false),
             is_transcribing: Mutex::new(false),
-            transcription_queue: Mutex::new(Vec::new()),
+            transcription_queue: Mutex::new(VecDeque::new()),
             downloading_model_id: Mutex::new(None),
             download_progress: Mutex::new(0.0),
             transcription_cancelled: Mutex::new(false),
@@ -194,17 +195,12 @@ impl AppState {
 
     pub fn enqueue(&self, path: PathBuf) -> usize {
         let mut queue = self.transcription_queue.lock().unwrap();
-        queue.push(path);
+        queue.push_back(path);
         queue.len()
     }
 
     pub fn dequeue(&self) -> Option<PathBuf> {
-        let mut queue = self.transcription_queue.lock().unwrap();
-        if queue.is_empty() {
-            None
-        } else {
-            Some(queue.remove(0))
-        }
+        self.transcription_queue.lock().unwrap().pop_front()
     }
 
     pub fn queue_count(&self) -> usize {
@@ -219,8 +215,6 @@ impl AppState {
             "queue_count": self.queue_count(),
             "downloading_model_id": *self.downloading_model_id.lock().unwrap(),
             "download_progress": *self.download_progress.lock().unwrap(),
-            "selected_model_id": *self.selected_model_id.lock().unwrap(),
-            "selected_language": *self.selected_language.lock().unwrap(),
         })
     }
 

@@ -162,7 +162,7 @@ async function startMicTest() {
 
   await invoke('start_mic_test')
 
-  spectrumUnlisten = await listen<number[]>('spectrum-data', (event) => {
+  spectrumUnlisten = await listen<number[]>('mic-test-spectrum', (event) => {
     if (!isTesting.value) return
     const bands = event.payload
     const smoothed = [...testSpectrum.value]

@@ -1,5 +1,8 @@
 use crate::state::LlmConfig;
 use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
+
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 #[derive(Debug, thiserror::Error)]
 pub enum LlmError {
@@ -114,8 +117,7 @@ async fn call_openai_compatible(text: &str, language: &str, config: &LlmConfig) 
         max_tokens: 4096,
     };
 
-    let client = reqwest::Client::new();
-    let mut req = client.post(&url).json(&request);
+    let mut req = HTTP_CLIENT.post(&url).json(&request);
     if !config.api_key.is_empty() {
         req = req.header("Authorization", format!("Bearer {}", config.api_key));
     }
@@ -154,8 +156,7 @@ async fn call_anthropic(text: &str, language: &str, config: &LlmConfig) -> Resul
         }],
     };
 
-    let client = reqwest::Client::new();
-    let mut req = client
+    let mut req = HTTP_CLIENT
         .post(&url)
         .header("anthropic-version", "2023-06-01")
         .json(&request);

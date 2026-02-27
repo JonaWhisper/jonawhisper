@@ -479,7 +479,8 @@ pub fn spawn_spectrum_emitter(
 
         let spectrum = spectrum_data.lock().unwrap().clone();
         let _ = cmd_tx.send(AudioCmd::GetSpectrum);
-        let _ = app.emit("spectrum-data", spectrum);
+        let event_name = if is_mic_testing { "mic-test-spectrum" } else { "spectrum-data" };
+        let _ = app.emit(event_name, spectrum);
     });
 }
 
