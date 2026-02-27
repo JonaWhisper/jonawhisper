@@ -1,4 +1,15 @@
 use regex::Regex;
+use std::sync::LazyLock;
+
+// Punctuation spacing regexes (compiled once)
+static RE_SPACE_BEFORE_CLOSE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"\s+([.,?!;:\u{2026})\u{00BB}"\]])"#).unwrap());
+static RE_SPACE_AFTER_PUNCT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"([.,?!;:\u{2026}])([^\s\n.,?!;:\u{2026})\u{00BB}"\]\d])"#).unwrap());
+static RE_SPACE_AFTER_OPEN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"([\(\u{00AB}"\[])\s+"#).unwrap());
+static RE_CAPITALIZE_AFTER_SENTENCE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([.?!]\s+|\n)(\p{Ll})").unwrap());
 
 pub fn process(text: &str, language: &str) -> String {
     let mut result = text.to_string();
@@ -30,8 +41,7 @@ fn resolve_language(code: &str, text: &str) -> String {
     ];
 
     let lower = text.to_lowercase();
-    let words: Vec<&str> = lower.split_whitespace().collect();
-    let french_count = words.iter().filter(|w| french_words.contains(w)).count();
+    let french_count = lower.split_whitespace().filter(|w| french_words.contains(w)).count();
 
     if french_count >= 2 { "fr".to_string() } else { "en".to_string() }
 }
@@ -85,7 +95,6 @@ fn apply_dictation_commands(text: &str, language: &str) -> String {
 
     let mut result = text.to_string();
     for (pattern, replacement) in commands {
-        // Case-insensitive replacement
         let re = Regex::new(&format!("(?i){}", regex::escape(pattern))).unwrap();
         result = re.replace_all(&result, replacement).to_string();
     }
@@ -96,23 +105,19 @@ fn fix_punctuation_spacing(text: &str) -> String {
     let mut result = text.to_string();
 
     // Remove space before closing punctuation: "word ." → "word."
-    let re1 = Regex::new(r#"\s+([.,?!;:\u{2026})\u{00BB}"\]])"#).unwrap();
-    result = re1.replace_all(&result, "$1").to_string();
+    result = RE_SPACE_BEFORE_CLOSE.replace_all(&result, "$1").to_string();
 
     // Ensure space after punctuation (except before newline, end, or more punctuation)
-    let re2 = Regex::new(r#"([.,?!;:\u{2026}])([^\s\n.,?!;:\u{2026})\u{00BB}"\]\d])"#).unwrap();
-    result = re2.replace_all(&result, "$1 $2").to_string();
+    result = RE_SPACE_AFTER_PUNCT.replace_all(&result, "$1 $2").to_string();
 
     // Remove space after opening punctuation: "( word" → "(word"
-    let re3 = Regex::new(r#"([\(\u{00AB}"\[])\s+"#).unwrap();
-    result = re3.replace_all(&result, "$1").to_string();
+    result = RE_SPACE_AFTER_OPEN.replace_all(&result, "$1").to_string();
 
     result
 }
 
 fn capitalize_after_sentence_endings(text: &str) -> String {
-    let re = Regex::new(r"([.?!]\s+|\n)(\p{Ll})").unwrap();
-    let result = re.replace_all(text, |caps: &regex::Captures| {
+    let result = RE_CAPITALIZE_AFTER_SENTENCE.replace_all(text, |caps: &regex::Captures| {
         let prefix = &caps[1];
         let letter = &caps[2];
         format!("{}{}", prefix, letter.to_uppercase())
