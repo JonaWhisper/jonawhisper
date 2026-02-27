@@ -8,6 +8,7 @@ class KeyMonitor {
     private let onKeyUp: () -> Void
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var retainedSelfPtr: UnsafeMutableRawPointer?
     private var rightCmdHeld = false
 
     // Right Command keycode
@@ -21,8 +22,9 @@ class KeyMonitor {
     func start() {
         let eventMask: CGEventMask = (1 << CGEventType.flagsChanged.rawValue)
 
-        // Store self in a pointer for the C callback
+        // Store self in a pointer for the C callback (released in stop())
         let selfPtr = Unmanaged.passRetained(self).toOpaque()
+        self.retainedSelfPtr = selfPtr
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -39,8 +41,8 @@ class KeyMonitor {
             // The system will show a prompt when we try to create the tap and fail
             DispatchQueue.main.async {
                 let alert = NSAlert()
-                alert.messageText = "Input Monitoring Required"
-                alert.informativeText = "WhisperDictate needs Input Monitoring permission to detect the right Command key.\n\nPlease grant access in System Settings > Privacy & Security > Input Monitoring, then relaunch the app."
+                alert.messageText = "Surveillance du clavier requise"
+                alert.informativeText = "WhisperDictate a besoin de la permission « Surveillance de l'entrée » pour détecter la touche Commande droite.\n\nAccordez l'accès dans Réglages Système > Confidentialité et sécurité > Surveillance de l'entrée, puis relancez l'app."
                 alert.alertStyle = .warning
                 alert.runModal()
             }
@@ -64,13 +66,17 @@ class KeyMonitor {
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
         }
+        if let ptr = retainedSelfPtr {
+            Unmanaged<KeyMonitor>.fromOpaque(ptr).release()
+            retainedSelfPtr = nil
+        }
         eventTap = nil
         runLoopSource = nil
     }
 
     /// C-compatible callback for CGEvent tap
     private static let eventCallback: CGEventTapCallBack = { proxy, type, event, userInfo in
-        guard let userInfo = userInfo else { return Unmanaged.passRetained(event) }
+        guard let userInfo = userInfo else { return Unmanaged.passUnretained(event) }
         let monitor = Unmanaged<KeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
 
         // If the tap gets disabled (e.g. system timeout), re-enable it
@@ -78,11 +84,11 @@ class KeyMonitor {
             if let tap = monitor.eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
 
         guard type == .flagsChanged else {
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
 
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
@@ -113,6 +119,6 @@ class KeyMonitor {
             }
         }
 
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 }

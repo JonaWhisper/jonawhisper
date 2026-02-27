@@ -4,17 +4,19 @@ class ModelDownloader {
     static let shared = ModelDownloader()
     private init() {}
 
+    private let lock = NSLock()
+
     // URLSession-based download state
-    private var activeTask: URLSessionDownloadTask?
-    private var activeSession: URLSession?
-    private var activeDelegate: DownloadDelegate?
+    private var _activeTask: URLSessionDownloadTask?
+    private var _activeSession: URLSession?
+    private var _activeDelegate: DownloadDelegate?
 
     // Subprocess-based download state
-    private var activeProcess: Process?
+    private var _activeProcess: Process?
 
-    private var activeModelId: String?
+    private var _activeModelId: String?
 
-    var activeDownloadModelId: String? { activeModelId }
+    var activeDownloadModelId: String? { lock.withLock { _activeModelId } }
 
     private static let pendingDir: String = {
         NSString(string: "~/.local/share/whisper-dictate").expandingTildeInPath
@@ -53,7 +55,7 @@ class ModelDownloader {
 
     func download(_ model: ASRModel, progress: @escaping (Double) -> Void) async -> Bool {
         try? FileManager.default.createDirectory(atPath: Self.pendingDir, withIntermediateDirectories: true)
-        activeModelId = model.id
+        lock.withLock { _activeModelId = model.id }
         try? model.id.data(using: .utf8)?.write(to: URL(fileURLWithPath: Self.pendingDownloadPath()))
 
         if case .remoteAPI = model.downloadType { return true }
@@ -135,8 +137,10 @@ class ModelDownloader {
         }
 
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
-        activeDelegate = delegate
-        activeSession = session
+        lock.withLock {
+            _activeDelegate = delegate
+            _activeSession = session
+        }
 
         // Resume data only for single file downloads
         if !isZip {
@@ -144,7 +148,7 @@ class ModelDownloader {
             if let resumeData = FileManager.default.contents(atPath: resumePath) {
                 Log.info("Resuming download for model: \(model.id)")
                 let task = session.downloadTask(withResumeData: resumeData)
-                activeTask = task
+                lock.withLock { _activeTask = task }
                 task.resume()
                 return
             }
@@ -156,7 +160,7 @@ class ModelDownloader {
         }
         Log.info("Starting download for model: \(model.id)")
         let task = session.downloadTask(with: url)
-        activeTask = task
+        lock.withLock { _activeTask = task }
         task.resume()
     }
 
@@ -172,7 +176,7 @@ class ModelDownloader {
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
 
-            self.activeProcess = process
+            self.lock.withLock { self._activeProcess = process }
 
             // Simulated progress since we can't track subprocess progress
             let progressQueue = DispatchQueue(label: "download-progress")
@@ -210,7 +214,8 @@ class ModelDownloader {
     // MARK: - Cancel / cleanup
 
     func saveResumeDataAndCancel() {
-        if let task = activeTask, let modelId = activeModelId,
+        let (task, modelId, process) = lock.withLock { (_activeTask, _activeModelId, _activeProcess) }
+        if let task = task, let modelId = modelId,
            let model = ASRModelCatalog.shared.model(byId: modelId) {
             Log.info("Saving resume data for model: \(modelId)")
             task.cancel { resumeData in
@@ -222,17 +227,18 @@ class ModelDownloader {
                     Log.info("No resume data available")
                 }
             }
-        } else if let process = activeProcess, process.isRunning {
+        } else if let process = process, process.isRunning {
             Log.info("Cancelling subprocess download")
             process.terminate()
         }
     }
 
     func cancelDownload() {
-        guard let modelId = activeModelId,
+        let (task, modelId, process) = lock.withLock { (_activeTask, _activeModelId, _activeProcess) }
+        guard let modelId = modelId,
               let model = ASRModelCatalog.shared.model(byId: modelId) else { return }
-        activeTask?.cancel()
-        if let process = activeProcess, process.isRunning {
+        task?.cancel()
+        if let process = process, process.isRunning {
             process.terminate()
         }
         clearPendingState(for: model)
@@ -252,11 +258,13 @@ class ModelDownloader {
     private func clearPendingState(for model: ASRModel) {
         try? FileManager.default.removeItem(atPath: Self.pendingDownloadPath())
         try? FileManager.default.removeItem(atPath: Self.resumeDataPath(for: model))
-        activeTask = nil
-        activeSession = nil
-        activeDelegate = nil
-        activeProcess = nil
-        activeModelId = nil
+        lock.withLock {
+            _activeTask = nil
+            _activeSession = nil
+            _activeDelegate = nil
+            _activeProcess = nil
+            _activeModelId = nil
+        }
     }
 }
 

@@ -99,9 +99,10 @@ class AudioDeviceManager {
                 mScope: kAudioObjectPropertyScopeGlobal,
                 mElement: kAudioObjectPropertyElementMain
             )
-            var name: CFString = "" as CFString
+            var nameRef: Unmanaged<CFString>?
             var nameSize = UInt32(MemoryLayout<CFString>.size)
-            AudioObjectGetPropertyData(id, &nameAddress, 0, nil, &nameSize, &name)
+            AudioObjectGetPropertyData(id, &nameAddress, 0, nil, &nameSize, &nameRef)
+            let name = (nameRef?.takeRetainedValue() as String?) ?? ""
 
             // Get device UID
             var uidAddress = AudioObjectPropertyAddress(
@@ -109,9 +110,10 @@ class AudioDeviceManager {
                 mScope: kAudioObjectPropertyScopeGlobal,
                 mElement: kAudioObjectPropertyElementMain
             )
-            var uid: CFString = "" as CFString
+            var uidRef: Unmanaged<CFString>?
             var uidSize = UInt32(MemoryLayout<CFString>.size)
-            AudioObjectGetPropertyData(id, &uidAddress, 0, nil, &uidSize, &uid)
+            AudioObjectGetPropertyData(id, &uidAddress, 0, nil, &uidSize, &uidRef)
+            let uid = (uidRef?.takeRetainedValue() as String?) ?? ""
 
             // Get transport type
             var transportAddress = AudioObjectPropertyAddress(
@@ -147,7 +149,7 @@ class AudioDeviceManager {
                 transport = .unknown
             }
 
-            return AudioDevice(id: id, name: name as String, uid: uid as String, transportType: transport)
+            return AudioDevice(id: id, name: name, uid: uid, transportType: transport)
         }
     }
 

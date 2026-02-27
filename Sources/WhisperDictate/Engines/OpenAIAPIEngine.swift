@@ -53,7 +53,7 @@ struct OpenAIAPIEngine: ASREngine {
 
     let installHint = ""
 
-    func resolveExecutable() -> String? { "" }
+    func resolveExecutable() -> String? { "http" }
 
     func transcribe(model: ASRModel, audioURL: URL, language: String) throws -> String {
         guard let config = Self.loadConfigs().first(where: { $0.id == model.filename }) else {
@@ -155,6 +155,7 @@ struct OpenAIAPIEngine: ASREngine {
     static func saveConfigs(_ configs: [APIServerConfig]) {
         let data = try? JSONEncoder().encode(configs)
         UserDefaults.standard.set(data, forKey: configKey)
+        ASRModelCatalog.shared.invalidateEngines()
     }
 
     static func addConfig(_ config: APIServerConfig) {

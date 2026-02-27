@@ -29,8 +29,16 @@ struct MoonshineEngine: ASREngine {
 
     let installHint = "pip install moonshine-voice"
 
+    private static var _cachedAvailable: Bool?
+
     func resolveExecutable() -> String? {
-        guard findExecutable("python3") != nil else { return nil }
+        if let cached = Self._cachedAvailable {
+            return cached ? "/usr/bin/env" : nil
+        }
+        guard findExecutable("python3") != nil else {
+            Self._cachedAvailable = false
+            return nil
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = ["python3", "-c", "import moonshine_voice"]
@@ -39,8 +47,11 @@ struct MoonshineEngine: ASREngine {
         do {
             try process.run()
             process.waitUntilExit()
-            return process.terminationStatus == 0 ? "/usr/bin/env" : nil
+            let available = process.terminationStatus == 0
+            Self._cachedAvailable = available
+            return available ? "/usr/bin/env" : nil
         } catch {
+            Self._cachedAvailable = false
             return nil
         }
     }

@@ -10,6 +10,8 @@ class AudioRecorder {
     /// Real spectrum data — 32 frequency bands, updated in real-time
     private(set) var spectrum: [Float] = Array(repeating: 0, count: 32)
     private var smoothedSpectrum: [Float] = Array(repeating: 0, count: 32)
+    private let spectrumLock = NSLock()
+    private let fftQueue = DispatchQueue(label: "com.local.WhisperDictate.fft", qos: .userInteractive)
 
     func startRecording() {
         let tempDir = FileManager.default.temporaryDirectory
@@ -68,8 +70,8 @@ class AudioRecorder {
                     // Ignore write errors during recording
                 }
 
-                // Compute FFT for spectrum visualization
-                self.computeSpectrum(buffer: convertedBuffer)
+                // Compute FFT off the audio thread
+                self.fftQueue.async { self.computeSpectrum(buffer: convertedBuffer) }
             }
         }
 
@@ -87,14 +89,15 @@ class AudioRecorder {
 
     /// Current audio level in dB (legacy, for compatibility)
     func currentLevel() -> Float {
-        let maxVal = spectrum.max() ?? 0
+        let s = spectrumLock.withLock { spectrum }
+        let maxVal = s.max() ?? 0
         if maxVal <= 0 { return -160 }
         return 20 * log10(maxVal)
     }
 
     /// Get smoothed spectrum for visualization
     func getSpectrum() -> [Float] {
-        return smoothedSpectrum
+        spectrumLock.withLock { smoothedSpectrum }
     }
 
     func stopRecording() -> URL? {
@@ -191,13 +194,15 @@ class AudioRecorder {
                 // Fixed reference level — low enough to show voice clearly
                 let referenceLevel: Float = 5.0
 
-                for i in 0..<bandCount {
-                    let raw = sqrt(bands[i]) / referenceLevel
-                    let clamped = min(1.0, max(0.0, raw))
-                    let gated: Float = clamped < 0.03 ? 0.0 : clamped
-                    self.smoothedSpectrum[i] = self.smoothedSpectrum[i] * 0.3 + gated * 0.7
+                self.spectrumLock.withLock {
+                    for i in 0..<bandCount {
+                        let raw = sqrt(bands[i]) / referenceLevel
+                        let clamped = min(1.0, max(0.0, raw))
+                        let gated: Float = clamped < 0.03 ? 0.0 : clamped
+                        self.smoothedSpectrum[i] = self.smoothedSpectrum[i] * 0.3 + gated * 0.7
+                    }
+                    self.spectrum = self.smoothedSpectrum
                 }
-                self.spectrum = self.smoothedSpectrum
             }
         }
     }

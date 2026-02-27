@@ -20,13 +20,26 @@ enum ProcessRunner {
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             throw TranscriberError.launchFailed(error)
         }
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        // Read pipes concurrently to avoid deadlock when output exceeds buffer
+        var stdoutData = Data()
+        var stderrData = Data()
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global().async {
+            stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
+        group.enter()
+        DispatchQueue.global().async {
+            stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
+        process.waitUntilExit()
+        group.wait()
 
         let result = ProcessResult(
             status: process.terminationStatus,

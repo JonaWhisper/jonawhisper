@@ -115,7 +115,7 @@ class PermissionChecker {
 
             // Request accessibility (shows system prompt)
             if initialReport.accessibility != .granted {
-                let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
+                let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
                 _ = AXIsProcessTrustedWithOptions(opts)
             }
 

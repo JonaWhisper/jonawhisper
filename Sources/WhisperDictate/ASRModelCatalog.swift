@@ -11,9 +11,19 @@ class ASRModelCatalog {
         MoonshineEngine(),
     ]
 
+    private var _cachedEngines: [ASREngine]?
+
     var engines: [ASREngine] {
+        if let cached = _cachedEngines { return cached }
         let api = OpenAIAPIEngine()
-        return api.models.isEmpty ? localEngines : localEngines + [api]
+        let result = api.models.isEmpty ? localEngines : localEngines + [api]
+        _cachedEngines = result
+        return result
+    }
+
+    /// Invalidate cached engines (call after API config changes)
+    func invalidateEngines() {
+        _cachedEngines = nil
     }
 
     var allModels: [ASRModel] { engines.flatMap { $0.models } }
@@ -56,7 +66,7 @@ class ASRModelCatalog {
     var selectedModel: ASRModel {
         model(byId: selectedModelId)
             ?? model(byId: "whisper:large-v3-turbo")
-            ?? allModels.first!
+            ?? allModels[0] // Whisper engine always provides models
     }
 
     var selectedLanguage: String {
