@@ -1,0 +1,279 @@
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::SampleFormat;
+use hound::{WavSpec, WavWriter};
+use rustfft::{num_complex::Complex, FftPlanner};
+use std::io::BufWriter;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+const SAMPLE_RATE: u32 = 16000;
+const NUM_BANDS: usize = 12;
+const FFT_SIZE: usize = 1024;
+const SPECTRUM_SMOOTHING: f32 = 0.55; // new data weight (old = 1 - this)
+
+pub struct AudioRecorder {
+    stream: Option<cpal::Stream>,
+    writer: Arc<Mutex<Option<WavWriter<BufWriter<std::fs::File>>>>>,
+    current_file: Arc<Mutex<Option<PathBuf>>>,
+    spectrum: Arc<Mutex<Vec<f32>>>,
+    fft_buffer: Arc<Mutex<Vec<f32>>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AudioDevice {
+    pub name: String,
+    pub uid: String,
+    pub is_default: bool,
+}
+
+impl AudioRecorder {
+    pub fn new() -> Self {
+        Self {
+            stream: None,
+            writer: Arc::new(Mutex::new(None)),
+            current_file: Arc::new(Mutex::new(None)),
+            spectrum: Arc::new(Mutex::new(vec![0.0; NUM_BANDS])),
+            fft_buffer: Arc::new(Mutex::new(Vec::with_capacity(FFT_SIZE))),
+        }
+    }
+
+    pub fn list_devices() -> Vec<AudioDevice> {
+        let host = cpal::default_host();
+        let default_device_name = host
+            .default_input_device()
+            .map(|d| d.name().unwrap_or_default())
+            .unwrap_or_default();
+
+        host.input_devices()
+            .map(|devices| {
+                devices
+                    .filter_map(|d| {
+                        let name = d.name().ok()?;
+                        // Use name as UID since cpal doesn't expose platform UIDs directly
+                        Some(AudioDevice {
+                            is_default: name == default_device_name,
+                            uid: name.clone(),
+                            name,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    pub fn start_recording(&mut self, device_uid: Option<&str>) -> bool {
+        let host = cpal::default_host();
+
+        let device = if let Some(uid) = device_uid {
+            host.input_devices()
+                .ok()
+                .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(uid)))
+                .or_else(|| host.default_input_device())
+        } else {
+            host.default_input_device()
+        };
+
+        let device = match device {
+            Some(d) => d,
+            None => {
+                log::error!("No input device available");
+                return false;
+            }
+        };
+
+        // Configure for 16kHz mono
+        let config = cpal::StreamConfig {
+            channels: 1,
+            sample_rate: cpal::SampleRate(SAMPLE_RATE),
+            buffer_size: cpal::BufferSize::Default,
+        };
+
+        // Create WAV file
+        let tmp_dir = std::env::temp_dir();
+        let filename = format!(
+            "whisper_dictate_{}.wav",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        );
+        let filepath = tmp_dir.join(&filename);
+
+        let spec = WavSpec {
+            channels: 1,
+            sample_rate: SAMPLE_RATE,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+
+        let writer = match WavWriter::create(&filepath, spec) {
+            Ok(w) => w,
+            Err(e) => {
+                log::error!("Failed to create WAV file: {}", e);
+                return false;
+            }
+        };
+
+        *self.current_file.lock().unwrap() = Some(filepath);
+        *self.writer.lock().unwrap() = Some(writer);
+        *self.spectrum.lock().unwrap() = vec![0.0; NUM_BANDS];
+        *self.fft_buffer.lock().unwrap() = Vec::with_capacity(FFT_SIZE);
+
+        let writer_clone = Arc::clone(&self.writer);
+        let fft_buffer_clone = Arc::clone(&self.fft_buffer);
+        let spectrum_clone = Arc::clone(&self.spectrum);
+
+        // Determine the device's supported format
+        let supported = device.supported_input_configs()
+            .ok()
+            .and_then(|mut configs| configs.next())
+            .map(|c| c.sample_format())
+            .unwrap_or(SampleFormat::F32);
+
+        let stream = match supported {
+            SampleFormat::F32 => {
+                device.build_input_stream(
+                    &config,
+                    move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                        process_samples(data, &writer_clone, &fft_buffer_clone, &spectrum_clone);
+                    },
+                    |err| log::error!("Audio stream error: {}", err),
+                    None,
+                )
+            }
+            SampleFormat::I16 => {
+                let writer_clone2 = Arc::clone(&self.writer);
+                let fft_buffer_clone2 = Arc::clone(&self.fft_buffer);
+                let spectrum_clone2 = Arc::clone(&self.spectrum);
+                device.build_input_stream(
+                    &config,
+                    move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                        let float_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
+                        process_samples(&float_data, &writer_clone2, &fft_buffer_clone2, &spectrum_clone2);
+                    },
+                    |err| log::error!("Audio stream error: {}", err),
+                    None,
+                )
+            }
+            _ => {
+                log::error!("Unsupported sample format: {:?}", supported);
+                return false;
+            }
+        };
+
+        match stream {
+            Ok(s) => {
+                if let Err(e) = s.play() {
+                    log::error!("Failed to play stream: {}", e);
+                    return false;
+                }
+                self.stream = Some(s);
+                true
+            }
+            Err(e) => {
+                log::error!("Failed to build input stream: {}", e);
+                false
+            }
+        }
+    }
+
+    pub fn stop_recording(&mut self) -> Option<PathBuf> {
+        // Drop the stream first to stop recording
+        self.stream = None;
+
+        // Finalize the WAV writer
+        if let Some(writer) = self.writer.lock().unwrap().take() {
+            let _ = writer.finalize();
+        }
+
+        self.current_file.lock().unwrap().take()
+    }
+
+    pub fn get_spectrum(&self) -> Vec<f32> {
+        self.spectrum.lock().unwrap().clone()
+    }
+}
+
+fn process_samples(
+    data: &[f32],
+    writer: &Mutex<Option<WavWriter<BufWriter<std::fs::File>>>>,
+    fft_buffer: &Mutex<Vec<f32>>,
+    spectrum: &Mutex<Vec<f32>>,
+) {
+    // Write to WAV
+    if let Some(ref mut w) = *writer.lock().unwrap() {
+        for &sample in data {
+            let s16 = (sample * 32767.0).clamp(-32768.0, 32767.0) as i16;
+            let _ = w.write_sample(s16);
+        }
+    }
+
+    // Accumulate FFT buffer
+    let mut buf = fft_buffer.lock().unwrap();
+    buf.extend_from_slice(data);
+
+    if buf.len() >= FFT_SIZE {
+        let samples: Vec<f32> = buf.drain(..FFT_SIZE).collect();
+        let new_spectrum = compute_spectrum(&samples);
+
+        let mut spec = spectrum.lock().unwrap();
+        for i in 0..NUM_BANDS {
+            let old_weight = 1.0 - SPECTRUM_SMOOTHING;
+            spec[i] = spec[i] * old_weight + new_spectrum[i] * SPECTRUM_SMOOTHING;
+        }
+    }
+}
+
+fn compute_spectrum(samples: &[f32]) -> Vec<f32> {
+    let mut planner = FftPlanner::new();
+    let fft = planner.plan_fft_forward(FFT_SIZE);
+
+    let mut buffer: Vec<Complex<f32>> = samples
+        .iter()
+        .map(|&s| Complex { re: s, im: 0.0 })
+        .collect();
+
+    fft.process(&mut buffer);
+
+    // Convert to magnitude spectrum (only first half)
+    let half = FFT_SIZE / 2;
+    let magnitudes: Vec<f32> = buffer[..half]
+        .iter()
+        .map(|c| (c.re * c.re + c.im * c.im).sqrt())
+        .collect();
+
+    // Map to logarithmic bands
+    let mut bands = vec![0.0f32; NUM_BANDS];
+    let min_freq = 80.0f32;
+    let max_freq = (SAMPLE_RATE as f32) / 2.0;
+    let log_min = min_freq.ln();
+    let log_max = max_freq.ln();
+
+    for i in 0..NUM_BANDS {
+        let lo = ((log_min + (log_max - log_min) * i as f32 / NUM_BANDS as f32).exp()
+            / max_freq * half as f32) as usize;
+        let hi = ((log_min + (log_max - log_min) * (i + 1) as f32 / NUM_BANDS as f32).exp()
+            / max_freq * half as f32) as usize;
+
+        let lo = lo.min(half - 1);
+        let hi = hi.min(half).max(lo + 1);
+
+        let sum: f32 = magnitudes[lo..hi].iter().sum();
+        let avg = sum / (hi - lo) as f32;
+
+        // Normalize to 0..1 range (approximate)
+        bands[i] = (avg * 4.0).min(1.0);
+    }
+
+    // Reorder bands symmetrically (center outward) like the Swift version
+    let mut reordered = vec![0.0f32; NUM_BANDS];
+    let mid = NUM_BANDS / 2;
+    for i in 0..NUM_BANDS {
+        let src = if i % 2 == 0 { mid - 1 - i / 2 } else { mid + i / 2 };
+        if src < NUM_BANDS {
+            reordered[i] = bands[src];
+        }
+    }
+
+    reordered
+}

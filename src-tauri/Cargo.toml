@@ -1,0 +1,41 @@
+[package]
+name = "whisper-dictate"
+version = "0.1.0"
+description = "WhisperDictate - Voice-to-text dictation"
+authors = ["Jonathan"]
+edition = "2021"
+
+[lib]
+name = "whisper_dictate_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-shell = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cpal = "0.15"
+hound = "3.5"
+reqwest = { version = "0.12", features = ["stream", "multipart", "json", "blocking"] }
+regex = "1"
+tokio = { version = "1", features = ["full"] }
+dirs = "6"
+log = "0.4"
+env_logger = "0.11"
+rustfft = "6"
+futures-util = "0.3"
+shellexpand = "3"
+thiserror = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+core-foundation = "0.10"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSSound", "NSApplication", "NSRunningApplication"] }
