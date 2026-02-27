@@ -117,23 +117,55 @@ pub fn close_pill_window(app: &AppHandle) {
     });
 }
 
+fn device_icon(name: &str) -> &'static str {
+    let lower = name.to_lowercase();
+    if lower.contains("airpods") {
+        "\u{1F3A7}" // 🎧
+    } else if lower.contains("bluetooth") || lower.contains("beats") || lower.contains("bose")
+        || lower.contains("sony") || lower.contains("jabra") || lower.contains("jbl")
+    {
+        "\u{1F3A7}" // 🎧
+    } else if lower.contains("usb") || lower.contains("yeti") || lower.contains("scarlett")
+        || lower.contains("focusrite") || lower.contains("rode") || lower.contains("blue")
+        || lower.contains("elgato")
+    {
+        "\u{1F399}\u{FE0F}" // 🎙️
+    } else {
+        "\u{1F3A4}" // 🎤 built-in / default
+    }
+}
+
 fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
     let state: Arc<AppState> = app.state::<Arc<AppState>>().inner().clone();
 
-    // Audio device submenu
-    let mic_submenu = Submenu::with_id(app, "mic_submenu", "Microphone", true)?;
+    // Audio device submenu — title shows selected device name
     let devices = audio::AudioRecorder::list_devices();
     let selected_uid = state.selected_input_device_uid.lock().unwrap().clone();
+
+    let mut active_name = String::from("Microphone");
+    for device in &devices {
+        let is_selected = match &selected_uid {
+            Some(uid) => uid == &device.uid,
+            None => device.is_default,
+        };
+        if is_selected {
+            active_name = device.name.clone();
+        }
+    }
+
+    let mic_submenu = Submenu::with_id(app, "mic_submenu", &active_name, true)?;
 
     for device in &devices {
         let is_selected = match &selected_uid {
             Some(uid) => uid == &device.uid,
             None => device.is_default,
         };
+        let icon = device_icon(&device.name);
+        let label = format!("{} {}", icon, device.name);
         let item = CheckMenuItem::with_id(
             app,
             format!("device_{}", device.uid),
-            &device.name,
+            &label,
             true,
             is_selected,
             None::<&str>,
