@@ -15,7 +15,7 @@
 - [x] **17 Mutex individuels → grouper** — ✅ Fixé : 4 groupes (runtime, download, settings, history), lock+copy+drop partout
 - [x] **Duplicate audio device listing** — ✅ Fixé : un seul AudioDevice (CoreAudio), filtré par cpal dans audio::list_usable_devices()
 - [x] **Regex recompilées en boucle** — ✅ Fixé : LazyLock pour hallucinations et dictation commands
-- [ ] **`unsafe impl Sync` sur RecordingState** — Fragile. Utiliser crossbeam channels ou garder le Mutex wrapper
+- [x] **`unsafe impl Sync` sur RecordingState** — ✅ Fixé : crossbeam-channel (Send+Sync), unsafe impls supprimés
 - [x] **`std::process::exit(0)` skip destructeurs** — ✅ Fixé : remplacé par `app.exit(0)`
 - [x] **`AudioReply::Spectrum` dead code** — ✅ Supprimé
 - [x] **Recursive async → while loop** — ✅ Fixé : boucle while dans process_next_in_queue
@@ -40,9 +40,9 @@
 ## UX / Polish
 
 - [ ] **Indicateur visuel transcription dans le tray** — Feedback plus clair
-- [ ] **Setup window : padding bouton Continuer** — Collé au bas de la fenêtre
-- [ ] **Setup window : retirer texte redondant** — "pour WhisperDictate" superflu
-- [ ] **Setup window : auto-restart** — Redémarrer auto au lieu du message "peut-être nécessaire"
+- [x] **Setup window : padding bouton Continuer** — ✅ Fixé : ajouté pb-2
+- [x] **Setup window : retirer texte redondant** — ✅ Fixé : "pour WhisperDictate" retiré du subtitle
+- [x] **Setup window : note restart supprimée** — ✅ Fixé : note inutile retirée (startMonitoring gère tout)
 - [ ] **Settings window : taille adaptative** — Hauteur prioritaire, colonnes si besoin
 
 ## Technique / Infra
