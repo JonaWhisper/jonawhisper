@@ -3,6 +3,7 @@ use crate::platform::audio_devices;
 use crate::state::AppState;
 use std::sync::Arc;
 use tauri::{
+    image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
@@ -11,6 +12,9 @@ use tauri::{
 const PILL_WIDTH: f64 = 140.0;
 const PILL_HEIGHT: f64 = 56.0;
 const PILL_TOP_OFFSET: f64 = 40.0;
+
+// Tray icon size (44px for @2x Retina)
+const TRAY_ICON_SIZE: u32 = 44;
 
 fn get_state(app: &AppHandle) -> Arc<AppState> {
     app.state::<Arc<AppState>>().inner().clone()
@@ -65,6 +69,7 @@ pub fn open_pill_window(app: &AppHandle) {
 }
 
 pub fn close_pill_window(app: &AppHandle) {
+    set_tray_state(app, "idle");
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(win) = handle.get_webview_window("pill") {
@@ -267,6 +272,84 @@ fn rebuild_menu(app: &AppHandle) {
             let _ = tray.set_menu(Some(new_menu));
         }
     }
+}
+
+// -- Dynamic tray icon --
+
+/// Update tray icon and tooltip based on app state.
+pub fn set_tray_state(app: &AppHandle, state: &str) {
+    let Some(tray) = app.tray_by_id("main") else { return };
+
+    match state {
+        "recording" => {
+            let _ = tray.set_icon(Some(make_recording_icon()));
+            let _ = tray.set_icon_as_template(true);
+            let _ = tray.set_tooltip(Some("Recording\u{2026}"));
+        }
+        "transcribing" => {
+            let _ = tray.set_icon(Some(make_transcribing_icon()));
+            let _ = tray.set_icon_as_template(true);
+            let _ = tray.set_tooltip(Some("Transcribing\u{2026}"));
+        }
+        _ => {
+            if let Some(icon) = app.default_window_icon() {
+                let _ = tray.set_icon(Some(icon.clone()));
+                let _ = tray.set_icon_as_template(true);
+            }
+            let _ = tray.set_tooltip(Some("WhisperDictate"));
+        }
+    }
+}
+
+/// Filled circle icon (recording indicator), 44x44 RGBA.
+fn make_recording_icon() -> Image<'static> {
+    let s = TRAY_ICON_SIZE as usize;
+    let mut rgba = vec![0u8; s * s * 4];
+    let center = s as f32 / 2.0;
+    let radius = s as f32 * 0.36;
+
+    for y in 0..s {
+        for x in 0..s {
+            let dx = x as f32 + 0.5 - center;
+            let dy = y as f32 + 0.5 - center;
+            let dist = (dx * dx + dy * dy).sqrt();
+            if dist <= radius {
+                let idx = (y * s + x) * 4;
+                // Anti-alias the edge
+                let alpha = ((radius - dist + 0.5).min(1.0) * 255.0) as u8;
+                rgba[idx + 3] = alpha;
+            }
+        }
+    }
+
+    Image::new_owned(rgba, TRAY_ICON_SIZE, TRAY_ICON_SIZE)
+}
+
+/// Three dots icon (transcribing indicator), 44x44 RGBA.
+fn make_transcribing_icon() -> Image<'static> {
+    let s = TRAY_ICON_SIZE as usize;
+    let mut rgba = vec![0u8; s * s * 4];
+    let cy = s as f32 / 2.0;
+    let dot_r = s as f32 * 0.09;
+    let gap = s as f32 * 0.25;
+
+    for i in 0..3 {
+        let cx = cy + (i as f32 - 1.0) * gap;
+        for y in 0..s {
+            for x in 0..s {
+                let dx = x as f32 + 0.5 - cx;
+                let dy = y as f32 + 0.5 - cy;
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist <= dot_r {
+                    let idx = (y * s + x) * 4;
+                    let alpha = ((dot_r - dist + 0.5).min(1.0) * 255.0) as u8;
+                    rgba[idx + 3] = rgba[idx + 3].max(alpha);
+                }
+            }
+        }
+    }
+
+    Image::new_owned(rgba, TRAY_ICON_SIZE, TRAY_ICON_SIZE)
 }
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {

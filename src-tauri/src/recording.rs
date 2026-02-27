@@ -62,6 +62,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
 
     platform::play_sound("Tink");
     crate::tray::open_pill_window(app);
+    crate::tray::set_tray_state(app, "recording");
     let _ = app.emit("pill-mode", "recording");
     let _ = app.emit("recording-started", ());
 }
@@ -113,6 +114,7 @@ pub fn stop_recording_and_enqueue(
         serde_json::json!({ "queue_count": count }),
     );
     let _ = app.emit("pill-mode", "transcribing");
+    crate::tray::set_tray_state(app, "transcribing");
 
     // Save clipboard once before the paste batch starts
     {
@@ -156,6 +158,7 @@ fn handle_short_tap(
         crate::tray::close_pill_window(app);
     } else {
         let _ = app.emit("pill-mode", "transcribing");
+        crate::tray::set_tray_state(app, "transcribing");
     }
     let _ = app.emit("recording-stopped", ());
 }
