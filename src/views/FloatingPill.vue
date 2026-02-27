@@ -172,6 +172,11 @@ function drawError(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 onMounted(() => {
+  // Ensure transparent background for pill window
+  document.documentElement.style.background = 'transparent'
+  document.body.style.background = 'transparent'
+  document.body.style.margin = '0'
+  document.body.style.overflow = 'hidden'
   animFrame = requestAnimationFrame(draw)
 })
 

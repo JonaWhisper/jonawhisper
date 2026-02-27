@@ -15,11 +15,6 @@
     "security": {
       "csp": null
     },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "WhisperDictate"
-    },
     "macOSPrivateApi": true
   },
   "bundle": {

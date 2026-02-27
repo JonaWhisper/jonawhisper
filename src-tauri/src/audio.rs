@@ -81,14 +81,45 @@ impl AudioRecorder {
             }
         };
 
-        // Configure for 16kHz mono
-        let config = cpal::StreamConfig {
+        // Try 16kHz mono first, fall back to device default config
+        let preferred = cpal::StreamConfig {
             channels: 1,
             sample_rate: cpal::SampleRate(SAMPLE_RATE),
             buffer_size: cpal::BufferSize::Default,
         };
 
-        // Create WAV file
+        let default_cfg = device.default_input_config().ok();
+        let (config, native_channels, native_rate) = if device
+            .supported_input_configs()
+            .ok()
+            .map(|configs| {
+                configs.into_iter().any(|c| {
+                    c.channels() >= 1
+                        && c.min_sample_rate().0 <= SAMPLE_RATE
+                        && c.max_sample_rate().0 >= SAMPLE_RATE
+                })
+            })
+            .unwrap_or(false)
+        {
+            (preferred, 1u16, SAMPLE_RATE)
+        } else if let Some(ref cfg) = default_cfg {
+            let sc = cpal::StreamConfig {
+                channels: cfg.channels(),
+                sample_rate: cfg.sample_rate(),
+                buffer_size: cpal::BufferSize::Default,
+            };
+            log::info!(
+                "Using device native config: {}Hz {}ch (will resample to 16kHz mono)",
+                cfg.sample_rate().0,
+                cfg.channels()
+            );
+            (sc, cfg.channels(), cfg.sample_rate().0)
+        } else {
+            log::error!("No supported input configuration found");
+            return false;
+        };
+
+        // Create WAV file — always write 16kHz mono for Whisper
         let tmp_dir = std::env::temp_dir();
         let filename = format!(
             "whisper_dictate_{}.wav",
@@ -123,19 +154,21 @@ impl AudioRecorder {
         let fft_buffer_clone = Arc::clone(&self.fft_buffer);
         let spectrum_clone = Arc::clone(&self.spectrum);
 
-        // Determine the device's supported format
-        let supported = device.supported_input_configs()
-            .ok()
-            .and_then(|mut configs| configs.next())
+        let sample_format = default_cfg
             .map(|c| c.sample_format())
             .unwrap_or(SampleFormat::F32);
 
-        let stream = match supported {
+        let channels = native_channels;
+        let rate = native_rate;
+
+        let stream = match sample_format {
             SampleFormat::F32 => {
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                        process_samples(data, &writer_clone, &fft_buffer_clone, &spectrum_clone);
+                        let mono = mix_to_mono(data, channels);
+                        let resampled = resample(&mono, rate, SAMPLE_RATE);
+                        process_samples(&resampled, &writer_clone, &fft_buffer_clone, &spectrum_clone);
                     },
                     |err| log::error!("Audio stream error: {}", err),
                     None,
@@ -149,14 +182,16 @@ impl AudioRecorder {
                     &config,
                     move |data: &[i16], _: &cpal::InputCallbackInfo| {
                         let float_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
-                        process_samples(&float_data, &writer_clone2, &fft_buffer_clone2, &spectrum_clone2);
+                        let mono = mix_to_mono(&float_data, channels);
+                        let resampled = resample(&mono, rate, SAMPLE_RATE);
+                        process_samples(&resampled, &writer_clone2, &fft_buffer_clone2, &spectrum_clone2);
                     },
                     |err| log::error!("Audio stream error: {}", err),
                     None,
                 )
             }
             _ => {
-                log::error!("Unsupported sample format: {:?}", supported);
+                log::error!("Unsupported sample format: {:?}", sample_format);
                 return false;
             }
         };
@@ -192,6 +227,36 @@ impl AudioRecorder {
     pub fn get_spectrum(&self) -> Vec<f32> {
         self.spectrum.lock().unwrap().clone()
     }
+}
+
+/// Mix multi-channel audio to mono by averaging channels.
+fn mix_to_mono(data: &[f32], channels: u16) -> Vec<f32> {
+    if channels <= 1 {
+        return data.to_vec();
+    }
+    let ch = channels as usize;
+    data.chunks_exact(ch)
+        .map(|frame| frame.iter().sum::<f32>() / ch as f32)
+        .collect()
+}
+
+/// Simple linear resampling from src_rate to dst_rate.
+fn resample(data: &[f32], src_rate: u32, dst_rate: u32) -> Vec<f32> {
+    if src_rate == dst_rate || data.is_empty() {
+        return data.to_vec();
+    }
+    let ratio = src_rate as f64 / dst_rate as f64;
+    let out_len = (data.len() as f64 / ratio) as usize;
+    let mut out = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let src_pos = i as f64 * ratio;
+        let idx = src_pos as usize;
+        let frac = src_pos - idx as f64;
+        let s0 = data[idx];
+        let s1 = if idx + 1 < data.len() { data[idx + 1] } else { s0 };
+        out.push(s0 + (s1 - s0) * frac as f32);
+    }
+    out
 }
 
 fn process_samples(

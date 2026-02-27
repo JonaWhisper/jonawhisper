@@ -139,9 +139,7 @@ fn run_event_tap(
         const TAP_DISABLED_BY_USER: u32 = 0xFFFFFFFF;
 
         if event_type == TAP_DISABLED_BY_TIMEOUT || event_type == TAP_DISABLED_BY_USER {
-            // Re-enable tap
-            // We can't easily re-enable here without the tap reference,
-            // but the run loop will handle it
+            log::warn!("CGEvent tap disabled (type={}), will re-enable", event_type);
             return event;
         }
 
@@ -158,8 +156,10 @@ fn run_event_tap(
                 fn CGEventGetFlags(event: *mut c_void) -> u64;
             }
 
-            let key_code = CGEventGetIntegerValueField(event, 6) as u16; // field 6 = keycode
+            let key_code = CGEventGetIntegerValueField(event, 9) as u16; // kCGKeyboardEventKeycode = 9
             let flags = CGEventGetFlags(event);
+
+            log::debug!("flagsChanged: keycode=0x{:02x} flags=0x{:x}", key_code, flags);
 
             let expected_code = KEY_CODE.load(Ordering::SeqCst);
             let expected_mask = FLAG_MASK.load(Ordering::SeqCst);
@@ -171,12 +171,14 @@ fn run_event_tap(
                     // Key pressed
                     if !KEY_HELD.load(Ordering::SeqCst) {
                         KEY_HELD.store(true, Ordering::SeqCst);
+                        log::debug!("Hotkey callback: KeyDown (code={}, flags=0x{:x})", key_code, flags);
                         let _ = tx.send(HotkeyEvent::KeyDown);
                     }
                 } else {
                     // Key released
                     if KEY_HELD.load(Ordering::SeqCst) {
                         KEY_HELD.store(false, Ordering::SeqCst);
+                        log::debug!("Hotkey callback: KeyUp (code={}, flags=0x{:x})", key_code, flags);
                         let _ = tx.send(HotkeyEvent::KeyUp);
                     }
                 }
@@ -254,6 +256,9 @@ fn run_event_tap(
         loop {
             // Run the loop for a short interval
             CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
+
+            // Re-enable tap in case macOS disabled it
+            CGEventTapEnable(tap, true);
 
             // Check if hotkey was updated
             if let Ok(new_hotkey) = hotkey_rx.try_recv() {

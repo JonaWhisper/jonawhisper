@@ -59,3 +59,7 @@
 .pill-window {
   background: transparent !important;
 }
+html:has(.pill-window),
+html:has(.pill-window) body {
+  background: transparent !important;
+}
