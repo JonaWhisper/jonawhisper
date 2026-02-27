@@ -7,6 +7,7 @@
 - [ ] **TOCTOU races start/stop** — `is_recording` check-then-set sans garder le lock (`recording.rs:54-57, 77-80`). Garder le lock sur le check+set
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement
 - [ ] **`transcription-error` ne décrémente pas `queueCount`** — Le handler d'erreur oublie de décrémenter, `isBusy` reste true trop longtemps (`app.ts:359-361`)
+- [ ] **Tray menu se ferme au premier clic après lancement** — Le tout premier clic sur l'icône tray après le démarrage de l'app ferme le menu au lieu de l'ouvrir. Fonctionne normalement ensuite
 - [x] **Post-processing : persistence des toggles** — Bug trouvé : Switch utilisait `:checked` au lieu de `:model-value` (API reka-ui v2)
 
 ## Refacto (Audit)
