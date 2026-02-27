@@ -301,23 +301,71 @@ pub fn set_tray_state(app: &AppHandle, state: &str) {
     }
 }
 
-/// Filled circle icon (recording indicator), 44x44 RGBA.
+// -- Icon SDF helpers --
+
+fn sdf_aa(d: f32) -> f32 {
+    (0.5 - d).clamp(0.0, 1.0)
+}
+
+/// Signed distance to a rounded rectangle.
+fn sdf_rrect(px: f32, py: f32, cx: f32, cy: f32, hw: f32, hh: f32, r: f32) -> f32 {
+    let qx = (px - cx).abs() - (hw - r).max(0.0);
+    let qy = (py - cy).abs() - (hh - r).max(0.0);
+    (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt() + qx.max(qy).min(0.0) - r
+}
+
+fn sdf_circle(px: f32, py: f32, cx: f32, cy: f32, r: f32) -> f32 {
+    ((px - cx).powi(2) + (py - cy).powi(2)).sqrt() - r
+}
+
+#[allow(clippy::too_many_arguments)]
+fn point_in_triangle(px: f32, py: f32, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) -> bool {
+    let d1 = (px - x2) * (y1 - y2) - (x1 - x2) * (py - y2);
+    let d2 = (px - x3) * (y2 - y3) - (x2 - x3) * (py - y3);
+    let d3 = (px - x1) * (y3 - y1) - (x3 - x1) * (py - y1);
+    !(d1 < 0.0 && (d2 > 0.0 || d3 > 0.0)) && !(d1 > 0.0 && (d2 < 0.0 || d3 < 0.0))
+}
+
+/// Microphone with sound wave arcs (recording state), 44x44 RGBA template.
 fn make_recording_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
-    let center = s as f32 / 2.0;
-    let radius = s as f32 * 0.36;
+    let lw = 2.2_f32;
 
     for y in 0..s {
         for x in 0..s {
-            let dx = x as f32 + 0.5 - center;
-            let dy = y as f32 + 0.5 - center;
-            let dist = (dx * dx + dy * dy).sqrt();
-            if dist <= radius {
-                let idx = (y * s + x) * 4;
-                // Anti-alias the edge
-                let alpha = ((radius - dist + 0.5).min(1.0) * 255.0) as u8;
-                rgba[idx + 3] = alpha;
+            let px = x as f32 + 0.5;
+            let py = y as f32 + 0.5;
+            let mut a = 0.0_f32;
+
+            // Filled mic capsule (pill shape)
+            a = a.max(sdf_aa(sdf_rrect(px, py, 22.0, 13.0, 5.0, 9.0, 5.0)));
+
+            // Holder arc (U-shape below capsule)
+            if py >= 22.0 {
+                let ring = sdf_circle(px, py, 22.0, 22.0, 9.0).abs() - lw / 2.0;
+                a = a.max(sdf_aa(ring));
+            }
+            // Vertical connections from capsule to holder
+            a = a.max(sdf_aa(sdf_rrect(px, py, 13.0, 20.5, lw / 2.0, 2.5, 0.0)));
+            a = a.max(sdf_aa(sdf_rrect(px, py, 31.0, 20.5, lw / 2.0, 2.5, 0.0)));
+
+            // Stand
+            a = a.max(sdf_aa(sdf_rrect(px, py, 22.0, 34.0, lw / 2.0, 3.0, 0.0)));
+
+            // Base
+            a = a.max(sdf_aa(sdf_rrect(px, py, 22.0, 37.5, 5.5, lw / 2.0, lw / 2.0)));
+
+            // Sound wave arcs (recording indicator)
+            for &(radius, min_dx) in &[(14.0_f32, 8.0_f32), (18.0, 12.0)] {
+                if (px - 22.0).abs() > min_dx && py < 19.0 {
+                    let ring = sdf_circle(px, py, 22.0, 13.0, radius).abs() - lw * 0.45;
+                    a = a.max(sdf_aa(ring));
+                }
+            }
+
+            if a > 0.0 {
+                rgba[(y * s + x) * 4 + 3] = (a * 255.0) as u8;
             }
         }
     }
@@ -325,26 +373,34 @@ fn make_recording_icon() -> Image<'static> {
     Image::new_owned(rgba, TRAY_ICON_SIZE, TRAY_ICON_SIZE)
 }
 
-/// Three dots icon (transcribing indicator), 44x44 RGBA.
+/// Speech bubble with three dots (transcribing state), 44x44 RGBA template.
 fn make_transcribing_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
-    let cy = s as f32 / 2.0;
-    let dot_r = s as f32 * 0.09;
-    let gap = s as f32 * 0.25;
 
-    for i in 0..3 {
-        let cx = cy + (i as f32 - 1.0) * gap;
-        for y in 0..s {
-            for x in 0..s {
-                let dx = x as f32 + 0.5 - cx;
-                let dy = y as f32 + 0.5 - cy;
-                let dist = (dx * dx + dy * dy).sqrt();
-                if dist <= dot_r {
-                    let idx = (y * s + x) * 4;
-                    let alpha = ((dot_r - dist + 0.5).min(1.0) * 255.0) as u8;
-                    rgba[idx + 3] = rgba[idx + 3].max(alpha);
-                }
+    for y in 0..s {
+        for x in 0..s {
+            let px = x as f32 + 0.5;
+            let py = y as f32 + 0.5;
+
+            // Filled rounded-rect bubble
+            let bubble = sdf_rrect(px, py, 22.0, 17.0, 18.0, 11.0, 6.0);
+            // Small tail at bottom-left (triangle)
+            let in_tail = point_in_triangle(px, py, 8.0, 26.5, 16.0, 26.5, 6.0, 35.0);
+
+            let shape_alpha = if in_tail { 1.0 } else { sdf_aa(bubble) };
+
+            // Three dot cutouts
+            let dots = sdf_circle(px, py, 14.0, 17.0, 2.8)
+                .min(sdf_circle(px, py, 22.0, 17.0, 2.8))
+                .min(sdf_circle(px, py, 30.0, 17.0, 2.8));
+            let dot_alpha = sdf_aa(dots);
+
+            // Shape minus dots
+            let a = shape_alpha * (1.0 - dot_alpha);
+
+            if a > 0.001 {
+                rgba[(y * s + x) * 4 + 3] = (a * 255.0) as u8;
             }
         }
     }

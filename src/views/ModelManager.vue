@@ -140,21 +140,13 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- Add API Server button -->
-      <div class="p-3 mt-2">
-        <Button variant="outline" size="sm" class="w-full" @click="showApiServerForm = true">
-          + {{ t('modelManager.addApiServer') }}
-        </Button>
-      </div>
-    </div>
-
-    <!-- Model list -->
-    <div class="flex-1 overflow-y-auto p-4">
       <!-- Language selector -->
-      <div class="flex items-center gap-2 mb-4">
-        <label class="text-sm font-medium text-muted-foreground">{{ t('modelManager.language') }}</label>
+      <div class="px-3 mt-4">
+        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">
+          {{ t('modelManager.language') }}
+        </label>
         <Select :model-value="store.selectedLanguage" @update:model-value="handleLanguageChange">
-          <SelectTrigger class="w-48">
+          <SelectTrigger class="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -169,6 +161,16 @@ onMounted(async () => {
         </Select>
       </div>
 
+      <!-- Add API Server button -->
+      <div class="p-3 mt-2">
+        <Button variant="outline" size="sm" class="w-full" @click="showApiServerForm = true">
+          + {{ t('modelManager.addApiServer') }}
+        </Button>
+      </div>
+    </div>
+
+    <!-- Model list -->
+    <div class="flex-1 overflow-y-auto p-4">
       <!-- Language warning -->
       <div v-if="languageWarning" class="mb-4 px-3 py-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-sm">
         {{ languageWarning }}
