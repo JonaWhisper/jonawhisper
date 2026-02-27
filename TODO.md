@@ -11,7 +11,7 @@
 
 ## Refacto (Audit)
 
-- [ ] **17 Mutex individuels → grouper** — `state.rs` : regrouper en 2-3 groupes logiques (runtime, settings, history)
+- [x] **17 Mutex individuels → grouper** — ✅ Fixé : 4 groupes (runtime, download, settings, history), lock+copy+drop partout
 - [x] **Duplicate audio device listing** — ✅ Fixé : un seul AudioDevice (CoreAudio), filtré par cpal dans audio::list_usable_devices()
 - [x] **Regex recompilées en boucle** — ✅ Fixé : LazyLock pour hallucinations et dictation commands
 - [ ] **`unsafe impl Sync` sur RecordingState** — Fragile. Utiliser crossbeam channels ou garder le Mutex wrapper
