@@ -45,11 +45,6 @@ pub fn select_model(id: String, state: tauri::State<'_, Arc<AppState>>) {
 }
 
 #[tauri::command]
-pub fn get_selected_model_id(state: tauri::State<'_, Arc<AppState>>) -> String {
-    state.selected_model_id.lock().unwrap().clone()
-}
-
-#[tauri::command]
 pub async fn download_model_cmd(
     app: AppHandle,
     id: String,
@@ -82,11 +77,6 @@ pub fn select_language(code: String, state: tauri::State<'_, Arc<AppState>>) {
     state.save_preferences();
 }
 
-#[tauri::command]
-pub fn get_selected_language(state: tauri::State<'_, Arc<AppState>>) -> String {
-    state.selected_language.lock().unwrap().clone()
-}
-
 // -- Permissions --
 
 #[tauri::command]
@@ -100,28 +90,6 @@ pub fn request_permission(kind: String) -> bool {
 }
 
 // -- Settings --
-
-#[tauri::command]
-pub fn get_post_processing_enabled(state: tauri::State<'_, Arc<AppState>>) -> bool {
-    *state.post_processing_enabled.lock().unwrap()
-}
-
-#[tauri::command]
-pub fn set_post_processing_enabled(enabled: bool, state: tauri::State<'_, Arc<AppState>>) {
-    *state.post_processing_enabled.lock().unwrap() = enabled;
-    state.save_preferences();
-}
-
-#[tauri::command]
-pub fn get_hotkey(state: tauri::State<'_, Arc<AppState>>) -> String {
-    state.hotkey_option.lock().unwrap().clone()
-}
-
-#[tauri::command]
-pub fn set_hotkey(hotkey: String, state: tauri::State<'_, Arc<AppState>>) {
-    *state.hotkey_option.lock().unwrap() = hotkey;
-    state.save_preferences();
-}
 
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {

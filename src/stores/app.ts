@@ -243,19 +243,7 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function setPostProcessing(enabled: boolean) {
-    try {
-      await invoke('set_post_processing_enabled', { enabled })
-      postProcessingEnabled.value = enabled
-    } catch (e) { console.error('setPostProcessing failed:', e) }
-  }
 
-  async function setHotkey(key: string) {
-    try {
-      await invoke('set_hotkey', { hotkey: key })
-      hotkey.value = key
-    } catch (e) { console.error('setHotkey failed:', e) }
-  }
 
   async function fetchSettings() {
     try {
@@ -424,11 +412,9 @@ export const useAppStore = defineStore('app', () => {
     fetchApiServers, fetchState,
     selectModel, selectLanguageAction,
     downloadModel, deleteModel,
-    setPostProcessing, setHotkey,
     fetchSettings, setSetting,
     clearHistoryAction, requestPermission,
     startMonitoring,
     addApiServer, removeApiServer,
-    setupListeners,
   }
 })

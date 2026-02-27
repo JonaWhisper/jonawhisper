@@ -23,16 +23,33 @@ fn get_state(app: &AppHandle) -> Arc<AppState> {
 // -- Window management --
 
 pub fn open_window(app: &AppHandle, label: &str, title: &str, url: &str, width: f64, height: f64) {
+    open_window_with_min(app, label, title, url, width, height, None)
+}
+
+pub fn open_window_with_min(
+    app: &AppHandle,
+    label: &str,
+    title: &str,
+    url: &str,
+    width: f64,
+    height: f64,
+    min_size: Option<(f64, f64)>,
+) {
     if let Some(window) = app.get_webview_window(label) {
         let _ = window.set_focus();
         return;
     }
 
-    let _ = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
         .title(title)
         .inner_size(width, height)
-        .resizable(true)
-        .build();
+        .resizable(true);
+
+    if let Some((min_w, min_h)) = min_size {
+        builder = builder.min_inner_size(min_w, min_h);
+    }
+
+    let _ = builder.build();
 }
 
 pub fn open_pill_window(app: &AppHandle) {
@@ -427,7 +444,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
                 }
                 "settings" => {
-                    open_window(app, "settings", "Settings", "/settings", 580.0, 420.0);
+                    open_window_with_min(app, "settings", "Settings", "/settings", 580.0, 420.0, Some((460.0, 320.0)));
                 }
                 "setup" => {
                     open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);

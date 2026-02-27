@@ -68,7 +68,7 @@ async function onHallucinationFilterChange(enabled: boolean) {
 
 async function onHotkeyChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setHotkey(value)
+  await store.setSetting('hotkey', value)
 }
 
 async function onCancelShortcutChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -128,9 +128,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-screen select-none">
+  <div class="flex h-screen min-w-0 select-none">
     <!-- Sidebar -->
-    <div class="w-44 border-r border-border bg-muted/30 overflow-y-auto flex-shrink-0">
+    <div class="w-40 min-w-[8rem] border-r border-border bg-muted/30 overflow-y-auto flex-shrink-0">
       <div class="p-3">
         <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           {{ t('settings.title') }}
@@ -141,21 +141,21 @@ onUnmounted(() => {
           v-for="section in sections"
           :key="section.id"
           @click="activeSection = section.id"
-          class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"
+          class="w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors"
           :class="activeSection === section.id
             ? 'bg-accent text-accent-foreground'
             : 'hover:bg-accent/50 text-foreground'"
         >
           <div class="flex items-center gap-2">
-            <span class="text-base w-5 text-center">{{ section.icon }}</span>
-            <span class="font-medium">{{ t(section.label) }}</span>
+            <span class="text-base w-5 text-center flex-shrink-0">{{ section.icon }}</span>
+            <span class="font-medium truncate">{{ t(section.label) }}</span>
           </div>
         </button>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-5">
+    <div class="flex-1 min-w-0 overflow-y-auto p-5">
       <!-- General -->
       <div v-if="activeSection === 'general'">
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.general') }}</h2>
@@ -164,7 +164,7 @@ onUnmounted(() => {
           <div class="space-y-1.5">
             <Label class="text-sm font-medium">{{ t('settings.locale') }}</Label>
             <Select :model-value="store.appLocale" @update:model-value="onLocaleChange">
-              <SelectTrigger class="w-full max-w-xs">
+              <SelectTrigger class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -186,8 +186,8 @@ onUnmounted(() => {
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.postProcessing') }}</h2>
 
         <div class="space-y-4">
-          <div class="flex items-center justify-between max-w-sm">
-            <Label class="text-sm">{{ t('settings.postProcessing.enable') }}</Label>
+          <div class="flex items-center justify-between gap-4">
+            <Label class="text-sm shrink-0">{{ t('settings.postProcessing.enable') }}</Label>
             <Switch
               :checked="store.postProcessingEnabled"
               @update:checked="onPostProcessingChange"
@@ -198,16 +198,16 @@ onUnmounted(() => {
             class="space-y-3 pl-4 border-l-2 border-border"
             :class="{ 'opacity-40 pointer-events-none': !store.postProcessingEnabled }"
           >
-            <div class="flex items-center justify-between max-w-sm">
-              <Label class="text-sm">{{ t('settings.postProcessing.hallucinations') }}</Label>
+            <div class="flex items-center justify-between gap-4">
+              <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
               <Switch
                 :checked="store.hallucinationFilterEnabled"
                 @update:checked="onHallucinationFilterChange"
               />
             </div>
-            <div class="flex items-center justify-between max-w-sm">
-              <Label class="text-sm text-muted-foreground">{{ t('settings.postProcessing.llm') }}</Label>
-              <Button variant="outline" size="sm" disabled>
+            <div class="flex items-center justify-between gap-4">
+              <Label class="text-sm text-muted-foreground shrink-0">{{ t('settings.postProcessing.llm') }}</Label>
+              <Button variant="outline" size="sm" disabled class="shrink-0">
                 {{ t('settings.postProcessing.llmConfigure') }}
               </Button>
             </div>
@@ -225,7 +225,7 @@ onUnmounted(() => {
             <Label class="text-sm font-medium">{{ t('settings.shortcut.mode') }}</Label>
             <div class="inline-flex rounded-md border border-border overflow-hidden">
               <button
-                class="px-3 py-1.5 text-sm transition-colors"
+                class="px-3 py-1.5 text-sm transition-colors whitespace-nowrap"
                 :class="store.recordingMode === 'push_to_talk'
                   ? 'bg-accent text-accent-foreground font-medium'
                   : 'hover:bg-accent/50 text-muted-foreground'"
@@ -234,7 +234,7 @@ onUnmounted(() => {
                 {{ t('settings.shortcut.mode.pushToTalk') }}
               </button>
               <button
-                class="px-3 py-1.5 text-sm border-l border-border transition-colors"
+                class="px-3 py-1.5 text-sm border-l border-border transition-colors whitespace-nowrap"
                 :class="store.recordingMode === 'toggle'
                   ? 'bg-accent text-accent-foreground font-medium'
                   : 'hover:bg-accent/50 text-muted-foreground'"
@@ -248,7 +248,7 @@ onUnmounted(() => {
           <div class="space-y-1.5">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.record') }}</Label>
             <Select :model-value="store.hotkey" @update:model-value="onHotkeyChange">
-              <SelectTrigger class="w-full max-w-xs">
+              <SelectTrigger class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -263,12 +263,13 @@ onUnmounted(() => {
             </Select>
           </div>
 
-          <div class="flex items-center justify-between max-w-sm">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
               <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.shortcut.cancel.escape') }}</p>
             </div>
             <Switch
+              class="shrink-0"
               :checked="store.cancelShortcut === 'escape'"
               @update:checked="(v: boolean) => onCancelShortcutChange(v ? 'escape' : 'none')"
             />
@@ -287,7 +288,7 @@ onUnmounted(() => {
               :model-value="store.audioDevices.find(d => d.is_default)?.uid ?? '__default__'"
               @update:model-value="onDeviceChange"
             >
-              <SelectTrigger class="w-full max-w-xs">
+              <SelectTrigger class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -309,11 +310,12 @@ onUnmounted(() => {
             <Button
               variant="outline"
               size="sm"
+              class="shrink-0"
               @click="isTesting ? stopMicTest() : startMicTest()"
             >
               {{ isTesting ? t('settings.microphone.testing') : t('settings.microphone.test') }}
             </Button>
-            <div v-if="isTesting" class="flex-1 max-w-xs">
+            <div v-if="isTesting" class="flex-1">
               <Progress :model-value="micLevel" class="h-2" />
             </div>
           </div>
