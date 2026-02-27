@@ -16,6 +16,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::Manager;
 
+/// Wrapper to store the hotkey update channel sender in Tauri managed state.
+pub struct HotkeyUpdateSender(
+    pub std::sync::Mutex<std::sync::mpsc::Sender<platform::hotkey::HotkeyUpdate>>,
+);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::init();
@@ -85,8 +90,9 @@ pub fn run() {
             let initial_hotkey = platform::hotkey::HotkeyOption::from_name(&hotkey_name);
             let cancel_name = app_state.cancel_shortcut.lock().unwrap().clone();
             let initial_cancel_key = platform::hotkey::cancel_keys::from_name(&cancel_name);
-            let (hotkey_rx, _hotkey_update_tx) =
+            let (hotkey_rx, hotkey_update_tx) =
                 platform::hotkey::start_monitor(initial_hotkey, initial_cancel_key, monitor_enabled.clone());
+            app.manage(HotkeyUpdateSender(std::sync::Mutex::new(hotkey_update_tx)));
 
             // Hotkey event processing thread
             recording::spawn_hotkey_handler(

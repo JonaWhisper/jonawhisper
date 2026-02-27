@@ -124,8 +124,11 @@ pub fn set_setting(
     key: String,
     value: String,
     state: tauri::State<'_, Arc<AppState>>,
+    hotkey_sender: tauri::State<'_, crate::HotkeyUpdateSender>,
     app: AppHandle,
 ) {
+    use crate::platform::hotkey;
+
     log::info!("set_setting: key={}, value={}", key, value);
     match key.as_str() {
         "app_locale" => *state.app_locale.lock().unwrap() = value,
@@ -135,8 +138,16 @@ pub fn set_setting(
         "hallucination_filter_enabled" => {
             *state.hallucination_filter_enabled.lock().unwrap() = value == "true";
         }
-        "hotkey" => *state.hotkey_option.lock().unwrap() = value,
-        "cancel_shortcut" => *state.cancel_shortcut.lock().unwrap() = value,
+        "hotkey" => {
+            *state.hotkey_option.lock().unwrap() = value.clone();
+            let new_hotkey = hotkey::HotkeyOption::from_name(&value);
+            let _ = hotkey_sender.0.lock().unwrap().send(hotkey::HotkeyUpdate::SetHotkey(new_hotkey));
+        }
+        "cancel_shortcut" => {
+            *state.cancel_shortcut.lock().unwrap() = value.clone();
+            let new_cancel_key = hotkey::cancel_keys::from_name(&value);
+            let _ = hotkey_sender.0.lock().unwrap().send(hotkey::HotkeyUpdate::SetCancelKey(new_cancel_key));
+        }
         "recording_mode" => *state.recording_mode.lock().unwrap() = value,
         "selected_input_device_uid" => {
             *state.selected_input_device_uid.lock().unwrap() = if value.is_empty() {

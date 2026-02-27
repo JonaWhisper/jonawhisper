@@ -94,7 +94,6 @@ pub enum HotkeyEvent {
 
 /// Messages to update hotkey configuration at runtime.
 /// Variants are handled in the monitor loop; constructed by callers via the update_tx channel.
-#[allow(dead_code)]
 pub enum HotkeyUpdate {
     SetHotkey(HotkeyOption),
     SetCancelKey(u16),
