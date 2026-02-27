@@ -42,11 +42,6 @@ const hotkeyOptions = [
   { value: 'right_shift', label: 'hotkey.rightShift' },
 ]
 
-const cancelShortcutOptions = [
-  { value: 'escape', label: 'settings.shortcut.cancel.escape' },
-  { value: 'none', label: 'settings.shortcut.cancel.none' },
-]
-
 const localeOptions = [
   { value: 'auto', label: 'settings.locale.auto' },
   { value: 'fr', label: 'settings.locale.fr' },
@@ -239,22 +234,15 @@ onUnmounted(() => {
             </Select>
           </div>
 
-          <div class="space-y-1.5">
-            <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
-            <Select :model-value="store.cancelShortcut" @update:model-value="onCancelShortcutChange">
-              <SelectTrigger class="w-full max-w-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="opt in cancelShortcutOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
-                  {{ t(opt.label) }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div class="flex items-center justify-between max-w-sm">
+            <div>
+              <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.shortcut.cancel.escape') }}</p>
+            </div>
+            <Switch
+              :checked="store.cancelShortcut === 'escape'"
+              @update:checked="(v: boolean) => onCancelShortcutChange(v ? 'escape' : 'none')"
+            />
           </div>
         </div>
       </div>
