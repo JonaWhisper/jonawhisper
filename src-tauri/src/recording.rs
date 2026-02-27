@@ -293,7 +293,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     } else {
         processed.clone()
     };
-    paste::paste_text(app, &paste_text);
+    // Run paste on a blocking thread to avoid stalling the async runtime (thread::sleep inside)
+    let app_for_paste = app.clone();
+    let _ = tokio::task::spawn_blocking(move || {
+        paste::paste_text(&app_for_paste, &paste_text);
+    })
+    .await;
     *state.last_paste_had_content.lock().unwrap() = true;
     state.add_history(processed.clone());
     platform::play_sound("Glass");

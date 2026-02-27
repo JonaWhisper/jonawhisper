@@ -69,6 +69,14 @@ const HALLUCINATIONS: &[&str] = &[
     "…",
 ];
 
+// Pre-compiled regexes for hallucination removal (case-insensitive)
+static HALLUCINATION_REGEXES: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    HALLUCINATIONS
+        .iter()
+        .map(|h| Regex::new(&format!("(?i){}", regex::escape(h))).unwrap())
+        .collect()
+});
+
 /// Strip known Whisper hallucination phrases from text.
 /// If only hallucinations remain, returns empty string.
 fn strip_hallucinations(text: &str) -> String {
@@ -85,8 +93,7 @@ fn strip_hallucinations(text: &str) -> String {
     }
 
     // Remove hallucination phrases embedded in longer text
-    for h in HALLUCINATIONS {
-        let re = Regex::new(&format!("(?i){}", regex::escape(h))).unwrap();
+    for re in HALLUCINATION_REGEXES.iter() {
         result = re.replace_all(&result, "").to_string();
     }
 
@@ -109,57 +116,71 @@ fn resolve_language(code: &str, text: &str) -> String {
     if french_count >= 2 { "fr".to_string() } else { "en".to_string() }
 }
 
+// Pre-compiled dictation command regexes per language
+static DICTATION_COMMANDS_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
+    [
+        ("point d'interrogation", "?"),
+        ("point d'exclamation", "!"),
+        ("points de suspension", "\u{2026}"),
+        ("point-virgule", ";"),
+        ("point virgule", ";"),
+        ("deux-points", ":"),
+        ("deux points", ":"),
+        ("ouvrir la parenthèse", "("),
+        ("fermer la parenthèse", ")"),
+        ("ouvrir les guillemets", "«\u{00A0}"),
+        ("fermer les guillemets", "\u{00A0}»"),
+        ("à la ligne", "\n"),
+        ("nouvelle ligne", "\n"),
+        ("nouveau paragraphe", "\n\n"),
+        ("virgule", ","),
+        ("point", "."),
+        ("tiret", "-"),
+    ]
+    .iter()
+    .map(|(p, r)| (Regex::new(&format!("(?i){}", regex::escape(p))).unwrap(), *r))
+    .collect()
+});
+
+static DICTATION_COMMANDS_EN: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
+    [
+        ("question mark", "?"),
+        ("exclamation mark", "!"),
+        ("exclamation point", "!"),
+        ("semicolon", ";"),
+        ("semi-colon", ";"),
+        ("ellipsis", "\u{2026}"),
+        ("colon", ":"),
+        ("open parenthesis", "("),
+        ("close parenthesis", ")"),
+        ("open paren", "("),
+        ("close paren", ")"),
+        ("open quote", "\""),
+        ("close quote", "\""),
+        ("new line", "\n"),
+        ("newline", "\n"),
+        ("new paragraph", "\n\n"),
+        ("comma", ","),
+        ("period", "."),
+        ("full stop", "."),
+        ("dash", "-"),
+        ("hyphen", "-"),
+    ]
+    .iter()
+    .map(|(p, r)| (Regex::new(&format!("(?i){}", regex::escape(p))).unwrap(), *r))
+    .collect()
+});
+
 fn apply_dictation_commands(text: &str, language: &str) -> String {
-    let commands: Vec<(&str, &str)> = if language.starts_with("fr") {
-        vec![
-            ("point d'interrogation", "?"),
-            ("point d'exclamation", "!"),
-            ("points de suspension", "\u{2026}"),
-            ("point-virgule", ";"),
-            ("point virgule", ";"),
-            ("deux-points", ":"),
-            ("deux points", ":"),
-            ("ouvrir la parenthèse", "("),
-            ("fermer la parenthèse", ")"),
-            ("ouvrir les guillemets", "«\u{00A0}"),
-            ("fermer les guillemets", "\u{00A0}»"),
-            ("à la ligne", "\n"),
-            ("nouvelle ligne", "\n"),
-            ("nouveau paragraphe", "\n\n"),
-            ("virgule", ","),
-            ("point", "."),
-            ("tiret", "-"),
-        ]
+    let commands = if language.starts_with("fr") {
+        &*DICTATION_COMMANDS_FR
     } else {
-        vec![
-            ("question mark", "?"),
-            ("exclamation mark", "!"),
-            ("exclamation point", "!"),
-            ("semicolon", ";"),
-            ("semi-colon", ";"),
-            ("ellipsis", "\u{2026}"),
-            ("colon", ":"),
-            ("open parenthesis", "("),
-            ("close parenthesis", ")"),
-            ("open paren", "("),
-            ("close paren", ")"),
-            ("open quote", "\""),
-            ("close quote", "\""),
-            ("new line", "\n"),
-            ("newline", "\n"),
-            ("new paragraph", "\n\n"),
-            ("comma", ","),
-            ("period", "."),
-            ("full stop", "."),
-            ("dash", "-"),
-            ("hyphen", "-"),
-        ]
+        &*DICTATION_COMMANDS_EN
     };
 
     let mut result = text.to_string();
-    for (pattern, replacement) in commands {
-        let re = Regex::new(&format!("(?i){}", regex::escape(pattern))).unwrap();
-        result = re.replace_all(&result, replacement).to_string();
+    for (re, replacement) in commands {
+        result = re.replace_all(&result, *replacement).to_string();
     }
     result
 }
