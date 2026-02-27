@@ -8,6 +8,7 @@
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement
 - [x] **`transcription-error` ne décrémente pas `queueCount`** — ✅ Fixé : queueCount décrémenté dans le handler d'erreur
 - [ ] **Tray menu se ferme au premier clic après lancement** — Le tout premier clic sur l'icône tray après le démarrage de l'app ferme le menu au lieu de l'ouvrir
+- [ ] **Test micro vs enregistrement** — Si le test micro est actif quand une transcription démarre, annuler le test micro automatiquement
 
 ## Refacto (Audit)
 
