@@ -41,37 +41,47 @@ impl AudioRecorder {
     }
 
     pub fn list_devices() -> Vec<AudioDevice> {
+        // Use CoreAudio to get real UIDs, then only include devices that cpal can also see
+        // (so we know they are usable for recording).
         let host = cpal::default_host();
-        let default_device_name = host
-            .default_input_device()
-            .map(|d| d.name().unwrap_or_default())
+        let cpal_names: Vec<String> = host
+            .input_devices()
+            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
             .unwrap_or_default();
 
-        host.input_devices()
-            .map(|devices| {
-                devices
-                    .filter_map(|d| {
-                        let name = d.name().ok()?;
-                        // Use name as UID since cpal doesn't expose platform UIDs directly
-                        Some(AudioDevice {
-                            is_default: name == default_device_name,
-                            uid: name.clone(),
-                            name,
-                        })
-                    })
-                    .collect()
+        crate::platform::audio_devices::list_input_devices()
+            .into_iter()
+            .filter(|ca_dev| cpal_names.iter().any(|n| n == &ca_dev.name))
+            .map(|ca_dev| AudioDevice {
+                name: ca_dev.name,
+                uid: ca_dev.uid,
+                is_default: ca_dev.is_default,
             })
-            .unwrap_or_default()
+            .collect()
     }
 
     pub fn start_recording(&mut self, device_uid: Option<&str>) -> bool {
         let host = cpal::default_host();
 
+        // Resolve CoreAudio UID to device name, then find the matching cpal device
         let device = if let Some(uid) = device_uid {
-            host.input_devices()
-                .ok()
-                .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(uid)))
-                .or_else(|| host.default_input_device())
+            let device_name = crate::platform::audio_devices::list_input_devices()
+                .into_iter()
+                .find(|d| d.uid == uid)
+                .map(|d| d.name);
+
+            if let Some(name) = device_name {
+                host.input_devices()
+                    .ok()
+                    .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(&name)))
+                    .or_else(|| {
+                        log::warn!("CoreAudio device '{}' not found in cpal, using default", name);
+                        host.default_input_device()
+                    })
+            } else {
+                log::warn!("No CoreAudio device with UID '{}', using default", uid);
+                host.default_input_device()
+            }
         } else {
             host.default_input_device()
         };
