@@ -198,6 +198,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     }
 
     if !*state.is_recording.lock().unwrap() {
+        *state.last_paste_had_content.lock().unwrap() = false;
         crate::tray::close_pill_window(app);
     }
 }
@@ -278,7 +279,15 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         }
     }
 
-    paste::paste_text(app, &processed);
+    // Add a leading space when pasting consecutive results (queued recordings)
+    let needs_separator = *state.last_paste_had_content.lock().unwrap();
+    let paste_text = if needs_separator {
+        format!(" {}", processed)
+    } else {
+        processed.clone()
+    };
+    paste::paste_text(app, &paste_text);
+    *state.last_paste_had_content.lock().unwrap() = true;
     state.add_history(processed.clone());
     platform::play_sound("Glass");
 
@@ -304,6 +313,7 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
         let _ = std::fs::remove_file(&path);
     }
     *state.transcription_cancelled.lock().unwrap() = true;
+    *state.last_paste_had_content.lock().unwrap() = false;
     platform::play_sound("Funk");
     let _ = app.emit("transcription-cancelled", ());
     show_error_then_close(app);

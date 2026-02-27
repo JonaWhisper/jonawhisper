@@ -394,7 +394,6 @@ export const useAppStore = defineStore('app', () => {
     setupListeners()
     await Promise.all([
       fetchState(),
-      fetchSettings(),
       fetchEngines(),
       fetchModels(),
       fetchLanguages(),

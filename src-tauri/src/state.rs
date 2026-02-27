@@ -31,6 +31,7 @@ pub struct AppState {
     pub recording_mode: Mutex<String>,
     pub llm_config: Mutex<LlmConfig>,
     pub mic_testing: Mutex<bool>,
+    pub last_paste_had_content: Mutex<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -160,6 +161,7 @@ impl Default for AppState {
             recording_mode: Mutex::new(prefs.recording_mode),
             llm_config: Mutex::new(prefs.llm_config),
             mic_testing: Mutex::new(false),
+            last_paste_had_content: Mutex::new(false),
         }
     }
 }
