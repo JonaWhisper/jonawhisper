@@ -17,7 +17,6 @@ const DOUBLE_TAP_MS: u64 = 500;
 const ERROR_DISPLAY_MS: u64 = 800;
 const SPECTRUM_INTERVAL_MS: u64 = 33;
 const ORPHAN_CLEANUP_SECS: u64 = 300;
-const CLIPBOARD_RESTORE_DELAY_MS: u64 = 300;
 
 // -- Audio commands for the dedicated audio thread --
 
@@ -25,6 +24,8 @@ pub enum AudioCmd {
     StartRecording { device_uid: Option<String> },
     StopRecording,
     GetSpectrum,
+    StartMicTest { device_uid: Option<String> },
+    StopMicTest,
 }
 
 pub enum AudioReply {
@@ -117,15 +118,6 @@ pub fn stop_recording_and_enqueue(
     let _ = app.emit("pill-mode", "transcribing");
     crate::tray::set_tray_state(app, "transcribing");
 
-    // Save clipboard once before the paste batch starts
-    {
-        let mut saved = state.saved_clipboard.lock().unwrap();
-        if saved.is_none() {
-            *saved = paste::save_clipboard(app);
-            log::info!("Clipboard saved before paste batch");
-        }
-    }
-
     let app_clone = app.clone();
     let state_clone = Arc::clone(state);
     tauri::async_runtime::spawn(async move {
@@ -193,7 +185,6 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     *state.is_transcribing.lock().unwrap() = false;
 
     if had_error {
-        restore_saved_clipboard(app, state);
         show_error_then_close(app);
         return;
     }
@@ -206,9 +197,6 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         return;
     }
 
-    // Queue empty → wait for paste to be processed, then restore clipboard
-    tokio::time::sleep(Duration::from_millis(CLIPBOARD_RESTORE_DELAY_MS)).await;
-    restore_saved_clipboard(app, state);
     if !*state.is_recording.lock().unwrap() {
         crate::tray::close_pill_window(app);
     }
@@ -232,7 +220,7 @@ async fn run_transcription(
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
             }
-            handle_transcription_result(app, state, &text);
+            handle_transcription_result(app, state, &text).await;
             false
         }
         Ok(Err(e)) => {
@@ -256,7 +244,7 @@ async fn run_transcription(
     }
 }
 
-fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str) {
+async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         platform::play_sound("Basso");
@@ -264,7 +252,8 @@ fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &st
         return;
     }
 
-    let processed = if *state.post_processing_enabled.lock().unwrap() {
+    // Step 1: regex-based post-processing
+    let mut processed = if *state.post_processing_enabled.lock().unwrap() {
         let lang = state.selected_language.lock().unwrap().clone();
         let opts = post_processor::PostProcessOptions {
             hallucination_filter: *state.hallucination_filter_enabled.lock().unwrap(),
@@ -273,6 +262,21 @@ fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &st
     } else {
         trimmed.to_string()
     };
+
+    // Step 2: LLM cleanup (if enabled)
+    let llm_config = state.llm_config.lock().unwrap().clone();
+    if llm_config.enabled {
+        let lang = state.selected_language.lock().unwrap().clone();
+        match crate::llm_cleanup::cleanup_text(&processed, &lang, &llm_config).await {
+            Ok(cleaned) => {
+                log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                processed = cleaned;
+            }
+            Err(e) => {
+                log::warn!("LLM cleanup failed, using regex result: {}", e);
+            }
+        }
+    }
 
     paste::paste_text(app, &processed);
     state.add_history(processed.clone());
@@ -295,20 +299,11 @@ fn show_error_then_close(app: &AppHandle) {
     });
 }
 
-fn restore_saved_clipboard(app: &AppHandle, state: &Arc<AppState>) {
-    let saved = state.saved_clipboard.lock().unwrap().take();
-    if saved.is_some() {
-        paste::restore_clipboard(app, saved);
-        log::info!("Clipboard restored after paste batch");
-    }
-}
-
 fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
     while let Some(path) = state.dequeue() {
         let _ = std::fs::remove_file(&path);
     }
     *state.transcription_cancelled.lock().unwrap() = true;
-    restore_saved_clipboard(app, state);
     platform::play_sound("Funk");
     let _ = app.emit("transcription-cancelled", ());
     show_error_then_close(app);
@@ -369,6 +364,15 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
                 Ok(AudioCmd::GetSpectrum) => {
                     let s = recorder.get_spectrum();
                     *spectrum_clone.lock().unwrap() = s.clone();
+                }
+                Ok(AudioCmd::StartMicTest { device_uid }) => {
+                    recorder.start_recording(device_uid.as_deref());
+                    // No reply — fire-and-forget for mic test
+                }
+                Ok(AudioCmd::StopMicTest) => {
+                    if let Some(path) = recorder.stop_recording() {
+                        let _ = std::fs::remove_file(&path);
+                    }
                 }
                 Err(_) => break,
             }
@@ -433,7 +437,9 @@ pub fn spawn_spectrum_emitter(
 ) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
-        if !*state.is_recording.lock().unwrap() {
+        let is_recording = *state.is_recording.lock().unwrap();
+        let is_mic_testing = *state.mic_testing.lock().unwrap();
+        if !is_recording && !is_mic_testing {
             continue;
         }
 
@@ -445,7 +451,6 @@ pub fn spawn_spectrum_emitter(
 
             platform::play_sound("Basso");
             let _ = app.emit("recording-stopped", ());
-            restore_saved_clipboard(&app, &state);
             show_error_then_close(&app);
             continue;
         }
@@ -455,6 +460,9 @@ pub fn spawn_spectrum_emitter(
         let _ = app.emit("spectrum-data", spectrum);
     });
 }
+
+/// Wrapper around audio command sender for mic test (managed by Tauri).
+pub struct MicTestSender(pub std::sync::Mutex<std::sync::mpsc::Sender<AudioCmd>>);
 
 pub fn new_recording_state(
     cmd_tx: std::sync::mpsc::Sender<AudioCmd>,

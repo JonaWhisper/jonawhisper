@@ -1,22 +1,7 @@
 use tauri::AppHandle;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
-/// Save the current clipboard text content.
-/// Returns the saved text, or None if clipboard is empty or non-text.
-pub fn save_clipboard(app: &AppHandle) -> Option<String> {
-    app.clipboard().read_text().ok()
-}
-
-/// Restore previously saved clipboard content.
-pub fn restore_clipboard(app: &AppHandle, content: Option<String>) {
-    if let Some(text) = content {
-        let _ = app.clipboard().write_text(text);
-    }
-}
-
 /// Write text to clipboard and simulate paste keystroke.
-/// Does NOT save/restore clipboard — caller manages that via
-/// save_clipboard/restore_clipboard around a batch of pastes.
 pub fn paste_text(app: &AppHandle, text: &str) {
     if let Err(e) = app.clipboard().write_text(text) {
         log::error!("Failed to write to clipboard: {}", e);
