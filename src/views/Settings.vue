@@ -99,6 +99,10 @@ const selectedDeviceUid = computed(() => {
   return def?.uid ?? ''
 })
 
+const selectedDevice = computed(() =>
+  store.audioDevices.find(d => d.uid === selectedDeviceUid.value)
+)
+
 async function onDeviceChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   // If selecting the default device, store empty string (= use system default)
@@ -437,7 +441,11 @@ onUnmounted(() => {
               @update:model-value="onDeviceChange"
             >
               <SelectTrigger class="w-full">
-                <SelectValue />
+                <span v-if="selectedDevice" class="inline-flex items-center gap-1.5 truncate">
+                  <component :is="deviceIcon(selectedDevice.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                  <span class="truncate">{{ selectedDevice.name }}{{ selectedDevice.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
+                </span>
+                <SelectValue v-else />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem

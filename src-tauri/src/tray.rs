@@ -239,6 +239,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             &mic_submenu,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "settings", "Settings\u{2026}", true, None::<&str>)?,
+            &MenuItem::with_id(app, "model_manager", "Models\u{2026}", true, None::<&str>)?,
             &MenuItem::with_id(app, "history", "History", true, None::<&str>)?,
             &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
@@ -423,6 +424,9 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 "quit" => app.exit(0),
                 "settings" => {
                     open_window_with_min(app, "settings", "Settings", "/settings", 580.0, 420.0, Some((460.0, 320.0)));
+                }
+                "model_manager" => {
+                    open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
                 }
                 "history" => {
                     open_window(app, "history", "History", "/history", 500.0, 500.0);
