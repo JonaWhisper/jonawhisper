@@ -472,9 +472,6 @@ pub fn spawn_hotkey_handler(
                     "display": shortcut.display_string(),
                 }));
             }
-            Ok(hotkey::HotkeyEvent::CaptureCancelled) => {
-                let _ = app.emit("shortcut-capture-cancelled", ());
-            }
             Err(_) => break,
         }
     });

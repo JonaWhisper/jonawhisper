@@ -29,7 +29,6 @@ const displayText = computed(() => {
 
 let unlistenUpdate: (() => void) | null = null
 let unlistenComplete: (() => void) | null = null
-let unlistenCancelled: (() => void) | null = null
 
 async function startCapture() {
   if (props.disabled) return
@@ -50,10 +49,6 @@ async function startCapture() {
     stopCapture()
   })
 
-  unlistenCancelled = await listen('shortcut-capture-cancelled', () => {
-    stopCapture()
-  })
-
   await invoke('start_shortcut_capture')
 }
 
@@ -67,7 +62,6 @@ function stopCapture() {
 function cleanup() {
   if (unlistenUpdate) { unlistenUpdate(); unlistenUpdate = null }
   if (unlistenComplete) { unlistenComplete(); unlistenComplete = null }
-  if (unlistenCancelled) { unlistenCancelled(); unlistenCancelled = null }
 }
 
 onUnmounted(() => {
@@ -79,16 +73,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <button
-    type="button"
-    class="flex items-center justify-between w-full h-9 rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none"
+  <div
+    class="flex items-center justify-between w-full h-9 rounded-md border px-3 py-2 text-sm transition-colors"
     :class="[
       capturing
         ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
         : 'border-border bg-background hover:bg-accent/50',
       disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
     ]"
-    @click="capturing ? stopCapture() : startCapture()"
+    @click="!capturing && !disabled && startCapture()"
   >
     <span v-if="capturing" class="text-primary font-medium">
       {{ captureDisplay || t('shortcutCapture.waiting') }}
@@ -96,8 +89,13 @@ onUnmounted(() => {
     <span v-else class="text-foreground font-mono">
       {{ displayText }}
     </span>
-    <span v-if="capturing" class="text-xs text-muted-foreground ml-2 shrink-0">
-      {{ t('shortcutCapture.escToCancel') }}
-    </span>
-  </button>
+    <button
+      v-if="capturing"
+      type="button"
+      class="text-xs text-muted-foreground hover:text-foreground ml-2 shrink-0 transition-colors"
+      @click.stop="stopCapture"
+    >
+      {{ t('shortcutCapture.cancel') }}
+    </button>
+  </div>
 </template>

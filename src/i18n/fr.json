@@ -159,5 +159,5 @@
   "history.yesterday": "Hier",
   "history.cancel": "Annuler",
   "shortcutCapture.waiting": "Appuyez sur un raccourci\u2026",
-  "shortcutCapture.escToCancel": "\u00c9chap pour annuler"
+  "shortcutCapture.cancel": "Annuler"
 }

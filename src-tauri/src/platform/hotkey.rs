@@ -201,7 +201,6 @@ pub enum HotkeyEvent {
     CancelPressed,
     CaptureUpdate { modifiers: u64, key_code: Option<u16> },
     CaptureComplete(Shortcut),
-    CaptureCancelled,
 }
 
 /// Messages to update hotkey configuration at runtime.
@@ -389,12 +388,6 @@ fn run_event_tap(
 
         match event_type {
             KEY_DOWN => {
-                // Escape cancels capture
-                if key_code == 0x35 && mod_flags == 0 {
-                    let _ = state.event_tx.send(HotkeyEvent::CaptureCancelled);
-                    return;
-                }
-
                 if !is_modifier_key_code(key_code) {
                     state.capture_key.store(key_code, Ordering::SeqCst);
                     state.capture_had_key.store(true, Ordering::SeqCst);
