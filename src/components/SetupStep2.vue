@@ -106,6 +106,10 @@ async function handleSelectModel(model: ASRModel) {
   await store.selectModel(model.id)
 }
 
+function engineName(model: ASRModel): string {
+  return store.engines.find(e => e.id === model.engine_id)?.name ?? ''
+}
+
 // -- Transcription language --
 const availableLanguages = computed(() => {
   const model = store.models.find(m => m.id === store.selectedModelId)
@@ -249,6 +253,7 @@ const canStart = computed(() => {
                 <div class="flex items-center gap-1.5">
                   <span class="text-sm font-medium truncate">{{ model.label }}</span>
                   <span v-if="model.size > 0" class="text-[11px] text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
+                  <span class="text-[11px] text-muted-foreground/60 shrink-0">{{ engineName(model) }}</span>
                 </div>
                 <BenchmarkBadges v-if="model.wer != null || model.rtf != null" :wer="model.wer" :rtf="model.rtf" compact class="mt-0.5" />
               </div>
