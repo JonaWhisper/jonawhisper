@@ -85,7 +85,7 @@ function formatSize(bytes: number): string {
           <span class="text-xs text-muted-foreground w-10 text-right">
             {{ Math.round((model.partial_progress ?? 0) * 100) }}%
           </span>
-          <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
+          <Button variant="ghost" size="icon-sm" :disabled="store.downloadingModelId != null" @click="emit('download', model)" :title="t('modelManager.resume')">
             <Play class="w-3.5 h-3.5" />
           </Button>
           <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -114,7 +114,7 @@ function formatSize(bytes: number): string {
 
       <!-- Not downloaded -->
       <template v-else>
-        <Button size="sm" @click="emit('download', model)">
+        <Button size="sm" :disabled="store.downloadingModelId != null" @click="emit('download', model)">
           {{ t('modelManager.download') }}
         </Button>
       </template>

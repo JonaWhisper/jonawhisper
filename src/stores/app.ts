@@ -211,6 +211,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function downloadModel(id: string) {
+    if (downloadingModelId.value) return false
     downloadingModelId.value = id
     // Don't reset progress here — backend emits initial progress (0% or resume %) immediately
     try {

@@ -279,7 +279,7 @@ const canStart = computed(() => {
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
                     {{ Math.round((model.partial_progress ?? 0) * 100) }}%
                   </span>
-                  <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
+                  <Button variant="ghost" size="icon-sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)" :title="t('modelManager.resume')">
                     <Play class="w-3.5 h-3.5" />
                   </Button>
                   <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -289,7 +289,7 @@ const canStart = computed(() => {
                 <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                   {{ t('modelManager.downloaded') }}
                 </Badge>
-                <Button v-else size="sm" @click="handleDownload(model)">
+                <Button v-else size="sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)">
                   {{ t('modelManager.download') }}
                 </Button>
               </div>
@@ -355,7 +355,7 @@ const canStart = computed(() => {
                       <span class="text-[11px] text-muted-foreground w-8 text-right">
                         {{ Math.round((model.partial_progress ?? 0) * 100) }}%
                       </span>
-                      <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
+                      <Button variant="ghost" size="icon-sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)" :title="t('modelManager.resume')">
                         <Play class="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -365,7 +365,7 @@ const canStart = computed(() => {
                     <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                       {{ t('modelManager.downloaded') }}
                     </Badge>
-                    <Button v-else size="sm" @click="handleDownload(model)">
+                    <Button v-else size="sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)">
                       {{ t('modelManager.download') }}
                     </Button>
                   </div>
