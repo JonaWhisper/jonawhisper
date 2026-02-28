@@ -43,10 +43,12 @@ pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Val
     cat.all_models().into_iter().map(|m| {
         let downloaded = m.is_downloaded();
         let recommended = recommended_ids.contains(&m.id);
+        let partial = if downloaded { None } else { downloader::partial_progress(&m) };
         let mut json = serde_json::to_value(&m).unwrap();
         let obj = json.as_object_mut().unwrap();
         obj.insert("is_downloaded".into(), downloaded.into());
         obj.insert("recommended".into(), recommended.into());
+        obj.insert("partial_progress".into(), serde_json::json!(partial));
         json
     }).collect()
 }
@@ -78,16 +80,27 @@ pub fn delete_model_cmd(id: String) -> bool {
 }
 
 #[tauri::command]
-pub fn stop_download(state: tauri::State<'_, Arc<AppState>>) {
+pub fn pause_download(state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
     dl.cancel_requested.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]
-pub fn cancel_download(state: tauri::State<'_, Arc<AppState>>) {
+pub fn cancel_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
-    dl.cancel_requested.store(true, Ordering::SeqCst);
-    dl.delete_partial.store(true, Ordering::SeqCst);
+    let is_active = dl.model_id.as_deref() == Some(id.as_str());
+    if is_active {
+        dl.cancel_requested.store(true, Ordering::SeqCst);
+        dl.delete_partial.store(true, Ordering::SeqCst);
+    }
+    drop(dl);
+
+    // Also delete partial directly (handles paused/no-active-download case)
+    if !is_active {
+        if let Some(model) = catalog().model_by_id(&id) {
+            downloader::delete_partial(&model);
+        }
+    }
 }
 
 // -- Language --

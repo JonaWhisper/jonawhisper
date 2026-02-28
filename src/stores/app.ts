@@ -33,6 +33,7 @@ export interface ASRModel {
   download_marker: string | null
   is_downloaded?: boolean
   recommended?: boolean
+  partial_progress: number | null
   wer: number | null
   rtf: number | null
 }
@@ -213,9 +214,6 @@ export const useAppStore = defineStore('app', () => {
     // Don't reset progress here — backend emits initial progress (0% or resume %) immediately
     try {
       const success = await invoke<boolean>('download_model_cmd', { id })
-      if (success) {
-        await fetchModels()
-      }
       return success
     } catch (e) {
       console.error('downloadModel failed:', e)
@@ -223,17 +221,20 @@ export const useAppStore = defineStore('app', () => {
     } finally {
       downloadingModelId.value = null
       downloadProgress.value = 0
+      await fetchModels()
     }
   }
 
-  async function stopDownload() {
-    try { await invoke('stop_download') }
-    catch (e) { console.error('stopDownload failed:', e) }
+  async function pauseDownload() {
+    try { await invoke('pause_download') }
+    catch (e) { console.error('pauseDownload failed:', e) }
   }
 
-  async function cancelDownload() {
-    try { await invoke('cancel_download') }
-    catch (e) { console.error('cancelDownload failed:', e) }
+  async function cancelDownload(id: string) {
+    try {
+      await invoke('cancel_download', { id })
+      await fetchModels()
+    } catch (e) { console.error('cancelDownload failed:', e) }
   }
 
   async function deleteModel(id: string) {
@@ -487,7 +488,7 @@ export const useAppStore = defineStore('app', () => {
     fetchAudioDevices, fetchPermissions, fetchHistory,
     fetchProviders, fetchState,
     selectModel, selectLanguageAction,
-    downloadModel, stopDownload, cancelDownload, deleteModel,
+    downloadModel, pauseDownload, cancelDownload, deleteModel,
     fetchSettings, setSetting,
     clearHistoryAction, searchHistory, deleteHistoryEntry, deleteHistoryDay,
     requestPermission,

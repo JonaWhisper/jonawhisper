@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronRight, X } from 'lucide-vue-next'
+import { ChevronRight, Pause, Play, X } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 
@@ -255,12 +255,29 @@ const canStart = computed(() => {
                 </div>
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
+                <!-- Downloading -->
                 <template v-if="store.downloadingModelId === model.id">
                   <Progress :model-value="store.downloadProgress * 100" class="w-16" />
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
                     {{ Math.round(store.downloadProgress * 100) }}%
                   </span>
-                  <Button variant="ghost" size="icon-sm" @click="store.cancelDownload()" :title="t('modelManager.cancel')">
+                  <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+                    <Pause class="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+                    <X class="w-3.5 h-3.5" />
+                  </Button>
+                </template>
+                <!-- Paused (partial exists) -->
+                <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
+                  <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-16" />
+                  <span class="text-[11px] text-muted-foreground w-8 text-right">
+                    {{ Math.round((model.partial_progress ?? 0) * 100) }}%
+                  </span>
+                  <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
+                    <Play class="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
                     <X class="w-3.5 h-3.5" />
                   </Button>
                 </template>
@@ -309,12 +326,29 @@ const canStart = computed(() => {
                     </div>
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
+                    <!-- Downloading -->
                     <template v-if="store.downloadingModelId === model.id">
                       <Progress :model-value="store.downloadProgress * 100" class="w-16" />
                       <span class="text-[11px] text-muted-foreground w-8 text-right">
                         {{ Math.round(store.downloadProgress * 100) }}%
                       </span>
-                      <Button variant="ghost" size="icon-sm" @click="store.cancelDownload()" :title="t('modelManager.cancel')">
+                      <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+                        <Pause class="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+                        <X class="w-3.5 h-3.5" />
+                      </Button>
+                    </template>
+                    <!-- Paused (partial exists) -->
+                    <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
+                      <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-16" />
+                      <span class="text-[11px] text-muted-foreground w-8 text-right">
+                        {{ Math.round((model.partial_progress ?? 0) * 100) }}%
+                      </span>
+                      <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
+                        <Play class="w-3.5 h-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
                         <X class="w-3.5 h-3.5" />
                       </Button>
                     </template>

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { ASRModel } from '@/stores/app'
+import { useAppStore, type ASRModel } from '@/stores/app'
 import { Button } from '@/components/ui/button'
-import { Trash2, Square, X } from 'lucide-vue-next'
+import { Trash2, Pause, Play, X } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 
 const { t } = useI18n()
+const store = useAppStore()
 
 const props = defineProps<{
   model: ASRModel
@@ -19,14 +20,16 @@ const props = defineProps<{
 const emit = defineEmits<{
   download: [model: ASRModel]
   delete: [model: ASRModel]
-  stop: []
-  cancel: []
 }>()
 
 const isDownloaded = computed(() => {
   const dt = props.model.download_type.type
   if (dt === 'System') return true
   return props.model.is_downloaded
+})
+
+const isPaused = computed(() => {
+  return !props.isDownloading && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
 })
 
 function formatSize(bytes: number): string {
@@ -61,10 +64,26 @@ function formatSize(bytes: number): string {
           <span class="text-xs text-muted-foreground w-10 text-right">
             {{ Math.round(downloadProgress * 100) }}%
           </span>
-          <Button variant="ghost" size="icon-sm" @click="emit('stop')" :title="t('modelManager.stop')">
-            <Square class="w-3.5 h-3.5" />
+          <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+            <Pause class="w-3.5 h-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-sm" @click="emit('cancel')" :title="t('modelManager.cancel')">
+          <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+            <X class="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </template>
+
+      <!-- Paused (partial exists) -->
+      <template v-else-if="isPaused">
+        <div class="flex items-center gap-2">
+          <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-24" />
+          <span class="text-xs text-muted-foreground w-10 text-right">
+            {{ Math.round((model.partial_progress ?? 0) * 100) }}%
+          </span>
+          <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
+            <Play class="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
             <X class="w-3.5 h-3.5" />
           </Button>
         </div>

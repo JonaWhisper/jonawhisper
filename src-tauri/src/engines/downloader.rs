@@ -10,13 +10,8 @@ use tauri::{AppHandle, Emitter};
 
 static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
-const PENDING_DIR: &str = ".local/share/whisper-dictate";
-
 fn pending_download_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_default()
-        .join(PENDING_DIR)
-        .join(".pending-download")
+    crate::state::config_dir().join(".pending-download")
 }
 
 /// Stable partial file path for a model (deterministic, survives app restart).
@@ -26,17 +21,37 @@ fn partial_path(model: &ASRModel) -> PathBuf {
     PathBuf::from(storage_dir).join(format!(".{}.partial", hash))
 }
 
+/// Returns download progress (0.0–0.99) if a `.partial` file exists for this model.
+pub fn partial_progress(model: &ASRModel) -> Option<f64> {
+    if model.size == 0 { return None; }
+    let size = fs::metadata(partial_path(model)).map(|m| m.len()).unwrap_or(0);
+    if size > 0 {
+        Some((size as f64 / model.size as f64).min(0.99))
+    } else {
+        None
+    }
+}
+
+/// Delete the `.partial` file for a model (used when cancelling a paused download).
+pub fn delete_partial(model: &ASRModel) {
+    let path = partial_path(model);
+    if path.exists() {
+        let _ = fs::remove_file(&path);
+        log::info!("Deleted partial file for {}", model.id);
+    }
+}
+
 pub async fn download_model(
     app: AppHandle,
     state: Arc<AppState>,
     model: ASRModel,
 ) -> bool {
-    // Create pending dir and write pending state
-    let pending_dir = dirs::home_dir()
-        .unwrap_or_default()
-        .join(PENDING_DIR);
-    let _ = fs::create_dir_all(&pending_dir);
-    let _ = fs::write(pending_download_path(), &model.id);
+    // Write pending state
+    let pending = pending_download_path();
+    if let Some(parent) = pending.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(&pending, &model.id);
 
     // Compute initial progress from partial file (avoids 0% → X% flash on resume)
     let initial_progress = if model.size > 0 {

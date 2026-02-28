@@ -56,7 +56,7 @@ pub fn run() {
             commands::get_downloaded_models,
             commands::download_model_cmd,
             commands::delete_model_cmd,
-            commands::stop_download,
+            commands::pause_download,
             commands::cancel_download,
             commands::get_languages,
             commands::get_permissions,
