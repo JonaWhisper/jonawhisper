@@ -40,8 +40,8 @@ function formatSize(bytes: number): string {
 
 <template>
   <div
-    class="group flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card transition-colors hover:bg-accent/30"
-    :class="{ 'ring-2 ring-primary/30': isSelected }"
+    class="group flex items-center gap-3 px-4 py-3 rounded-lg border bg-card transition-colors hover:bg-accent/30"
+    :class="isSelected ? 'border-primary/50' : 'border-border'"
   >
     <!-- Radio button -->
     <button

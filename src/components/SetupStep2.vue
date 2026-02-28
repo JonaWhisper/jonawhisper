@@ -206,12 +206,6 @@ const canStart = computed(() => {
               {{ t('setup.step2.toggle') }}
             </button>
           </div>
-          <p class="text-[11px] text-muted-foreground">
-            {{ store.recordingMode === 'push_to_talk'
-              ? t('setup.step2.recordingModeDesc.push_to_talk')
-              : t('setup.step2.recordingModeDesc.toggle')
-            }}
-          </p>
         </div>
 
         <!-- Transcription language -->
@@ -243,8 +237,8 @@ const canStart = computed(() => {
             <div
               v-for="model in recommendedModels"
               :key="model.id"
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border bg-card cursor-pointer transition-colors hover:bg-accent/30"
-              :class="{ 'ring-2 ring-primary/30': model.id === store.selectedModelId }"
+              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-card cursor-pointer transition-colors hover:bg-accent/30"
+              :class="model.id === store.selectedModelId ? 'border-primary/50' : 'border-border'"
               @click="handleSelectModel(model)"
             >
               <div
