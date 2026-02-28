@@ -6,8 +6,8 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
-- **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible API (Local/Cloud toggle)
-- **Post-processing** — hallucination filtering, dictation commands (new line, new paragraph), LLM text cleanup (local via llama.cpp or cloud)
+- **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible cloud API — unified model selector
+- **Post-processing** — hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) — unified model selector
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual recording indicator with real-time spectrum bars
 - **Mic test** — test your microphone with live spectrum visualization in Settings
@@ -78,15 +78,20 @@ Press Escape while recording to cancel without transcribing.
 Open Settings from the tray menu to configure:
 
 - Interface language (Auto / Français / English)
-- Transcription source (Local / Cloud) with model and GPU mode selection
-- Post-processing (hallucination filter, LLM cleanup with configurable max tokens)
+- Transcription model (local Whisper models + cloud providers in a single selector, GPU mode for local)
+- Post-processing (hallucination filter, text cleanup with unified BERT/LLM model selector)
 - Recording mode (push-to-talk / toggle)
 - Hotkey and cancel shortcut
 - Input microphone
 
-### LLM text cleanup
+### Text cleanup
 
-Optional post-transcription cleanup via LLM — local (llama.cpp with Metal GPU) or cloud (OpenAI-compatible or Anthropic API). Corrects punctuation, capitalization, and transcription artifacts without changing meaning. Max tokens is configurable (default 256). Configure in Settings > Post-processing.
+Optional post-transcription cleanup via a unified model selector:
+- **BERT punctuation** — fast, lightweight punctuation restoration (ONNX Runtime)
+- **Local LLM** — full text correction via llama.cpp with Metal GPU (GGUF models)
+- **Cloud LLM** — full text correction via OpenAI-compatible or Anthropic API
+
+Corrects punctuation, capitalization, and transcription artifacts without changing meaning. LLM max tokens is configurable (default 256). Configure in Settings > Post-processing.
 
 ## Tech stack
 
@@ -126,6 +131,7 @@ Optional post-transcription cleanup via LLM — local (llama.cpp with Metal GPU)
 | [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT pour spectre audio (visualisation) |
 | [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Transcription native Whisper (GGML, Metal GPU sur macOS) |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Inférence LLM locale (GGUF, Metal GPU, text cleanup) |
+| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (modèles BERT ponctuation) |
 | [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Décodage UTF-8 incrémental (sortie LLM token par token) |
 
 **Réseau / IO**
@@ -226,6 +232,8 @@ src-tauri/               Rust backend
     post_processor.rs    Text post-processing
     llm_cleanup.rs       Cloud LLM text cleanup (OpenAI/Anthropic)
     llm_local.rs         Local LLM text cleanup (llama.cpp)
+    llm_prompt.rs        Shared system prompt for LLM cleanup
+    bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
     tray.rs              Menu bar menu & tray icon states
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
     events.rs            Centralised event name constants

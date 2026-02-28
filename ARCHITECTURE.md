@@ -42,7 +42,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules |
-| `state.rs` | `AppState` with six fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL), tray menu state, and cached WhisperContext |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
@@ -76,10 +76,12 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | File | Role |
 |------|------|
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. |
-| `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if a provider is configured, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
-| `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands |
+| `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if `selected_model_id` starts with `cloud:`, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
+| `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (punctuation spacing, capitalization) |
+| `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime (`ort`). Cached `BertContext` in `AppState`. Sentence-level batching with tokenizer. |
 | `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (configurable `max_tokens`) |
 | `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. |
+| `llm_prompt.rs` | Shared system prompt template for LLM text cleanup (used by both cloud and local) |
 
 ### Tray & icons
 
@@ -119,7 +121,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 |------|-------|-------------|
 | `SetupWizard.vue` | `/setup` | Two-step wizard: permissions, then initial configuration |
 | `FloatingPill.vue` | `/pill` | Overlay showing recording/transcribing state with spectrum animation |
-| `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, post-processing, shortcuts, microphone) |
+| `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). |
 | `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
 | `History.vue` | `/history` | Transcription history timeline with search and deletion |
 
@@ -132,7 +134,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `SetupStep2.vue` | Initial configuration form (hotkey, recording mode, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
-| `ProviderForm.vue` | Reusable form for configuring cloud ASR providers (OpenAI-compatible API endpoints) |
+| `ProviderForm.vue` | Reusable form for configuring cloud providers (OpenAI, Anthropic, or custom API endpoints) — used for both ASR and LLM cleanup |
 
 ### State management
 
@@ -178,7 +180,7 @@ Main thread (Tauri + Tokio runtime)
 4. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
 5. **Audio stops** → WAV file path returned → enqueued in `RuntimeState.queue`
 6. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
-7. **Post-processing** → regex cleanup, then optional LLM cleanup
+7. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM), then finalize (spacing, capitalization)
 8. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
 9. **History** → entry saved to SQLite → frontend notified via event
 

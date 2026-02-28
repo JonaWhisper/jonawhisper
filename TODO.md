@@ -7,7 +7,6 @@
 
 ## Fonctionnalités
 
-- [ ] **Modèles spécialisés ponctuation** — bert-restore-punctuation (~436 MB, sub-10ms), fullstop-punctuation-multilingual (~440 MB, FR/EN/DE/IT). Nécessite ONNX Runtime via [`ort`](https://github.com/pykeIO/ort).
 - [ ] **Raccourci pour historique rapide** — Touche configurable pour afficher un popup flottant avec les dernières transcriptions. Permet de re-coller rapidement un texte récent sans ouvrir la fenêtre d'historique complète. Style popup léger (comme Spotlight/Alfred), clic ou Enter pour coller l'entrée sélectionnée.
 - [ ] **Détection de silence avant transcription** — Analyser l'audio avant de l'envoyer au modèle ASR. Si l'enregistrement ne contient que du silence (énergie RMS sous un seuil), le jeter directement sans transcrire. Évite les hallucinations sur audio vide (le modèle invente du texte quand il n'y a rien à transcrire).
 - [ ] **Filtre hallucinations via LLM** — Envisager de remplacer ou compléter le filtre regex actuel par un passage LLM. Le LLM peut détecter contextuellement les hallucinations (répétitions, texte sans rapport, artefacts de fin) là où le regex ne catch que des patterns connus. Approche combinée possible : regex rapide d'abord, puis LLM pour les cas complexes.
@@ -33,7 +32,7 @@
 
 - [ ] **Audit spacings (padding/margin/hauteurs)** — Vérifier la cohérence des paddings de page, cards/items, inputs, boutons, space-y, et tailles de texte sur toutes les vues et composants.
 
-- [ ] **Audit i18n** — Vérifier que tout texte visible passe par `t()` (Vue) ou `t!()` (Rust). Chercher les strings hardcodées, clés manquantes, clés inutilisées, incohérences entre en.json et fr.json.
+- [ ] **Audit i18n** — Lancer `python3 scripts/audit-i18n.py` pour détecter clés orphelines, manquantes, dupliquées, et désync EN/FR. Compléter par une relecture manuelle pour les strings hardcodées.
 
 - [ ] **Audit architecture & séparation des modules** — Passer en revue tout le codebase :
   - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée
