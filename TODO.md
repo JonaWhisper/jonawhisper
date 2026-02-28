@@ -38,7 +38,7 @@
 
 ## Audits (à planifier)
 
-- [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier. Inclut : `navigator.clipboard.writeText` dans History.vue → potentielle commande IPC.
+- [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier.
 
 - [ ] **Audit global du codebase** — Re-vérifier l'ensemble après les refactorings récents (FFI, events, hotkey, crossbeam, mutex grouping). Couvrir :
   - **Sécurité** — injections, gestion des clés API, permissions, sanitization des inputs
