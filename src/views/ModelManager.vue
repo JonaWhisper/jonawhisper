@@ -45,11 +45,12 @@ function handleDeleteRequest(model: ASRModel) {
 }
 
 async function confirmDelete() {
-  if (deleteTarget.value) {
-    await store.deleteModel(deleteTarget.value.id)
-  }
+  const target = deleteTarget.value
   showDeleteConfirm.value = false
   deleteTarget.value = null
+  if (target) {
+    await store.deleteModel(target.id)
+  }
 }
 
 onMounted(async () => {
