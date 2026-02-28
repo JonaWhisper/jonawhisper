@@ -69,11 +69,6 @@ pub async fn download_model(
         dl.progress = 0.0;
     }
 
-    let _ = app.emit("download-complete", serde_json::json!({
-        "model_id": model.id,
-        "success": success,
-    }));
-
     success
 }
 

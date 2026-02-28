@@ -32,6 +32,6 @@
 - [ ] **Event names centralisés** — Définir les noms d'events Tauri en constantes dans un module `events.rs` (éviter les strings éparpillés)
 - [ ] **Moonshine shell injection** — Passer le chemin audio via sys.argv au lieu de format! dans la string Python
 - [ ] **activateIgnoringOtherApps deprecated** — Remplacer par `activate()` (macOS 14+)
-- [ ] **Audit event listeners / doublons** — Vérifier qu'on n'a pas de doubles `on`/`listen` à plusieurs endroits (config Tauri + code Rust), comme le problème qu'on avait eu avec le tray icon
+- [x] **Audit event listeners / doublons** — ✅ Fait. Pas de doublons. Fixes : ajout emit `permission-changed` dans request_permission, suppression emit `download-complete` orphelin, ajout listener `mic-test-stopped` dans Settings.vue
 - [ ] **Script de test visuel + screenshots** — Pouvoir lancer des flows de test (pill, settings, etc.) et capturer des screenshots automatiquement pour vérifier le rendu sans intervention manuelle
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)

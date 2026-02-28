@@ -184,16 +184,32 @@ async function stopMicTest() {
   await invoke('stop_mic_test')
 }
 
+let micTestStoppedUnlisten: (() => void) | null = null
+
 onMounted(async () => {
   await Promise.all([
     store.fetchSettings(),
     store.fetchAudioDevices(),
   ])
   loadLlmFormFields()
+
+  // Listen for mic test being auto-cancelled (e.g. recording started while testing)
+  micTestStoppedUnlisten = await listen('mic-test-stopped', () => {
+    isTesting.value = false
+    testSpectrum.value = new Array(12).fill(0)
+    if (spectrumUnlisten) {
+      spectrumUnlisten()
+      spectrumUnlisten = null
+    }
+  })
 })
 
 onUnmounted(() => {
   stopMicTest()
+  if (micTestStoppedUnlisten) {
+    micTestStoppedUnlisten()
+    micTestStoppedUnlisten = null
+  }
 })
 </script>
 

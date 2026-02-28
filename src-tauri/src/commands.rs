@@ -85,8 +85,10 @@ pub fn get_permissions() -> platform::PermissionReport {
 }
 
 #[tauri::command]
-pub fn request_permission(kind: String) -> bool {
-    platform::request_permission(&kind)
+pub fn request_permission(kind: String, app: AppHandle) -> bool {
+    let result = platform::request_permission(&kind);
+    let _ = app.emit("permission-changed", &kind);
+    result
 }
 
 // -- Settings --
