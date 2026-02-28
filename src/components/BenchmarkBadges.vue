@@ -35,14 +35,14 @@ const rtfInfo = computed(() => {
       variant="secondary"
       :class="[werInfo.bg, 'border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
     >
-      {{ werInfo.label }} {{ +wer!.toFixed(1) }}%
+      {{ werInfo.label }} <span class="opacity-50 font-normal">{{ +wer!.toFixed(1) }}%</span>
     </Badge>
     <Badge
       v-if="rtfInfo"
       variant="secondary"
       :class="[rtfInfo.bg, 'border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
     >
-      {{ rtfInfo.label }} {{ +rtf!.toFixed(2) }}x
+      {{ rtfInfo.label }} <span class="opacity-50 font-normal">{{ +rtf!.toFixed(2) }}x</span>
     </Badge>
   </span>
 </template>
