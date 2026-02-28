@@ -180,7 +180,6 @@ const canStart = computed(() => {
             :model-value="store.hotkey"
             @update:model-value="onHotkeyChange"
           />
-          <p class="text-[11px] text-muted-foreground">{{ t('setup.step2.hotkeyDesc') }}</p>
         </div>
 
         <!-- Recording mode -->
