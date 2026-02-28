@@ -35,6 +35,7 @@ export interface ASRModel {
   partial_progress: number | null
   wer: number | null
   rtf: number | null
+  params: number | null
 }
 
 export interface Language {

@@ -43,6 +43,8 @@ pub struct ASRModel {
     pub rtf: Option<f32>,
     #[serde(default)]
     pub recommended: bool,
+    /// Number of parameters in billions (for LLM models).
+    pub params: Option<f32>,
 }
 
 impl ASRModel {

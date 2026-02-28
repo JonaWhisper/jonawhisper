@@ -19,6 +19,7 @@ impl ASREngine for LlmLocalEngine {
                 size: 1_282_439_584, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 recommended: true,
+                params: Some(1.7),
                 ..Default::default()
             },
             ASRModel {
@@ -28,6 +29,7 @@ impl ASREngine for LlmLocalEngine {
                 url: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q4_K_M.gguf".into(),
                 size: 1_055_609_824, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(1.7),
                 ..Default::default()
             },
             ASRModel {
@@ -37,6 +39,7 @@ impl ASREngine for LlmLocalEngine {
                 url: "https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF/resolve/main/google_gemma-3-1b-it-Q4_K_M.gguf".into(),
                 size: 806_058_496, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(1.0),
                 ..Default::default()
             },
             ASRModel {
@@ -46,15 +49,17 @@ impl ASREngine for LlmLocalEngine {
                 url: "https://huggingface.co/bartowski/Qwen_Qwen3-4B-GGUF/resolve/main/Qwen_Qwen3-4B-Q4_K_M.gguf".into(),
                 size: 2_497_280_960, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(4.0),
                 ..Default::default()
             },
             ASRModel {
                 id: "llm-local:phi4-mini".into(), engine_id: "llm-local".into(),
-                label: "Phi-4 Mini 3.8B".into(),
+                label: "Phi-4 Mini".into(),
                 filename: "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf".into(),
                 url: "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf".into(),
                 size: 2_491_874_688, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(3.8),
                 ..Default::default()
             },
         ]

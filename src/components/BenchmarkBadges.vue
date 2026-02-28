@@ -8,6 +8,7 @@ const { t } = useI18n()
 const props = defineProps<{
   wer: number | null
   rtf: number | null
+  params?: number | null
   compact?: boolean
 }>()
 
@@ -29,7 +30,7 @@ const rtfInfo = computed(() => {
 </script>
 
 <template>
-  <span v-if="werInfo || rtfInfo" class="inline-flex items-center gap-1">
+  <span v-if="werInfo || rtfInfo || params != null" class="inline-flex items-center gap-1">
     <Badge
       v-if="werInfo"
       variant="secondary"
@@ -43,6 +44,13 @@ const rtfInfo = computed(() => {
       :class="[rtfInfo.bg, 'border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
     >
       {{ rtfInfo.label }} <span class="opacity-50 font-normal">{{ +rtf!.toFixed(2) }}x</span>
+    </Badge>
+    <Badge
+      v-if="params != null"
+      variant="secondary"
+      :class="['bg-slate-500/10 text-slate-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
+    >
+      {{ params! % 1 === 0 ? params!.toFixed(0) : params!.toFixed(1) }}B
     </Badge>
   </span>
 </template>
