@@ -115,6 +115,7 @@ export const useAppStore = defineStore('app', () => {
   const isTranscribing = ref(false)
   const queueCount = ref(0)
   const activeDownloads = ref<Record<string, { progress: number; stopping: boolean }>>({})
+  const deletingModels = ref<Record<string, boolean>>({})
   const selectedModelId = ref('whisper:large-v3-turbo')
   const selectedLanguage = ref('auto')
   const postProcessingEnabled = ref(true)
@@ -249,6 +250,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function deleteModel(id: string) {
+    deletingModels.value = { ...deletingModels.value, [id]: true }
     try {
       const success = await invoke<boolean>('delete_model_cmd', { id })
       if (success) {
@@ -258,6 +260,9 @@ export const useAppStore = defineStore('app', () => {
     } catch (e) {
       console.error('deleteModel failed:', e)
       return false
+    } finally {
+      const { [id]: _, ...rest } = deletingModels.value
+      deletingModels.value = rest
     }
   }
 
@@ -486,7 +491,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     // State
     isRecording, isTranscribing, queueCount,
-    activeDownloads,
+    activeDownloads, deletingModels,
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,

@@ -31,6 +31,8 @@ const isDownloaded = computed(() => {
   return props.model.is_downloaded
 })
 
+const isDeleting = computed(() => !!store.deletingModels[props.model.id])
+
 const isPaused = computed(() => {
   return !isDownloading.value && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
 })
@@ -97,6 +99,16 @@ function formatSize(bytes: number): string {
         </div>
       </template>
 
+      <!-- Deleting — greyed trash with indeterminate bar -->
+      <template v-else-if="isDeleting">
+        <div class="relative flex items-center justify-center w-8 h-8 rounded-md">
+          <Trash2 class="w-4 h-4 text-muted-foreground/40" />
+          <div class="absolute bottom-0.5 left-1 right-1 h-0.5 rounded-full overflow-hidden bg-muted-foreground/15">
+            <div class="h-full w-1/3 rounded-full bg-muted-foreground/40 animate-indeterminate" />
+          </div>
+        </div>
+      </template>
+
       <!-- Downloaded — badge swaps to trash on hover -->
       <template v-else-if="isDownloaded">
         <Badge
@@ -124,3 +136,13 @@ function formatSize(bytes: number): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.animate-indeterminate {
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+</style>
