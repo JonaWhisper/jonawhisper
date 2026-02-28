@@ -4,6 +4,7 @@ mod engines;
 mod errors;
 mod events;
 mod llm_cleanup;
+mod menu_icons;
 mod platform;
 mod post_processor;
 mod process_runner;

@@ -14,21 +14,6 @@ pub enum AudioTransportType {
     Unknown,
 }
 
-impl AudioTransportType {
-    pub fn icon(&self) -> &'static str {
-        match self {
-            AudioTransportType::BuiltIn => "\u{1F4BB}",     // 💻
-            AudioTransportType::USB => "\u{1F399}\u{FE0F}",  // 🎙️
-            AudioTransportType::Bluetooth => "\u{1F3A7}",    // 🎧
-            AudioTransportType::Virtual => "\u{1F30A}",      // 🌊
-            AudioTransportType::Aggregate => "\u{1F4E6}",    // 📦
-            AudioTransportType::Thunderbolt => "\u{26A1}",   // ⚡
-            AudioTransportType::HDMI => "\u{1F4FA}",         // 📺
-            AudioTransportType::Unknown => "\u{1F3A4}",      // 🎤
-        }
-    }
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AudioDevice {
     pub id: u32,

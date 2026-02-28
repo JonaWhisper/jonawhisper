@@ -1,10 +1,11 @@
+use crate::menu_icons::{self, sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
 use crate::platform::audio_devices;
 use crate::state::AppState;
 use rust_i18n::t;
 use std::sync::Arc;
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
+    menu::{IconMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
@@ -280,7 +281,7 @@ pub fn update_mic_submenu(app: &AppHandle) {
         }
     }
 
-    // Add device items
+    // Add device items with bitmap icons
     for device in &devices {
         let is_selected = match &effective_uid {
             Some(uid) => uid == &device.uid,
@@ -292,8 +293,16 @@ pub fn update_mic_submenu(app: &AppHandle) {
         } else {
             String::new()
         };
-        let label = format!("{}{} {}{}", check, device.transport_type.icon(), device.name, default_tag);
-        if let Ok(item) = MenuItem::with_id(app, &format!("device_{}", device.uid), &label, true, None::<&str>) {
+        let label = format!("{}{}{}", check, device.name, default_tag);
+        let icon = menu_icons::transport_icon(&device.transport_type);
+        if let Ok(item) = IconMenuItem::with_id(
+            app,
+            &format!("device_{}", device.uid),
+            &label,
+            true,
+            Some(icon),
+            None::<&str>,
+        ) {
             let _ = m.mic_submenu.append(&item);
         }
     }
@@ -304,16 +313,18 @@ pub fn update_mic_submenu(app: &AppHandle) {
         }
     }
 
-    // Update submenu title to show active device
-    let active_label = devices
-        .iter()
-        .find(|d| match &effective_uid {
-            Some(uid) => uid == &d.uid,
-            None => d.is_default,
-        })
-        .map(|d| format!("{} {}", d.transport_type.icon(), d.name))
-        .unwrap_or_else(|| t!("menu.microphone").to_string());
-    let _ = m.mic_submenu.set_text(&active_label);
+    // Update submenu header: icon of active device + name (no emoji)
+    let active_device = devices.iter().find(|d| match &effective_uid {
+        Some(uid) => uid == &d.uid,
+        None => d.is_default,
+    });
+    if let Some(d) = active_device {
+        let _ = m.mic_submenu.set_icon(Some(menu_icons::transport_icon(&d.transport_type)));
+        let _ = m.mic_submenu.set_text(&d.name);
+    } else {
+        let _ = m.mic_submenu.set_icon(None::<Image<'_>>);
+        let _ = m.mic_submenu.set_text(&t!("menu.microphone"));
+    }
 }
 
 /// Update all static menu item labels (called when locale changes).
@@ -366,42 +377,17 @@ pub fn set_tray_state(app: &AppHandle, state: &str) {
             let _ = tray.set_tooltip(Some("Transcribing\u{2026}"));
         }
         _ => {
-            if let Some(icon) = app.default_window_icon() {
-                let _ = tray.set_icon(Some(icon.clone()));
-                let _ = tray.set_icon_as_template(true);
-            }
+            let _ = tray.set_icon(Some(make_idle_icon()));
+            let _ = tray.set_icon_as_template(true);
             let _ = tray.set_tooltip(Some("WhisperDictate"));
         }
     }
 }
 
-// -- Icon SDF helpers --
+// -- Tray bar icons (44×44, Lucide-inspired SDF) --
 
-fn sdf_aa(d: f32) -> f32 {
-    (0.5 - d).clamp(0.0, 1.0)
-}
-
-/// Signed distance to a rounded rectangle.
-fn sdf_rrect(px: f32, py: f32, cx: f32, cy: f32, hw: f32, hh: f32, r: f32) -> f32 {
-    let qx = (px - cx).abs() - (hw - r).max(0.0);
-    let qy = (py - cy).abs() - (hh - r).max(0.0);
-    (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt() + qx.max(qy).min(0.0) - r
-}
-
-fn sdf_circle(px: f32, py: f32, cx: f32, cy: f32, r: f32) -> f32 {
-    ((px - cx).powi(2) + (py - cy).powi(2)).sqrt() - r
-}
-
-#[allow(clippy::too_many_arguments)]
-fn point_in_triangle(px: f32, py: f32, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) -> bool {
-    let d1 = (px - x2) * (y1 - y2) - (x1 - x2) * (py - y2);
-    let d2 = (px - x3) * (y2 - y3) - (x2 - x3) * (py - y3);
-    let d3 = (px - x1) * (y3 - y1) - (x3 - x1) * (py - y1);
-    !(d1 < 0.0 && (d2 > 0.0 || d3 > 0.0)) && !(d1 > 0.0 && (d2 < 0.0 || d3 < 0.0))
-}
-
-/// Microphone with sound wave arcs (recording state), 44x44 RGBA template.
-fn make_recording_icon() -> Image<'static> {
+/// Idle state: simple microphone (Lucide mic.svg), 44×44 RGBA template.
+fn make_idle_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
     let lw = 2.2_f32;
@@ -412,10 +398,10 @@ fn make_recording_icon() -> Image<'static> {
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Filled mic capsule (pill shape)
+            // Mic capsule (filled pill)
             a = a.max(sdf_aa(sdf_rrect(px, py, 22.0, 13.0, 5.0, 9.0, 5.0)));
 
-            // Holder arc (U-shape below capsule)
+            // Holder arc (U-shape) — only below capsule
             if py >= 22.0 {
                 let ring = sdf_circle(px, py, 22.0, 22.0, 9.0).abs() - lw / 2.0;
                 a = a.max(sdf_aa(ring));
@@ -425,17 +411,46 @@ fn make_recording_icon() -> Image<'static> {
             a = a.max(sdf_aa(sdf_rrect(px, py, 31.0, 20.5, lw / 2.0, 2.5, 0.0)));
 
             // Stand
-            a = a.max(sdf_aa(sdf_rrect(px, py, 22.0, 34.0, lw / 2.0, 3.0, 0.0)));
+            a = a.max(sdf_aa(sdf_segment(px, py, 22.0, 31.0, 22.0, 37.0) - lw / 2.0));
 
-            // Base
-            a = a.max(sdf_aa(sdf_rrect(px, py, 22.0, 37.5, 5.5, lw / 2.0, lw / 2.0)));
+            if a > 0.0 {
+                rgba[(y * s + x) * 4 + 3] = (a * 255.0) as u8;
+            }
+        }
+    }
+    Image::new_owned(rgba, TRAY_ICON_SIZE, TRAY_ICON_SIZE)
+}
 
-            // Sound wave arcs (recording indicator)
-            for &(radius, min_dx) in &[(14.0_f32, 8.0_f32), (18.0, 12.0)] {
-                if (px - 22.0).abs() > min_dx && py < 19.0 {
-                    let ring = sdf_circle(px, py, 22.0, 13.0, radius).abs() - lw * 0.45;
-                    a = a.max(sdf_aa(ring));
-                }
+/// Recording state: audio bars (Lucide audio-lines.svg), 44×44 RGBA template.
+fn make_recording_icon() -> Image<'static> {
+    let s = TRAY_ICON_SIZE as usize;
+    let mut rgba = vec![0u8; s * s * 4];
+    let lw = 2.4_f32;
+
+    // 5 vertical bars at different heights, centered on 22
+    let bars: [(f32, f32, f32); 5] = [
+        (8.0, 14.0, 30.0),   // bar 1
+        (14.0, 8.0, 36.0),   // bar 2
+        (22.0, 4.0, 40.0),   // bar 3 (tallest, center)
+        (30.0, 10.0, 34.0),  // bar 4
+        (36.0, 16.0, 28.0),  // bar 5 (shortest)
+    ];
+
+    for y in 0..s {
+        for x in 0..s {
+            let px = x as f32 + 0.5;
+            let py = y as f32 + 0.5;
+            let mut a = 0.0_f32;
+
+            for &(bx, top, bot) in &bars {
+                let seg = sdf_segment(px, py, bx, top, bx, bot) - lw / 2.0;
+                a = a.max(sdf_aa(seg));
+            }
+
+            // Round caps at ends
+            for &(bx, top, bot) in &bars {
+                a = a.max(sdf_aa(sdf_circle(px, py, bx, top, lw / 2.0)));
+                a = a.max(sdf_aa(sdf_circle(px, py, bx, bot, lw / 2.0)));
             }
 
             if a > 0.0 {
@@ -443,42 +458,44 @@ fn make_recording_icon() -> Image<'static> {
             }
         }
     }
-
     Image::new_owned(rgba, TRAY_ICON_SIZE, TRAY_ICON_SIZE)
 }
 
-/// Speech bubble with three dots (transcribing state), 44x44 RGBA template.
+/// Transcribing state: speech bubble with text lines (Lucide message-square-text.svg), 44×44 RGBA template.
 fn make_transcribing_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
+    let lw = 2.2_f32;
 
     for y in 0..s {
         for x in 0..s {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
+            let mut a = 0.0_f32;
 
-            // Filled rounded-rect bubble
-            let bubble = sdf_rrect(px, py, 22.0, 17.0, 18.0, 11.0, 6.0);
-            // Small tail at bottom-left (triangle)
-            let in_tail = point_in_triangle(px, py, 8.0, 26.5, 16.0, 26.5, 6.0, 35.0);
+            // Bubble outline (rounded rect)
+            let bubble = sdf_rrect(px, py, 22.0, 18.0, 17.0, 13.0, 4.0).abs() - lw / 2.0;
+            a = a.max(sdf_aa(bubble));
 
-            let shape_alpha = if in_tail { 1.0 } else { sdf_aa(bubble) };
+            // Tail: two lines forming a pointer at bottom-left
+            let tail1 = sdf_segment(px, py, 10.0, 31.0, 6.0, 39.0) - lw / 2.0;
+            a = a.max(sdf_aa(tail1));
+            let tail2 = sdf_segment(px, py, 6.0, 39.0, 18.0, 31.0) - lw / 2.0;
+            a = a.max(sdf_aa(tail2));
 
-            // Three dot cutouts
-            let dots = sdf_circle(px, py, 14.0, 17.0, 2.8)
-                .min(sdf_circle(px, py, 22.0, 17.0, 2.8))
-                .min(sdf_circle(px, py, 30.0, 17.0, 2.8));
-            let dot_alpha = sdf_aa(dots);
+            // Three horizontal text lines inside bubble
+            let line1 = sdf_segment(px, py, 12.0, 14.0, 32.0, 14.0) - lw * 0.4;
+            a = a.max(sdf_aa(line1));
+            let line2 = sdf_segment(px, py, 12.0, 19.0, 32.0, 19.0) - lw * 0.4;
+            a = a.max(sdf_aa(line2));
+            let line3 = sdf_segment(px, py, 12.0, 24.0, 26.0, 24.0) - lw * 0.4;
+            a = a.max(sdf_aa(line3));
 
-            // Shape minus dots
-            let a = shape_alpha * (1.0 - dot_alpha);
-
-            if a > 0.001 {
+            if a > 0.0 {
                 rgba[(y * s + x) * 4 + 3] = (a * 255.0) as u8;
             }
         }
     }
-
     Image::new_owned(rgba, TRAY_ICON_SIZE, TRAY_ICON_SIZE)
 }
 
@@ -486,7 +503,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu_state = build_initial_menu(app)?;
 
     let _tray = TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(make_idle_icon())
         .icon_as_template(true)
         .tooltip("WhisperDictate")
         .on_menu_event(move |app, event| {

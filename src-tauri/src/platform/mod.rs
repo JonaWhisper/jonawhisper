@@ -44,10 +44,6 @@ pub mod audio_devices {
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub enum AudioTransportType { Unknown }
 
-    impl AudioTransportType {
-        pub fn icon(&self) -> &'static str { "\u{1F3A4}" }
-    }
-
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct AudioDevice {
         pub id: u32,
