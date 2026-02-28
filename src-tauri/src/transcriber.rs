@@ -6,22 +6,21 @@ pub fn transcribe(
     state: &AppState,
     audio_path: &Path,
 ) -> Result<String, EngineError> {
-    let (model_id, language, asr_provider_id, asr_cloud_model, providers) = {
+    let (model_id, language, asr_cloud_model, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.selected_model_id.clone(),
             s.selected_language.clone(),
-            s.asr_provider_id.clone(),
             s.asr_cloud_model.clone(),
             s.providers.clone(),
         )
     };
 
-    // Cloud dispatch: if a cloud ASR provider is selected, use it
-    if !asr_provider_id.is_empty() {
-        let provider = providers.iter().find(|p| p.id == asr_provider_id)
+    // Cloud dispatch: selected_model_id = "cloud:<provider_id>"
+    if let Some(provider_id) = model_id.strip_prefix("cloud:") {
+        let provider = providers.iter().find(|p| p.id == provider_id)
             .ok_or_else(|| EngineError::ApiError(
-                format!("ASR provider '{}' not found", asr_provider_id)
+                format!("ASR provider '{}' not found", provider_id)
             ))?;
         return openai_api::transcribe(provider, &asr_cloud_model, audio_path, &language);
     }

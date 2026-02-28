@@ -156,7 +156,6 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "cleanup_model_id": s.cleanup_model_id,
         "llm_provider_id": s.llm_provider_id,
         "llm_model": s.llm_model,
-        "asr_provider_id": s.asr_provider_id,
         "asr_cloud_model": s.asr_cloud_model,
         "gpu_mode": s.gpu_mode,
         "llm_max_tokens": s.llm_max_tokens,
@@ -196,7 +195,6 @@ pub fn set_setting(
             "cleanup_model_id" => s.cleanup_model_id = value.clone(),
             "llm_provider_id" => s.llm_provider_id = value.clone(),
             "llm_model" => s.llm_model = value.clone(),
-            "asr_provider_id" => s.asr_provider_id = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
             "gpu_mode" => s.gpu_mode = value.clone(),
             "llm_max_tokens" => s.llm_max_tokens = value.parse::<u32>().unwrap_or(256),
@@ -329,11 +327,8 @@ pub fn start_monitoring(
     }
 
     // Open model manager if no model is ready (skip if using cloud ASR)
-    let (selected_id, asr_provider_id) = {
-        let s = state.settings.lock().unwrap();
-        (s.selected_model_id.clone(), s.asr_provider_id.clone())
-    };
-    let model_ready = !asr_provider_id.is_empty()
+    let selected_id = state.settings.lock().unwrap().selected_model_id.clone();
+    let model_ready = selected_id.starts_with("cloud:")
         || catalog()
             .model_by_id(&selected_id)
             .is_some_and(|m| m.is_downloaded());

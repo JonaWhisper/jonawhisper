@@ -110,7 +110,6 @@ export interface SettingsPayload {
   cleanup_model_id: string
   llm_provider_id: string
   llm_model: string
-  asr_provider_id: string
   asr_cloud_model: string
   gpu_mode: string
   llm_max_tokens: number
@@ -136,7 +135,6 @@ export const useAppStore = defineStore('app', () => {
   const cleanupModelId = ref('')
   const llmProviderId = ref('')
   const llmModel = ref('')
-  const asrProviderId = ref('')
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
   const llmMaxTokens = ref(256)
@@ -186,6 +184,26 @@ export const useAppStore = defineStore('app', () => {
     }
     return result
   })
+  const asrModels = computed(() => {
+    const result: { id: string; label: string; group: string }[] = []
+    const asrIds = new Set(asrEngines.value.map(e => e.id))
+    for (const m of models.value) {
+      if (!asrIds.has(m.engine_id)) continue
+      if (m.download_type.type === 'System' || m.is_downloaded) {
+        result.push({ id: m.id, label: m.label, group: 'local' })
+      }
+    }
+    for (const p of providers.value) {
+      if (p.kind === 'OpenAI' || p.kind === 'Custom') {
+        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
+      }
+    }
+    return result
+  })
+  const isCloudAsr = computed(() => selectedModelId.value.startsWith('cloud:'))
+  const asrCloudProviderId = computed(() =>
+    isCloudAsr.value ? selectedModelId.value.slice('cloud:'.length) : ''
+  )
   const isCloudLlm = computed(() => cleanupModelId.value.startsWith('cloud:'))
   const isLocalLlm = computed(() => cleanupModelId.value.startsWith('llama:'))
   const cleanupCloudProviderId = computed(() =>
@@ -350,7 +368,6 @@ export const useAppStore = defineStore('app', () => {
       cleanupModelId.value = s.cleanup_model_id ?? ''
       llmProviderId.value = s.llm_provider_id ?? ''
       llmModel.value = s.llm_model ?? ''
-      asrProviderId.value = s.asr_provider_id ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
       llmMaxTokens.value = s.llm_max_tokens ?? 256
@@ -372,7 +389,6 @@ export const useAppStore = defineStore('app', () => {
       case 'cleanup_model_id': return cleanupModelId.value
       case 'llm_provider_id': return llmProviderId.value
       case 'llm_model': return llmModel.value
-      case 'asr_provider_id': return asrProviderId.value
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
       case 'llm_max_tokens': return String(llmMaxTokens.value)
@@ -395,7 +411,6 @@ export const useAppStore = defineStore('app', () => {
       case 'cleanup_model_id': cleanupModelId.value = value; break
       case 'llm_provider_id': llmProviderId.value = value; break
       case 'llm_model': llmModel.value = value; break
-      case 'asr_provider_id': asrProviderId.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
       case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 256; break
@@ -575,11 +590,13 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    textCleanupEnabled, cleanupModelId, llmProviderId, llmModel, llmMaxTokens, asrProviderId, asrCloudModel, gpuMode,
+    textCleanupEnabled, cleanupModelId, llmProviderId, llmModel, llmMaxTokens, asrCloudModel, gpuMode,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed
-    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady, cleanupModels, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
+    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady,
+    asrModels, isCloudAsr, asrCloudProviderId,
+    cleanupModels, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     // Actions
     init, fetchEngines, fetchModels, fetchLanguages,
     fetchAudioDevices, fetchPermissions, fetchHistory,

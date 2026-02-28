@@ -124,8 +124,6 @@ pub struct Preferences {
     pub llm_provider_id: String,
     #[serde(default)]
     pub llm_model: String,
-    #[serde(default)]
-    pub asr_provider_id: String,
     #[serde(default = "default_asr_cloud_model")]
     pub asr_cloud_model: String,
     #[serde(default = "default_gpu_mode")]
@@ -196,8 +194,8 @@ impl Preferences {
                                 api_key: api_key.to_string(),
                             });
                             // Migrate ASR model to settings
-                            if !model.is_empty() && prefs.asr_provider_id.is_empty() {
-                                prefs.asr_provider_id = id.to_string();
+                            if !model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
+                                prefs.selected_model_id = format!("cloud:{}", id);
                                 prefs.asr_cloud_model = model.to_string();
                             }
                         }
@@ -249,10 +247,10 @@ impl Preferences {
             if let Some(providers_json) = raw.get("providers").and_then(|v| v.as_array()) {
                 for pj in providers_json {
                     if let Some(asr_model) = pj.get("asr_model").and_then(|v| v.as_str()) {
-                        if !asr_model.is_empty() && prefs.asr_provider_id.is_empty() {
+                        if !asr_model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
                             if let Some(pid) = pj.get("id").and_then(|v| v.as_str()) {
                                 log::info!("Migrating asr_model from provider {} to settings", pid);
-                                prefs.asr_provider_id = pid.to_string();
+                                prefs.selected_model_id = format!("cloud:{}", pid);
                                 prefs.asr_cloud_model = asr_model.to_string();
                                 needs_save = true;
                             }
@@ -266,6 +264,16 @@ impl Preferences {
                 log::info!("Resetting selected_model_id from old openai-api: format");
                 prefs.selected_model_id = default_model_id();
                 needs_save = true;
+            }
+
+            // Migrate asr_provider_id → selected_model_id = "cloud:<provider_id>"
+            if let Some(asr_pid) = raw.get("asr_provider_id").and_then(|v| v.as_str()) {
+                if !asr_pid.is_empty() {
+                    let cloud_id = format!("cloud:{}", asr_pid);
+                    log::info!("Migrating asr_provider_id={} → selected_model_id={}", asr_pid, cloud_id);
+                    prefs.selected_model_id = cloud_id;
+                    needs_save = true;
+                }
             }
 
             // Migrate old cleanup_mode/punctuation_model_id/llm_source/llm_local_model_id → unified text_cleanup_enabled + cleanup_model_id

@@ -168,21 +168,11 @@ async function confirmRemoveProvider() {
   removeTarget.value = null
 }
 
-// -- Transcription (ASR source + model + language) --
+// -- Transcription --
 const OPENAI_ASR_MODELS = ['whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe']
 const CUSTOM_MODEL_VALUE = '_custom'
 
-// Local model: only show downloaded ASR models (exclude LLM)
-const asrEngineIds = computed(() => new Set(store.asrEngines.map(e => e.id)))
-const localDownloadedModels = computed(() =>
-  store.models.filter(m => {
-    if (!asrEngineIds.value.has(m.engine_id)) return false
-    if (m.download_type.type === 'System') return true
-    return m.is_downloaded
-  })
-)
-
-async function onLocalModelChange(value: string | number | bigint | Record<string, unknown> | null) {
+async function onAsrModelChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   await store.setSetting('selected_model_id', value)
 }
@@ -197,19 +187,15 @@ async function onGpuModeChange(value: string | number | bigint | Record<string, 
   await store.setSetting('gpu_mode', value)
 }
 
-const asrCapableProviders = computed(() =>
-  store.providers.filter(p => p.kind === 'OpenAI' || p.kind === 'Custom')
-)
-
 const asrSelectedProvider = computed(() =>
-  store.providers.find(p => p.id === store.asrProviderId)
+  store.providers.find(p => p.id === store.asrCloudProviderId)
 )
 
 const asrModelOptions = computed(() => {
   const provider = asrSelectedProvider.value
   if (!provider) return []
   if (provider.kind === 'OpenAI') return OPENAI_ASR_MODELS
-  return [] // Custom → free text only
+  return []
 })
 
 const isCustomAsrModel = computed(() => {
@@ -217,40 +203,15 @@ const isCustomAsrModel = computed(() => {
   return !asrModelOptions.value.includes(store.asrCloudModel)
 })
 
-// For the dropdown: show the actual value if it's in the list, otherwise show "_custom"
 const asrModelSelectValue = computed(() => {
   if (asrModelOptions.value.length === 0) return CUSTOM_MODEL_VALUE
   if (asrModelOptions.value.includes(store.asrCloudModel)) return store.asrCloudModel
   return CUSTOM_MODEL_VALUE
 })
 
-const asrSource = computed(() => store.asrProviderId ? 'cloud' : 'local')
-
-async function onAsrSourceChange(source: 'local' | 'cloud') {
-  if (source === 'local') {
-    await store.setSetting('asr_provider_id', '')
-  } else {
-    const first = asrCapableProviders.value[0]
-    if (first) {
-      await store.setSetting('asr_provider_id', first.id)
-      const defaultModel = first.kind === 'OpenAI' ? 'whisper-1' : ''
-      await store.setSetting('asr_cloud_model', defaultModel)
-    }
-  }
-}
-
-async function onAsrProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
-  await store.setSetting('asr_provider_id', value)
-  const provider = store.providers.find(p => p.id === value)
-  const defaultModel = provider?.kind === 'OpenAI' ? 'whisper-1' : ''
-  await store.setSetting('asr_cloud_model', defaultModel)
-}
-
 async function onAsrModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   if (value === CUSTOM_MODEL_VALUE) {
-    // Switch to custom mode — clear the model so the user types a new one
     await store.setSetting('asr_cloud_model', '')
     return
   }
@@ -490,113 +451,62 @@ onUnmounted(() => {
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.transcription') }}</h2>
 
         <div class="space-y-4">
-          <!-- Source: Local / Cloud segmented control -->
+          <!-- Unified model selector (local models + cloud providers) -->
           <div class="space-y-1">
-            <Label class="text-sm font-medium">{{ t('settings.transcription.source') }}</Label>
-            <div class="inline-flex rounded-md border border-border overflow-hidden w-full">
-              <button
-                class="flex-1 px-3 py-1.5 text-sm transition-colors"
-                :class="asrSource === 'local'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-accent/50 text-muted-foreground'"
-                @click="onAsrSourceChange('local')"
-              >
-                {{ t('settings.llm.source.local') }}
-              </button>
-              <button
-                class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
-                :class="asrSource === 'cloud'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-accent/50 text-muted-foreground'"
-                @click="onAsrSourceChange('cloud')"
-              >
-                {{ t('settings.llm.source.cloud') }}
-              </button>
-            </div>
+            <Label class="text-sm font-medium">{{ t('settings.transcription.model') }}</Label>
+            <Select
+              v-if="store.asrModels.length > 0"
+              :model-value="store.selectedModelId"
+              @update:model-value="onAsrModelChange"
+            >
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="m in store.asrModels"
+                  :key="m.id"
+                  :value="m.id"
+                >
+                  {{ m.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p v-else class="text-sm text-muted-foreground">
+              {{ t('settings.transcription.noModels') }}
+            </p>
           </div>
 
-          <!-- Cloud ASR config -->
-          <template v-if="asrSource === 'cloud'">
-            <div v-if="asrCapableProviders.length === 0" class="text-sm text-muted-foreground">
-              {{ t('settings.transcription.noProviders') }}
-            </div>
-            <template v-else>
-              <!-- Cloud provider -->
-              <div class="space-y-1">
-                <Label class="text-sm font-medium">{{ t('settings.llm.provider') }}</Label>
-                <Select :model-value="store.asrProviderId" @update:model-value="onAsrProviderChange">
-                  <SelectTrigger class="w-full h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      v-for="p in asrCapableProviders"
-                      :key="p.id"
-                      :value="p.id"
-                    >
-                      {{ p.name }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <!-- Cloud model -->
-              <div v-if="asrSelectedProvider" class="space-y-1">
-                <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
-                <Select
-                  v-if="asrModelOptions.length > 0"
-                  :model-value="asrModelSelectValue"
-                  @update:model-value="onAsrModelSelect"
-                >
-                  <SelectTrigger class="w-full h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      v-for="m in asrModelOptions"
-                      :key="m"
-                      :value="m"
-                    >
-                      {{ m }}
-                    </SelectItem>
-                    <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  v-if="isCustomAsrModel"
-                  :value="store.asrCloudModel"
-                  @input="onAsrModelInput"
-                  :placeholder="t('settings.cloudAsr.customPlaceholder')"
-                  class="h-9 text-sm mt-1.5"
-                />
-              </div>
-            </template>
-          </template>
-
-          <!-- Local model selection -->
-          <template v-if="asrSource === 'local'">
+          <!-- Cloud ASR sub-settings (model name) -->
+          <template v-if="store.isCloudAsr && asrSelectedProvider">
             <div class="space-y-1">
-              <Label class="text-sm font-medium">{{ t('settings.transcription.model') }}</Label>
+              <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
               <Select
-                v-if="localDownloadedModels.length > 0"
-                :model-value="store.selectedModelId"
-                @update:model-value="onLocalModelChange"
+                v-if="asrModelOptions.length > 0"
+                :model-value="asrModelSelectValue"
+                @update:model-value="onAsrModelSelect"
               >
                 <SelectTrigger class="w-full h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
-                    v-for="m in localDownloadedModels"
-                    :key="m.id"
-                    :value="m.id"
+                    v-for="m in asrModelOptions"
+                    :key="m"
+                    :value="m"
                   >
-                    {{ m.label }}
+                    {{ m }}
                   </SelectItem>
+                  <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
                 </SelectContent>
               </Select>
-              <p v-else class="text-sm text-muted-foreground">
-                {{ t('settings.transcription.noModels') }}
-              </p>
+              <Input
+                v-if="isCustomAsrModel"
+                :value="store.asrCloudModel"
+                @input="onAsrModelInput"
+                :placeholder="t('settings.cloudAsr.customPlaceholder')"
+                class="h-9 text-sm mt-1.5"
+              />
             </div>
           </template>
 
@@ -620,7 +530,7 @@ onUnmounted(() => {
           </div>
 
           <!-- GPU Acceleration (local only) -->
-          <div v-if="asrSource === 'local'" class="space-y-1">
+          <div v-if="!store.isCloudAsr" class="space-y-1">
             <Label class="text-sm font-medium">{{ t('settings.transcription.gpuMode') }}</Label>
             <Select :model-value="store.gpuMode" @update:model-value="onGpuModeChange">
               <SelectTrigger class="w-full h-9 text-sm">
