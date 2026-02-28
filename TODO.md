@@ -47,8 +47,8 @@
 - [ ] **FFI consolidation** — Regrouper les déclarations `extern "C"` CoreGraphics/CoreFoundation dupliquées (hotkey.rs + macos.rs) dans un module `ffi.rs` partagé
 - [ ] **Hotkey static atomics → struct user_info** — Remplacer les 4 static atomics dans hotkey.rs par un struct passé via le user_info du CGEvent callback
 - [ ] **Event names centralisés** — Définir les noms d'events Tauri en constantes dans un module `events.rs` (éviter les strings éparpillés)
-- [ ] **Moonshine shell injection** — Passer le chemin audio via sys.argv au lieu de format! dans la string Python
-- [ ] **activateIgnoringOtherApps deprecated** — Remplacer par `activate()` (macOS 14+)
+- [x] **Moonshine shell injection** — ✅ Chemin audio passé via sys.argv
+- [x] **activateIgnoringOtherApps deprecated** — ✅ Runtime check : `activate()` sur macOS 14+, fallback `activateIgnoringOtherApps:` sur macOS 13
 - [x] **Audit event listeners / doublons** — ✅ Fait. Pas de doublons. Fixes : ajout emit `permission-changed` dans request_permission, suppression emit `download-complete` orphelin, ajout listener `mic-test-stopped` dans Settings.vue
 - [ ] **Script de test visuel + screenshots** — Pouvoir lancer des flows de test (pill, settings, etc.) et capturer des screenshots automatiquement pour vérifier le rendu sans intervention manuelle
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)
