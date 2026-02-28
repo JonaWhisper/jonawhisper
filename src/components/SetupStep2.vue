@@ -264,9 +264,6 @@ const canStart = computed(() => {
                       {{ speedText(model.id) }}
                     </div>
                   </div>
-                  <span class="text-[11px] text-muted-foreground w-8 text-right">
-                    {{ Math.round((store.activeDownloads[model.id]?.progress ?? 0) * 100) }}%
-                  </span>
                   <template v-if="store.activeDownloads[model.id]?.stopping">
                     <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                   </template>
@@ -282,9 +279,6 @@ const canStart = computed(() => {
                 <!-- Paused (partial exists) -->
                 <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
                   <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-16" />
-                  <span class="text-[11px] text-muted-foreground w-8 text-right">
-                    {{ Math.round((model.partial_progress ?? 0) * 100) }}%
-                  </span>
                   <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
                     <Play class="w-3.5 h-3.5" />
                   </Button>
@@ -340,9 +334,6 @@ const canStart = computed(() => {
                     <!-- Downloading -->
                     <template v-if="store.activeDownloads[model.id]">
                       <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" class="w-16" />
-                      <span class="text-[11px] text-muted-foreground w-8 text-right">
-                        {{ Math.round((store.activeDownloads[model.id]?.progress ?? 0) * 100) }}%
-                      </span>
                       <template v-if="store.activeDownloads[model.id]?.stopping">
                         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                       </template>
@@ -358,9 +349,6 @@ const canStart = computed(() => {
                     <!-- Paused (partial exists) -->
                     <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
                       <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-16" />
-                      <span class="text-[11px] text-muted-foreground w-8 text-right">
-                        {{ Math.round((model.partial_progress ?? 0) * 100) }}%
-                      </span>
                       <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
                         <Play class="w-3.5 h-3.5" />
                       </Button>

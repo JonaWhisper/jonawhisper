@@ -65,9 +65,6 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
               {{ speedText }}
             </div>
           </div>
-          <span class="text-xs text-muted-foreground w-10 text-right">
-            {{ Math.round(progress * 100) }}%
-          </span>
           <template v-if="isStopping">
             <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
           </template>
@@ -86,9 +83,6 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
       <template v-else-if="isPaused">
         <div class="flex items-center gap-2">
           <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-24" />
-          <span class="text-xs text-muted-foreground w-10 text-right">
-            {{ Math.round((model.partial_progress ?? 0) * 100) }}%
-          </span>
           <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
             <Play class="w-3.5 h-3.5" />
           </Button>
