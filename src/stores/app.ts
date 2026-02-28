@@ -228,19 +228,39 @@ export const useAppStore = defineStore('app', () => {
       console.error('downloadModel failed:', e)
       return false
     } finally {
-      const freshModels = await invoke<ASRModel[]>('get_models')
-      // Update models and remove activeDownloads entry in the same synchronous tick
-      // to avoid a flash where the model is neither "downloading" nor "paused"
-      models.value = freshModels
-      const { [id]: _, ...rest } = activeDownloads.value
-      activeDownloads.value = rest
+      // If pauseDownload already cleaned up, skip
+      const entry = activeDownloads.value[id]
+      if (entry) {
+        const lastProgress = entry.progress
+        const m = models.value.find(m => m.id === id)
+        if (m) {
+          if (lastProgress >= 1) {
+            m.is_downloaded = true
+            m.partial_progress = null
+          } else if (lastProgress > 0) {
+            m.partial_progress = lastProgress
+          } else {
+            m.partial_progress = null
+          }
+        }
+        const { [id]: _, ...rest } = activeDownloads.value
+        activeDownloads.value = rest
+      }
+      fetchModels()
     }
   }
 
   async function pauseDownload(id: string) {
-    if (activeDownloads.value[id]) {
-      activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
+    const entry = activeDownloads.value[id]
+    if (!entry) return
+    // Optimistic: immediately show paused state (no intermediate spinner)
+    const m = models.value.find(m => m.id === id)
+    if (m && entry.progress > 0) {
+      m.partial_progress = entry.progress
     }
+    const { [id]: _, ...rest } = activeDownloads.value
+    activeDownloads.value = rest
+    // Tell backend to stop (fire-and-forget)
     try { await invoke('pause_download', { id }) }
     catch (e) { console.error('pauseDownload failed:', e) }
   }
@@ -248,6 +268,10 @@ export const useAppStore = defineStore('app', () => {
   async function cancelDownload(id: string) {
     if (activeDownloads.value[id]) {
       activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
+    } else {
+      // Cancelling from paused state — clear partial_progress immediately
+      const m = models.value.find(m => m.id === id)
+      if (m) m.partial_progress = null
     }
     try {
       await invoke('cancel_download', { id })
