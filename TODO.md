@@ -50,18 +50,18 @@
 
 Plan d'action par ordre de priorité :
 
-1. [ ] **Padding de page → `px-5` partout** — ModelManager `p-4` → `p-5`, History `px-4` → `px-5`.
-2. [ ] **Hauteur inputs → `h-9` partout** — Settings inputs LLM `h-8` → `h-9`. Vérifier que les selects shadcn ont la même hauteur.
-3. [ ] **Padding cards/items → 2 standards** — Normal (`px-4 py-3`) : ModelCell, permissions SetupWizard. Compact (`px-3 py-2`) : modèles SetupStep2, History entries. Supprimer les variantes `px-2.5 py-1.5` et `px-3.5 py-2.5`.
-4. [ ] **Réduire space-y → 3 valeurs** — Compact `space-y-1`, normal `space-y-2`, section `space-y-4`. Éliminer `space-y-0.5`, `space-y-1.5`, `space-y-3`, `space-y-3.5`.
-5. [ ] **Boutons download → même taille** — SetupStep2 `h-6` et ModelCell default `sm` → choisir un standard unique (`size="sm"`).
-6. [ ] **`text-[11px]` permissions → `text-xs`** — SetupWizard descriptions permissions. BenchmarkBadges `text-[10px]`/`text-[9px]` OK (spécifique).
+1. [x] **Padding de page → `px-5` partout** — ModelManager `p-4` → `p-5`, History `px-4` → `px-5`.
+2. [x] **Hauteur inputs → `h-9` partout** — Settings inputs LLM `h-8` → `h-9`. Vérifier que les selects shadcn ont la même hauteur.
+3. [x] **Padding cards/items → 2 standards** — Normal (`px-4 py-3`) : ModelCell, permissions SetupWizard. Compact (`px-3 py-2`) : modèles SetupStep2, History entries. Supprimer les variantes `px-2.5 py-1.5` et `px-3.5 py-2.5`.
+4. [x] **Réduire space-y → 3 valeurs** — Compact `space-y-1`, normal `space-y-2`, section `space-y-4`. Éliminer `space-y-0.5`, `space-y-1.5`, `space-y-3`, `space-y-3.5`.
+5. [x] **Boutons download → même taille** — SetupStep2 `h-6` et ModelCell default `sm` → choisir un standard unique (`size="sm"`).
+6. [x] **`text-[11px]` permissions → `text-xs`** — SetupWizard descriptions permissions. BenchmarkBadges `text-[10px]`/`text-[9px]` OK (spécifique).
 
 ## Corrections i18n (audit du 28/02/2026)
 
-1. [ ] **Localiser tooltips tray** — `tray.rs` : `"Recording…"` (l.371) → `t!("pill.recording")`, `"Transcribing…"` (l.376) → `t!("pill.transcribing")`, `"WhisperDictate"` (l.381, l.507) → `t!("app.name")`.
-2. [ ] **Afficher descriptions SetupStep2** — Ajouter les textes d'aide sous hotkey et recording mode. Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `.toggle` existent déjà dans en.json/fr.json.
-3. [ ] **Localiser validation ApiServerForm** — `'Required'` en dur (l.32-34) → clé i18n `validation.required`.
+1. [x] **Localiser tooltips tray** — `tray.rs` : `"Recording…"` (l.371) → `t!("pill.recording")`, `"Transcribing…"` (l.376) → `t!("pill.transcribing")`, `"WhisperDictate"` (l.381, l.507) → `t!("app.name")`.
+2. [x] **Afficher descriptions SetupStep2** — Ajouter les textes d'aide sous hotkey et recording mode. Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `.toggle` existent déjà dans en.json/fr.json.
+3. [x] **Localiser validation ApiServerForm** — `'Required'` en dur (l.32-34) → clé i18n `validation.required`.
 
 ## Audits récurrents
 
