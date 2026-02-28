@@ -38,18 +38,7 @@ const isPaused = computed(() => {
   return !isDownloading.value && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
 })
 
-const downloadInfo = computed(() => {
-  if (!dl.value) return ''
-  const { downloaded, totalSize, speed } = dl.value
-  const parts: string[] = []
-  if (totalSize > 0) {
-    parts.push(`${formatSize(downloaded)} / ${formatSize(totalSize)}`)
-  }
-  if (speed > 0) {
-    parts.push(formatSpeed(speed))
-  }
-  return parts.join(' \u00b7 ')
-})
+const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
 </script>
 
 <template>
@@ -75,8 +64,8 @@ const downloadInfo = computed(() => {
         <div class="flex items-center gap-2">
           <div class="w-24">
             <Progress :model-value="progress * 100" />
-            <div v-if="downloadInfo" class="text-[10px] text-muted-foreground mt-0.5 truncate">
-              {{ downloadInfo }}
+            <div v-if="speedText" class="text-[10px] text-muted-foreground mt-0.5">
+              {{ speedText }}
             </div>
           </div>
           <span class="text-xs text-muted-foreground w-10 text-right">

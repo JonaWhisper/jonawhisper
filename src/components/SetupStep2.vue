@@ -82,13 +82,9 @@ function isModelDownloaded(model: ASRModel): boolean {
 }
 
 
-function downloadInfo(modelId: string): string {
+function speedText(modelId: string): string {
   const dl = store.activeDownloads[modelId]
-  if (!dl) return ''
-  const parts: string[] = []
-  if (dl.totalSize > 0) parts.push(`${formatSize(dl.downloaded)} / ${formatSize(dl.totalSize)}`)
-  if (dl.speed > 0) parts.push(formatSpeed(dl.speed))
-  return parts.join(' \u00b7 ')
+  return dl ? formatSpeed(dl.speed) : ''
 }
 
 async function handleDownload(model: ASRModel) {
@@ -264,8 +260,8 @@ const canStart = computed(() => {
                 <template v-if="store.activeDownloads[model.id]">
                   <div class="w-16">
                     <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" />
-                    <div v-if="downloadInfo(model.id)" class="text-[9px] text-muted-foreground mt-0.5 truncate">
-                      {{ downloadInfo(model.id) }}
+                    <div v-if="speedText(model.id)" class="text-[9px] text-muted-foreground mt-0.5">
+                      {{ speedText(model.id) }}
                     </div>
                   </div>
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
