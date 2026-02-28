@@ -293,8 +293,8 @@ const canStart = computed(() => {
                 <div
                   v-for="model in group.models"
                   :key="model.id"
-                  class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border bg-card cursor-pointer transition-colors hover:bg-accent/30"
-                  :class="{ 'ring-2 ring-primary/30': model.id === store.selectedModelId }"
+                  class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
+                  :class="model.id === store.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
                   @click="handleSelectModel(model)"
                 >
                   <div
