@@ -54,6 +54,8 @@
 
 ## Audits (à planifier)
 
+- [ ] **Audit cohérence des spacings (padding/margin)** — Vérifier que tous les composants et vues utilisent les mêmes valeurs de padding et margin pour les mêmes types d'éléments (cards, listes, sections, headers, footers). Définir une échelle de spacing cohérente et l'appliquer partout. Concerne : ModelCell, SetupStep2, SetupWizard, ModelManager, Settings, History, etc.
+
 - [ ] **Audit complet architecture & séparation des modules** — Passer en revue tout le codebase :
   - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée (ex: recording.rs ne devrait pas connaître le tray, commands.rs ne devrait pas contenir de logique)
   - **Duplication** — code dupliqué entre SetupStep2/Settings/ModelManager, tables de keycodes frontend/backend, patterns répétés
