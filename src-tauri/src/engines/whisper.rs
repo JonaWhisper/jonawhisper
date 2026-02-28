@@ -101,9 +101,12 @@ pub fn transcribe_native(
     let mut ctx_guard = state.whisper_context.lock().unwrap();
     if ctx_guard.as_ref().map_or(true, |(id, _)| id != &model.id) {
         log::info!("Loading whisper model: {}", model.id);
+        let mut ctx_params = WhisperContextParameters::default();
+        ctx_params.use_gpu(true);
+        ctx_params.flash_attn(true);
         let ctx = WhisperContext::new_with_params(
             &model_path_str,
-            WhisperContextParameters::default(),
+            ctx_params,
         ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
         *ctx_guard = Some((model.id.clone(), ctx));
         log::info!("Whisper model loaded: {}", model.id);
@@ -119,7 +122,11 @@ pub fn transcribe_native(
     let audio = read_wav_f32(audio_path)?;
 
     // Configure transcription parameters
+    let n_threads = std::thread::available_parallelism()
+        .map(|p| p.get() as i32)
+        .unwrap_or(4);
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_n_threads(n_threads);
     params.set_translate(false);
     params.set_print_special(false);
     params.set_print_progress(false);
