@@ -37,6 +37,7 @@ export interface ASRModel {
   rtf: number | null
   params: number | null
   ram: number | null
+  lang_codes: string[] | null
 }
 
 export interface Language {

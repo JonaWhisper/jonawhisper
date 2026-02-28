@@ -21,6 +21,7 @@ impl ASREngine for LlmLocalEngine {
                 recommended: true,
                 params: Some(1.7),
                 ram: Some(1_500_000_000),
+                lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 ..Default::default()
             },
             ASRModel {
@@ -32,6 +33,7 @@ impl ASREngine for LlmLocalEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(1.7),
                 ram: Some(1_300_000_000),
+                lang_codes: Some(vec!["en".into()]),
                 ..Default::default()
             },
             ASRModel {
@@ -43,6 +45,7 @@ impl ASREngine for LlmLocalEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(1.0),
                 ram: Some(1_000_000_000),
+                lang_codes: Some(vec!["en".into(), "fr".into(), "es".into(), "de".into()]),
                 ..Default::default()
             },
             ASRModel {
@@ -54,6 +57,7 @@ impl ASREngine for LlmLocalEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(4.0),
                 ram: Some(3_000_000_000),
+                lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 ..Default::default()
             },
             ASRModel {
@@ -65,6 +69,7 @@ impl ASREngine for LlmLocalEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(3.8),
                 ram: Some(3_000_000_000),
+                lang_codes: Some(vec!["en".into()]),
                 ..Default::default()
             },
         ]

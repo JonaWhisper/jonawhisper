@@ -10,6 +10,7 @@ const props = defineProps<{
   rtf: number | null
   params?: number | null
   ram?: number | null
+  langCodes?: string[] | null
   compact?: boolean
 }>()
 
@@ -38,7 +39,7 @@ const rtfInfo = computed(() => {
 </script>
 
 <template>
-  <span v-if="werInfo || rtfInfo || params != null" class="inline-flex items-center gap-1">
+  <span v-if="werInfo || rtfInfo || params != null || (langCodes && langCodes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
     <Badge
       v-if="werInfo"
       variant="secondary"
@@ -66,6 +67,13 @@ const rtfInfo = computed(() => {
       :class="['bg-cyan-500/10 text-cyan-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
     >
       RAM <span class="opacity-50 font-normal">~{{ formatRam(ram!) }}</span>
+    </Badge>
+    <Badge
+      v-if="langCodes && langCodes.length > 0"
+      variant="secondary"
+      :class="['bg-indigo-500/10 text-indigo-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
+    >
+      {{ langCodes.map(c => c.toUpperCase()).join(' ') }}
     </Badge>
   </span>
 </template>
