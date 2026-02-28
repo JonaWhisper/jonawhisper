@@ -87,7 +87,7 @@ pub fn get_permissions() -> platform::PermissionReport {
 #[tauri::command]
 pub fn request_permission(kind: String, app: AppHandle) -> bool {
     let result = platform::request_permission(&kind);
-    let _ = app.emit("permission-changed", &kind);
+    let _ = app.emit(crate::events::PERMISSION_CHANGED, &kind);
     result
 }
 
@@ -161,7 +161,7 @@ pub fn set_setting(
         _ => {}
     }
     state.save_preferences();
-    let _ = app.emit("settings-changed", &key);
+    let _ = app.emit(crate::events::SETTINGS_CHANGED, &key);
 }
 
 // -- Mic Test --
@@ -189,7 +189,7 @@ pub fn set_llm_config(
 ) {
     state.settings.lock().unwrap().llm_config = config;
     state.save_preferences();
-    let _ = app.emit("settings-changed", "llm_config");
+    let _ = app.emit(crate::events::SETTINGS_CHANGED, "llm_config");
 }
 
 // -- History --
@@ -274,8 +274,8 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
 
         crate::tray::open_pill_window(&app);
         tokio::time::sleep(Duration::from_millis(200)).await;
-        let _ = app.emit("pill-mode", "recording");
-        let _ = app.emit("recording-started", ());
+        let _ = app.emit(crate::events::PILL_MODE, "recording");
+        let _ = app.emit(crate::events::RECORDING_STARTED, ());
 
         // Fake spectrum data for 2 seconds (30fps)
         for frame in 0..60u32 {
@@ -285,24 +285,24 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
                     (phase.sin() * 0.5 + 0.5) * 0.8
                 })
                 .collect();
-            let _ = app.emit("spectrum-data", &spectrum);
+            let _ = app.emit(crate::events::SPECTRUM_DATA, &spectrum);
             tokio::time::sleep(Duration::from_millis(33)).await;
         }
 
-        let _ = app.emit("recording-stopped", serde_json::json!({ "queue_count": rounds - round }));
-        let _ = app.emit("pill-mode", "transcribing");
-        let _ = app.emit("transcription-started", serde_json::json!({ "queue_count": rounds - round - 1 }));
+        let _ = app.emit(crate::events::RECORDING_STOPPED, serde_json::json!({ "queue_count": rounds - round }));
+        let _ = app.emit(crate::events::PILL_MODE, "transcribing");
+        let _ = app.emit(crate::events::TRANSCRIPTION_STARTED, serde_json::json!({ "queue_count": rounds - round - 1 }));
 
         tokio::time::sleep(Duration::from_millis(2000)).await;
 
-        let _ = app.emit("transcription-complete", serde_json::json!({ "text": format!("Simulation round {}", round + 1) }));
+        let _ = app.emit(crate::events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": format!("Simulation round {}", round + 1) }));
 
         if round < rounds - 1 {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 
-    let _ = app.emit("pill-mode", "error");
+    let _ = app.emit(crate::events::PILL_MODE, "error");
     tokio::time::sleep(Duration::from_millis(800)).await;
 
     crate::tray::close_pill_window(&app);

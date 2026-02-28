@@ -31,7 +31,7 @@
 
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
 - [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo
-- [ ] **Hotkey static atomics → struct user_info** — Remplacer les 4 static atomics dans hotkey.rs par un struct passé via le user_info du CGEvent callback
-- [ ] **Event names centralisés** — Définir les noms d'events Tauri en constantes dans un module `events.rs`
+- [x] **Hotkey static atomics → struct user_info** — ✅ TapState struct passé via user_info, plus de static atomics
+- [x] **Event names centralisés** — ✅ Module `events.rs` avec 12 constantes, plus de strings bruts
 - [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)

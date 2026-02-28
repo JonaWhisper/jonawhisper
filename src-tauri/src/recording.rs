@@ -54,7 +54,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         if rt.mic_testing {
             rt.mic_testing = false;
             let _ = rec.audio_tx.send(AudioCmd::StopMicTest);
-            let _ = app.emit("mic-test-stopped", ());
+            let _ = app.emit(crate::events::MIC_TEST_STOPPED, ());
         }
         rt.is_recording = true;
         rt.transcription_cancelled = false;
@@ -68,8 +68,8 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     platform::play_sound("Tink");
     crate::tray::open_pill_window(app);
     crate::tray::set_tray_state(app, "recording");
-    let _ = app.emit("pill-mode", "recording");
-    let _ = app.emit("recording-started", ());
+    let _ = app.emit(crate::events::PILL_MODE, "recording");
+    let _ = app.emit(crate::events::RECORDING_STARTED, ());
 }
 
 pub fn stop_recording_and_enqueue(
@@ -109,7 +109,7 @@ pub fn stop_recording_and_enqueue(
         None => {
             log::warn!("No audio file produced, closing pill");
             crate::tray::close_pill_window(app);
-            let _ = app.emit("recording-stopped", ());
+            let _ = app.emit(crate::events::RECORDING_STOPPED, ());
             return;
         }
     };
@@ -118,10 +118,10 @@ pub fn stop_recording_and_enqueue(
 
     let count = state.enqueue(audio_path);
     let _ = app.emit(
-        "recording-stopped",
+        crate::events::RECORDING_STOPPED,
         serde_json::json!({ "queue_count": count }),
     );
-    let _ = app.emit("pill-mode", "transcribing");
+    let _ = app.emit(crate::events::PILL_MODE, "transcribing");
     crate::tray::set_tray_state(app, "transcribing");
 
     let app_clone = app.clone();
@@ -159,10 +159,10 @@ fn handle_short_tap(
     if !is_transcribing && queue_empty {
         crate::tray::close_pill_window(app);
     } else {
-        let _ = app.emit("pill-mode", "transcribing");
+        let _ = app.emit(crate::events::PILL_MODE, "transcribing");
         crate::tray::set_tray_state(app, "transcribing");
     }
-    let _ = app.emit("recording-stopped", ());
+    let _ = app.emit(crate::events::RECORDING_STOPPED, ());
 }
 
 // -- Transcription queue processing --
@@ -188,7 +188,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         };
 
         let _ = app.emit(
-            "transcription-started",
+            crate::events::TRANSCRIPTION_STARTED,
             serde_json::json!({ "queue_count": state.queue_count() }),
         );
 
@@ -262,7 +262,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     let trimmed = text.trim();
     if trimmed.is_empty() {
         platform::play_sound("Basso");
-        let _ = app.emit("transcription-complete", serde_json::json!({ "text": "" }));
+        let _ = app.emit(crate::events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": "" }));
         return;
     }
 
@@ -318,7 +318,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     platform::play_sound("Glass");
 
     let _ = app.emit(
-        "transcription-complete",
+        crate::events::TRANSCRIPTION_COMPLETE,
         serde_json::json!({ "text": processed }),
     );
 }
@@ -326,7 +326,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
 // -- Cleanup helpers --
 
 fn show_error_then_close(app: &AppHandle) {
-    let _ = app.emit("pill-mode", "error");
+    let _ = app.emit(crate::events::PILL_MODE, "error");
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(ERROR_DISPLAY_MS)).await;
@@ -344,7 +344,7 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
         rt.last_paste_had_content = false;
     }
     platform::play_sound("Funk");
-    let _ = app.emit("transcription-cancelled", ());
+    let _ = app.emit(crate::events::TRANSCRIPTION_CANCELLED, ());
     show_error_then_close(app);
 }
 
@@ -485,14 +485,14 @@ pub fn spawn_spectrum_emitter(
             stream_error.store(false, Ordering::SeqCst);
 
             platform::play_sound("Basso");
-            let _ = app.emit("recording-stopped", ());
+            let _ = app.emit(crate::events::RECORDING_STOPPED, ());
             show_error_then_close(&app);
             continue;
         }
 
         let spectrum = spectrum_data.lock().unwrap().clone();
         let _ = cmd_tx.send(AudioCmd::GetSpectrum);
-        let event_name = if is_mic_testing { "mic-test-spectrum" } else { "spectrum-data" };
+        let event_name = if is_mic_testing { crate::events::MIC_TEST_SPECTRUM } else { crate::events::SPECTRUM_DATA };
         let _ = app.emit(event_name, spectrum);
     });
 }

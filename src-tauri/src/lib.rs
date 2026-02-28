@@ -2,6 +2,7 @@ mod audio;
 mod commands;
 mod engines;
 mod errors;
+mod events;
 mod llm_cleanup;
 mod platform;
 mod post_processor;

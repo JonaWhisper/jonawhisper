@@ -117,7 +117,7 @@ async fn download_single_file(
                 if total_size > 0 {
                     let progress = downloaded as f64 / total_size as f64;
                     state.download.lock().unwrap().progress = progress;
-                    let _ = app.emit("download-progress", serde_json::json!({
+                    let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
                         "model_id": model.id,
                         "progress": progress,
                     }));
@@ -212,7 +212,7 @@ async fn download_with_subprocess(
                     if let Some(caps) = progress_re.captures(&buf) {
                         if let Ok(pct) = caps[1].parse::<f64>() {
                             let progress = pct / 100.0;
-                            let _ = app_clone.emit("download-progress", serde_json::json!({
+                            let _ = app_clone.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
                                 "model_id": model_id,
                                 "progress": progress,
                             }));
@@ -238,7 +238,7 @@ async fn download_with_subprocess(
 
     if result {
         state.download.lock().unwrap().progress = 1.0;
-        let _ = app.emit("download-progress", serde_json::json!({
+        let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
             "model_id": model.id,
             "progress": 1.0,
         }));

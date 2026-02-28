@@ -123,6 +123,17 @@ pub fn start_monitor(
     (event_rx, update_tx)
 }
 
+/// Shared state between the CGEvent callback and the main hotkey thread.
+/// Passed via user_info pointer (leaked Box) instead of static atomics.
+#[cfg(target_os = "macos")]
+struct TapState {
+    key_code: std::sync::atomic::AtomicU16,
+    flag_mask: std::sync::atomic::AtomicU64,
+    key_held: AtomicBool,
+    cancel_key_code: std::sync::atomic::AtomicU16,
+    event_tx: crossbeam_channel::Sender<HotkeyEvent>,
+}
+
 #[cfg(target_os = "macos")]
 fn run_event_tap(
     initial_hotkey: HotkeyOption,
@@ -131,21 +142,17 @@ fn run_event_tap(
     update_rx: crossbeam_channel::Receiver<HotkeyUpdate>,
 ) {
     use std::os::raw::c_void;
-    use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 
-    // Shared state between callback and thread
-    static KEY_CODE: AtomicU16 = AtomicU16::new(0x36);
-    static FLAG_MASK: AtomicU64 = AtomicU64::new(HotkeyOption::CG_MASK_COMMAND);
-    static KEY_HELD: AtomicBool = AtomicBool::new(false);
-    static CANCEL_KEY_CODE: AtomicU16 = AtomicU16::new(0x35); // Escape
-
-    KEY_CODE.store(initial_hotkey.key_code, Ordering::SeqCst);
-    FLAG_MASK.store(initial_hotkey.flag_mask, Ordering::SeqCst);
-    KEY_HELD.store(false, Ordering::SeqCst);
-    CANCEL_KEY_CODE.store(initial_cancel_key, Ordering::SeqCst);
-
-    // Store event_tx in a Box leaked into a raw pointer for the callback
-    let tx_ptr = Box::into_raw(Box::new(event_tx.clone())) as *mut c_void;
+    // All callback state in a single struct, passed via user_info
+    let state = Box::new(TapState {
+        key_code: AtomicU16::new(initial_hotkey.key_code),
+        flag_mask: AtomicU64::new(initial_hotkey.flag_mask),
+        key_held: AtomicBool::new(false),
+        cancel_key_code: AtomicU16::new(initial_cancel_key),
+        event_tx,
+    });
+    let state_ptr = Box::into_raw(state);
 
     extern "C" fn callback(
         _proxy: *mut c_void,
@@ -153,7 +160,6 @@ fn run_event_tap(
         event: *mut c_void,
         user_info: *mut c_void,
     ) -> *mut c_void {
-        // CGEventType values
         const KEY_DOWN: u32 = 10;
         const FLAGS_CHANGED: u32 = 12;
         const TAP_DISABLED_BY_TIMEOUT: u32 = 0xFFFFFFFE;
@@ -168,22 +174,21 @@ fn run_event_tap(
             return event;
         }
 
-        // SAFETY: Called from CGEventTap callback. `event` is a valid CGEventRef.
+        // SAFETY: user_info is a leaked Box<TapState> — valid for the lifetime of the tap.
         // CGEventGetIntegerValueField and CGEventGetFlags are CoreGraphics C functions.
-        // user_info is a leaked Box<Sender<HotkeyEvent>> — valid for the lifetime of the tap.
         unsafe {
+            use std::sync::atomic::Ordering;
             use super::ffi::{CGEventGetIntegerValueField, CGEventGetFlags};
 
-            // kCGKeyboardEventKeycode = 9 (CGEventField enum)
+            let state = &*(user_info as *const TapState);
             let key_code = CGEventGetIntegerValueField(event, 9) as u16;
 
             // Handle cancel key (keyDown only)
             if event_type == KEY_DOWN {
-                let cancel_code = CANCEL_KEY_CODE.load(Ordering::SeqCst);
+                let cancel_code = state.cancel_key_code.load(Ordering::SeqCst);
                 if cancel_code != 0 && key_code == cancel_code {
-                    let tx = &*(user_info as *const crossbeam_channel::Sender<HotkeyEvent>);
                     log::debug!("Cancel key pressed (code=0x{:02x})", key_code);
-                    let _ = tx.send(HotkeyEvent::CancelPressed);
+                    let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
                 }
                 return event;
             }
@@ -192,26 +197,20 @@ fn run_event_tap(
             let flags = CGEventGetFlags(event);
             log::debug!("flagsChanged: keycode=0x{:02x} flags=0x{:x}", key_code, flags);
 
-            let expected_code = KEY_CODE.load(Ordering::SeqCst);
-            let expected_mask = FLAG_MASK.load(Ordering::SeqCst);
+            let expected_code = state.key_code.load(Ordering::SeqCst);
+            let expected_mask = state.flag_mask.load(Ordering::SeqCst);
 
             if key_code == expected_code {
-                let tx = &*(user_info as *const crossbeam_channel::Sender<HotkeyEvent>);
-
                 if (flags & expected_mask) != 0 {
-                    // Key pressed
-                    if !KEY_HELD.load(Ordering::SeqCst) {
-                        KEY_HELD.store(true, Ordering::SeqCst);
+                    if !state.key_held.load(Ordering::SeqCst) {
+                        state.key_held.store(true, Ordering::SeqCst);
                         log::debug!("Hotkey callback: KeyDown (code={}, flags=0x{:x})", key_code, flags);
-                        let _ = tx.send(HotkeyEvent::KeyDown);
+                        let _ = state.event_tx.send(HotkeyEvent::KeyDown);
                     }
-                } else {
-                    // Key released
-                    if KEY_HELD.load(Ordering::SeqCst) {
-                        KEY_HELD.store(false, Ordering::SeqCst);
-                        log::debug!("Hotkey callback: KeyUp (code={}, flags=0x{:x})", key_code, flags);
-                        let _ = tx.send(HotkeyEvent::KeyUp);
-                    }
+                } else if state.key_held.load(Ordering::SeqCst) {
+                    state.key_held.store(false, Ordering::SeqCst);
+                    log::debug!("Hotkey callback: KeyUp (code={}, flags=0x{:x})", key_code, flags);
+                    let _ = state.event_tx.send(HotkeyEvent::KeyUp);
                 }
             }
         }
@@ -220,22 +219,16 @@ fn run_event_tap(
     }
 
     // SAFETY: CGEventTapCreate creates an active event tap for flagsChanged + keyDown events.
-    // The callback pointer (tx_ptr) is a leaked Box<Sender> — lives until process exit.
+    // state_ptr is a leaked Box<TapState> — lives until process exit.
     // CFMachPortCreateRunLoopSource/CFRunLoopAddSource wire the tap into the current runloop.
-    // The loop re-enables the tap periodically (macOS may disable it on timeout).
     unsafe {
         use super::ffi;
 
-        // CGEventMask for keyDown (bit 10) + flagsChanged (bit 12)
         let event_mask: u64 = (1 << 10) | (1 << 12);
 
         let tap = ffi::CGEventTapCreate(
-            1, // cgSessionEventTap
-            0, // headInsertEventTap
-            0, // defaultTap (not listenOnly — we need to intercept)
-            event_mask,
-            callback,
-            tx_ptr,
+            1, 0, 0, event_mask, callback,
+            state_ptr as *mut c_void,
         );
 
         if tap.is_null() {
@@ -250,25 +243,21 @@ fn run_event_tap(
 
         log::info!("Hotkey monitor started ({})", initial_hotkey.label);
 
-        // Run the event loop, periodically checking for hotkey updates
+        let state = &*state_ptr;
         loop {
-            // Run the loop for a short interval
             ffi::CFRunLoopRunInMode(ffi::kCFRunLoopDefaultMode, 0.5, false);
-
-            // Re-enable tap in case macOS disabled it
             ffi::CGEventTapEnable(tap, true);
 
-            // Check for updates
             while let Ok(update) = update_rx.try_recv() {
                 match update {
                     HotkeyUpdate::SetHotkey(new_hotkey) => {
-                        KEY_CODE.store(new_hotkey.key_code, Ordering::SeqCst);
-                        FLAG_MASK.store(new_hotkey.flag_mask, Ordering::SeqCst);
-                        KEY_HELD.store(false, Ordering::SeqCst);
+                        state.key_code.store(new_hotkey.key_code, Ordering::SeqCst);
+                        state.flag_mask.store(new_hotkey.flag_mask, Ordering::SeqCst);
+                        state.key_held.store(false, Ordering::SeqCst);
                         log::info!("Hotkey changed to {}", new_hotkey.label);
                     }
                     HotkeyUpdate::SetCancelKey(code) => {
-                        CANCEL_KEY_CODE.store(code, Ordering::SeqCst);
+                        state.cancel_key_code.store(code, Ordering::SeqCst);
                         log::info!("Cancel shortcut changed to keycode=0x{:02x}", code);
                     }
                 }
