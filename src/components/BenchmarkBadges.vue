@@ -9,8 +9,16 @@ const props = defineProps<{
   wer: number | null
   rtf: number | null
   params?: number | null
+  ram?: number | null
   compact?: boolean
 }>()
+
+function formatRam(bytes: number): string {
+  const gb = bytes / 1_000_000_000
+  if (gb >= 1) return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} GB`
+  const mb = bytes / 1_000_000
+  return `${Math.round(mb)} MB`
+}
 
 const werInfo = computed(() => {
   if (props.wer == null) return null
@@ -51,6 +59,13 @@ const rtfInfo = computed(() => {
       :class="['bg-slate-500/10 text-slate-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
     >
       {{ params! % 1 === 0 ? params!.toFixed(0) : params!.toFixed(1) }}B
+    </Badge>
+    <Badge
+      v-if="ram != null"
+      variant="secondary"
+      :class="['bg-cyan-500/10 text-cyan-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
+    >
+      RAM <span class="opacity-50 font-normal">~{{ formatRam(ram!) }}</span>
     </Badge>
   </span>
 </template>

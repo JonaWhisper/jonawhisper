@@ -20,6 +20,7 @@ impl ASREngine for LlmLocalEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 recommended: true,
                 params: Some(1.7),
+                ram: Some(1_500_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -30,6 +31,7 @@ impl ASREngine for LlmLocalEngine {
                 size: 1_055_609_824, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(1.7),
+                ram: Some(1_300_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -40,6 +42,7 @@ impl ASREngine for LlmLocalEngine {
                 size: 806_058_496, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(1.0),
+                ram: Some(1_000_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -50,6 +53,7 @@ impl ASREngine for LlmLocalEngine {
                 size: 2_497_280_960, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(4.0),
+                ram: Some(3_000_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -60,6 +64,7 @@ impl ASREngine for LlmLocalEngine {
                 size: 2_491_874_688, storage_dir: LLM_STORAGE_DIR.into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(3.8),
+                ram: Some(3_000_000_000),
                 ..Default::default()
             },
         ]

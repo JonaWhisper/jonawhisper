@@ -261,7 +261,7 @@ const canStart = computed(() => {
                       <span class="text-sm font-medium truncate">{{ model.label }}</span>
                       <span v-if="model.size > 0" class="text-[11px] text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
                     </div>
-                    <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null" :wer="model.wer" :rtf="model.rtf" :params="model.params" compact class="mt-0.5" />
+                    <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null || model.ram != null" :wer="model.wer" :rtf="model.rtf" :params="model.params" :ram="model.ram" compact class="mt-0.5" />
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                     <!-- Downloading -->

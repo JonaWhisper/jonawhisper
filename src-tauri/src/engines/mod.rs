@@ -45,6 +45,8 @@ pub struct ASRModel {
     pub recommended: bool,
     /// Number of parameters in billions (for LLM models).
     pub params: Option<f32>,
+    /// Estimated RAM usage in bytes when loaded.
+    pub ram: Option<u64>,
 }
 
 impl ASRModel {

@@ -51,7 +51,7 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
         <span class="font-medium text-sm truncate">{{ model.label }}</span>
         <span v-if="model.size > 0" class="text-xs text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
       </div>
-      <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null" :wer="model.wer" :rtf="model.rtf" :params="model.params" class="mt-0.5" />
+      <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null || model.ram != null" :wer="model.wer" :rtf="model.rtf" :params="model.params" :ram="model.ram" class="mt-0.5" />
     </div>
 
     <!-- Status / Actions -->
