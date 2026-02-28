@@ -5,8 +5,51 @@
 //! - Key: standalone key without modifiers (e.g. F13, F14)
 
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::Arc;
+
+/// Shared capture-mode state, accessible from both the CGEvent callback thread
+/// and the Tauri command handler.  Commands set capture mode **immediately** via
+/// atomics, bypassing the channel delay that caused the race condition.
+pub struct CaptureControl {
+    pub mode: AtomicBool,
+    pub modifiers: AtomicU64,
+    pub key: AtomicU16,
+    pub had_key: AtomicBool,
+    pub active: AtomicBool,
+}
+
+impl CaptureControl {
+    pub fn new() -> Self {
+        Self {
+            mode: AtomicBool::new(false),
+            modifiers: AtomicU64::new(0),
+            key: AtomicU16::new(0),
+            had_key: AtomicBool::new(false),
+            active: AtomicBool::new(false),
+        }
+    }
+
+    /// Enter capture mode: reset fields then set mode=true.
+    pub fn enter(&self) {
+        self.modifiers.store(0, Ordering::SeqCst);
+        self.key.store(0, Ordering::SeqCst);
+        self.had_key.store(false, Ordering::SeqCst);
+        self.active.store(false, Ordering::SeqCst);
+        self.mode.store(true, Ordering::SeqCst);
+        log::info!("Entering shortcut capture mode (immediate)");
+    }
+
+    /// Exit capture mode: set mode=false then reset fields.
+    pub fn exit(&self) {
+        self.mode.store(false, Ordering::SeqCst);
+        self.modifiers.store(0, Ordering::SeqCst);
+        self.key.store(0, Ordering::SeqCst);
+        self.had_key.store(false, Ordering::SeqCst);
+        self.active.store(false, Ordering::SeqCst);
+        log::info!("Exiting shortcut capture mode (immediate)");
+    }
+}
 
 // -- CGEventFlags masks --
 
@@ -207,8 +250,6 @@ pub enum HotkeyEvent {
 pub enum HotkeyUpdate {
     SetRecordShortcut(Shortcut),
     SetCancelShortcut(Shortcut),
-    EnterCaptureMode,
-    ExitCaptureMode,
 }
 
 // -- Monitor --
@@ -220,6 +261,7 @@ pub fn start_monitor(
     initial_record: Shortcut,
     initial_cancel: Shortcut,
     enabled: Arc<AtomicBool>,
+    capture: Arc<CaptureControl>,
 ) -> (crossbeam_channel::Receiver<HotkeyEvent>, crossbeam_channel::Sender<HotkeyUpdate>) {
     let (event_tx, event_rx) = crossbeam_channel::unbounded::<HotkeyEvent>();
     let (update_tx, update_rx) = crossbeam_channel::unbounded::<HotkeyUpdate>();
@@ -229,7 +271,7 @@ pub fn start_monitor(
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
         log::info!("Hotkey monitoring enabled, starting event tap");
-        run_event_tap(initial_record, initial_cancel, event_tx, update_rx);
+        run_event_tap(initial_record, initial_cancel, event_tx, update_rx, capture);
     });
 
     (event_rx, update_tx)
@@ -239,22 +281,18 @@ pub fn start_monitor(
 #[cfg(target_os = "macos")]
 struct TapState {
     // Record shortcut (atomics for lock-free callback access)
-    rec_key_code: std::sync::atomic::AtomicU16,
-    rec_modifiers: std::sync::atomic::AtomicU64,
+    rec_key_code: AtomicU16,
+    rec_modifiers: AtomicU64,
     rec_kind: std::sync::atomic::AtomicU8, // 0=ModifierOnly, 1=Combo, 2=Key
     rec_held: AtomicBool,
 
     // Cancel shortcut
-    cancel_key_code: std::sync::atomic::AtomicU16,
-    cancel_modifiers: std::sync::atomic::AtomicU64,
+    cancel_key_code: AtomicU16,
+    cancel_modifiers: AtomicU64,
     cancel_kind: std::sync::atomic::AtomicU8,
 
-    // Capture mode
-    capture_mode: AtomicBool,
-    capture_modifiers: std::sync::atomic::AtomicU64,
-    capture_key: std::sync::atomic::AtomicU16,
-    capture_had_key: AtomicBool,
-    capture_active: AtomicBool, // any key/modifier is currently held
+    // Capture mode (shared with Tauri commands via Arc)
+    capture: Arc<CaptureControl>,
 
     event_tx: crossbeam_channel::Sender<HotkeyEvent>,
 }
@@ -313,9 +351,9 @@ fn run_event_tap(
     initial_cancel: Shortcut,
     event_tx: crossbeam_channel::Sender<HotkeyEvent>,
     update_rx: crossbeam_channel::Receiver<HotkeyUpdate>,
+    capture: Arc<CaptureControl>,
 ) {
     use std::os::raw::c_void;
-    use std::sync::atomic::{AtomicU16, AtomicU64};
 
     let state = Box::new(TapState {
         rec_key_code: AtomicU16::new(initial_record.key_code),
@@ -327,11 +365,7 @@ fn run_event_tap(
         cancel_modifiers: AtomicU64::new(initial_cancel.modifiers),
         cancel_kind: std::sync::atomic::AtomicU8::new(TapState::kind_to_u8(initial_cancel.kind)),
 
-        capture_mode: AtomicBool::new(false),
-        capture_modifiers: AtomicU64::new(0),
-        capture_key: AtomicU16::new(0),
-        capture_had_key: AtomicBool::new(false),
-        capture_active: AtomicBool::new(false),
+        capture,
 
         event_tx,
     });
@@ -367,7 +401,7 @@ fn run_event_tap(
             let mod_flags = flags & CG_MASK_ALL_MODIFIERS;
 
             // -- Capture mode --
-            if state.capture_mode.load(Ordering::SeqCst) {
+            if state.capture.mode.load(Ordering::SeqCst) {
                 handle_capture(state, event_type, key_code, mod_flags);
                 return event;
             }
@@ -386,12 +420,14 @@ fn run_event_tap(
         const KEY_UP: u32 = 11;
         const FLAGS_CHANGED: u32 = 12;
 
+        let cap = &state.capture;
+
         match event_type {
             KEY_DOWN => {
                 if !is_modifier_key_code(key_code) {
-                    state.capture_key.store(key_code, Ordering::SeqCst);
-                    state.capture_had_key.store(true, Ordering::SeqCst);
-                    state.capture_active.store(true, Ordering::SeqCst);
+                    cap.key.store(key_code, Ordering::SeqCst);
+                    cap.had_key.store(true, Ordering::SeqCst);
+                    cap.active.store(true, Ordering::SeqCst);
 
                     let _ = state.event_tx.send(HotkeyEvent::CaptureUpdate {
                         modifiers: mod_flags,
@@ -400,9 +436,9 @@ fn run_event_tap(
                 }
             }
             KEY_UP => {
-                if !is_modifier_key_code(key_code) && state.capture_had_key.load(Ordering::SeqCst) {
-                    let captured_key = state.capture_key.load(Ordering::SeqCst);
-                    let captured_mods = state.capture_modifiers.load(Ordering::SeqCst);
+                if !is_modifier_key_code(key_code) && cap.had_key.load(Ordering::SeqCst) {
+                    let captured_key = cap.key.load(Ordering::SeqCst);
+                    let captured_mods = cap.modifiers.load(Ordering::SeqCst);
 
                     let kind = if captured_mods != 0 {
                         ShortcutKind::Combo
@@ -417,27 +453,27 @@ fn run_event_tap(
                     };
 
                     // Reset capture state
-                    state.capture_key.store(0, Ordering::SeqCst);
-                    state.capture_modifiers.store(0, Ordering::SeqCst);
-                    state.capture_had_key.store(false, Ordering::SeqCst);
-                    state.capture_active.store(false, Ordering::SeqCst);
+                    cap.key.store(0, Ordering::SeqCst);
+                    cap.modifiers.store(0, Ordering::SeqCst);
+                    cap.had_key.store(false, Ordering::SeqCst);
+                    cap.active.store(false, Ordering::SeqCst);
 
                     let _ = state.event_tx.send(HotkeyEvent::CaptureComplete(shortcut));
                 }
             }
             FLAGS_CHANGED => {
-                state.capture_modifiers.store(mod_flags, Ordering::SeqCst);
+                cap.modifiers.store(mod_flags, Ordering::SeqCst);
 
                 if mod_flags != 0 {
-                    state.capture_active.store(true, Ordering::SeqCst);
-                    let cap_key = state.capture_key.load(Ordering::SeqCst);
+                    cap.active.store(true, Ordering::SeqCst);
+                    let cap_key = cap.key.load(Ordering::SeqCst);
                     let _ = state.event_tx.send(HotkeyEvent::CaptureUpdate {
                         modifiers: mod_flags,
-                        key_code: if state.capture_had_key.load(Ordering::SeqCst) { Some(cap_key) } else { None },
+                        key_code: if cap.had_key.load(Ordering::SeqCst) { Some(cap_key) } else { None },
                     });
-                } else if state.capture_active.load(Ordering::SeqCst) {
+                } else if cap.active.load(Ordering::SeqCst) {
                     // All modifiers released
-                    if !state.capture_had_key.load(Ordering::SeqCst) {
+                    if !cap.had_key.load(Ordering::SeqCst) {
                         // ModifierOnly: we need to figure out which modifier was released
                         // The key_code in flagsChanged tells us which modifier changed
                         let shortcut = Shortcut {
@@ -446,9 +482,9 @@ fn run_event_tap(
                             kind: ShortcutKind::ModifierOnly,
                         };
 
-                        state.capture_key.store(0, Ordering::SeqCst);
-                        state.capture_modifiers.store(0, Ordering::SeqCst);
-                        state.capture_active.store(false, Ordering::SeqCst);
+                        cap.key.store(0, Ordering::SeqCst);
+                        cap.modifiers.store(0, Ordering::SeqCst);
+                        cap.active.store(false, Ordering::SeqCst);
 
                         let _ = state.event_tx.send(HotkeyEvent::CaptureComplete(shortcut));
                     }
@@ -625,18 +661,6 @@ fn run_event_tap(
                         log::info!("Cancel shortcut changed to {}", s.display_string());
                         state.store_cancel_shortcut(&s);
                     }
-                    HotkeyUpdate::EnterCaptureMode => {
-                        log::info!("Entering shortcut capture mode");
-                        state.capture_mode.store(true, Ordering::SeqCst);
-                        state.capture_modifiers.store(0, Ordering::SeqCst);
-                        state.capture_key.store(0, Ordering::SeqCst);
-                        state.capture_had_key.store(false, Ordering::SeqCst);
-                        state.capture_active.store(false, Ordering::SeqCst);
-                    }
-                    HotkeyUpdate::ExitCaptureMode => {
-                        log::info!("Exiting shortcut capture mode");
-                        state.capture_mode.store(false, Ordering::SeqCst);
-                    }
                 }
             }
         }
@@ -659,6 +683,7 @@ pub fn start_monitor(
     _initial_record: Shortcut,
     _initial_cancel: Shortcut,
     _enabled: Arc<AtomicBool>,
+    _capture: Arc<CaptureControl>,
 ) -> (crossbeam_channel::Receiver<HotkeyEvent>, crossbeam_channel::Sender<HotkeyUpdate>) {
     let (_event_tx, event_rx) = crossbeam_channel::unbounded();
     let (update_tx, _update_rx) = crossbeam_channel::unbounded();

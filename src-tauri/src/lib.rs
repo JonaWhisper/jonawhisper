@@ -112,8 +112,10 @@ pub fn run() {
             };
             let initial_record = platform::hotkey::Shortcut::parse(&hotkey_str);
             let initial_cancel = platform::hotkey::Shortcut::parse(&cancel_str);
+            let capture_control = Arc::new(platform::hotkey::CaptureControl::new());
             let (hotkey_rx, hotkey_update_tx) =
-                platform::hotkey::start_monitor(initial_record, initial_cancel, monitor_enabled.clone());
+                platform::hotkey::start_monitor(initial_record, initial_cancel, monitor_enabled.clone(), capture_control.clone());
+            app.manage(capture_control);
             app.manage(HotkeyUpdateSender(hotkey_update_tx));
 
             // Hotkey event processing thread
@@ -146,9 +148,12 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
-            // Keep the app running when the last window closes (menu bar app)
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+            // Keep the app running when the last window closes (menu bar app),
+            // but allow explicit quit (Cmd+Q, tray quit, force quit).
+            if let tauri::RunEvent::ExitRequested { code, api, .. } = event {
+                if code.is_none() {
+                    api.prevent_exit();
+                }
             }
         });
 }
