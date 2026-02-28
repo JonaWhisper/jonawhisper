@@ -9,6 +9,7 @@
 
 - [ ] **Remplacer emojis/SVG inline par Lucide icons** — Unifier toutes les icones du projet avec `lucide-vue-next` (déjà installé). Fichiers concernés : Settings.vue (⚙ ✨ ⌨ 🎙 dans la sidebar), ModelCell.vue (SVG inline delete), SetupWizard.vue (SVG inline checkmark).
 - [x] **Descriptions des moteurs dans le Model Manager** — Description par moteur affichée dans le panneau principal.
+- [x] **Fix overflow fenêtres** — Remplacement `h-screen` par `h-full` + contraintes globales CSS (`html, body, #app { height: 100%; overflow: hidden }`).
 
 ## Fonctionnalités
 
@@ -23,7 +24,7 @@
 - [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique. Chaque provider déclare ses capacités (audio→texte, texte→texte, ou les deux).
   - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et modèles prédéfinis (dropdown), champs verrouillés. Custom uniquement pour serveurs locaux.
   - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings.
-- [x] **Historique des transcriptions (infini)** — Persistance JSON, timeline groupée par jour, recherche, copier/supprimer
+- [x] **Historique des transcriptions (infini)** — Persistance SQLite (WAL), timeline groupée par jour, recherche, copier/supprimer
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue sur disque
 - [ ] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon micro intégré/AirPods/casque/USB
@@ -37,7 +38,7 @@
 
 ## Audits (à planifier)
 
-- [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier.
+- [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier. Inclut : `navigator.clipboard.writeText` dans History.vue → potentielle commande IPC.
 
 - [ ] **Audit global du codebase** — Re-vérifier l'ensemble après les refactorings récents (FFI, events, hotkey, crossbeam, mutex grouping). Couvrir :
   - **Sécurité** — injections, gestion des clés API, permissions, sanitization des inputs
