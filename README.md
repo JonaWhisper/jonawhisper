@@ -57,18 +57,18 @@ WhisperDictate supports multiple speech recognition backends. Each has different
 
 | Engine | Best for | Install | Languages |
 |---|---|---|---|
-| **Whisper** (whisper.cpp) | CPU, lightweight, general use | `brew install whisper-cpp` | Auto, FR, EN, ES, DE |
-| **Faster Whisper** (CTranslate2) | GPU acceleration (~4x faster) | `pip install whisper-ctranslate2` | Auto, FR, EN, ES, DE |
-| **MLX Whisper** | Apple Silicon (M1/M2/M3/M4) | `pip install mlx-whisper` | Auto, FR, EN, ES, DE |
-| **Vosk** | Low resources, small models | `pip install vosk` | EN, FR |
-| **Moonshine** | Ultra-fast, English only | `pip install useful-moonshine` | EN |
+| [**whisper.cpp**](https://github.com/ggerganov/whisper.cpp) | CPU, lightweight, general use | `brew install whisper-cpp` | Auto, FR, EN, ES, DE |
+| [**Faster Whisper**](https://github.com/SYSTRAN/faster-whisper) (CTranslate2) | GPU acceleration (~4x faster) | `pip install whisper-ctranslate2` | Auto, FR, EN, ES, DE |
+| [**MLX Whisper**](https://github.com/ml-explore/mlx-examples/tree/main/whisper) | Apple Silicon (M1/M2/M3/M4) | `pip install mlx-whisper` | Auto, FR, EN, ES, DE |
+| [**Vosk**](https://alphacephei.com/vosk/) | Low resources, small models | `pip install vosk` | EN, FR |
+| [**Moonshine**](https://github.com/usefulsensors/moonshine) | Ultra-fast, English only | `pip install useful-moonshine` | EN |
 | **OpenAI API** | Cloud, no local compute | API key only | Auto, FR, EN, ES, DE |
 
-- **Whisper** is the default engine — C++ implementation, runs well on any Mac.
-- **MLX Whisper** is the recommended engine on Apple Silicon — uses the Neural Engine and unified GPU for best performance.
-- **Faster Whisper** shines with NVIDIA GPUs via CTranslate2 optimization.
+- **whisper.cpp** is the default engine — C++ implementation, runs well on any Mac.
+- **MLX Whisper** is the recommended engine on Apple Silicon — uses Apple's [MLX framework](https://github.com/ml-explore/mlx) for best performance on the Neural Engine and unified GPU.
+- **Faster Whisper** shines with NVIDIA GPUs via [CTranslate2](https://github.com/OpenNMT/CTranslate2) optimization.
 - **Vosk** and **Moonshine** are lightweight alternatives for quick dictation with smaller models.
-- **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server (local or remote).
+- **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/audio/createTranscription) server (local or remote).
 
 Models are downloaded and managed from within the app (Model Manager).
 
