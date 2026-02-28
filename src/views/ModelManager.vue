@@ -140,13 +140,17 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- Language selector -->
-      <div class="px-3 mt-4">
-        <label class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">
+    </div>
+
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col min-w-0">
+      <!-- Fixed toolbar: language + add server -->
+      <div class="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-background flex-shrink-0">
+        <label class="text-xs font-medium text-muted-foreground whitespace-nowrap">
           {{ t('modelManager.language') }}
         </label>
         <Select :model-value="store.selectedLanguage" @update:model-value="handleLanguageChange">
-          <SelectTrigger class="w-full">
+          <SelectTrigger class="w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -159,50 +163,47 @@ onMounted(async () => {
             </SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      <!-- Add API Server button -->
-      <div class="p-3 mt-2">
-        <Button variant="outline" size="sm" class="w-full" @click="showApiServerForm = true">
+        <div class="flex-1" />
+        <Button variant="outline" size="sm" @click="showApiServerForm = true">
           + {{ t('modelManager.addApiServer') }}
         </Button>
       </div>
-    </div>
 
-    <!-- Model list -->
-    <div class="flex-1 overflow-y-auto p-4">
-      <!-- Language warning -->
-      <div v-if="languageWarning" class="mb-4 px-3 py-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-sm">
-        {{ languageWarning }}
-      </div>
-
-      <!-- Engine header with install hint -->
-      <div class="mb-4">
-        <h2 class="text-lg font-semibold">
-          {{ selectedEngineInfo?.name || t('modelManager.models') }}
-        </h2>
-        <div v-if="selectedEngineInfo && !selectedEngineInfo.available && selectedEngineInfo.install_hint" class="mt-1 text-sm text-muted-foreground">
-          {{ t('modelManager.installWith') }}
-          <code class="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">{{ selectedEngineInfo.install_hint }}</code>
+      <!-- Scrollable model list -->
+      <div class="flex-1 overflow-y-auto p-4">
+        <!-- Language warning -->
+        <div v-if="languageWarning" class="mb-4 px-3 py-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-sm">
+          {{ languageWarning }}
         </div>
-      </div>
 
-      <div class="space-y-2">
-        <ModelCell
-          v-for="model in filteredModels"
-          :key="model.id"
-          :model="model"
-          :is-selected="model.id === store.selectedModelId"
-          :is-downloading="model.id === store.downloadingModelId"
-          :download-progress="model.id === store.downloadingModelId ? store.downloadProgress : 0"
-          @select="handleSelect"
-          @download="handleDownload"
-          @delete="handleDeleteRequest"
-        />
-      </div>
+        <!-- Engine header with install hint (always shown when hint exists) -->
+        <div class="mb-4">
+          <h2 class="text-lg font-semibold">
+            {{ selectedEngineInfo?.name || t('modelManager.models') }}
+          </h2>
+          <div v-if="selectedEngineInfo?.install_hint" class="mt-1 text-sm text-muted-foreground">
+            {{ t('modelManager.installWith') }}
+            <code class="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">{{ selectedEngineInfo.install_hint }}</code>
+          </div>
+        </div>
 
-      <div v-if="filteredModels.length === 0" class="text-muted-foreground text-sm py-8 text-center">
-        {{ t('modelManager.noModels') }}
+        <div class="space-y-2">
+          <ModelCell
+            v-for="model in filteredModels"
+            :key="model.id"
+            :model="model"
+            :is-selected="model.id === store.selectedModelId"
+            :is-downloading="model.id === store.downloadingModelId"
+            :download-progress="model.id === store.downloadingModelId ? store.downloadProgress : 0"
+            @select="handleSelect"
+            @download="handleDownload"
+            @delete="handleDeleteRequest"
+          />
+        </div>
+
+        <div v-if="filteredModels.length === 0" class="text-muted-foreground text-sm py-8 text-center">
+          {{ t('modelManager.noModels') }}
+        </div>
       </div>
     </div>
 

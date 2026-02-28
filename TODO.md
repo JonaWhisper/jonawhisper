@@ -8,9 +8,9 @@
 ## UX / Polish
 
 - [ ] **README** — Écrire un README propre pour le repo (description, screenshots, install, usage, build)
-- [ ] **Model Manager : langue en haut** — Déplacer la sélection de langue en haut de la fenêtre (actuellement en bas, se perd quand la liste de modèles grandit)
-- [ ] **Model Manager : layout toolbar en haut (Option A)** — Langue + bouton "Add Server" en header fixe, liste de modèles scrollable en dessous
-- [ ] **Model Manager : commande d'install visible pour tous les moteurs** — Afficher la commande d'installation même pour les moteurs déjà installés (ex: `brew install whisper-cpp`), pas seulement quand ils sont absents
+- [x] **Model Manager : langue en haut** — ✅ Déplacé dans une toolbar fixe en haut du contenu principal
+- [x] **Model Manager : layout toolbar en haut (Option A)** — ✅ Langue + bouton "Add Server" en header fixe, liste scrollable en dessous
+- [x] **Model Manager : commande d'install visible pour tous les moteurs** — ✅ Affiche la commande même quand le moteur est installé
 
 ## Fonctionnalités
 
