@@ -98,7 +98,6 @@ interface AppStatePayload {
 
 export interface SettingsPayload {
   app_locale: string
-  post_processing_enabled: boolean
   hallucination_filter_enabled: boolean
   hotkey: string
   cancel_shortcut: string
@@ -124,7 +123,6 @@ export const useAppStore = defineStore('app', () => {
   const deletingModels = ref<Record<string, boolean>>({})
   const selectedModelId = ref('whisper:large-v3-turbo-q8')
   const selectedLanguage = ref('auto')
-  const postProcessingEnabled = ref(true)
   const hallucinationFilterEnabled = ref(true)
   const appLocale = ref('auto')
   const cancelShortcut = ref('escape')
@@ -356,7 +354,6 @@ export const useAppStore = defineStore('app', () => {
     try {
       const s = await invoke<SettingsPayload>('get_settings')
       appLocale.value = s.app_locale
-      postProcessingEnabled.value = s.post_processing_enabled
       hallucinationFilterEnabled.value = s.hallucination_filter_enabled
       hotkey.value = s.hotkey
       selectedInputDeviceUid.value = s.selected_input_device_uid
@@ -377,7 +374,6 @@ export const useAppStore = defineStore('app', () => {
   function getSettingValue(key: string): string {
     switch (key) {
       case 'app_locale': return appLocale.value
-      case 'post_processing_enabled': return String(postProcessingEnabled.value)
       case 'hallucination_filter_enabled': return String(hallucinationFilterEnabled.value)
       case 'hotkey': return hotkey.value
       case 'cancel_shortcut': return cancelShortcut.value
@@ -399,7 +395,6 @@ export const useAppStore = defineStore('app', () => {
   function applySettingLocally(key: string, value: string) {
     switch (key) {
       case 'app_locale': appLocale.value = value; break
-      case 'post_processing_enabled': postProcessingEnabled.value = value === 'true'; break
       case 'hallucination_filter_enabled': hallucinationFilterEnabled.value = value === 'true'; break
       case 'hotkey': hotkey.value = value; break
       case 'cancel_shortcut': cancelShortcut.value = value; break
@@ -588,7 +583,7 @@ export const useAppStore = defineStore('app', () => {
     isRecording, isTranscribing, queueCount,
     activeDownloads, deletingModels,
     selectedModelId, selectedLanguage,
-    postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
+    hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
     textCleanupEnabled, cleanupModelId, llmProviderId, llmModel, llmMaxTokens, asrCloudModel, gpuMode,
     engines, models, languages, history,

@@ -267,11 +267,10 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (pp_enabled, lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
+    let (lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
          llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
-            s.post_processing_enabled,
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
             s.text_cleanup_enabled,
@@ -283,13 +282,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     };
 
     // Step 1: preprocess (hallucination filter + dictation commands)
-    let mut processed = if pp_enabled {
+    let mut processed = {
         let opts = post_processor::PostProcessOptions {
             hallucination_filter: hall_filter,
         };
         post_processor::preprocess(trimmed, &lang, &opts)
-    } else {
-        trimmed.to_string()
     };
 
     if processed.trim().is_empty() {
@@ -319,14 +316,10 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     log::warn!("BERT punctuation task panicked: {}", e);
                 }
             }
-            if pp_enabled {
-                processed = post_processor::finalize(&processed);
-            }
+            processed = post_processor::finalize(&processed);
         } else if let Some(cloud_provider_id) = cleanup_model_id.strip_prefix("cloud:") {
             // Cloud LLM (finalize before)
-            if pp_enabled {
-                processed = post_processor::finalize(&processed);
-            }
+            processed = post_processor::finalize(&processed);
             if let Some(provider) = providers.iter().find(|p| p.id == cloud_provider_id) {
                 match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
                     Ok(cleaned) => {
@@ -342,9 +335,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             }
         } else {
             // Local LLM (llama:*) — finalize before
-            if pp_enabled {
-                processed = post_processor::finalize(&processed);
-            }
+            processed = post_processor::finalize(&processed);
             let state_clone = Arc::clone(state);
             let text_for_llm = processed.clone();
             let lang_for_llm = lang.clone();
@@ -366,9 +357,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         }
     } else {
         // No cleanup: just finalize
-        if pp_enabled {
-            processed = post_processor::finalize(&processed);
-        }
+        processed = post_processor::finalize(&processed);
     }
 
     // Add a leading space when pasting consecutive results (queued recordings)

@@ -68,10 +68,6 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
   i18n.global.locale.value = locale as 'fr' | 'en'
 }
 
-async function onPostProcessingChange(enabled: boolean) {
-  await store.setSetting('post_processing_enabled', String(enabled))
-}
-
 async function onHallucinationFilterChange(enabled: boolean) {
   await store.setSetting('hallucination_filter_enabled', String(enabled))
 }
@@ -548,18 +544,9 @@ onUnmounted(() => {
 
       <!-- Post-processing -->
       <div v-if="activeSection === 'postprocessing'">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-semibold">{{ t('settings.section.postProcessing') }}</h2>
-          <Switch
-            :model-value="store.postProcessingEnabled"
-            @update:model-value="onPostProcessingChange"
-          />
-        </div>
+        <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.postProcessing') }}</h2>
 
-        <div
-          class="space-y-4"
-          :class="{ 'opacity-40 pointer-events-none': !store.postProcessingEnabled }"
-        >
+        <div class="space-y-4">
           <div class="flex items-center justify-between gap-4">
             <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
             <Switch

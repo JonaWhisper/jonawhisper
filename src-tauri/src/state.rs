@@ -99,8 +99,6 @@ pub struct Preferences {
     pub selected_model_id: String,
     #[serde(default = "default_language")]
     pub selected_language: String,
-    #[serde(default = "default_true")]
-    pub post_processing_enabled: bool,
     #[serde(default = "default_hotkey")]
     pub hotkey_option: String,
     #[serde(default)]
@@ -413,10 +411,7 @@ impl AppState {
     /// Save current preferences to disk.
     pub fn save_preferences(&self) {
         let settings = self.settings.lock().unwrap();
-        log::info!("save_preferences: post_processing={}, hallucination_filter={}",
-            settings.post_processing_enabled,
-            settings.hallucination_filter_enabled,
-        );
+        log::info!("save_preferences: hallucination_filter={}", settings.hallucination_filter_enabled);
         settings.save();
     }
 

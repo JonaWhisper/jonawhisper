@@ -139,12 +139,11 @@ pub fn request_permission(kind: String, app: AppHandle) -> bool {
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     let s = state.settings.lock().unwrap();
-    log::info!("get_settings: post_processing={}, hallucination_filter={}, text_cleanup_enabled={}, cleanup_model_id={}",
-        s.post_processing_enabled, s.hallucination_filter_enabled, s.text_cleanup_enabled, s.cleanup_model_id,
+    log::info!("get_settings: hallucination_filter={}, text_cleanup_enabled={}, cleanup_model_id={}",
+        s.hallucination_filter_enabled, s.text_cleanup_enabled, s.cleanup_model_id,
     );
     serde_json::json!({
         "app_locale": s.app_locale,
-        "post_processing_enabled": s.post_processing_enabled,
         "hallucination_filter_enabled": s.hallucination_filter_enabled,
         "hotkey": s.hotkey_option,
         "selected_input_device_uid": s.selected_input_device_uid,
@@ -181,7 +180,6 @@ pub fn set_setting(
                 let lang = crate::resolve_locale(&value);
                 rust_i18n::set_locale(&lang);
             }
-            "post_processing_enabled" => s.post_processing_enabled = value == "true",
             "hallucination_filter_enabled" => s.hallucination_filter_enabled = value == "true",
             "hotkey" => s.hotkey_option = value.clone(),
             "cancel_shortcut" => s.cancel_shortcut = value.clone(),
