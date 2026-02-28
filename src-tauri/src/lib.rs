@@ -59,6 +59,8 @@ pub fn run() {
             commands::get_app_state,
             commands::start_mic_test,
             commands::stop_mic_test,
+            commands::start_shortcut_capture,
+            commands::stop_shortcut_capture,
             commands::simulate_pill_test,
         ])
         .setup(move |app| {
@@ -87,14 +89,14 @@ pub fn run() {
             app.manage(monitor_enabled.clone());
 
             // Start CGEvent tap hotkey monitor (with cancel key support)
-            let (hotkey_name, cancel_name) = {
+            let (hotkey_str, cancel_str) = {
                 let s = app_state.settings.lock().unwrap();
                 (s.hotkey_option.clone(), s.cancel_shortcut.clone())
             };
-            let initial_hotkey = platform::hotkey::HotkeyOption::from_name(&hotkey_name);
-            let initial_cancel_key = platform::hotkey::cancel_keys::from_name(&cancel_name);
+            let initial_record = platform::hotkey::Shortcut::parse(&hotkey_str);
+            let initial_cancel = platform::hotkey::Shortcut::parse(&cancel_str);
             let (hotkey_rx, hotkey_update_tx) =
-                platform::hotkey::start_monitor(initial_hotkey, initial_cancel_key, monitor_enabled.clone());
+                platform::hotkey::start_monitor(initial_record, initial_cancel, monitor_enabled.clone());
             app.manage(HotkeyUpdateSender(hotkey_update_tx));
 
             // Hotkey event processing thread

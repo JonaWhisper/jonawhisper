@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import SpectrumBars from '@/components/SpectrumBars.vue'
+import ShortcutCapture from '@/components/ShortcutCapture.vue'
+import { serializeShortcut } from '@/utils/shortcut'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -37,13 +39,6 @@ const sections = [
 const isTesting = ref(false)
 const testSpectrum = ref<number[]>(new Array(12).fill(0))
 let spectrumUnlisten: (() => void) | null = null
-
-const hotkeyOptions = [
-  { value: 'right_command', label: 'hotkey.rightCommand' },
-  { value: 'right_option', label: 'hotkey.rightOption' },
-  { value: 'right_control', label: 'hotkey.rightControl' },
-  { value: 'right_shift', label: 'hotkey.rightShift' },
-]
 
 const localeOptions = [
   { value: 'auto', label: 'settings.locale.auto' },
@@ -69,14 +64,17 @@ async function onHallucinationFilterChange(enabled: boolean) {
   await store.setSetting('hallucination_filter_enabled', String(enabled))
 }
 
-async function onHotkeyChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
+async function onHotkeyChange(value: string) {
   await store.setSetting('hotkey', value)
 }
 
-async function onCancelShortcutChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
+async function onCancelShortcutChange(value: string) {
   await store.setSetting('cancel_shortcut', value)
+}
+
+function onDisableCancel() {
+  const disabled = serializeShortcut({ key_code: 0, modifiers: 0, kind: 'Key' })
+  onCancelShortcutChange(disabled)
 }
 
 async function onRecordingModeChange(mode: string) {
@@ -390,32 +388,29 @@ onUnmounted(() => {
 
           <div class="space-y-1.5">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.record') }}</Label>
-            <Select :model-value="store.hotkey" @update:model-value="onHotkeyChange">
-              <SelectTrigger class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="opt in hotkeyOptions"
-                  :key="opt.value"
-                  :value="opt.value"
-                >
-                  {{ t(opt.label) }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <ShortcutCapture
+              :model-value="store.hotkey"
+              @update:model-value="onHotkeyChange"
+            />
           </div>
 
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
-              <p class="text-xs text-muted-foreground mt-0.5">{{ t('settings.shortcut.cancel.escape') }}</p>
+          <div class="space-y-1.5">
+            <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
+            <div class="flex gap-2">
+              <ShortcutCapture
+                class="flex-1"
+                :model-value="store.cancelShortcut"
+                @update:model-value="onCancelShortcutChange"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                @click="onDisableCancel"
+              >
+                {{ t('settings.shortcut.cancel.none') }}
+              </Button>
             </div>
-            <Switch
-              class="shrink-0"
-              :model-value="store.cancelShortcut === 'escape'"
-              @update:model-value="(v: boolean) => onCancelShortcutChange(v ? 'escape' : 'none')"
-            />
           </div>
         </div>
       </div>

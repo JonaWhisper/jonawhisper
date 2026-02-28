@@ -157,5 +157,7 @@
   "history.emptySearch": "Aucun résultat pour \u00ab {0} \u00bb",
   "history.today": "Aujourd'hui",
   "history.yesterday": "Hier",
-  "history.cancel": "Annuler"
+  "history.cancel": "Annuler",
+  "shortcutCapture.waiting": "Appuyez sur un raccourci\u2026",
+  "shortcutCapture.escToCancel": "\u00c9chap pour annuler"
 }

@@ -157,5 +157,7 @@
   "history.emptySearch": "No results for \"{0}\"",
   "history.today": "Today",
   "history.yesterday": "Yesterday",
-  "history.cancel": "Cancel"
+  "history.cancel": "Cancel",
+  "shortcutCapture.waiting": "Press a shortcut…",
+  "shortcutCapture.escToCancel": "Esc to cancel"
 }

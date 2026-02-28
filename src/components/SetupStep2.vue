@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ChevronRight } from 'lucide-vue-next'
+import ShortcutCapture from '@/components/ShortcutCapture.vue'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -40,15 +41,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
 }
 
 // -- Hotkey --
-const hotkeyOptions = [
-  { value: 'right_command', label: 'hotkey.rightCommand' },
-  { value: 'right_option', label: 'hotkey.rightOption' },
-  { value: 'right_control', label: 'hotkey.rightControl' },
-  { value: 'right_shift', label: 'hotkey.rightShift' },
-]
-
-async function onHotkeyChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
+async function onHotkeyChange(value: string) {
   await store.setSetting('hotkey', value)
 }
 
@@ -174,16 +167,10 @@ const canStart = computed(() => {
       <!-- Hotkey -->
       <div class="space-y-1.5">
         <Label class="text-sm font-medium">{{ t('setup.step2.hotkey') }}</Label>
-        <Select :model-value="store.hotkey" @update:model-value="onHotkeyChange">
-          <SelectTrigger class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="opt in hotkeyOptions" :key="opt.value" :value="opt.value">
-              {{ t(opt.label) }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <ShortcutCapture
+          :model-value="store.hotkey"
+          @update:model-value="onHotkeyChange"
+        />
         <p class="text-[11px] text-muted-foreground">{{ t('setup.step2.hotkeyDesc') }}</p>
       </div>
 

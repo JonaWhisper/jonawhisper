@@ -458,6 +458,23 @@ pub fn spawn_hotkey_handler(
                     cancel_transcription(&app, &state);
                 }
             }
+            Ok(hotkey::HotkeyEvent::CaptureUpdate { modifiers, key_code }) => {
+                let _ = app.emit("shortcut-capture-update", serde_json::json!({
+                    "modifiers": modifiers,
+                    "key_code": key_code,
+                }));
+            }
+            Ok(hotkey::HotkeyEvent::CaptureComplete(shortcut)) => {
+                let _ = app.emit("shortcut-capture-complete", serde_json::json!({
+                    "key_code": shortcut.key_code,
+                    "modifiers": shortcut.modifiers,
+                    "kind": shortcut.kind,
+                    "display": shortcut.display_string(),
+                }));
+            }
+            Ok(hotkey::HotkeyEvent::CaptureCancelled) => {
+                let _ = app.emit("shortcut-capture-cancelled", ());
+            }
             Err(_) => break,
         }
     });

@@ -151,12 +151,12 @@ pub fn set_setting(
     // Send hotkey updates outside the settings lock
     match key.as_str() {
         "hotkey" => {
-            let new_hotkey = hotkey::HotkeyOption::from_name(&value);
-            let _ = hotkey_sender.0.send(hotkey::HotkeyUpdate::SetHotkey(new_hotkey));
+            let shortcut = hotkey::Shortcut::parse(&value);
+            let _ = hotkey_sender.0.send(hotkey::HotkeyUpdate::SetRecordShortcut(shortcut));
         }
         "cancel_shortcut" => {
-            let new_cancel_key = hotkey::cancel_keys::from_name(&value);
-            let _ = hotkey_sender.0.send(hotkey::HotkeyUpdate::SetCancelKey(new_cancel_key));
+            let shortcut = hotkey::Shortcut::parse(&value);
+            let _ = hotkey_sender.0.send(hotkey::HotkeyUpdate::SetCancelShortcut(shortcut));
         }
         _ => {}
     }
@@ -278,6 +278,18 @@ pub fn start_monitoring(
 #[tauri::command]
 pub fn get_app_state(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     state.to_frontend_json()
+}
+
+// -- Shortcut capture --
+
+#[tauri::command]
+pub fn start_shortcut_capture(hotkey_sender: tauri::State<'_, crate::HotkeyUpdateSender>) {
+    let _ = hotkey_sender.0.send(crate::platform::hotkey::HotkeyUpdate::EnterCaptureMode);
+}
+
+#[tauri::command]
+pub fn stop_shortcut_capture(hotkey_sender: tauri::State<'_, crate::HotkeyUpdateSender>) {
+    let _ = hotkey_sender.0.send(crate::platform::hotkey::HotkeyUpdate::ExitCaptureMode);
 }
 
 // -- Debug --
