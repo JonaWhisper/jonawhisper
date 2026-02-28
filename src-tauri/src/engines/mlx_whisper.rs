@@ -64,6 +64,7 @@ impl ASREngine for MLXWhisperEngine {
 
     fn supported_languages(&self) -> Vec<Language> { common_languages() }
 
+    fn description(&self) -> &str { "Apple Silicon optimized (M1/M2/M3/M4 Neural Engine)." }
     fn install_hint(&self) -> &str { "pip install mlx-whisper" }
 
     fn resolve_executable(&self) -> Option<String> {

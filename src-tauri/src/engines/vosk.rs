@@ -48,6 +48,7 @@ impl ASREngine for VoskEngine {
         ]
     }
 
+    fn description(&self) -> &str { "Lightweight offline engine. Language-specific models." }
     fn install_hint(&self) -> &str { "pip install vosk" }
 
     fn resolve_executable(&self) -> Option<String> {

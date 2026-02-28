@@ -77,6 +77,7 @@ pub trait ASREngine: Send + Sync {
     fn display_name(&self) -> &str;
     fn models(&self) -> Vec<ASRModel>;
     fn supported_languages(&self) -> Vec<Language>;
+    fn description(&self) -> &str;
     fn install_hint(&self) -> &str;
     fn resolve_executable(&self) -> Option<String>;
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError>;
@@ -88,6 +89,7 @@ pub trait ASREngine: Send + Sync {
 pub struct EngineInfo {
     pub id: String,
     pub name: String,
+    pub description: String,
     pub install_hint: String,
     pub available: bool,
     pub tool_name: Option<String>,
@@ -184,6 +186,7 @@ impl EngineCatalog {
             .map(|e| EngineInfo {
                 id: e.engine_id().to_string(),
                 name: e.display_name().to_string(),
+                description: e.description().to_string(),
                 install_hint: e.install_hint().to_string(),
                 available: e.resolve_executable().is_some()
                     || e.engine_id() == "openai-api",

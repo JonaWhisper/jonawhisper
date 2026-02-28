@@ -64,6 +64,7 @@ impl ASREngine for FasterWhisperEngine {
 
     fn supported_languages(&self) -> Vec<Language> { common_languages() }
 
+    fn description(&self) -> &str { "CTranslate2 optimization, ~4x faster. Best with NVIDIA GPU." }
     fn install_hint(&self) -> &str { "pip install whisper-ctranslate2" }
 
     fn resolve_executable(&self) -> Option<String> {

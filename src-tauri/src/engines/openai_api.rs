@@ -39,6 +39,7 @@ impl ASREngine for OpenAIAPIEngine {
 
     fn supported_languages(&self) -> Vec<Language> { common_languages() }
 
+    fn description(&self) -> &str { "Cloud transcription via OpenAI-compatible API." }
     fn install_hint(&self) -> &str { "" }
 
     fn resolve_executable(&self) -> Option<String> {

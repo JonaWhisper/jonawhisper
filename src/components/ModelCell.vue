@@ -55,7 +55,7 @@ const isRemoteAPI = computed(() => props.model.download_type.type === 'RemoteAPI
 
     <!-- Model info -->
     <div class="flex-1 min-w-0">
-      <div class="font-medium text-sm">{{ model.label }}</div>
+      <div class="font-medium text-sm truncate">{{ model.label }}</div>
       <div v-if="model.size" class="text-xs text-muted-foreground">{{ model.size }}</div>
     </div>
 

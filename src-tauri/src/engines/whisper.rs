@@ -57,6 +57,7 @@ impl ASREngine for WhisperEngine {
 
     fn supported_languages(&self) -> Vec<Language> { common_languages() }
 
+    fn description(&self) -> &str { "C++ implementation, fast on CPU. Default engine." }
     fn install_hint(&self) -> &str { "brew install whisper-cpp" }
 
     fn resolve_executable(&self) -> Option<String> {

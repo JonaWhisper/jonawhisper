@@ -33,6 +33,7 @@ impl ASREngine for MoonshineEngine {
         ]
     }
 
+    fn description(&self) -> &str { "Ultra-fast, tiny models. English only." }
     fn install_hint(&self) -> &str { "pip install useful-moonshine" }
 
     fn resolve_executable(&self) -> Option<String> {
