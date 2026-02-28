@@ -81,18 +81,7 @@ onMounted(async () => {
             ? 'bg-accent text-accent-foreground'
             : 'hover:bg-accent/50 text-foreground'"
         >
-          <div class="flex items-center gap-2">
-            <span
-              class="w-2 h-2 rounded-full flex-shrink-0"
-              :class="engine.available ? 'bg-green-500' : 'bg-gray-400'"
-            />
-            <div class="min-w-0">
-              <div class="font-medium truncate">{{ engine.name }}</div>
-              <div v-if="engine.tool_name" class="text-xs text-muted-foreground truncate">
-                {{ engine.tool_name }}
-              </div>
-            </div>
-          </div>
+          <span class="font-medium truncate">{{ engine.name }}</span>
         </button>
       </div>
     </div>
