@@ -139,8 +139,8 @@ pub fn request_permission(kind: String, app: AppHandle) -> bool {
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     let s = state.settings.lock().unwrap();
-    log::info!("get_settings: post_processing={}, hallucination_filter={}, llm_enabled={}",
-        s.post_processing_enabled, s.hallucination_filter_enabled, s.llm_enabled,
+    log::info!("get_settings: post_processing={}, hallucination_filter={}, cleanup_mode={}",
+        s.post_processing_enabled, s.hallucination_filter_enabled, s.cleanup_mode,
     );
     serde_json::json!({
         "app_locale": s.app_locale,
@@ -152,7 +152,8 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "selected_language": s.selected_language,
         "cancel_shortcut": s.cancel_shortcut,
         "recording_mode": s.recording_mode,
-        "llm_enabled": s.llm_enabled,
+        "cleanup_mode": s.cleanup_mode,
+        "punctuation_model_id": s.punctuation_model_id,
         "llm_provider_id": s.llm_provider_id,
         "llm_model": s.llm_model,
         "llm_source": s.llm_source,
@@ -193,7 +194,8 @@ pub fn set_setting(
             }
             "selected_model_id" => s.selected_model_id = value.clone(),
             "selected_language" => s.selected_language = value.clone(),
-            "llm_enabled" => s.llm_enabled = value == "true",
+            "cleanup_mode" => s.cleanup_mode = value.clone(),
+            "punctuation_model_id" => s.punctuation_model_id = value.clone(),
             "llm_provider_id" => s.llm_provider_id = value.clone(),
             "llm_model" => s.llm_model = value.clone(),
             "llm_source" => s.llm_source = value.clone(),
@@ -215,6 +217,10 @@ pub fn set_setting(
     // Invalidate cached LLM context when local model changes
     if key == "llm_local_model_id" {
         *state.llm_context.lock().unwrap() = None;
+    }
+    // Invalidate cached BERT context when punctuation model changes
+    if key == "punctuation_model_id" || key == "cleanup_mode" {
+        *state.bert_context.lock().unwrap() = None;
     }
     // Send hotkey updates outside the settings lock
     match key.as_str() {

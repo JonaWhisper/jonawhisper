@@ -15,7 +15,8 @@ pub struct PostProcessOptions {
     pub hallucination_filter: bool,
 }
 
-pub fn process(text: &str, language: &str, opts: &PostProcessOptions) -> String {
+/// Phase 1: hallucination filter + dictation command substitution.
+pub fn preprocess(text: &str, language: &str, opts: &PostProcessOptions) -> String {
     let mut result = if opts.hallucination_filter {
         strip_hallucinations(text)
     } else {
@@ -27,7 +28,12 @@ pub fn process(text: &str, language: &str, opts: &PostProcessOptions) -> String 
 
     let lang = resolve_language(language, &result);
     result = apply_dictation_commands(&result, &lang);
-    result = fix_punctuation_spacing(&result);
+    result
+}
+
+/// Phase 2: spacing fixes + capitalization after sentences + capitalize first char.
+pub fn finalize(text: &str) -> String {
+    let mut result = fix_punctuation_spacing(text);
     result = capitalize_after_sentence_endings(&result);
 
     // Capitalize first character
@@ -39,6 +45,16 @@ pub fn process(text: &str, language: &str, opts: &PostProcessOptions) -> String 
     }
 
     result
+}
+
+/// Full pipeline: preprocess + finalize (convenience wrapper, used by tests).
+#[cfg(test)]
+pub fn process(text: &str, language: &str, opts: &PostProcessOptions) -> String {
+    let preprocessed = preprocess(text, language, opts);
+    if preprocessed.is_empty() {
+        return String::new();
+    }
+    finalize(&preprocessed)
 }
 
 /// Known Whisper hallucination phrases that appear on silence/noise.

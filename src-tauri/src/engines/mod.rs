@@ -2,6 +2,7 @@ pub mod whisper;
 pub mod openai_api;
 pub mod downloader;
 pub mod llama;
+pub mod bert;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 pub enum EngineCategory {
     ASR,
     LLM,
+    Punctuation,
 }
 
 // -- Download type --
@@ -150,6 +152,7 @@ impl EngineCatalog {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
             Box::new(llama::LlamaEngine),
+            Box::new(bert::BertPunctuationEngine),
         ];
 
         Self { engines }

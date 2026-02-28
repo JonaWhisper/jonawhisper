@@ -58,6 +58,8 @@ pub struct AppState {
     pub whisper_context: Mutex<Option<(String, String, whisper_rs::WhisperContext)>>,
     /// Cached LLM context for local inference. Invalidated when llm_local_model_id changes.
     pub llm_context: Mutex<Option<crate::llm_local::LlmContext>>,
+    /// Cached BERT punctuation context. Invalidated when punctuation_model_id changes.
+    pub bert_context: Mutex<Option<crate::bert_punctuation::BertContext>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -113,8 +115,11 @@ pub struct Preferences {
     pub cancel_shortcut: String,
     #[serde(default = "default_recording_mode")]
     pub recording_mode: String,
+    /// "none" | "punctuation" | "full"
+    #[serde(default = "default_none")]
+    pub cleanup_mode: String,
     #[serde(default)]
-    pub llm_enabled: bool,
+    pub punctuation_model_id: String,
     #[serde(default)]
     pub llm_provider_id: String,
     #[serde(default)]
@@ -142,6 +147,7 @@ fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
+fn default_none() -> String { "none".to_string() }
 fn default_llm_source() -> String { "cloud".to_string() }
 fn default_llm_max_tokens() -> u32 { 256 }
 
@@ -206,13 +212,14 @@ impl Preferences {
 
                 // 2. Convert llm_config → provider + settings
                 if let Some(llm) = raw.get("llm_config") {
-                    let enabled = llm.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
                     let provider_str = llm.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
                     let api_url = llm.get("api_url").and_then(|v| v.as_str()).unwrap_or("");
                     let api_key = llm.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
                     let model = llm.get("model").and_then(|v| v.as_str()).unwrap_or("");
 
-                    prefs.llm_enabled = enabled;
+                    if llm.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+                        prefs.cleanup_mode = "full".to_string();
+                    }
                     prefs.llm_model = model.to_string();
 
                     if !api_url.is_empty() {
@@ -273,9 +280,13 @@ impl Preferences {
                 needs_save = true;
             }
 
-            // Migrate: if llm_enabled with a cloud provider but no llm_source set, default to cloud
-            if prefs.llm_enabled && !prefs.llm_provider_id.is_empty() && prefs.llm_source == "cloud" {
-                // Already correct default, no migration needed
+            // Migrate llm_enabled → cleanup_mode
+            if let Some(llm_enabled) = raw.get("llm_enabled").and_then(|v| v.as_bool()) {
+                if llm_enabled && prefs.cleanup_mode == "none" {
+                    log::info!("Migrating llm_enabled=true → cleanup_mode=full");
+                    prefs.cleanup_mode = "full".to_string();
+                    needs_save = true;
+                }
             }
         }
 
@@ -352,6 +363,7 @@ impl Default for AppState {
             tray_menu: Mutex::new(None),
             whisper_context: Mutex::new(None),
             llm_context: Mutex::new(None),
+            bert_context: Mutex::new(None),
         }
     }
 }

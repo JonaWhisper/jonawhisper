@@ -15,7 +15,7 @@ export interface EngineInfo {
   id: string
   name: string
   description: string
-  category: 'asr' | 'llm'
+  category: 'asr' | 'llm' | 'punctuation'
   available: boolean
   supported_language_codes: string[]
 }
@@ -106,7 +106,8 @@ export interface SettingsPayload {
   selected_input_device_uid: string | null
   selected_model_id: string
   selected_language: string
-  llm_enabled: boolean
+  cleanup_mode: string
+  punctuation_model_id: string
   llm_provider_id: string
   llm_model: string
   llm_source: string
@@ -133,7 +134,8 @@ export const useAppStore = defineStore('app', () => {
   const recordingMode = ref('push_to_talk')
   const selectedInputDeviceUid = ref<string | null>(null)
   const hotkey = ref('right_command')
-  const llmEnabled = ref(false)
+  const cleanupMode = ref<'none' | 'punctuation' | 'full'>('none')
+  const punctuationModelId = ref('')
   const llmProviderId = ref('')
   const llmModel = ref('')
   const llmSource = ref<'local' | 'cloud'>('cloud')
@@ -169,6 +171,12 @@ export const useAppStore = defineStore('app', () => {
     const llmEngineIds = new Set(llmEngines.value.map(e => e.id))
     return models.value.filter(m => llmEngineIds.has(m.engine_id) && m.is_downloaded)
   })
+  const punctuationEngines = computed(() => engines.value.filter(e => e.category === 'punctuation'))
+  const downloadedPunctuationModels = computed(() => {
+    const ids = new Set(punctuationEngines.value.map(e => e.id))
+    return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
+  })
+  const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
 
   // Actions
   async function fetchEngines() {
@@ -324,7 +332,8 @@ export const useAppStore = defineStore('app', () => {
       recordingMode.value = s.recording_mode
       selectedModelId.value = s.selected_model_id
       selectedLanguage.value = s.selected_language
-      llmEnabled.value = s.llm_enabled ?? false
+      cleanupMode.value = (s.cleanup_mode as 'none' | 'punctuation' | 'full') ?? 'none'
+      punctuationModelId.value = s.punctuation_model_id ?? ''
       llmProviderId.value = s.llm_provider_id ?? ''
       llmModel.value = s.llm_model ?? ''
       llmSource.value = (s.llm_source as 'local' | 'cloud') ?? 'cloud'
@@ -347,7 +356,8 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_input_device_uid': return selectedInputDeviceUid.value ?? ''
       case 'selected_model_id': return selectedModelId.value
       case 'selected_language': return selectedLanguage.value
-      case 'llm_enabled': return String(llmEnabled.value)
+      case 'cleanup_mode': return cleanupMode.value
+      case 'punctuation_model_id': return punctuationModelId.value
       case 'llm_provider_id': return llmProviderId.value
       case 'llm_model': return llmModel.value
       case 'llm_source': return llmSource.value
@@ -371,7 +381,8 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_input_device_uid': selectedInputDeviceUid.value = value || null; break
       case 'selected_model_id': selectedModelId.value = value; break
       case 'selected_language': selectedLanguage.value = value; break
-      case 'llm_enabled': llmEnabled.value = value === 'true'; break
+      case 'cleanup_mode': cleanupMode.value = value as 'none' | 'punctuation' | 'full'; break
+      case 'punctuation_model_id': punctuationModelId.value = value; break
       case 'llm_provider_id': llmProviderId.value = value; break
       case 'llm_model': llmModel.value = value; break
       case 'llm_source': llmSource.value = value as 'local' | 'cloud'; break
@@ -556,11 +567,11 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    llmEnabled, llmProviderId, llmModel, llmSource, llmLocalModelId, llmMaxTokens, asrProviderId, asrCloudModel, gpuMode,
+    cleanupMode, punctuationModelId, llmProviderId, llmModel, llmSource, llmLocalModelId, llmMaxTokens, asrProviderId, asrCloudModel, gpuMode,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed
-    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels,
+    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady,
     // Actions
     init, fetchEngines, fetchModels, fetchLanguages,
     fetchAudioDevices, fetchPermissions, fetchHistory,

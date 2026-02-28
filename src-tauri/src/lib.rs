@@ -1,4 +1,5 @@
 mod audio;
+mod bert_punctuation;
 mod commands;
 mod engines;
 mod errors;

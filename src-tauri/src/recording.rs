@@ -267,13 +267,15 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (pp_enabled, lang, hall_filter, llm_enabled, llm_source, llm_provider_id, llm_model, llm_local_model_id, llm_max_tokens, providers) = {
+    let (pp_enabled, lang, hall_filter, cleanup_mode, punctuation_model_id,
+         llm_source, llm_provider_id, llm_model, llm_local_model_id, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.post_processing_enabled,
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
-            s.llm_enabled,
+            s.cleanup_mode.clone(),
+            s.punctuation_model_id.clone(),
             s.llm_source.clone(),
             s.llm_provider_id.clone(),
             s.llm_model.clone(),
@@ -283,51 +285,92 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         )
     };
 
-    // Step 1: regex-based post-processing
+    // Step 1: preprocess (hallucination filter + dictation commands)
     let mut processed = if pp_enabled {
         let opts = post_processor::PostProcessOptions {
             hallucination_filter: hall_filter,
         };
-        post_processor::process(trimmed, &lang, &opts)
+        post_processor::preprocess(trimmed, &lang, &opts)
     } else {
         trimmed.to_string()
     };
 
-    // Step 2: LLM cleanup (if enabled)
-    if llm_enabled {
-        if llm_source == "local" {
-            // Local LLM inference via llama.cpp
+    if processed.trim().is_empty() {
+        platform::play_sound("Basso");
+        let _ = app.emit(crate::events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": "" }));
+        return;
+    }
+
+    // Step 2: mode-specific cleanup
+    match cleanup_mode.as_str() {
+        "punctuation" => {
+            // BERT punctuation restoration
             let state_clone = Arc::clone(state);
-            let text_for_llm = processed.clone();
-            let lang_for_llm = lang.clone();
+            let text_for_bert = processed.clone();
             match tokio::task::spawn_blocking(move || {
-                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &llm_local_model_id, llm_max_tokens)
+                run_bert_punctuation(&state_clone, &text_for_bert, &punctuation_model_id)
             }).await {
-                Ok(Ok(cleaned)) => {
-                    log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
-                    processed = cleaned;
+                Ok(Ok(punctuated)) => {
+                    log::info!("BERT punctuation: {} → {}", processed.len(), punctuated.len());
+                    processed = punctuated;
                 }
                 Ok(Err(e)) => {
-                    log::warn!("Local LLM cleanup failed, using regex result: {}", e);
+                    log::warn!("BERT punctuation failed, using preprocessed result: {}", e);
                 }
                 Err(e) => {
-                    log::warn!("Local LLM cleanup task panicked: {}", e);
+                    log::warn!("BERT punctuation task panicked: {}", e);
                 }
             }
-        } else {
-            // Cloud LLM cleanup
-            if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
-                match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
-                    Ok(cleaned) => {
-                        log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+            // Finalize spacing + capitalization after BERT
+            if pp_enabled {
+                processed = post_processor::finalize(&processed);
+            }
+        }
+        "full" => {
+            // Finalize before LLM (clean input, matches previous behavior)
+            if pp_enabled {
+                processed = post_processor::finalize(&processed);
+            }
+            // LLM cleanup
+            if llm_source == "local" {
+                let state_clone = Arc::clone(state);
+                let text_for_llm = processed.clone();
+                let lang_for_llm = lang.clone();
+                match tokio::task::spawn_blocking(move || {
+                    run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &llm_local_model_id, llm_max_tokens)
+                }).await {
+                    Ok(Ok(cleaned)) => {
+                        log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
                         processed = cleaned;
                     }
+                    Ok(Err(e)) => {
+                        log::warn!("Local LLM cleanup failed, using regex result: {}", e);
+                    }
                     Err(e) => {
-                        log::warn!("LLM cleanup failed, using regex result: {}", e);
+                        log::warn!("Local LLM cleanup task panicked: {}", e);
                     }
                 }
             } else {
-                log::warn!("LLM cleanup enabled but provider '{}' not found", llm_provider_id);
+                // Cloud LLM cleanup
+                if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
+                    match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
+                        Ok(cleaned) => {
+                            log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                            processed = cleaned;
+                        }
+                        Err(e) => {
+                            log::warn!("LLM cleanup failed, using regex result: {}", e);
+                        }
+                    }
+                } else {
+                    log::warn!("LLM cleanup enabled but provider '{}' not found", llm_provider_id);
+                }
+            }
+        }
+        _ => {
+            // "none": just finalize
+            if pp_enabled {
+                processed = post_processor::finalize(&processed);
             }
         }
     }
@@ -357,6 +400,43 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         crate::events::TRANSCRIPTION_COMPLETE,
         serde_json::json!({ "text": processed }),
     );
+}
+
+// -- BERT punctuation --
+
+fn run_bert_punctuation(
+    state: &Arc<AppState>,
+    text: &str,
+    punctuation_model_id: &str,
+) -> Result<String, String> {
+    // Resolve model: use explicit ID or auto-select first downloaded punctuation model
+    let catalog = crate::engines::EngineCatalog::new();
+    let model = if punctuation_model_id.is_empty() {
+        // Auto-select first downloaded punctuation model
+        catalog.all_models().into_iter()
+            .find(|m| m.engine_id == "bert-punctuation" && m.is_downloaded())
+            .ok_or_else(|| "No punctuation model downloaded".to_string())?
+    } else {
+        catalog.model_by_id(punctuation_model_id)
+            .ok_or_else(|| format!("Punctuation model not found: {}", punctuation_model_id))?
+    };
+
+    if !model.is_downloaded() {
+        return Err(format!("Punctuation model not downloaded: {}", model.id));
+    }
+
+    let model_path = model.local_path();
+
+    // Load or reuse cached BertContext
+    let mut ctx_guard = state.bert_context.lock().unwrap();
+    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
+        log::info!("Loading BERT punctuation model: {}", model.id);
+        let ctx = crate::bert_punctuation::BertContext::load(&model_path, &model.id)?;
+        *ctx_guard = Some(ctx);
+    }
+
+    let ctx = ctx_guard.as_mut().unwrap();
+    crate::bert_punctuation::restore_punctuation(ctx, text)
 }
 
 // -- Local LLM cleanup --

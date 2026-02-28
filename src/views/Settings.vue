@@ -290,8 +290,13 @@ const isCustomLlmModel = computed(() => llmModelOptions.value.length === 0)
 
 let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
 
-async function onLlmEnabledChange(enabled: boolean) {
-  await store.setSetting('llm_enabled', String(enabled))
+async function onCleanupModeChange(mode: string) {
+  await store.setSetting('cleanup_mode', mode)
+}
+
+async function onPunctuationModelChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('punctuation_model_id', value)
 }
 
 async function onLlmMaxTokensChange(event: Event) {
@@ -671,17 +676,69 @@ onUnmounted(() => {
                 @update:model-value="onHallucinationFilterChange"
               />
             </div>
-            <div class="flex items-center justify-between gap-4">
-              <Label class="text-sm shrink-0">{{ t('settings.postProcessing.llm') }}</Label>
-              <Switch
-                :model-value="store.llmEnabled"
-                @update:model-value="onLlmEnabledChange"
-              />
+            <!-- Cleanup mode segmented control -->
+            <div class="space-y-1">
+              <Label class="text-sm shrink-0">{{ t('settings.postProcessing.cleanupMode') }}</Label>
+              <div class="inline-flex rounded-md border border-border overflow-hidden w-full">
+                <button
+                  class="flex-1 px-3 py-1.5 text-sm transition-colors"
+                  :class="store.cleanupMode === 'none'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-accent/50 text-muted-foreground'"
+                  @click="onCleanupModeChange('none')"
+                >
+                  {{ t('settings.postProcessing.cleanupMode.none') }}
+                </button>
+                <button
+                  class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
+                  :class="store.cleanupMode === 'punctuation'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-accent/50 text-muted-foreground'"
+                  :disabled="!store.bertModelReady"
+                  @click="store.bertModelReady && onCleanupModeChange('punctuation')"
+                >
+                  {{ t('settings.postProcessing.cleanupMode.punctuation') }}
+                </button>
+                <button
+                  class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
+                  :class="store.cleanupMode === 'full'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-accent/50 text-muted-foreground'"
+                  @click="onCleanupModeChange('full')"
+                >
+                  {{ t('settings.postProcessing.cleanupMode.full') }}
+                </button>
+              </div>
+              <p v-if="!store.bertModelReady" class="text-xs text-muted-foreground mt-1">
+                {{ t('settings.postProcessing.punctuationNeedsModel') }}
+              </p>
             </div>
 
-            <!-- LLM config -->
+            <!-- Punctuation model selector (when punctuation mode and multiple models) -->
             <div
-              v-if="store.llmEnabled"
+              v-if="store.cleanupMode === 'punctuation' && store.downloadedPunctuationModels.length > 1"
+              class="space-y-1 pl-4 border-l-2 border-border"
+            >
+              <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+              <Select :model-value="store.punctuationModelId" @update:model-value="onPunctuationModelChange">
+                <SelectTrigger class="w-full h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="m in store.downloadedPunctuationModels"
+                    :key="m.id"
+                    :value="m.id"
+                  >
+                    {{ m.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <!-- LLM config (only when full correction mode) -->
+            <div
+              v-if="store.cleanupMode === 'full'"
               class="space-y-4 pl-4 border-l-2 border-border"
             >
               <!-- Source toggle: Local / Cloud -->
