@@ -79,6 +79,7 @@ watch(step, async (newStep) => {
 })
 
 onMounted(() => {
+  getCurrentWindow().setTitle(t('window.setup'))
   store.fetchPermissions()
   pollInterval = setInterval(() => {
     store.fetchPermissions()

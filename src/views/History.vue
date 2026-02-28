@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
 import type { HistoryEntry } from '@/stores/app'
 import { Button } from '@/components/ui/button'
@@ -46,6 +47,7 @@ watch(searchQuery, () => {
 })
 
 onMounted(async () => {
+  getCurrentWindow().setTitle(t('window.history'))
   await store.init()
   updateFiltered()
 })

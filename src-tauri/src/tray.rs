@@ -1,4 +1,3 @@
-use crate::engines::{common_languages, EngineCatalog};
 use crate::platform::audio_devices;
 use crate::state::AppState;
 use std::sync::Arc;
@@ -193,14 +192,9 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
 
     // Audio device submenu
     let devices = audio_devices::list_input_devices();
-    let (selected_uid, selected_lang, api_servers, selected_model_id) = {
+    let selected_uid = {
         let s = state.settings.lock().unwrap();
-        (
-            s.selected_input_device_uid.clone(),
-            s.selected_language.clone(),
-            s.api_servers.clone(),
-            s.selected_model_id.clone(),
-        )
+        s.selected_input_device_uid.clone()
     };
     let uid_valid = selected_uid
         .as_ref()
@@ -237,66 +231,12 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
         mic_submenu.append(&MenuItem::with_id(app, "no_devices", "No input devices", false, None::<&str>)?)?;
     }
 
-    // Language submenu
-    let languages = common_languages();
-    let active_lang = languages
-        .iter()
-        .find(|l| l.code == selected_lang)
-        .map(|l| l.label.clone())
-        .unwrap_or_else(|| "Language".to_string());
-
-    let lang_submenu = Submenu::with_id(app, "lang_submenu", &active_lang, true)?;
-    for lang in &languages {
-        let check = if lang.code == selected_lang { "✓ " } else { "   " };
-        let label = format!("{}{}", check, lang.label);
-        lang_submenu.append(&MenuItem::with_id(
-            app,
-            format!("lang_{}", lang.code),
-            &label,
-            true,
-            None::<&str>,
-        )?)?;
-    }
-
-    // Model submenu
-    let downloaded = EngineCatalog::new(&api_servers).downloaded_models();
-    let active_model = downloaded
-        .iter()
-        .find(|m| m.id == selected_model_id)
-        .map(|m| m.label.clone())
-        .unwrap_or_else(|| "Model".to_string());
-
-    let model_submenu = Submenu::with_id(app, "model_submenu", &active_model, true)?;
-    for model in &downloaded {
-        let check = if model.id == selected_model_id { "✓ " } else { "   " };
-        let label = format!("{}{}", check, model.label);
-        model_submenu.append(&MenuItem::with_id(
-            app,
-            format!("model_{}", model.id),
-            &label,
-            true,
-            None::<&str>,
-        )?)?;
-    }
-    if !downloaded.is_empty() {
-        model_submenu.append(&PredefinedMenuItem::separator(app)?)?;
-    }
-    model_submenu.append(&MenuItem::with_id(
-        app,
-        "model_manager",
-        "Manage Models\u{2026}",
-        true,
-        None::<&str>,
-    )?)?;
-
     let menu = Menu::with_items(
         app,
         &[
             &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &mic_submenu,
-            &model_submenu,
-            &lang_submenu,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "settings", "Settings\u{2026}", true, None::<&str>)?,
             &MenuItem::with_id(app, "history", "History", true, None::<&str>)?,
@@ -320,8 +260,6 @@ fn handle_selection(app: &AppHandle, prefix: &str, value: &str) {
         let mut s = state.settings.lock().unwrap();
         match prefix {
             "device" => s.selected_input_device_uid = Some(value.to_string()),
-            "model" => s.selected_model_id = value.to_string(),
-            "lang" => s.selected_language = value.to_string(),
             _ => return,
         }
     }
@@ -483,9 +421,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             let id = event.id().0.as_str();
             match id {
                 "quit" => app.exit(0),
-                "model_manager" => {
-                    open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
-                }
                 "settings" => {
                     open_window_with_min(app, "settings", "Settings", "/settings", 580.0, 420.0, Some((460.0, 320.0)));
                 }
@@ -502,7 +437,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     });
                 }
                 _ => {
-                    // Handle prefixed selections: device_*, model_*, lang_*
+                    // Handle prefixed selections: device_*
                     if let Some((prefix, value)) = id.split_once('_') {
                         handle_selection(app, prefix, value);
                     }

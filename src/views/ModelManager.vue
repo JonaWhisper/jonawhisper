@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore, type ASRModel, type EngineInfo } from '@/stores/app'
 import ModelCell from '@/components/ModelCell.vue'
 import ApiServerForm from '@/components/ApiServerForm.vue'
@@ -99,6 +100,7 @@ watch(languageWarning, (val) => {
 })
 
 onMounted(async () => {
+  getCurrentWindow().setTitle(t('window.modelManager'))
   await Promise.all([store.fetchEngines(), store.fetchModels(), store.fetchLanguages()])
   if (store.engines.length > 0 && !selectedEngineId.value) {
     selectedEngineId.value = store.engines[0]?.id ?? null

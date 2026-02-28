@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
 import type { LlmConfig } from '@/stores/app'
-import { Settings, Sparkles, Keyboard, Mic } from 'lucide-vue-next'
+import { Settings, Sparkles, Keyboard, Mic, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor } from 'lucide-vue-next'
+import type { Component } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { i18n } from '@/main'
@@ -80,6 +82,13 @@ function onDisableCancel() {
 async function onRecordingModeChange(mode: string) {
   await store.setSetting('recording_mode', mode)
 }
+
+const TRANSPORT_ICONS: Record<string, Component> = {
+  BuiltIn: Laptop, USB: Usb, Bluetooth: Bluetooth,
+  Virtual: Waves, Aggregate: HardDrive, Thunderbolt: Zap,
+  HDMI: Monitor, Unknown: Mic,
+}
+function deviceIcon(type: string): Component { return TRANSPORT_ICONS[type] ?? Mic }
 
 // Selected device UID: use the stored preference, or the default device UID
 const selectedDeviceUid = computed(() => {
@@ -186,6 +195,7 @@ async function stopMicTest() {
 let micTestStoppedUnlisten: (() => void) | null = null
 
 onMounted(async () => {
+  getCurrentWindow().setTitle(t('window.settings'))
   await Promise.all([
     store.fetchSettings(),
     store.fetchAudioDevices(),
@@ -435,7 +445,10 @@ onUnmounted(() => {
                   :key="device.uid"
                   :value="device.uid"
                 >
-                  {{ device.name }}{{ device.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}
+                  <span class="inline-flex items-center gap-1.5">
+                    <component :is="deviceIcon(device.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                    <span>{{ device.name }}{{ device.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
+                  </span>
                 </SelectItem>
               </SelectContent>
             </Select>
