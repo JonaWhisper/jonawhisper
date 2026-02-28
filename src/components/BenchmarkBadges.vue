@@ -31,11 +31,11 @@ const rtfInfo = computed(() => {
   <span v-if="werInfo || rtfInfo" class="inline-flex items-center gap-1.5">
     <span v-if="werInfo" class="inline-flex items-center gap-0.5">
       <span :class="[werInfo.color, compact ? 'text-[10px]' : 'text-[11px]']" class="font-medium">{{ werInfo.label }}</span>
-      <span :class="compact ? 'text-[9px]' : 'text-[10px]'" class="text-muted-foreground">{{ wer }}%</span>
+      <span :class="compact ? 'text-[9px]' : 'text-[10px]'" class="text-muted-foreground">{{ +wer!.toFixed(1) }}%</span>
     </span>
     <span v-if="rtfInfo" class="inline-flex items-center gap-0.5">
       <span :class="[rtfInfo.color, compact ? 'text-[10px]' : 'text-[11px]']" class="font-medium">{{ rtfInfo.label }}</span>
-      <span :class="compact ? 'text-[9px]' : 'text-[10px]'" class="text-muted-foreground">{{ rtf }}x</span>
+      <span :class="compact ? 'text-[9px]' : 'text-[10px]'" class="text-muted-foreground">{{ +rtf!.toFixed(2) }}x</span>
     </span>
   </span>
 </template>
