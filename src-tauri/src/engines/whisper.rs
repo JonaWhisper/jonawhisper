@@ -1,6 +1,7 @@
 use super::*;
-use crate::process_runner;
+use crate::state::AppState;
 use std::path::Path;
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 pub struct WhisperEngine;
 
@@ -70,40 +71,117 @@ impl ASREngine for WhisperEngine {
 
     fn supported_languages(&self) -> Vec<Language> { common_languages() }
 
-    fn description(&self) -> &str { "C++ implementation, fast on CPU. Default engine." }
-    fn install_hint(&self) -> &str { "brew install whisper-cpp" }
+    fn description(&self) -> &str { "Native Whisper engine with Metal GPU acceleration." }
+    fn install_hint(&self) -> &str { "Built-in, no installation needed." }
 
     fn resolve_executable(&self) -> Option<String> {
-        find_executable("whisper-cli", &[])
-            .or_else(|| find_executable("whisper-cpp", &[]))
-            .or_else(|| find_executable("main", &["/opt/homebrew/bin"]))
+        Some("built-in".into())
     }
 
-    fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {
-        let exe = self.resolve_executable()
-            .ok_or_else(|| EngineError::EngineUnavailable {
-                engine_id: self.engine_id().into(),
-                install_hint: self.install_hint().into(),
-            })?;
+    fn transcribe(&self, _model: &ASRModel, _audio_path: &Path, _language: &str) -> Result<String, EngineError> {
+        Err(EngineError::LaunchFailed("Use transcribe_native() for whisper engine".into()))
+    }
+}
 
-        let model_path = model.local_path();
-        if !model_path.exists() {
-            return Err(EngineError::ModelNotFound(model_path.display().to_string()));
+/// Native whisper-rs transcription — bypasses subprocess entirely.
+pub fn transcribe_native(
+    state: &AppState,
+    model: &ASRModel,
+    audio_path: &Path,
+    language: &str,
+) -> Result<String, EngineError> {
+    let model_path = model.local_path();
+    if !model_path.exists() {
+        return Err(EngineError::ModelNotFound(model_path.display().to_string()));
+    }
+
+    let model_path_str = model_path.to_string_lossy().to_string();
+
+    // Load or reuse cached WhisperContext
+    let mut ctx_guard = state.whisper_context.lock().unwrap();
+    if ctx_guard.as_ref().map_or(true, |(id, _)| id != &model.id) {
+        log::info!("Loading whisper model: {}", model.id);
+        let ctx = WhisperContext::new_with_params(
+            &model_path_str,
+            WhisperContextParameters::default(),
+        ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
+        *ctx_guard = Some((model.id.clone(), ctx));
+        log::info!("Whisper model loaded: {}", model.id);
+    }
+
+    let (_, ctx) = ctx_guard.as_ref().unwrap();
+
+    // Create a lightweight state for this transcription
+    let mut wstate = ctx.create_state()
+        .map_err(|e| EngineError::LaunchFailed(format!("Failed to create whisper state: {}", e)))?;
+
+    // Read WAV audio as f32 mono 16kHz
+    let audio = read_wav_f32(audio_path)?;
+
+    // Configure transcription parameters
+    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_translate(false);
+    params.set_print_special(false);
+    params.set_print_progress(false);
+    params.set_print_realtime(false);
+    params.set_print_timestamps(false);
+    params.set_no_timestamps(true);
+
+    if language != "auto" {
+        params.set_language(Some(language));
+    } else {
+        params.set_detect_language(true);
+    }
+
+    // Run transcription
+    wstate.full(params, &audio)
+        .map_err(|e| EngineError::LaunchFailed(format!("Whisper transcription failed: {}", e)))?;
+
+    // Extract text from segments
+    let mut text = String::new();
+    let n_segments = wstate.full_n_segments();
+    for i in 0..n_segments {
+        if let Some(segment) = wstate.get_segment(i) {
+            if let Ok(s) = segment.to_str() {
+                text.push_str(s);
+            }
         }
+    }
 
-        let mut args = vec![
-            "--model".to_string(), model_path.to_string_lossy().to_string(),
-            "--file".to_string(), audio_path.to_string_lossy().to_string(),
-            "--output-txt".to_string(),
-            "--no-timestamps".to_string(),
-        ];
+    Ok(text.trim().to_string())
+}
 
-        if language != "auto" {
-            args.push("--language".to_string());
-            args.push(language.to_string());
+/// Read a WAV file and convert to f32 mono samples.
+fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
+    let reader = hound::WavReader::open(path)
+        .map_err(|e| EngineError::LaunchFailed(format!("Failed to open WAV: {}", e)))?;
+
+    let spec = reader.spec();
+    let channels = spec.channels as usize;
+
+    let samples_f32: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Int => {
+            let bits = spec.bits_per_sample;
+            let max_val = (1u32 << (bits - 1)) as f32;
+            reader.into_samples::<i32>()
+                .filter_map(|s| s.ok())
+                .map(|s| s as f32 / max_val)
+                .collect()
         }
+        hound::SampleFormat::Float => {
+            reader.into_samples::<f32>()
+                .filter_map(|s| s.ok())
+                .collect()
+        }
+    };
 
-        let result = process_runner::run(&exe, &args)?;
-        Ok(result.stdout)
+    // Convert to mono by averaging channels
+    if channels > 1 {
+        Ok(samples_f32
+            .chunks(channels)
+            .map(|chunk| chunk.iter().sum::<f32>() / channels as f32)
+            .collect())
+    } else {
+        Ok(samples_f32)
     }
 }

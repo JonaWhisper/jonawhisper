@@ -36,6 +36,11 @@ pub fn transcribe(
         return Err(EngineError::ModelNotFound(model.local_path().display().to_string()));
     }
 
+    // Native whisper-rs path — no subprocess needed
+    if model.engine_id == "whisper" {
+        return crate::engines::whisper::transcribe_native(state, &model, audio_path, &language);
+    }
+
     let engine = catalog.engine_for_model(&model)
         .ok_or_else(|| EngineError::EngineNotFound(model.engine_id.clone()))?;
 

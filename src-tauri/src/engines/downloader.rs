@@ -47,11 +47,7 @@ pub async fn download_model(
             download_single_file(&app, &state, &model, true).await
         }
         DownloadType::HuggingFaceRepo => {
-            download_with_subprocess(
-                &app, &state, &model,
-                "/usr/bin/env",
-                &["huggingface-cli".to_string(), "download".to_string(), model.url.clone()],
-            ).await
+            download_hf_repo(&app, state.clone(), &model).await
         }
         DownloadType::Command { executable, arguments } => {
             download_with_subprocess(
@@ -169,6 +165,127 @@ async fn download_single_file(
             }
         }
     }
+}
+
+/// Progress reporter that emits Tauri events for HF repo downloads.
+struct HfProgress {
+    app: AppHandle,
+    model_id: String,
+    state: Arc<AppState>,
+    /// Total number of files to download.
+    total_files: usize,
+    /// Number of files fully downloaded so far.
+    completed_files: usize,
+    /// Size of the current file being downloaded.
+    current_file_size: usize,
+    /// Bytes downloaded for the current file.
+    current_downloaded: usize,
+}
+
+impl hf_hub::api::Progress for HfProgress {
+    fn init(&mut self, size: usize, filename: &str) {
+        self.current_file_size = size;
+        self.current_downloaded = 0;
+        log::info!("Downloading {} ({} bytes)", filename, size);
+    }
+
+    fn update(&mut self, size: usize) {
+        self.current_downloaded += size;
+        let file_progress = if self.current_file_size > 0 {
+            self.current_downloaded as f64 / self.current_file_size as f64
+        } else {
+            0.0
+        };
+        let progress = if self.total_files > 0 {
+            (self.completed_files as f64 + file_progress) / self.total_files as f64
+        } else {
+            0.0
+        };
+        self.state.download.lock().unwrap().progress = progress;
+        let _ = self.app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+            "model_id": self.model_id,
+            "progress": progress,
+        }));
+    }
+
+    fn finish(&mut self) {
+        self.completed_files += 1;
+    }
+}
+
+async fn download_hf_repo(
+    app: &AppHandle,
+    state: Arc<AppState>,
+    model: &ASRModel,
+) -> bool {
+    let app = app.clone();
+    let model_id = model.id.clone();
+    let repo_id = model.url.clone();
+
+    // hf-hub uses sync API (ureq), run in blocking thread
+    tokio::task::spawn_blocking(move || {
+        let api = match hf_hub::api::sync::Api::new() {
+            Ok(a) => a,
+            Err(e) => {
+                log::error!("Failed to create HF API: {}", e);
+                return false;
+            }
+        };
+
+        let repo = api.model(repo_id.clone());
+
+        // List files in the repo
+        let info = match repo.info() {
+            Ok(i) => i,
+            Err(e) => {
+                log::error!("Failed to get repo info for {}: {}", repo_id, e);
+                return false;
+            }
+        };
+
+        let filenames: Vec<String> = info.siblings.iter()
+            .map(|s| s.rfilename.clone())
+            .collect();
+
+        log::info!("HF repo {} has {} files", repo_id, filenames.len());
+
+        let total_files = filenames.len();
+        let mut completed = 0usize;
+
+        for filename in &filenames {
+            let progress = HfProgress {
+                app: app.clone(),
+                model_id: model_id.clone(),
+                state: state.clone(),
+                total_files,
+                completed_files: completed,
+                current_file_size: 0,
+                current_downloaded: 0,
+            };
+
+            match repo.download_with_progress(filename, progress) {
+                Ok(_path) => {
+                    completed += 1;
+                    log::info!("Downloaded {}/{}: {}", completed, total_files, filename);
+                }
+                Err(e) => {
+                    log::error!("Failed to download {}: {}", filename, e);
+                    return false;
+                }
+            }
+        }
+
+        // Emit final 100% progress
+        state.download.lock().unwrap().progress = 1.0;
+        let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+            "model_id": model_id,
+            "progress": 1.0,
+        }));
+
+        true
+    })
+    .await
+    .unwrap_or(false)
 }
 
 async fn download_with_subprocess(

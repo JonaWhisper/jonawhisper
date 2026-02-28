@@ -52,6 +52,8 @@ pub struct AppState {
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
     pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
+    /// Cached WhisperContext: (model_id, context). Invalidated when model changes.
+    pub whisper_context: Mutex<Option<(String, whisper_rs::WhisperContext)>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -320,6 +322,7 @@ impl Default for AppState {
             settings: Mutex::new(prefs),
             history_db: Mutex::new(open_history_db()),
             tray_menu: Mutex::new(None),
+            whisper_context: Mutex::new(None),
         }
     }
 }

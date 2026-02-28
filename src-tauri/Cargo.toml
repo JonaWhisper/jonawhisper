@@ -36,11 +36,17 @@ crossbeam-channel = "0.5.15"
 rusqlite = { version = "0.32", features = ["bundled"] }
 rust-i18n = "3"
 sys-locale = "0.3"
+hf-hub = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.15", features = ["metal"] }
+
 core-graphics = "0.24"
 core-foundation = "0.10"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
 objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSSound", "NSApplication", "NSRunningApplication"] }
 block2 = "0.6"
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = "0.15"

@@ -165,6 +165,10 @@ pub fn set_setting(
             }
         }
     }
+    // Invalidate cached whisper context when model changes
+    if key == "selected_model_id" {
+        *state.whisper_context.lock().unwrap() = None;
+    }
     // Send hotkey updates outside the settings lock
     match key.as_str() {
         "hotkey" => {

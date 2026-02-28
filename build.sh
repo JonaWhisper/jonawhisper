@@ -24,6 +24,9 @@ APP_PATH="$BUNDLE_DIR/macos/${APP_NAME}.app"
 echo ""
 echo "=== Building ${APP_NAME} (Tauri ${MODE_LABEL}) ==="
 
+# Ensure deployment target matches Tauri config (needed by whisper-rs-sys cmake)
+export MACOSX_DEPLOYMENT_TARGET="13.0"
+
 cd "$SCRIPT_DIR"
 npx tauri build --bundles app $TAURI_FLAGS
 
