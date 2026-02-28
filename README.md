@@ -1,6 +1,6 @@
 # WhisperDictate
 
-Local-first voice-to-text dictation for macOS. Runs in the menu bar, records audio via a global hotkey, transcribes with your choice of speech recognition engine, and pastes the result into the active application.
+Local-first voice-to-text dictation for macOS. Runs in the menu bar, records audio via a global hotkey, transcribes locally with Whisper, and pastes the result into the active application.
 
 ## Features
 
@@ -50,17 +50,9 @@ On first launch, a setup wizard asks for three macOS permissions:
 | **Accessibility** | Paste simulation (Cmd+V via [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent)) | [AXIsProcessTrusted](https://developer.apple.com/documentation/applicationservices/1459186-axisprocesstrusted) |
 | **Input Monitoring** | Global hotkey detection ([CGEvent tap](https://developer.apple.com/documentation/coregraphics/1454426-cgeventtapcreate)) | [TCC](https://support.apple.com/guide/security/controlling-app-access-to-files-secddd1d86a6/web) ListenEvent |
 
-## Engines
+## Speech recognition
 
-| Engine | Type | Description | Languages |
-|---|---|---|---|
-| **Whisper** ([whisper-rs](https://github.com/tazz4843/whisper-rs)) | Native (built-in) | GGML models running natively in Rust with Metal GPU acceleration on Apple Silicon. No external install needed. | Auto, FR, EN, ES, DE |
-| **OpenAI API** | Cloud | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/audio/createTranscription) server (OpenAI, local, or remote). Requires an API key. | Auto, FR, EN, ES, DE |
-
-- **Whisper** is the default and recommended engine — runs locally with Metal GPU acceleration on Apple Silicon (M1/M2/M3/M4). Multiple model sizes available (tiny to large-v3-turbo).
-- **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server.
-
-Models are downloaded and managed from within the app (Model Manager).
+Transcription runs natively via [whisper-rs](https://github.com/tazz4843/whisper-rs) with Metal GPU acceleration on Apple Silicon — nothing to install. Multiple model sizes are available (tiny to large-v3-turbo), downloaded and managed from within the app. An OpenAI-compatible cloud API can also be configured as an alternative.
 
 ## Usage
 
