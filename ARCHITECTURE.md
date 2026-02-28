@@ -62,7 +62,7 @@ macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future 
 
 ### Engines (`engines/`)
 
-Each speech engine implements the `ASREngine` trait. Currently all engines run as subprocesses; native Rust bindings are planned.
+Each speech engine implements the `ASREngine` trait (with a `recommended_model_id(language)` method for per-language recommendations). Currently all engines run as subprocesses; native Rust bindings are planned.
 
 | File | Engine |
 |------|--------|
@@ -74,7 +74,7 @@ Each speech engine implements the `ASREngine` trait. Currently all engines run a
 | `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) |
 | `downloader.rs` | Model downloads: streaming HTTP, HuggingFace repos, ZIP extraction |
 
-The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup, language listing, and availability checks.
+The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup, language listing, availability checks, and recommended model selection per language.
 
 ### Audio & transcription
 
