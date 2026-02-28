@@ -7,7 +7,6 @@
 
 ## UX / Polish
 
-- [ ] **Remplacer emojis/SVG inline par Lucide icons** — Unifier toutes les icones du projet avec `lucide-vue-next` (déjà installé). Fichiers concernés : Settings.vue (⚙ ✨ ⌨ 🎙 dans la sidebar), ModelCell.vue (SVG inline delete), SetupWizard.vue (SVG inline checkmark).
 
 ## Fonctionnalités
 

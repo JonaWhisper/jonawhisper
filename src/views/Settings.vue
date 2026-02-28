@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import type { LlmConfig } from '@/stores/app'
+import { Settings, Sparkles, Keyboard, Mic } from 'lucide-vue-next'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { i18n } from '@/main'
@@ -26,10 +27,10 @@ const store = useAppStore()
 const activeSection = ref('general')
 
 const sections = [
-  { id: 'general', icon: '⚙', label: 'settings.section.general' },
-  { id: 'postprocessing', icon: '✨', label: 'settings.section.postProcessing' },
-  { id: 'shortcuts', icon: '⌨', label: 'settings.section.shortcuts' },
-  { id: 'microphone', icon: '🎙', label: 'settings.section.microphone' },
+  { id: 'general', icon: Settings, label: 'settings.section.general' },
+  { id: 'postprocessing', icon: Sparkles, label: 'settings.section.postProcessing' },
+  { id: 'shortcuts', icon: Keyboard, label: 'settings.section.shortcuts' },
+  { id: 'microphone', icon: Mic, label: 'settings.section.microphone' },
 ]
 
 // Mic test
@@ -233,7 +234,7 @@ onUnmounted(() => {
             : 'hover:bg-accent/50 text-foreground'"
         >
           <div class="flex items-center gap-2">
-            <span class="text-base w-5 text-center flex-shrink-0">{{ section.icon }}</span>
+            <component :is="section.icon" class="w-4 h-4 flex-shrink-0" />
             <span class="font-medium truncate">{{ t(section.label) }}</span>
           </div>
         </button>

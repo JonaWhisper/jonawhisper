@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { Button } from '@/components/ui/button'
+import { Check } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 
 const { t } = useI18n()
@@ -76,7 +77,7 @@ onUnmounted(() => {
           <div class="text-[11px] text-muted-foreground mt-0.5 leading-snug">{{ item.desc }}</div>
         </div>
         <Badge v-if="item.status === 'Granted'" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent">
-          <svg class="w-3 h-3" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>
+          <Check class="w-3 h-3" />
           {{ t('setup.granted') }}
         </Badge>
         <Button v-else size="sm" @click="grant(item.key)">
