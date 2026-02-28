@@ -236,8 +236,8 @@ const canStart = computed(() => {
             <div
               v-for="model in recommendedModels"
               :key="model.id"
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border bg-card cursor-pointer transition-colors hover:bg-accent/30"
-              :class="model.id === store.selectedModelId ? 'border-primary/50' : 'border-border'"
+              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border cursor-pointer transition-colors hover:bg-accent/30"
+              :class="model.id === store.selectedModelId ? 'bg-accent/40' : 'bg-card'"
               @click="handleSelectModel(model)"
             >
               <div
