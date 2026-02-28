@@ -1,7 +1,7 @@
 pub mod whisper;
 pub mod openai_api;
 pub mod downloader;
-pub mod llm_local;
+pub mod llama;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -149,7 +149,7 @@ impl EngineCatalog {
     pub fn new() -> Self {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
-            Box::new(llm_local::LlmLocalEngine),
+            Box::new(llama::LlamaEngine),
         ];
 
         Self { engines }

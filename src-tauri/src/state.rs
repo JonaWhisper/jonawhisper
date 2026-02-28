@@ -265,6 +265,14 @@ impl Preferences {
                 needs_save = true;
             }
 
+            // Migrate llm_local_model_id from old "llm-local:" prefix to "llama:"
+            if prefs.llm_local_model_id.starts_with("llm-local:") {
+                let new_id = prefs.llm_local_model_id.replacen("llm-local:", "llama:", 1);
+                log::info!("Migrating llm_local_model_id: {} → {}", prefs.llm_local_model_id, new_id);
+                prefs.llm_local_model_id = new_id;
+                needs_save = true;
+            }
+
             // Migrate: if llm_enabled with a cloud provider but no llm_source set, default to cloud
             if prefs.llm_enabled && !prefs.llm_provider_id.is_empty() && prefs.llm_source == "cloud" {
                 // Already correct default, no migration needed

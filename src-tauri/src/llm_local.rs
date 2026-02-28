@@ -45,33 +45,10 @@ impl LlmContext {
     }
 }
 
-fn system_prompt(language: &str) -> String {
-    let lang_name = match language {
-        "fr" => "French",
-        "en" => "English",
-        "es" => "Spanish",
-        "de" => "German",
-        _ => "the same language as the input",
-    };
-
-    format!(
-        "You are a dictation text cleaner. Your job is to clean up raw speech-to-text output.\n\
-         Rules:\n\
-         - Fix punctuation, capitalization, and spacing\n\
-         - Remove filler words and speech artifacts (um, uh, etc.)\n\
-         - Do NOT change the meaning or rephrase\n\
-         - Do NOT add information that wasn't in the original\n\
-         - Output language: {lang_name}\n\
-         - Reply with ONLY the cleaned text, nothing else\n\
-         - Do NOT use HTML, markdown, or any formatting\n\
-         - Do NOT use /think or reasoning tags"
-    )
-}
-
 /// Clean up transcribed text using a local LLM.
 pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: usize) -> Result<String, String> {
     let messages = vec![
-        LlamaChatMessage::new("system".to_string(), system_prompt(language))
+        LlamaChatMessage::new("system".to_string(), crate::llm_prompt::system_prompt(language))
             .map_err(|e| format!("Failed to create system message: {}", e))?,
         LlamaChatMessage::new("user".to_string(), text.to_string())
             .map_err(|e| format!("Failed to create user message: {}", e))?,
