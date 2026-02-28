@@ -46,11 +46,22 @@
 - [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
+## Spacings (audit fait)
+
+- [ ] **Standardiser le padding de page** — ModelManager utilise `p-4`, Settings/SetupStep2 utilisent `p-5`, History utilise `px-4` variable. Passer tout à `px-5`.
+- [ ] **Standardiser la hauteur des inputs** — ShortcutCapture = `h-9`, inputs LLM dans Settings = `h-8`, selects = default. Aligner tout sur `h-9` (36px).
+- [ ] **Standardiser le padding des cards/items** — 4 valeurs différentes : ModelCell `px-4 py-3`, permissions Setup `px-3.5 py-2.5`, modèles SetupStep2 `px-2.5 py-1.5`, History `px-3 py-2`. Définir 2 standards : compact (`px-3 py-2`) et normal (`px-4 py-3`).
+- [ ] **Réduire les variantes de space-y** — 7 valeurs utilisées (0.5 à 4). Garder 3 : compact `space-y-1`, normal `space-y-2`, section `space-y-4`.
+- [ ] **Aligner les boutons download** — SetupStep2 utilise `h-6` (24px), ModelCell utilise default `sm` (~32px) pour la même action. Harmoniser.
+- [ ] **Remplacer `text-[11px]` des descriptions permissions** — SetupWizard utilise `text-[11px]` custom, devrait être `text-xs` (12px) comme partout ailleurs. Les `text-[10px]`/`text-[9px]` dans BenchmarkBadges sont acceptables (besoin spécifique).
+
+## i18n (audit fait)
+
+- [ ] **Localiser les tooltips tray** — 4 strings hardcodées dans `tray.rs` : `"Recording…"` (l.371), `"Transcribing…"` (l.376), `"WhisperDictate"` (l.381, l.507). Remplacer par `t!("pill.recording")`, `t!("pill.transcribing")`, `t!("app.name")`.
+- [ ] **Afficher les descriptions SetupStep2** — Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `setup.step2.recordingModeDesc.toggle` existent dans en.json/fr.json mais ne sont jamais affichées dans le composant.
+- [ ] **Localiser la validation ApiServerForm** — `'Required'` en dur (lignes 32-34). Remplacer par une clé i18n.
+
 ## Audits (à planifier)
-
-- [ ] **Audit cohérence des spacings (padding/margin)** — Vérifier que tous les composants et vues utilisent les mêmes valeurs de padding et margin pour les mêmes types d'éléments (cards, listes, sections, headers, footers). Définir une échelle de spacing cohérente et l'appliquer partout. Concerne : ModelCell, SetupStep2, SetupWizard, ModelManager, Settings, History, etc. Inclut la hauteur des éléments côte à côte (ex: boutons et inputs dans la même ligne doivent avoir la même hauteur).
-
-- [ ] **Audit i18n — repasse traductions complète** — Vérifier que TOUT le texte visible est traduit et utilise vue-i18n (pas de strings en dur). Inclut : tray menu (actuellement tout en anglais, nécessite un système i18n côté Rust), labels dans Settings/Setup/ModelManager/History, messages d'erreur, tooltips, placeholders. Rationaliser les clés existantes (doublons, naming incohérent entre sections).
 
 - [ ] **Audit complet architecture & séparation des modules** — Passer en revue tout le codebase :
   - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée (ex: recording.rs ne devrait pas connaître le tray, commands.rs ne devrait pas contenir de logique)
