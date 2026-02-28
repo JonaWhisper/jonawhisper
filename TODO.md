@@ -20,11 +20,15 @@
 - [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique de providers. Chaque provider déclare ses capacités : transcription audio→texte, nettoyage texte→texte, ou les deux. Config serveur partagée (URL, clé API, modèle). Support local (Ollama, llama.cpp) en plus des API distantes.
   - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et liste de modèles prédéfinis (dropdown), champs non-modifiables. Champs custom (URL, modèle libre) uniquement pour serveurs locaux/custom.
   - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings (éviter la duplication du formulaire d'ajout de serveur)
-- [ ] **Installation intégrée des moteurs** — Supprimer la friction CLI, installer les moteurs depuis l'app directement. Approche hybride :
-  - **whisper.cpp intégré via whisper-rs** — Lier whisper.cpp directement dans le binaire Rust via le crate [whisper-rs](https://github.com/tazz4843/whisper-rs). Compilé depuis les sources par `build.rs`, zéro dépendance externe. Supporte CoreML/Metal pour l'accélération Apple Silicon. Appel de fonction direct (pas de subprocess). C'est le moteur par défaut, ça marche out-of-the-box.
-  - **Venv Python dédié** — Pour les moteurs Python (Faster Whisper, MLX Whisper, Vosk, Moonshine) : l'app crée et gère `~/.whisper-dictate/venv/`, installe les packages dedans. Bouton "Install" dans le Model Manager avec barre de progression. Nécessite un Python système détecté automatiquement (`python3` / `python`).
-  - **API = rien à installer** — OpenAI API et serveurs custom restent en config pure (URL + clé).
-  - **UX cible** : dans le Model Manager, chaque moteur non installé affiche un bouton "Install" au lieu de la commande CLI. Le bouton lance l'install en background, affiche la progression, et rafraîchit le statut une fois terminé.
+- [ ] **Moteurs natifs Rust (stratégie "zéro Python")** — Remplacer les subprocess Python/CLI par des bindings Rust natifs. L'objectif est un binaire unique sans dépendances externes, cross-platform (macOS + Windows).
+  - **whisper.cpp → [whisper-rs](https://github.com/tazz4843/whisper-rs)** — Binding Rust natif, compilé par `build.rs`. CoreML/Metal sur macOS, CUDA/DirectML sur Windows. Moteur par défaut out-of-the-box.
+  - **Vosk → [vosk-rs](https://github.com/Bear-03/vosk-rs)** — Binding Rust vers la lib C de Vosk. Léger, cross-platform.
+  - **Moonshine → [ort](https://github.com/pykeIO/ort)** (ONNX Runtime pour Rust) — Moonshine utilise des modèles ONNX. Le crate `ort` charge et exécute les modèles ONNX directement depuis Rust. Cross-platform, supporte CPU/GPU/CoreML/DirectML. Pourrait aussi servir pour d'autres modèles ONNX à l'avenir.
+  - **Faster Whisper → [ct2rs](https://github.com/jkawamoto/ctranslate2-rs)** — Binding Rust pour CTranslate2 (le moteur derrière Faster Whisper). Moins mature, à évaluer. Si whisper-rs avec CoreML/Metal est suffisamment performant sur Mac, Faster Whisper devient redondant.
+  - **MLX Whisper** — MLX est un framework Apple Python/Swift only. Pas de binding Rust. Avec whisper-rs + CoreML on obtient la même accélération Apple Silicon, donc MLX Whisper pourrait être retiré ou gardé comme option Python legacy.
+  - **API** — Déjà natif Rust (reqwest). Rien à changer.
+  - **Moteurs Python en fallback** — Garder le support subprocess Python en option (venv dédié `~/.whisper-dictate/venv/`) pour les utilisateurs qui préfèrent ou qui ont des modèles spécifiques. Mais ce n'est plus le chemin par défaut.
+  - **UX cible** : les moteurs Rust natifs sont disponibles immédiatement (juste télécharger le modèle). Les moteurs Python optionnels affichent un bouton "Install" qui gère le venv automatiquement.
 - [ ] **Descriptions des moteurs dans le Model Manager** — Ajouter une description/sous-titre pour chaque moteur expliquant sa spécificité :
   - **Whisper** (whisper.cpp) — C++, rapide sur CPU, le plus léger. Moteur par défaut.
   - **Faster Whisper** (CTranslate2) — Optimisé GPU via CTranslate2, ~4x plus rapide que le Whisper original. Idéal si GPU NVIDIA disponible.
