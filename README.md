@@ -53,16 +53,22 @@ On first launch, a setup wizard asks for three macOS permissions:
 
 ## Engines
 
-WhisperDictate supports multiple speech recognition backends. Install at least one:
+WhisperDictate supports multiple speech recognition backends. Each has different strengths:
 
-| Engine | Install | Models | Languages |
+| Engine | Best for | Install | Languages |
 |---|---|---|---|
-| **Whisper** (whisper.cpp) | `brew install whisper-cpp` | Tiny to Large V3 (75 MB - 3.1 GB) | Auto, FR, EN, ES, DE |
-| **Faster Whisper** | `pip install whisper-ctranslate2` | Tiny to Distil Large V3 | Auto, FR, EN, ES, DE |
-| **MLX Whisper** (Apple Silicon) | `pip install mlx-whisper` | Tiny to Large V3 Q4 | Auto, FR, EN, ES, DE |
-| **Vosk** | `pip install vosk` | Small/Large per language | EN, FR |
-| **Moonshine** | `pip install useful-moonshine` | Tiny, Base | EN |
-| **OpenAI API** | - | Custom (via API server) | Auto, FR, EN, ES, DE |
+| **Whisper** (whisper.cpp) | CPU, lightweight, general use | `brew install whisper-cpp` | Auto, FR, EN, ES, DE |
+| **Faster Whisper** (CTranslate2) | GPU acceleration (~4x faster) | `pip install whisper-ctranslate2` | Auto, FR, EN, ES, DE |
+| **MLX Whisper** | Apple Silicon (M1/M2/M3/M4) | `pip install mlx-whisper` | Auto, FR, EN, ES, DE |
+| **Vosk** | Low resources, small models | `pip install vosk` | EN, FR |
+| **Moonshine** | Ultra-fast, English only | `pip install useful-moonshine` | EN |
+| **OpenAI API** | Cloud, no local compute | API key only | Auto, FR, EN, ES, DE |
+
+- **Whisper** is the default engine — C++ implementation, runs well on any Mac.
+- **MLX Whisper** is the recommended engine on Apple Silicon — uses the Neural Engine and unified GPU for best performance.
+- **Faster Whisper** shines with NVIDIA GPUs via CTranslate2 optimization.
+- **Vosk** and **Moonshine** are lightweight alternatives for quick dictation with smaller models.
+- **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server (local or remote).
 
 Models are downloaded and managed from within the app (Model Manager).
 

@@ -21,10 +21,18 @@
   - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et liste de modèles prédéfinis (dropdown), champs non-modifiables. Champs custom (URL, modèle libre) uniquement pour serveurs locaux/custom.
   - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings (éviter la duplication du formulaire d'ajout de serveur)
 - [ ] **Installation intégrée des moteurs** — Supprimer la friction CLI, installer les moteurs depuis l'app directement. Approche hybride :
-  - **whisper.cpp bundlé** — Compiler et embarquer le binaire whisper dans le .app. Zéro install pour l'utilisateur, ça marche out-of-the-box. Télécharger depuis GitHub Releases en alternative à la compilation.
+  - **whisper.cpp intégré via whisper-rs** — Lier whisper.cpp directement dans le binaire Rust via le crate [whisper-rs](https://github.com/tazz4843/whisper-rs). Compilé depuis les sources par `build.rs`, zéro dépendance externe. Supporte CoreML/Metal pour l'accélération Apple Silicon. Appel de fonction direct (pas de subprocess). C'est le moteur par défaut, ça marche out-of-the-box.
   - **Venv Python dédié** — Pour les moteurs Python (Faster Whisper, MLX Whisper, Vosk, Moonshine) : l'app crée et gère `~/.whisper-dictate/venv/`, installe les packages dedans. Bouton "Install" dans le Model Manager avec barre de progression. Nécessite un Python système détecté automatiquement (`python3` / `python`).
   - **API = rien à installer** — OpenAI API et serveurs custom restent en config pure (URL + clé).
   - **UX cible** : dans le Model Manager, chaque moteur non installé affiche un bouton "Install" au lieu de la commande CLI. Le bouton lance l'install en background, affiche la progression, et rafraîchit le statut une fois terminé.
+- [ ] **Descriptions des moteurs dans le Model Manager** — Ajouter une description/sous-titre pour chaque moteur expliquant sa spécificité :
+  - **Whisper** (whisper.cpp) — C++, rapide sur CPU, le plus léger. Moteur par défaut.
+  - **Faster Whisper** (CTranslate2) — Optimisé GPU via CTranslate2, ~4x plus rapide que le Whisper original. Idéal si GPU NVIDIA disponible.
+  - **MLX Whisper** — Optimisé Apple Silicon (Neural Engine / GPU unifié via MLX). Le plus performant sur Mac M1/M2/M3/M4.
+  - **Vosk** — Léger, offline, fonctionne bien sur CPU faible. Modèles petits. Moins précis que Whisper.
+  - **Moonshine** — Ultra-léger et rapide, anglais uniquement. Idéal pour de la dictée rapide en anglais.
+  - **OpenAI API** — Transcription cloud via API OpenAI-compatible. Pas de ressources locales nécessaires, mais nécessite une connexion internet et une clé API.
+  - Afficher cette description dans la sidebar du Model Manager sous le nom du moteur, et/ou dans le header du panneau principal quand le moteur est sélectionné.
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon micro intégré/AirPods/casque/USB
 
 ## Technique / Infra
