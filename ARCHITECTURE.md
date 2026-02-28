@@ -45,6 +45,8 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 | `state.rs` | `AppState` with four fine-grained mutexes: runtime state, download state, preferences, and history DB |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
 | `events.rs` | Centralised event name constants to avoid string typos |
+| `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
+| `process_runner.rs` | Subprocess execution helper for speech engine CLIs |
 
 ### Platform (`platform/`)
 
@@ -83,9 +85,35 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands |
 | `llm_cleanup.rs` | Optional LLM-based text cleanup via OpenAI or Anthropic API |
 
-### Tray
+### Tray & icons
 
-`tray.rs` manages the system tray icon, the context menu (localized), and the floating pill window lifecycle.
+| File | Role |
+|------|------|
+| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), floating pill window lifecycle. Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
+| `menu_icons.rs` | SDF (Signed Distance Field) icon rendering — shared primitives (`sdf_aa`, `sdf_rrect`, `sdf_circle`, `sdf_segment`, `point_in_triangle`) and 8 transport type icons (laptop, USB, bluetooth, waves, hard drive, zap, monitor, mic). Icons are rendered at 16×16, cached in a `LazyLock`, and composited onto 36×36 colored bubbles (blue=selected, gray=other) for menu items. Inspired by [Lucide](https://lucide.dev/) icon paths, hand-crafted as SDF shapes — zero image dependencies. |
+
+### SDF icon rendering — how it works
+
+All tray bar and menu icons are rendered at runtime in pure Rust using **Signed Distance Field** (SDF) functions — no image files, no PNG assets, no external dependencies.
+
+**How it works:** each icon is described by geometric primitives (rounded rectangles, circles, line segments, triangles). For each pixel, we compute the distance to each shape and use anti-aliasing smoothstep (`sdf_aa`) to produce a smooth alpha value. The result is a raw RGBA bitmap.
+
+**Two categories of icons:**
+
+| Category | Size | Where | Examples |
+|----------|------|-------|---------|
+| Tray bar icons | 44×44 (22pt @2x) | Menu bar status | `make_idle_icon()` (mic), `make_recording_icon()` (audio bars), `make_transcribing_icon()` (speech bubble) |
+| Transport icons | 16×16 shape → 36×36 bubble | Device submenu items | laptop, USB, bluetooth, waves, hard drive, zap, monitor, mic |
+
+**Transport icons** are composited onto colored bubbles: blue `(0,122,255)` = selected device, gray `(99,99,102)` = other devices. The 16×16 shapes are cached in a `LazyLock` and upsampled to 36×36 with bilinear interpolation.
+
+**To add or modify an icon:**
+1. Find the reference icon on [Lucide](https://lucide.dev/) (all current icons are inspired by Lucide v0.575)
+2. Scale the SVG path coordinates from 24×24 to 16×16 (multiply by `16.0/24.0`)
+3. Express the path as SDF primitives in a `render_*()` function in `menu_icons.rs`
+4. Add it to the `ICON_SHAPES` array and update the `transport_icon()` match
+
+**Tray bar icons** are in `tray.rs`, use the same SDF primitives from `menu_icons.rs`, and render at 44×44 (set as template images for automatic light/dark mode adaptation).
 
 ## Frontend (`src/`)
 
@@ -106,6 +134,9 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `ShortcutCapture.vue` | Press-to-record shortcut input. Invokes `start_shortcut_capture` on the backend, listens for `shortcut-capture-update` and `shortcut-capture-complete` events. |
 | `SpectrumBars.vue` | Reusable audio spectrum visualization (used in pill and mic test) |
 | `SetupStep2.vue` | Initial configuration form (locale, hotkey, model, language) — embedded in SetupWizard |
+| `ModelCell.vue` | Model list item with download progress, actions, and benchmark display |
+| `BenchmarkBadges.vue` | WER/RTF benchmark badges with visual indicators for model quality/speed |
+| `ApiServerForm.vue` | Reusable form for configuring OpenAI-compatible API server endpoints |
 
 ### State management
 

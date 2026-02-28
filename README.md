@@ -108,7 +108,7 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted en Rust, rendues en bitmap RGBA — zéro dépendance image, inspirées [Lucide](https://lucide.dev/) |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
 | Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
-| i18n | [vue-i18n](https://vue-i18n.intlify.dev/) |
+| i18n | [vue-i18n](https://vue-i18n.intlify.dev/) (frontend), [rust-i18n](https://github.com/longbridge/rust-i18n) (backend/tray menu) |
 
 ## Dependencies
 
@@ -214,24 +214,27 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed architecture guide with da
 ```
 src/                     Vue frontend
   views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
-  components/            UI components (ShortcutCapture, SpectrumBars, …)
+  components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, BenchmarkBadges, …)
   stores/app.ts          Pinia store
   utils/                 Shared utilities (shortcut types & formatting)
   i18n/                  Translations (en.json, fr.json)
 src-tauri/               Rust backend
   src/
     lib.rs               Tauri setup & app lifecycle
+    commands.rs          Tauri IPC commands
+    state.rs             App state & persistent preferences
     recording.rs         Recording state machine & audio thread
+    audio.rs             cpal recording & FFT
     transcriber.rs       Transcription orchestration
     post_processor.rs    Text post-processing
     llm_cleanup.rs       LLM text cleanup client
-    commands.rs          Tauri IPC commands
-    state.rs             App state & persistent preferences
+    process_runner.rs    Subprocess execution (speech engines)
     tray.rs              Menu bar menu & tray icon states
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
-    audio.rs             cpal recording & FFT
+    events.rs            Centralised event name constants
+    errors.rs            App error types
     engines/             Speech recognition engine adapters
-    platform/            OS-specific code (permissions, hotkey, paste)
+    platform/            OS-specific code (permissions, hotkey, paste, audio devices)
 build.sh                 Build + codesign + package script
 ```
 
