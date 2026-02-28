@@ -37,11 +37,28 @@ pub async fn download_model(
     let _ = fs::create_dir_all(&pending_dir);
     let _ = fs::write(pending_download_path(), &model.id);
 
+    // Compute initial progress from partial file (avoids 0% → X% flash on resume)
+    let initial_progress = if model.size > 0 {
+        let existing = fs::metadata(partial_path(&model)).map(|m| m.len()).unwrap_or(0);
+        if existing > 0 {
+            (existing as f64 / model.size as f64).min(0.99)
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+
     {
         let mut dl = state.download.lock().unwrap();
         dl.model_id = Some(model.id.clone());
-        dl.progress = 0.0;
+        dl.progress = initial_progress;
     }
+
+    let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+        "model_id": model.id,
+        "progress": initial_progress,
+    }));
 
     let success = match &model.download_type {
         DownloadType::RemoteAPI | DownloadType::System => true,

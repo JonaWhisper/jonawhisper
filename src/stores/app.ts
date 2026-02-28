@@ -210,7 +210,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function downloadModel(id: string) {
     downloadingModelId.value = id
-    downloadProgress.value = 0
+    // Don't reset progress here — backend emits initial progress (0% or resume %) immediately
     try {
       const success = await invoke<boolean>('download_model_cmd', { id })
       if (success) {
