@@ -60,11 +60,10 @@ impl ASREngine for VoskEngine {
     }
 
     fn recommended_model_id(&self, language: &str) -> Option<String> {
-        if language.starts_with("fr") {
-            Some("vosk:fr-small".into())
-        } else {
-            Some("vosk:en-small".into())
-        }
+        let prefix = if language.starts_with("fr") { "vosk:fr-" } else { "vosk:en-" };
+        self.models().iter()
+            .find(|m| m.id.starts_with(prefix))
+            .map(|m| m.id.clone())
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, _language: &str) -> Result<String, EngineError> {

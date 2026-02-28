@@ -73,7 +73,9 @@ impl ASREngine for WhisperEngine {
     }
 
     fn recommended_model_id(&self, _language: &str) -> Option<String> {
-        Some("whisper:large-v3-turbo".into())
+        self.models().iter()
+            .find(|m| m.id.contains("large-v3-turbo"))
+            .map(|m| m.id.clone())
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {

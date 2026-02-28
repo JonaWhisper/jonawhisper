@@ -44,7 +44,9 @@ impl ASREngine for MoonshineEngine {
     }
 
     fn recommended_model_id(&self, _language: &str) -> Option<String> {
-        Some("moonshine:base".into())
+        self.models().iter()
+            .find(|m| m.id.contains("base"))
+            .map(|m| m.id.clone())
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, _language: &str) -> Result<String, EngineError> {
