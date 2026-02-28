@@ -20,6 +20,11 @@
 - [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique de providers. Chaque provider déclare ses capacités : transcription audio→texte, nettoyage texte→texte, ou les deux. Config serveur partagée (URL, clé API, modèle). Support local (Ollama, llama.cpp) en plus des API distantes.
   - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et liste de modèles prédéfinis (dropdown), champs non-modifiables. Champs custom (URL, modèle libre) uniquement pour serveurs locaux/custom.
   - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings (éviter la duplication du formulaire d'ajout de serveur)
+- [ ] **Installation intégrée des moteurs** — Supprimer la friction CLI, installer les moteurs depuis l'app directement. Approche hybride :
+  - **whisper.cpp bundlé** — Compiler et embarquer le binaire whisper dans le .app. Zéro install pour l'utilisateur, ça marche out-of-the-box. Télécharger depuis GitHub Releases en alternative à la compilation.
+  - **Venv Python dédié** — Pour les moteurs Python (Faster Whisper, MLX Whisper, Vosk, Moonshine) : l'app crée et gère `~/.whisper-dictate/venv/`, installe les packages dedans. Bouton "Install" dans le Model Manager avec barre de progression. Nécessite un Python système détecté automatiquement (`python3` / `python`).
+  - **API = rien à installer** — OpenAI API et serveurs custom restent en config pure (URL + clé).
+  - **UX cible** : dans le Model Manager, chaque moteur non installé affiche un bouton "Install" au lieu de la commande CLI. Le bouton lance l'install en background, affiche la progression, et rafraîchit le statut une fois terminé.
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon micro intégré/AirPods/casque/USB
 
 ## Technique / Infra
