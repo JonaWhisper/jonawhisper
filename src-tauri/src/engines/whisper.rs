@@ -10,53 +10,8 @@ impl ASREngine for WhisperEngine {
     fn display_name(&self) -> &str { "Whisper" }
 
     fn models(&self) -> Vec<ASRModel> {
+        // Sorted by WER ascending (best quality first)
         vec![
-            ASRModel {
-                id: "whisper:tiny".into(), engine_id: "whisper".into(),
-                label: "Tiny".into(), filename: "ggml-tiny.bin".into(),
-                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin".into(),
-                size: 75_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
-                download_type: DownloadType::SingleFile, download_marker: None,
-                wer: Some(7.6), rtf: Some(0.05),
-                ..Default::default()
-            },
-            ASRModel {
-                id: "whisper:base".into(), engine_id: "whisper".into(),
-                label: "Base".into(), filename: "ggml-base.bin".into(),
-                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin".into(),
-                size: 142_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
-                download_type: DownloadType::SingleFile, download_marker: None,
-                wer: Some(5.0), rtf: Some(0.08),
-                ..Default::default()
-            },
-            ASRModel {
-                id: "whisper:small".into(), engine_id: "whisper".into(),
-                label: "Small".into(), filename: "ggml-small.bin".into(),
-                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin".into(),
-                size: 466_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
-                download_type: DownloadType::SingleFile, download_marker: None,
-                wer: Some(3.4), rtf: Some(0.15),
-                ..Default::default()
-            },
-            ASRModel {
-                id: "whisper:medium".into(), engine_id: "whisper".into(),
-                label: "Medium".into(), filename: "ggml-medium.bin".into(),
-                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin".into(),
-                size: 1_500_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
-                download_type: DownloadType::SingleFile, download_marker: None,
-                wer: Some(2.7), rtf: Some(0.35),
-                ..Default::default()
-            },
-            ASRModel {
-                id: "whisper:large-v3-turbo".into(), engine_id: "whisper".into(),
-                label: "Large V3 Turbo".into(), filename: "ggml-large-v3-turbo.bin".into(),
-                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin".into(),
-                size: 1_600_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
-                download_type: DownloadType::SingleFile, download_marker: None,
-                wer: Some(2.1), rtf: Some(0.25),
-                recommended: true,
-                ..Default::default()
-            },
             ASRModel {
                 id: "whisper:large-v3".into(), engine_id: "whisper".into(),
                 label: "Large V3".into(), filename: "ggml-large-v3.bin".into(),
@@ -76,12 +31,13 @@ impl ASREngine for WhisperEngine {
                 ..Default::default()
             },
             ASRModel {
-                id: "whisper:large-v3-turbo-q5".into(), engine_id: "whisper".into(),
-                label: "Large V3 Turbo Q5".into(), filename: "ggml-large-v3-turbo-q5_0.bin".into(),
-                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin".into(),
-                size: 574_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                id: "whisper:large-v3-turbo".into(), engine_id: "whisper".into(),
+                label: "Large V3 Turbo".into(), filename: "ggml-large-v3-turbo.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin".into(),
+                size: 1_600_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                wer: Some(2.3), rtf: Some(0.15),
+                wer: Some(2.1), rtf: Some(0.25),
+                recommended: true,
                 ..Default::default()
             },
             ASRModel {
@@ -94,6 +50,24 @@ impl ASREngine for WhisperEngine {
                 ..Default::default()
             },
             ASRModel {
+                id: "whisper:large-v3-turbo-q5".into(), engine_id: "whisper".into(),
+                label: "Large V3 Turbo Q5".into(), filename: "ggml-large-v3-turbo-q5_0.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin".into(),
+                size: 574_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.3), rtf: Some(0.15),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:medium".into(), engine_id: "whisper".into(),
+                label: "Medium".into(), filename: "ggml-medium.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin".into(),
+                size: 1_500_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.7), rtf: Some(0.35),
+                ..Default::default()
+            },
+            ASRModel {
                 id: "whisper:medium-q5".into(), engine_id: "whisper".into(),
                 label: "Medium Q5".into(), filename: "ggml-medium-q5_0.bin".into(),
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin".into(),
@@ -103,12 +77,39 @@ impl ASREngine for WhisperEngine {
                 ..Default::default()
             },
             ASRModel {
+                id: "whisper:small".into(), engine_id: "whisper".into(),
+                label: "Small".into(), filename: "ggml-small.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin".into(),
+                size: 466_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(3.4), rtf: Some(0.15),
+                ..Default::default()
+            },
+            ASRModel {
                 id: "whisper:small-q5".into(), engine_id: "whisper".into(),
                 label: "Small Q5".into(), filename: "ggml-small-q5_1.bin".into(),
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin".into(),
                 size: 190_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(3.6), rtf: Some(0.10),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:base".into(), engine_id: "whisper".into(),
+                label: "Base".into(), filename: "ggml-base.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin".into(),
+                size: 142_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(5.0), rtf: Some(0.08),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:tiny".into(), engine_id: "whisper".into(),
+                label: "Tiny".into(), filename: "ggml-tiny.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin".into(),
+                size: 75_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(7.6), rtf: Some(0.05),
                 ..Default::default()
             },
         ]
