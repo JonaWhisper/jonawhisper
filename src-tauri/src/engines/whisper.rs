@@ -96,6 +96,7 @@ impl ASREngine for WhisperEngine {
             "--file".to_string(), audio_path.to_string_lossy().to_string(),
             "--output-txt".to_string(),
             "--no-timestamps".to_string(),
+            "--no-prints".to_string(),
         ];
 
         if language != "auto" {
