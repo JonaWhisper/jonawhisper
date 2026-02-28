@@ -2,8 +2,10 @@ use crate::platform::audio_devices::AudioTransportType;
 use std::sync::LazyLock;
 use tauri::image::Image;
 
-// Menu icon size: 16×16 RGBA (template icon for menu items)
-const MENU_ICON_SIZE: u32 = 16;
+// Shape cache: 16×16 alpha-only (used as source for compositing)
+const SHAPE_SIZE: usize = 16;
+// Output icon size: 36×36 pixels = 18pt @2x Retina (muda uses fixed_height=18)
+const MENU_ICON_SIZE: u32 = 36;
 
 // -- Shared SDF primitives (used by tray.rs too) --
 
@@ -46,9 +48,9 @@ pub(crate) fn sdf_segment(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32) 
     ((px - nx).powi(2) + (py - ny).powi(2)).sqrt()
 }
 
-// -- Cached menu icons --
+// -- Cached icon shapes (16×16 alpha buffers) --
 
-static MENU_ICONS: LazyLock<[Vec<u8>; 8]> = LazyLock::new(|| {
+static ICON_SHAPES: LazyLock<[Vec<u8>; 8]> = LazyLock::new(|| {
     [
         render_laptop(),
         render_usb(),
@@ -61,8 +63,35 @@ static MENU_ICONS: LazyLock<[Vec<u8>; 8]> = LazyLock::new(|| {
     ]
 });
 
-/// Get a cached 16×16 template icon for an audio transport type.
-pub fn transport_icon(t: &AudioTransportType) -> Image<'static> {
+/// Bilinear sample from a 16×16 alpha buffer (RGBA, only A channel used).
+fn sample_shape(shape: &[u8], fx: f32, fy: f32) -> f32 {
+    if fx < 0.0 || fy < 0.0 || fx >= SHAPE_SIZE as f32 || fy >= SHAPE_SIZE as f32 {
+        return 0.0;
+    }
+    let x0 = fx.floor() as usize;
+    let y0 = fy.floor() as usize;
+    let x1 = (x0 + 1).min(SHAPE_SIZE - 1);
+    let y1 = (y0 + 1).min(SHAPE_SIZE - 1);
+    let dx = fx - fx.floor();
+    let dy = fy - fy.floor();
+
+    let a00 = shape[(y0 * SHAPE_SIZE + x0) * 4 + 3] as f32 / 255.0;
+    let a10 = shape[(y0 * SHAPE_SIZE + x1) * 4 + 3] as f32 / 255.0;
+    let a01 = shape[(y1 * SHAPE_SIZE + x0) * 4 + 3] as f32 / 255.0;
+    let a11 = shape[(y1 * SHAPE_SIZE + x1) * 4 + 3] as f32 / 255.0;
+
+    let top = a00 * (1.0 - dx) + a10 * dx;
+    let bot = a01 * (1.0 - dx) + a11 * dx;
+    top * (1.0 - dy) + bot * dy
+}
+
+// Bubble colors
+const BLUE: (u8, u8, u8) = (0, 122, 255);   // macOS system blue
+const GRAY: (u8, u8, u8) = (174, 174, 178);  // macOS systemGray3
+
+/// Get a 36×36 icon with colored bubble for an audio transport type.
+/// `selected`: blue bubble (active device), otherwise gray bubble.
+pub fn transport_icon(t: &AudioTransportType, selected: bool) -> Image<'static> {
     let idx = match t {
         AudioTransportType::BuiltIn => 0,
         AudioTransportType::USB => 1,
@@ -73,49 +102,79 @@ pub fn transport_icon(t: &AudioTransportType) -> Image<'static> {
         AudioTransportType::HDMI => 6,
         AudioTransportType::Unknown => 7,
     };
-    Image::new_owned(MENU_ICONS[idx].clone(), MENU_ICON_SIZE, MENU_ICON_SIZE)
-}
+    let shape = &ICON_SHAPES[idx];
+    let (bg_r, bg_g, bg_b) = if selected { BLUE } else { GRAY };
 
-// -- Render helpers --
-
-fn new_buf() -> Vec<u8> {
-    vec![0u8; (MENU_ICON_SIZE * MENU_ICON_SIZE * 4) as usize]
-}
-
-fn set_alpha(buf: &mut [u8], x: usize, y: usize, a: f32) {
     let s = MENU_ICON_SIZE as usize;
-    let i = (y * s + x) * 4;
-    // Template icon: R=G=B=0, A=shape
-    buf[i + 3] = (a * 255.0) as u8;
-}
+    let mut rgba = vec![0u8; s * s * 4];
 
-// -- 8 transport icon renderers (16×16) --
-
-/// Laptop: screen rrect + base segment + feet
-fn render_laptop() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
-    let lw = 1.2_f32;
+    // Bubble: filled rounded rect (squircle feel) covering most of the 36×36 area
+    // Icon shape: sampled from 16×16 cache, mapped to a 22×22 area centered in the bubble
+    let center = s as f32 / 2.0;
+    let bubble_r = center - 1.5; // radius 16.5 in a 36×36 canvas
+    let icon_margin = 7.0; // icon occupies center 22×22 area (36 - 2*7 = 22)
+    let icon_span = s as f32 - 2.0 * icon_margin;
 
     for y in 0..s {
         for x in 0..s {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
+
+            // Bubble shape (filled circle)
+            let bubble_a = sdf_aa(sdf_circle(px, py, center, center, bubble_r));
+            if bubble_a <= 0.0 {
+                continue;
+            }
+
+            // Sample the icon shape (maps icon_margin..icon_margin+icon_span → 0..16)
+            let ix = (px - icon_margin) * SHAPE_SIZE as f32 / icon_span;
+            let iy = (py - icon_margin) * SHAPE_SIZE as f32 / icon_span;
+            let icon_a = sample_shape(shape, ix, iy);
+
+            // Composite: white icon on colored bubble
+            let r = bg_r as f32 * (1.0 - icon_a) + 255.0 * icon_a;
+            let g = bg_g as f32 * (1.0 - icon_a) + 255.0 * icon_a;
+            let b = bg_b as f32 * (1.0 - icon_a) + 255.0 * icon_a;
+
+            let i = (y * s + x) * 4;
+            rgba[i] = r as u8;
+            rgba[i + 1] = g as u8;
+            rgba[i + 2] = b as u8;
+            rgba[i + 3] = (bubble_a * 255.0) as u8;
+        }
+    }
+
+    Image::new_owned(rgba, MENU_ICON_SIZE, MENU_ICON_SIZE)
+}
+
+// -- Shape renderers (16×16 alpha-only, cached) --
+
+fn new_shape_buf() -> Vec<u8> {
+    vec![0u8; SHAPE_SIZE * SHAPE_SIZE * 4]
+}
+
+fn set_alpha(buf: &mut [u8], x: usize, y: usize, a: f32) {
+    let i = (y * SHAPE_SIZE + x) * 4;
+    buf[i + 3] = (a * 255.0) as u8;
+}
+
+/// Laptop: screen rrect + base segment + hinges
+fn render_laptop() -> Vec<u8> {
+    let mut buf = new_shape_buf();
+    let lw = 1.2_f32;
+
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
+            let px = x as f32 + 0.5;
+            let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Screen body (rounded rect, outline)
             let screen = sdf_rrect(px, py, 8.0, 6.5, 5.5, 4.0, 1.0).abs() - lw / 2.0;
             a = a.max(sdf_aa(screen));
-
-            // Base line
             let base = sdf_segment(px, py, 1.5, 12.5, 14.5, 12.5) - lw / 2.0;
             a = a.max(sdf_aa(base));
-
-            // Left hinge
             let lh = sdf_segment(px, py, 3.0, 10.5, 2.0, 12.5) - lw / 2.0;
             a = a.max(sdf_aa(lh));
-
-            // Right hinge
             let rh = sdf_segment(px, py, 13.0, 10.5, 14.0, 12.5) - lw / 2.0;
             a = a.max(sdf_aa(rh));
 
@@ -127,43 +186,31 @@ fn render_laptop() -> Vec<u8> {
     buf
 }
 
-/// USB: vertical stem + circle connector + branches with dots
+/// USB: vertical stem + arrow + branches with dots
 fn render_usb() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
     let lw = 1.2_f32;
 
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Main vertical stem
             let stem = sdf_segment(px, py, 8.0, 2.0, 8.0, 13.0) - lw / 2.0;
             a = a.max(sdf_aa(stem));
-
-            // Arrow head at top
             let arr_l = sdf_segment(px, py, 5.5, 4.5, 8.0, 2.0) - lw / 2.0;
             a = a.max(sdf_aa(arr_l));
             let arr_r = sdf_segment(px, py, 10.5, 4.5, 8.0, 2.0) - lw / 2.0;
             a = a.max(sdf_aa(arr_r));
-
-            // Bottom circle
             let circ = sdf_circle(px, py, 8.0, 14.0, 1.5).abs() - lw / 2.0;
             a = a.max(sdf_aa(circ));
-
-            // Right branch
             let rb = sdf_segment(px, py, 8.0, 7.0, 12.0, 9.0) - lw / 2.0;
             a = a.max(sdf_aa(rb));
-            // Right branch dot (filled circle)
             let rd = sdf_circle(px, py, 12.0, 9.0, 1.2);
             a = a.max(sdf_aa(rd));
-
-            // Left branch
             let lb = sdf_segment(px, py, 8.0, 9.5, 4.5, 11.0) - lw / 2.0;
             a = a.max(sdf_aa(lb));
-            // Left branch square
             let ls = sdf_rrect(px, py, 4.5, 11.0, 1.2, 1.2, 0.2);
             a = a.max(sdf_aa(ls));
 
@@ -175,38 +222,27 @@ fn render_usb() -> Vec<u8> {
     buf
 }
 
-/// Bluetooth: the ᛒ rune shape (B-shaped path)
+/// Bluetooth: the rune B shape
 fn render_bluetooth() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
     let lw = 1.2_f32;
 
-    // Bluetooth rune scaled to 16×16:
-    // Lucide bluetooth path: vertical line + two chevrons forming the B shape
-    // Center at x=8, spans y=2..14
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Vertical center line
             let vert = sdf_segment(px, py, 8.0, 2.0, 8.0, 14.0) - lw / 2.0;
             a = a.max(sdf_aa(vert));
-
-            // Top-right chevron: center-top to right, then right to center-middle
             let tr1 = sdf_segment(px, py, 8.0, 2.0, 12.0, 5.5) - lw / 2.0;
             a = a.max(sdf_aa(tr1));
             let tr2 = sdf_segment(px, py, 12.0, 5.5, 8.0, 8.0) - lw / 2.0;
             a = a.max(sdf_aa(tr2));
-
-            // Bottom-right chevron: center-middle to right, then right to center-bottom
             let br1 = sdf_segment(px, py, 8.0, 8.0, 12.0, 10.5) - lw / 2.0;
             a = a.max(sdf_aa(br1));
             let br2 = sdf_segment(px, py, 12.0, 10.5, 8.0, 14.0) - lw / 2.0;
             a = a.max(sdf_aa(br2));
-
-            // Left wings: from center-middle going out-left
             let lw1 = sdf_segment(px, py, 4.0, 5.0, 8.0, 8.0) - lw / 2.0;
             a = a.max(sdf_aa(lw1));
             let lw2 = sdf_segment(px, py, 4.0, 11.0, 8.0, 8.0) - lw / 2.0;
@@ -220,25 +256,23 @@ fn render_bluetooth() -> Vec<u8> {
     buf
 }
 
-/// Waves (Activity/Audio): 3 vertical bars of different heights (like audio-lines)
+/// Waves: 5 vertical bars at different heights
 fn render_waves() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
     let lw = 1.4_f32;
 
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // 5 vertical bars at different heights (audio-lines style)
             let bars: [(f32, f32, f32); 5] = [
-                (3.5, 5.0, 11.0),   // bar 1: x, top, bottom
-                (6.0, 3.0, 13.0),   // bar 2
-                (8.0, 1.5, 14.5),   // bar 3 (tallest)
-                (10.0, 4.0, 12.0),  // bar 4
-                (12.5, 6.0, 10.0),  // bar 5 (shortest)
+                (3.5, 5.0, 11.0),
+                (6.0, 3.0, 13.0),
+                (8.0, 1.5, 14.5),
+                (10.0, 4.0, 12.0),
+                (12.5, 6.0, 10.0),
             ];
 
             for &(bx, top, bot) in &bars {
@@ -254,27 +288,21 @@ fn render_waves() -> Vec<u8> {
     buf
 }
 
-/// HardDrive: box with separator line and 2 LED dots
+/// HardDrive: box + separator + LEDs
 fn render_hard_drive() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
     let lw = 1.2_f32;
 
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Outer box (rounded rect outline)
             let outer = sdf_rrect(px, py, 8.0, 8.0, 6.5, 5.0, 1.5).abs() - lw / 2.0;
             a = a.max(sdf_aa(outer));
-
-            // Horizontal separator
             let sep = sdf_segment(px, py, 1.5, 8.0, 14.5, 8.0) - lw / 2.0;
             a = a.max(sdf_aa(sep));
-
-            // LED dots in lower half
             let led1 = sdf_circle(px, py, 10.0, 11.0, 1.0);
             a = a.max(sdf_aa(led1));
             let led2 = sdf_circle(px, py, 12.5, 11.0, 1.0);
@@ -290,20 +318,15 @@ fn render_hard_drive() -> Vec<u8> {
 
 /// Zap: lightning bolt (filled)
 fn render_zap() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
 
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
 
-            // Lightning bolt: two triangles
-            // Upper triangle: top-right to middle-left to middle-right
             let in_upper = point_in_triangle(px, py, 10.0, 1.0, 3.0, 8.5, 9.0, 8.5);
-            // Lower triangle: middle-left to bottom-left to middle-right
             let in_lower = point_in_triangle(px, py, 7.0, 7.5, 6.0, 15.0, 13.0, 7.5);
-
             let a = if in_upper || in_lower { 1.0 } else { 0.0 };
 
             if a > 0.0 {
@@ -316,25 +339,19 @@ fn render_zap() -> Vec<u8> {
 
 /// Monitor: screen rrect + stand + base
 fn render_monitor() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
     let lw = 1.2_f32;
 
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Screen (rounded rect outline)
             let screen = sdf_rrect(px, py, 8.0, 5.5, 6.5, 4.0, 1.0).abs() - lw / 2.0;
             a = a.max(sdf_aa(screen));
-
-            // Stand (vertical segment)
             let stand = sdf_segment(px, py, 8.0, 9.5, 8.0, 12.5) - lw / 2.0;
             a = a.max(sdf_aa(stand));
-
-            // Base (horizontal segment)
             let base = sdf_segment(px, py, 4.5, 12.5, 11.5, 12.5) - lw / 2.0;
             a = a.max(sdf_aa(base));
 
@@ -346,33 +363,25 @@ fn render_monitor() -> Vec<u8> {
     buf
 }
 
-/// Mic: capsule rrect + holder arc + stand
+/// Mic: capsule + holder arc + stand
 fn render_mic() -> Vec<u8> {
-    let mut buf = new_buf();
-    let s = MENU_ICON_SIZE as usize;
+    let mut buf = new_shape_buf();
     let lw = 1.2_f32;
 
-    for y in 0..s {
-        for x in 0..s {
+    for y in 0..SHAPE_SIZE {
+        for x in 0..SHAPE_SIZE {
             let px = x as f32 + 0.5;
             let py = y as f32 + 0.5;
             let mut a = 0.0_f32;
 
-            // Mic capsule (filled pill shape)
             let capsule = sdf_rrect(px, py, 8.0, 5.0, 2.5, 4.0, 2.5);
             a = a.max(sdf_aa(capsule));
-
-            // Holder arc (U-shape below capsule) — only bottom half
             if py >= 8.0 {
                 let ring = sdf_circle(px, py, 8.0, 8.0, 4.5).abs() - lw / 2.0;
                 a = a.max(sdf_aa(ring));
             }
-
-            // Stand (vertical)
             let stand = sdf_segment(px, py, 8.0, 12.5, 8.0, 14.0) - lw / 2.0;
             a = a.max(sdf_aa(stand));
-
-            // Base
             let base = sdf_segment(px, py, 5.5, 14.0, 10.5, 14.0) - lw / 2.0;
             a = a.max(sdf_aa(base));
 

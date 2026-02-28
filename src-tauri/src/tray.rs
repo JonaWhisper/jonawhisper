@@ -281,20 +281,19 @@ pub fn update_mic_submenu(app: &AppHandle) {
         }
     }
 
-    // Add device items with bitmap icons
+    // Add device items with colored bubble icons (blue=selected, gray=other)
     for device in &devices {
         let is_selected = match &effective_uid {
             Some(uid) => uid == &device.uid,
             None => device.is_default,
         };
-        let check = if is_selected { "✓ " } else { "   " };
         let default_tag = if device.is_default {
             format!(" ({})", t!("settings.microphone.defaultTag"))
         } else {
             String::new()
         };
-        let label = format!("{}{}{}", check, device.name, default_tag);
-        let icon = menu_icons::transport_icon(&device.transport_type);
+        let label = format!("{}{}", device.name, default_tag);
+        let icon = menu_icons::transport_icon(&device.transport_type, is_selected);
         if let Ok(item) = IconMenuItem::with_id(
             app,
             &format!("device_{}", device.uid),
@@ -313,13 +312,13 @@ pub fn update_mic_submenu(app: &AppHandle) {
         }
     }
 
-    // Update submenu header: icon of active device + name (no emoji)
+    // Update submenu header: blue icon of active device + name
     let active_device = devices.iter().find(|d| match &effective_uid {
         Some(uid) => uid == &d.uid,
         None => d.is_default,
     });
     if let Some(d) = active_device {
-        let _ = m.mic_submenu.set_icon(Some(menu_icons::transport_icon(&d.transport_type)));
+        let _ = m.mic_submenu.set_icon(Some(menu_icons::transport_icon(&d.transport_type, true)));
         let _ = m.mic_submenu.set_text(&d.name);
     } else {
         let _ = m.mic_submenu.set_icon(None::<Image<'_>>);
