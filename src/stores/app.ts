@@ -224,9 +224,9 @@ export const useAppStore = defineStore('app', () => {
       console.error('downloadModel failed:', e)
       return false
     } finally {
+      await fetchModels()
       const { [id]: _, ...rest } = activeDownloads.value
       activeDownloads.value = rest
-      await fetchModels()
     }
   }
 
@@ -453,9 +453,9 @@ export const useAppStore = defineStore('app', () => {
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
       const { model_id, progress } = event.payload ?? {}
       if (model_id && progress !== undefined && activeDownloads.value[model_id]) {
-        activeDownloads.value = {
-          ...activeDownloads.value,
-          [model_id]: { ...activeDownloads.value[model_id], progress },
+        // Only accept forward progress (avoid jitter from out-of-order events)
+        if (progress >= activeDownloads.value[model_id].progress) {
+          activeDownloads.value[model_id].progress = progress
         }
       }
     })
