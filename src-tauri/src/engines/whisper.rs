@@ -66,6 +66,51 @@ impl ASREngine for WhisperEngine {
                 wer: Some(1.8), rtf: Some(0.50),
                 ..Default::default()
             },
+            ASRModel {
+                id: "whisper:large-v2".into(), engine_id: "whisper".into(),
+                label: "Large V2".into(), filename: "ggml-large-v2.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v2.bin".into(),
+                size: 3_090_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(1.9), rtf: Some(0.50),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:large-v3-turbo-q5".into(), engine_id: "whisper".into(),
+                label: "Large V3 Turbo Q5".into(), filename: "ggml-large-v3-turbo-q5_0.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin".into(),
+                size: 574_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.3), rtf: Some(0.15),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:large-v3-turbo-q8".into(), engine_id: "whisper".into(),
+                label: "Large V3 Turbo Q8".into(), filename: "ggml-large-v3-turbo-q8_0.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin".into(),
+                size: 874_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.1), rtf: Some(0.20),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:medium-q5".into(), engine_id: "whisper".into(),
+                label: "Medium Q5".into(), filename: "ggml-medium-q5_0.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin".into(),
+                size: 539_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.8), rtf: Some(0.20),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "whisper:small-q5".into(), engine_id: "whisper".into(),
+                label: "Small Q5".into(), filename: "ggml-small-q5_1.bin".into(),
+                url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin".into(),
+                size: 190_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(3.6), rtf: Some(0.10),
+                ..Default::default()
+            },
         ]
     }
 
@@ -96,23 +141,25 @@ pub fn transcribe_native(
     }
 
     let model_path_str = model_path.to_string_lossy().to_string();
+    let gpu_mode = state.settings.lock().unwrap().gpu_mode.clone();
 
-    // Load or reuse cached WhisperContext
+    // Load or reuse cached WhisperContext (invalidate if model or gpu_mode changed)
     let mut ctx_guard = state.whisper_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |(id, _)| id != &model.id) {
-        log::info!("Loading whisper model: {}", model.id);
+    if ctx_guard.as_ref().map_or(true, |(id, mode, _)| id != &model.id || mode != &gpu_mode) {
+        let use_gpu = gpu_mode != "cpu";
+        log::info!("Loading whisper model: {} (gpu_mode={})", model.id, gpu_mode);
         let mut ctx_params = WhisperContextParameters::default();
-        ctx_params.use_gpu(true);
+        ctx_params.use_gpu(use_gpu);
         ctx_params.flash_attn(true);
         let ctx = WhisperContext::new_with_params(
             &model_path_str,
             ctx_params,
         ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
-        *ctx_guard = Some((model.id.clone(), ctx));
-        log::info!("Whisper model loaded: {}", model.id);
+        *ctx_guard = Some((model.id.clone(), gpu_mode.clone(), ctx));
+        log::info!("Whisper model loaded: {} (gpu={})", model.id, use_gpu);
     }
 
-    let (_, ctx) = ctx_guard.as_ref().unwrap();
+    let (_, _, ctx) = ctx_guard.as_ref().unwrap();
 
     // Create a lightweight state for this transcription
     let mut wstate = ctx.create_state()

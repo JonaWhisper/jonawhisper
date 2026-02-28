@@ -190,6 +190,11 @@ async function onLanguageChange(value: string | number | bigint | Record<string,
   await store.setSetting('selected_language', value)
 }
 
+async function onGpuModeChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('gpu_mode', value)
+}
+
 const asrCapableProviders = computed(() =>
   store.providers.filter(p => p.kind === 'OpenAI' || p.kind === 'Custom')
 )
@@ -562,6 +567,21 @@ onUnmounted(() => {
                 >
                   {{ lang.label }}
                 </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- GPU Acceleration (local only) -->
+          <div v-if="!store.asrProviderId" class="space-y-1">
+            <Label class="text-sm font-medium">{{ t('settings.transcription.gpuMode') }}</Label>
+            <Select :model-value="store.gpuMode" @update:model-value="onGpuModeChange">
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">{{ t('settings.transcription.gpuMode.auto') }}</SelectItem>
+                <SelectItem value="gpu">{{ t('settings.transcription.gpuMode.gpu') }}</SelectItem>
+                <SelectItem value="cpu">{{ t('settings.transcription.gpuMode.cpu') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>

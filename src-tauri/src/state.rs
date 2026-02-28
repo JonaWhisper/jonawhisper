@@ -52,8 +52,8 @@ pub struct AppState {
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
     pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
-    /// Cached WhisperContext: (model_id, context). Invalidated when model changes.
-    pub whisper_context: Mutex<Option<(String, whisper_rs::WhisperContext)>>,
+    /// Cached WhisperContext: (model_id, gpu_mode, context). Invalidated when model or GPU mode changes.
+    pub whisper_context: Mutex<Option<(String, String, whisper_rs::WhisperContext)>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -119,6 +119,8 @@ pub struct Preferences {
     pub asr_provider_id: String,
     #[serde(default = "default_asr_cloud_model")]
     pub asr_cloud_model: String,
+    #[serde(default = "default_gpu_mode")]
+    pub gpu_mode: String,
 }
 
 fn default_model_id() -> String { "whisper:large-v3-turbo".to_string() }
@@ -129,6 +131,7 @@ fn default_auto() -> String { "auto".to_string() }
 fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
+fn default_gpu_mode() -> String { "auto".to_string() }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
 /// or %APPDATA%/WhisperDictate/ (Windows).

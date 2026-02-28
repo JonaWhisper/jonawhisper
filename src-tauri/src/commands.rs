@@ -122,6 +122,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "llm_model": s.llm_model,
         "asr_provider_id": s.asr_provider_id,
         "asr_cloud_model": s.asr_cloud_model,
+        "gpu_mode": s.gpu_mode,
     })
 }
 
@@ -159,14 +160,15 @@ pub fn set_setting(
             "llm_model" => s.llm_model = value.clone(),
             "asr_provider_id" => s.asr_provider_id = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
+            "gpu_mode" => s.gpu_mode = value.clone(),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;
             }
         }
     }
-    // Invalidate cached whisper context when model changes
-    if key == "selected_model_id" {
+    // Invalidate cached whisper context when model or GPU mode changes
+    if key == "selected_model_id" || key == "gpu_mode" {
         *state.whisper_context.lock().unwrap() = None;
     }
     // Send hotkey updates outside the settings lock

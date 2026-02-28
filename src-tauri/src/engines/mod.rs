@@ -1,6 +1,4 @@
 pub mod whisper;
-pub mod faster_whisper;
-pub mod mlx_whisper;
 pub mod vosk;
 pub mod moonshine;
 pub mod openai_api;
@@ -166,8 +164,6 @@ impl EngineCatalog {
     pub fn new() -> Self {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
-            Box::new(mlx_whisper::MLXWhisperEngine),
-            Box::new(faster_whisper::FasterWhisperEngine),
             Box::new(vosk::VoskEngine),
             Box::new(moonshine::MoonshineEngine),
         ];
