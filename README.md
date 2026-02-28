@@ -6,7 +6,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
-- **Multiple speech engines** — Whisper (C++), Faster Whisper, MLX Whisper, Vosk, Moonshine, or any OpenAI-compatible API
+- **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible API
 - **Post-processing** — hallucination filtering, dictation commands (new line, new paragraph), optional LLM text cleanup
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual recording indicator with real-time spectrum bars
@@ -18,7 +18,6 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - macOS 13.0+
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - [Node.js](https://nodejs.org/) (LTS)
-- At least one speech engine installed (see [Engines](#engines) below)
 
 ## Build
 
@@ -53,22 +52,13 @@ On first launch, a setup wizard asks for three macOS permissions:
 
 ## Engines
 
-WhisperDictate supports multiple speech recognition backends. Each has different strengths:
-
-| Engine | Best for | Install | Languages |
+| Engine | Type | Description | Languages |
 |---|---|---|---|
-| [**whisper.cpp**](https://github.com/ggerganov/whisper.cpp) | CPU, lightweight, general use | `brew install whisper-cpp` | Auto, FR, EN, ES, DE |
-| [**Faster Whisper**](https://github.com/SYSTRAN/faster-whisper) (CTranslate2) | GPU acceleration (~4x faster) | `pip install whisper-ctranslate2` | Auto, FR, EN, ES, DE |
-| [**MLX Whisper**](https://github.com/ml-explore/mlx-examples/tree/main/whisper) | Apple Silicon (M1/M2/M3/M4) | `pip install mlx-whisper` | Auto, FR, EN, ES, DE |
-| [**Vosk**](https://alphacephei.com/vosk/) | Low resources, small models | `pip install vosk` | EN, FR |
-| [**Moonshine**](https://github.com/usefulsensors/moonshine) | Ultra-fast, English only | `pip install useful-moonshine` | EN |
-| **OpenAI API** | Cloud, no local compute | API key only | Auto, FR, EN, ES, DE |
+| **Whisper** ([whisper-rs](https://github.com/tazz4843/whisper-rs)) | Native (built-in) | GGML models running natively in Rust with Metal GPU acceleration on Apple Silicon. No external install needed. | Auto, FR, EN, ES, DE |
+| **OpenAI API** | Cloud | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/audio/createTranscription) server (OpenAI, local, or remote). Requires an API key. | Auto, FR, EN, ES, DE |
 
-- **whisper.cpp** is the default engine — C++ implementation, runs well on any Mac.
-- **MLX Whisper** is the recommended engine on Apple Silicon — uses Apple's [MLX framework](https://github.com/ml-explore/mlx) for best performance on the Neural Engine and unified GPU.
-- **Faster Whisper** shines with NVIDIA GPUs via [CTranslate2](https://github.com/OpenNMT/CTranslate2) optimization.
-- **Vosk** and **Moonshine** are lightweight alternatives for quick dictation with smaller models.
-- **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/audio/createTranscription) server (local or remote).
+- **Whisper** is the default and recommended engine — runs locally with Metal GPU acceleration on Apple Silicon (M1/M2/M3/M4). Multiple model sizes available (tiny to large-v3-turbo).
+- **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server.
 
 Models are downloaded and managed from within the app (Model Manager).
 
@@ -105,6 +95,7 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum) |
+| Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) (native, Metal GPU) |
 | Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted en Rust, rendues en bitmap RGBA — zéro dépendance image, inspirées [Lucide](https://lucide.dev/) |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
 | Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
@@ -125,13 +116,14 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | [`log`](https://github.com/rust-lang/log) / [`env_logger`](https://github.com/rust-cli/env_logger) | Logging |
 | [`thiserror`](https://github.com/dtolnay/thiserror) | Dérivation d'erreurs typées |
 
-**Audio**
+**Audio / Transcription**
 
 | Crate | Rôle |
 |-------|------|
 | [`cpal`](https://github.com/RustAudio/cpal) | Capture audio cross-platform (enregistrement micro) |
 | [`hound`](https://github.com/ruuda/hound) | Écriture fichiers WAV |
 | [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT pour spectre audio (visualisation) |
+| [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Transcription native Whisper (GGML, Metal GPU sur macOS) |
 
 **Réseau / IO**
 
@@ -149,11 +141,13 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 |-------|------|
 | [`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam) | Canaux multi-producteur (thread audio, hotkey) |
 
-**Traitement texte**
+**Traitement texte / i18n**
 
 | Crate | Rôle |
 |-------|------|
 | [`regex`](https://github.com/rust-lang/regex) | Post-traitement transcriptions (filtrage hallucinations) |
+| [`rust-i18n`](https://github.com/longbridge/rust-i18n) | Internationalisation backend (menus tray, messages) |
+| [`sys-locale`](https://github.com/1Password/sys-locale) | Détection locale système |
 
 **macOS uniquement**
 
@@ -225,10 +219,9 @@ src-tauri/               Rust backend
     state.rs             App state & persistent preferences
     recording.rs         Recording state machine & audio thread
     audio.rs             cpal recording & FFT
-    transcriber.rs       Transcription orchestration
+    transcriber.rs       Transcription dispatcher (native whisper / cloud API)
     post_processor.rs    Text post-processing
     llm_cleanup.rs       LLM text cleanup client
-    process_runner.rs    Subprocess execution (speech engines)
     tray.rs              Menu bar menu & tray icon states
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
     events.rs            Centralised event name constants

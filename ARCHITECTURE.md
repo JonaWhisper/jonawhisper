@@ -42,11 +42,10 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules |
-| `state.rs` | `AppState` with four fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, and history DB |
+| `state.rs` | `AppState` with six fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL), tray menu state, and cached WhisperContext |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
-| `process_runner.rs` | Subprocess execution helper for speech engine CLIs |
 
 ### Platform (`platform/`)
 
@@ -62,16 +61,12 @@ macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future 
 
 ### Engines (`engines/`)
 
-Each speech engine implements the `ASREngine` trait (with a `recommended_model_id(language)` method for per-language recommendations). Currently all engines run as subprocesses; native Rust bindings are planned.
+Each speech engine implements the `ASREngine` trait (with a `recommended_model_id(language)` method for per-language recommendations).
 
 | File | Engine |
 |------|--------|
-| `whisper.rs` | whisper.cpp (CLI) |
-| `faster_whisper.rs` | Faster Whisper (Python CLI) |
-| `mlx_whisper.rs` | MLX Whisper (Python, macOS only) |
-| `vosk.rs` | Vosk (Python CLI) |
-| `moonshine.rs` | Moonshine (Python CLI) |
-| `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) |
+| `whisper.rs` | Native Whisper via [whisper-rs](https://github.com/tazz4843/whisper-rs) with Metal GPU acceleration on macOS. Models are GGML format, downloaded and cached locally. Context is kept in `AppState.whisper_context` to avoid reloading. |
+| `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) — works with OpenAI, local servers, etc. |
 | `downloader.rs` | Model downloads: streaming HTTP with resume (Range headers), per-model state tracking, 250ms-throttled progress events with speed, HuggingFace repos, ZIP extraction |
 
 The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup, language listing, availability checks, and recommended model selection per language.
@@ -81,7 +76,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | File | Role |
 |------|------|
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. |
-| `transcriber.rs` | Picks the right engine from the catalog and calls `engine.transcribe()`. Runs on `spawn_blocking`. |
+| `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if a provider is configured, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands |
 | `llm_cleanup.rs` | Optional LLM-based text cleanup via OpenAI or Anthropic API |
 
@@ -136,7 +131,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `SetupStep2.vue` | Initial configuration form (locale, hotkey, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
-| `ApiServerForm.vue` | Reusable form for configuring OpenAI-compatible API server endpoints |
+| `ProviderForm.vue` | Reusable form for configuring cloud ASR providers (OpenAI-compatible API endpoints) |
 
 ### State management
 
