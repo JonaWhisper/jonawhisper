@@ -78,6 +78,10 @@ impl ASREngine for FasterWhisperEngine {
         find_executable("whisper-ctranslate2", &[])
     }
 
+    fn recommended_model_id(&self, _language: &str) -> Option<String> {
+        Some("faster-whisper:large-v3-turbo".into())
+    }
+
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {
         let exe = self.resolve_executable()
             .ok_or_else(|| EngineError::EngineUnavailable {

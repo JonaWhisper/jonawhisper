@@ -59,6 +59,14 @@ impl ASREngine for VoskEngine {
         find_executable("vosk-transcriber", &[])
     }
 
+    fn recommended_model_id(&self, language: &str) -> Option<String> {
+        if language.starts_with("fr") {
+            Some("vosk:fr-small".into())
+        } else {
+            Some("vosk:en-small".into())
+        }
+    }
+
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, _language: &str) -> Result<String, EngineError> {
         let exe = self.resolve_executable()
             .ok_or_else(|| EngineError::EngineUnavailable {

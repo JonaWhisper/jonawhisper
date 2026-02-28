@@ -43,6 +43,10 @@ impl ASREngine for MoonshineEngine {
         find_executable("python3", &[])
     }
 
+    fn recommended_model_id(&self, _language: &str) -> Option<String> {
+        Some("moonshine:base".into())
+    }
+
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, _language: &str) -> Result<String, EngineError> {
         let python = self.resolve_executable()
             .ok_or_else(|| EngineError::EngineUnavailable {

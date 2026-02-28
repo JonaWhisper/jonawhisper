@@ -51,28 +51,12 @@ async function onRecordingModeChange(mode: string) {
 }
 
 // -- Models --
-const RECOMMENDED: Record<string, string> = {
-  'whisper': 'whisper:large-v3-turbo',
-  'faster-whisper': 'faster-whisper:large-v3-turbo',
-  'mlx-whisper': 'mlx-whisper:large-v3-turbo',
-  'moonshine': 'moonshine:base',
-  'vosk': navigator.language.startsWith('fr') ? 'vosk:fr-small' : 'vosk:en-small',
-}
-
 const availableEngines = computed(() => store.engines.filter(e => e.available))
 
 const recommendedModels = computed(() => {
-  const result: ASRModel[] = []
-  const addedIds = new Set<string>()
-  for (const engine of availableEngines.value) {
-    const recId = RECOMMENDED[engine.id]
-    if (recId) {
-      const model = store.models.find(m => m.id === recId)
-      if (model) { result.push(model); addedIds.add(model.id) }
-    }
-  }
+  const result = store.models.filter(m => m.recommended)
   // Include the currently selected model if not already in the list
-  if (store.selectedModelId && !addedIds.has(store.selectedModelId)) {
+  if (store.selectedModelId && !result.find(m => m.id === store.selectedModelId)) {
     const selected = store.models.find(m => m.id === store.selectedModelId)
     if (selected) result.unshift(selected)
   }
@@ -134,6 +118,11 @@ async function onLanguageChange(value: string | number | bigint | Record<string,
   if (typeof value !== 'string') return
   await store.selectLanguageAction(value)
 }
+
+// Refresh models when language changes (recommended flags depend on it)
+watch(() => store.selectedLanguage, () => {
+  store.fetchModels()
+})
 
 // Reset language if no longer supported when model changes
 watch(() => store.selectedModelId, () => {

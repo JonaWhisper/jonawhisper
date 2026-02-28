@@ -72,6 +72,10 @@ impl ASREngine for WhisperEngine {
             .or_else(|| find_executable("main", &["/opt/homebrew/bin"]))
     }
 
+    fn recommended_model_id(&self, _language: &str) -> Option<String> {
+        Some("whisper:large-v3-turbo".into())
+    }
+
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {
         let exe = self.resolve_executable()
             .ok_or_else(|| EngineError::EngineUnavailable {

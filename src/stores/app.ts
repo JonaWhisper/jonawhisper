@@ -32,6 +32,7 @@ export interface ASRModel {
   download_type: { type: string }
   download_marker: string | null
   is_downloaded?: boolean
+  recommended?: boolean
   wer: number | null
   rtf: number | null
 }

@@ -78,6 +78,10 @@ impl ASREngine for MLXWhisperEngine {
         find_executable("mlx_whisper", &[])
     }
 
+    fn recommended_model_id(&self, _language: &str) -> Option<String> {
+        Some("mlx-whisper:large-v3-turbo".into())
+    }
+
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {
         let exe = self.resolve_executable()
             .ok_or_else(|| EngineError::EngineUnavailable {

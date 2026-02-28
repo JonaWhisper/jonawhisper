@@ -83,6 +83,7 @@ pub trait ASREngine: Send + Sync {
     fn install_hint(&self) -> &str;
     fn resolve_executable(&self) -> Option<String>;
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError>;
+    fn recommended_model_id(&self, _language: &str) -> Option<String> { None }
 }
 
 // -- Engine info (serializable for frontend) --
@@ -216,6 +217,12 @@ impl EngineCatalog {
 
     pub fn downloaded_models(&self) -> Vec<ASRModel> {
         self.all_models().into_iter().filter(|m| m.is_downloaded()).collect()
+    }
+
+    pub fn recommended_model_ids(&self, language: &str) -> std::collections::HashSet<String> {
+        self.engines.iter()
+            .filter_map(|e| e.recommended_model_id(language))
+            .collect()
     }
 
     pub fn supported_languages(&self) -> Vec<Language> {

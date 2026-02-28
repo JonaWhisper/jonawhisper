@@ -38,10 +38,16 @@ pub fn get_engines(state: tauri::State<'_, Arc<AppState>>) -> Vec<EngineInfo> {
 
 #[tauri::command]
 pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Value> {
-    catalog(&state).all_models().into_iter().map(|m| {
+    let cat = catalog(&state);
+    let language = state.settings.lock().unwrap().selected_language.clone();
+    let recommended_ids = cat.recommended_model_ids(&language);
+    cat.all_models().into_iter().map(|m| {
         let downloaded = m.is_downloaded();
+        let recommended = recommended_ids.contains(&m.id);
         let mut json = serde_json::to_value(&m).unwrap();
-        json.as_object_mut().unwrap().insert("is_downloaded".into(), downloaded.into());
+        let obj = json.as_object_mut().unwrap();
+        obj.insert("is_downloaded".into(), downloaded.into());
+        obj.insert("recommended".into(), recommended.into());
         json
     }).collect()
 }
