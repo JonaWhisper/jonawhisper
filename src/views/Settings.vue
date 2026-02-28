@@ -172,9 +172,11 @@ async function confirmRemoveProvider() {
 const OPENAI_ASR_MODELS = ['whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe']
 const CUSTOM_MODEL_VALUE = '_custom'
 
-// Local model: only show downloaded models
+// Local model: only show downloaded ASR models (exclude LLM)
+const asrEngineIds = computed(() => new Set(store.asrEngines.map(e => e.id)))
 const localDownloadedModels = computed(() =>
   store.models.filter(m => {
+    if (!asrEngineIds.value.has(m.engine_id)) return false
     if (m.download_type.type === 'System') return true
     return m.is_downloaded
   })
@@ -278,6 +280,15 @@ let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
 
 async function onLlmEnabledChange(enabled: boolean) {
   await store.setSetting('llm_enabled', String(enabled))
+}
+
+async function onLlmSourceChange(source: string) {
+  await store.setSetting('llm_source', source)
+}
+
+async function onLlmLocalModelChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('llm_local_model_id', value)
 }
 
 async function onLlmProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -625,58 +636,110 @@ onUnmounted(() => {
               v-if="store.llmEnabled"
               class="space-y-4 pl-4 border-l-2 border-border"
             >
-              <div v-if="store.providers.length === 0" class="text-sm text-muted-foreground">
-                {{ t('settings.llm.noProviders') }}
+              <!-- Source toggle: Local / Cloud -->
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.source') }}</Label>
+                <div class="inline-flex rounded-md border border-border overflow-hidden w-full">
+                  <button
+                    class="flex-1 px-3 py-1.5 text-sm transition-colors"
+                    :class="store.llmSource === 'local'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50 text-muted-foreground'"
+                    @click="onLlmSourceChange('local')"
+                  >
+                    {{ t('settings.llm.source.local') }}
+                  </button>
+                  <button
+                    class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
+                    :class="store.llmSource === 'cloud'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50 text-muted-foreground'"
+                    @click="onLlmSourceChange('cloud')"
+                  >
+                    {{ t('settings.llm.source.cloud') }}
+                  </button>
+                </div>
               </div>
 
-              <template v-else>
-                <div class="space-y-1">
-                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
-                  <Select :model-value="store.llmProviderId" @update:model-value="onLlmProviderChange">
+              <!-- Local LLM model selector -->
+              <template v-if="store.llmSource === 'local'">
+                <div v-if="store.downloadedLlmModels.length === 0" class="text-sm text-muted-foreground">
+                  {{ t('settings.llm.noLocalModels') }}
+                </div>
+                <div v-else class="space-y-1">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.localModel') }}</Label>
+                  <Select :model-value="store.llmLocalModelId" @update:model-value="onLlmLocalModelChange">
                     <SelectTrigger class="w-full h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem
-                        v-for="p in store.providers"
-                        :key="p.id"
-                        :value="p.id"
+                        v-for="m in store.downloadedLlmModels"
+                        :key="m.id"
+                        :value="m.id"
                       >
-                        {{ p.name }}
+                        {{ m.label }}
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </template>
+
+              <!-- Cloud LLM config -->
+              <template v-if="store.llmSource === 'cloud'">
+                <div v-if="store.providers.length === 0" class="text-sm text-muted-foreground">
+                  {{ t('settings.llm.noProviders') }}
                 </div>
 
-                <div v-if="llmSelectedProvider" class="space-y-1">
-                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
-                  <!-- Preconfigured: dropdown -->
-                  <Select
-                    v-if="!isCustomLlmModel"
-                    :model-value="store.llmModel"
-                    @update:model-value="onLlmModelSelect"
-                  >
-                    <SelectTrigger class="w-full h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        v-for="m in llmModelOptions"
-                        :key="m"
-                        :value="m"
-                      >
-                        {{ m }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <!-- Custom: free text input -->
-                  <Input
-                    v-else
-                    :value="store.llmModel"
-                    @input="onLlmModelInput"
-                    class="h-9 text-sm"
-                  />
-                </div>
+                <template v-else>
+                  <div class="space-y-1">
+                    <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
+                    <Select :model-value="store.llmProviderId" @update:model-value="onLlmProviderChange">
+                      <SelectTrigger class="w-full h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          v-for="p in store.providers"
+                          :key="p.id"
+                          :value="p.id"
+                        >
+                          {{ p.name }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div v-if="llmSelectedProvider" class="space-y-1">
+                    <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+                    <!-- Preconfigured: dropdown -->
+                    <Select
+                      v-if="!isCustomLlmModel"
+                      :model-value="store.llmModel"
+                      @update:model-value="onLlmModelSelect"
+                    >
+                      <SelectTrigger class="w-full h-9 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          v-for="m in llmModelOptions"
+                          :key="m"
+                          :value="m"
+                        >
+                          {{ m }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <!-- Custom: free text input -->
+                    <Input
+                      v-else
+                      :value="store.llmModel"
+                      @input="onLlmModelInput"
+                      class="h-9 text-sm"
+                    />
+                  </div>
+                </template>
               </template>
             </div>
           </div>

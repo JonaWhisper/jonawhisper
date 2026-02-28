@@ -267,15 +267,17 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (pp_enabled, lang, hall_filter, llm_enabled, llm_provider_id, llm_model, providers) = {
+    let (pp_enabled, lang, hall_filter, llm_enabled, llm_source, llm_provider_id, llm_model, llm_local_model_id, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.post_processing_enabled,
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
             s.llm_enabled,
+            s.llm_source.clone(),
             s.llm_provider_id.clone(),
             s.llm_model.clone(),
+            s.llm_local_model_id.clone(),
             s.providers.clone(),
         )
     };
@@ -292,18 +294,40 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
 
     // Step 2: LLM cleanup (if enabled)
     if llm_enabled {
-        if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
-            match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model).await {
-                Ok(cleaned) => {
-                    log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+        if llm_source == "local" {
+            // Local LLM inference via llama.cpp
+            let state_clone = Arc::clone(state);
+            let text_for_llm = processed.clone();
+            let lang_for_llm = lang.clone();
+            match tokio::task::spawn_blocking(move || {
+                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &llm_local_model_id)
+            }).await {
+                Ok(Ok(cleaned)) => {
+                    log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
                     processed = cleaned;
                 }
+                Ok(Err(e)) => {
+                    log::warn!("Local LLM cleanup failed, using regex result: {}", e);
+                }
                 Err(e) => {
-                    log::warn!("LLM cleanup failed, using regex result: {}", e);
+                    log::warn!("Local LLM cleanup task panicked: {}", e);
                 }
             }
         } else {
-            log::warn!("LLM cleanup enabled but provider '{}' not found", llm_provider_id);
+            // Cloud LLM cleanup
+            if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
+                match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model).await {
+                    Ok(cleaned) => {
+                        log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                        processed = cleaned;
+                    }
+                    Err(e) => {
+                        log::warn!("LLM cleanup failed, using regex result: {}", e);
+                    }
+                }
+            } else {
+                log::warn!("LLM cleanup enabled but provider '{}' not found", llm_provider_id);
+            }
         }
     }
 
@@ -332,6 +356,41 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         crate::events::TRANSCRIPTION_COMPLETE,
         serde_json::json!({ "text": processed }),
     );
+}
+
+// -- Local LLM cleanup --
+
+fn run_local_llm_cleanup(
+    state: &Arc<AppState>,
+    text: &str,
+    language: &str,
+    llm_local_model_id: &str,
+) -> Result<String, String> {
+    if llm_local_model_id.is_empty() {
+        return Err("No local LLM model selected".into());
+    }
+
+    // Resolve model path from catalog
+    let catalog = crate::engines::EngineCatalog::new();
+    let model = catalog.model_by_id(llm_local_model_id)
+        .ok_or_else(|| format!("LLM model not found: {}", llm_local_model_id))?;
+
+    if !model.is_downloaded() {
+        return Err(format!("LLM model not downloaded: {}", llm_local_model_id));
+    }
+
+    let model_path = model.local_path();
+
+    // Load or reuse cached LlmContext
+    let mut ctx_guard = state.llm_context.lock().unwrap();
+    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != llm_local_model_id) {
+        log::info!("Loading local LLM model: {}", llm_local_model_id);
+        let ctx = crate::llm_local::LlmContext::load(&model_path, llm_local_model_id)?;
+        *ctx_guard = Some(ctx);
+    }
+
+    let ctx = ctx_guard.as_ref().unwrap();
+    crate::llm_local::cleanup_text(ctx, text, language)
 }
 
 // -- Cleanup helpers --

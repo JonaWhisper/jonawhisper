@@ -15,6 +15,7 @@ export interface EngineInfo {
   id: string
   name: string
   description: string
+  category: 'asr' | 'llm'
   available: boolean
   supported_language_codes: string[]
 }
@@ -105,6 +106,8 @@ export interface SettingsPayload {
   llm_enabled: boolean
   llm_provider_id: string
   llm_model: string
+  llm_source: string
+  llm_local_model_id: string
   asr_provider_id: string
   asr_cloud_model: string
   gpu_mode: string
@@ -129,6 +132,8 @@ export const useAppStore = defineStore('app', () => {
   const llmEnabled = ref(false)
   const llmProviderId = ref('')
   const llmModel = ref('')
+  const llmSource = ref<'local' | 'cloud'>('cloud')
+  const llmLocalModelId = ref('')
   const asrProviderId = ref('')
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
@@ -153,6 +158,12 @@ export const useAppStore = defineStore('app', () => {
     if (m.download_type.type === 'RemoteAPI' || m.download_type.type === 'System') return true
     return m.is_downloaded
   }))
+  const asrEngines = computed(() => engines.value.filter(e => e.category === 'asr'))
+  const llmEngines = computed(() => engines.value.filter(e => e.category === 'llm'))
+  const downloadedLlmModels = computed(() => {
+    const llmEngineIds = new Set(llmEngines.value.map(e => e.id))
+    return models.value.filter(m => llmEngineIds.has(m.engine_id) && m.is_downloaded)
+  })
 
   // Actions
   async function fetchEngines() {
@@ -311,6 +322,8 @@ export const useAppStore = defineStore('app', () => {
       llmEnabled.value = s.llm_enabled ?? false
       llmProviderId.value = s.llm_provider_id ?? ''
       llmModel.value = s.llm_model ?? ''
+      llmSource.value = (s.llm_source as 'local' | 'cloud') ?? 'cloud'
+      llmLocalModelId.value = s.llm_local_model_id ?? ''
       asrProviderId.value = s.asr_provider_id ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
@@ -331,6 +344,8 @@ export const useAppStore = defineStore('app', () => {
       case 'llm_enabled': return String(llmEnabled.value)
       case 'llm_provider_id': return llmProviderId.value
       case 'llm_model': return llmModel.value
+      case 'llm_source': return llmSource.value
+      case 'llm_local_model_id': return llmLocalModelId.value
       case 'asr_provider_id': return asrProviderId.value
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
@@ -352,6 +367,8 @@ export const useAppStore = defineStore('app', () => {
       case 'llm_enabled': llmEnabled.value = value === 'true'; break
       case 'llm_provider_id': llmProviderId.value = value; break
       case 'llm_model': llmModel.value = value; break
+      case 'llm_source': llmSource.value = value as 'local' | 'cloud'; break
+      case 'llm_local_model_id': llmLocalModelId.value = value; break
       case 'asr_provider_id': asrProviderId.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
@@ -527,11 +544,11 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    llmEnabled, llmProviderId, llmModel, asrProviderId, asrCloudModel, gpuMode,
+    llmEnabled, llmProviderId, llmModel, llmSource, llmLocalModelId, asrProviderId, asrCloudModel, gpuMode,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed
-    isBusy, selectedEngine, downloadedModels,
+    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels,
     // Actions
     init, fetchEngines, fetchModels, fetchLanguages,
     fetchAudioDevices, fetchPermissions, fetchHistory,

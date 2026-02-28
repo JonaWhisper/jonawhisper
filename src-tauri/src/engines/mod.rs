@@ -1,9 +1,19 @@
 pub mod whisper;
 pub mod openai_api;
 pub mod downloader;
+pub mod llm_local;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+// -- Engine category --
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EngineCategory {
+    ASR,
+    LLM,
+}
 
 // -- Download type --
 
@@ -70,6 +80,7 @@ pub struct Language {
 pub trait ASREngine: Send + Sync {
     fn engine_id(&self) -> &str;
     fn display_name(&self) -> &str;
+    fn category(&self) -> EngineCategory { EngineCategory::ASR }
     fn models(&self) -> Vec<ASRModel>;
     fn supported_languages(&self) -> Vec<Language>;
     fn description(&self) -> &str;
@@ -85,6 +96,7 @@ pub struct EngineInfo {
     pub id: String,
     pub name: String,
     pub description: String,
+    pub category: EngineCategory,
     pub available: bool,
     pub supported_language_codes: Vec<String>,
 }
@@ -130,6 +142,7 @@ impl EngineCatalog {
     pub fn new() -> Self {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
+            Box::new(llm_local::LlmLocalEngine),
         ];
 
         Self { engines }
@@ -146,6 +159,7 @@ impl EngineCatalog {
                 id: e.engine_id().to_string(),
                 name: e.display_name().to_string(),
                 description: e.description().to_string(),
+                category: e.category(),
                 available: true,
                 supported_language_codes: e.supported_languages().into_iter().map(|l| l.code).collect(),
             })
@@ -162,6 +176,7 @@ impl EngineCatalog {
 
     pub fn recommended_model_ids(&self, language: &str) -> std::collections::HashSet<String> {
         self.engines.iter()
+            .filter(|e| e.category() == EngineCategory::ASR)
             .filter_map(|e| e.recommended_model_id(language))
             .collect()
     }

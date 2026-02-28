@@ -1,0 +1,164 @@
+use std::num::NonZeroU32;
+use std::path::Path;
+
+use llama_cpp_2::context::params::LlamaContextParams;
+use llama_cpp_2::llama_backend::LlamaBackend;
+use llama_cpp_2::llama_batch::LlamaBatch;
+use llama_cpp_2::model::params::LlamaModelParams;
+use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaModel};
+use llama_cpp_2::sampling::LlamaSampler;
+
+/// Cached LLM context: backend + model, reused across calls.
+pub struct LlmContext {
+    backend: LlamaBackend,
+    model: LlamaModel,
+    model_id: String,
+}
+
+// LlamaBackend/LlamaModel are Send+Sync
+unsafe impl Send for LlmContext {}
+unsafe impl Sync for LlmContext {}
+
+impl LlmContext {
+    /// Load a GGUF model from disk. GPU offloads all layers on macOS Metal.
+    pub fn load(path: &Path, model_id: &str) -> Result<Self, String> {
+        let backend = LlamaBackend::init()
+            .map_err(|e| format!("Failed to init llama backend: {}", e))?;
+
+        let model_params = LlamaModelParams::default()
+            .with_n_gpu_layers(999);
+
+        let model = LlamaModel::load_from_file(&backend, path, &model_params)
+            .map_err(|e| format!("Failed to load LLM model: {}", e))?;
+
+        log::info!("LLM model loaded: {} ({})", model_id, path.display());
+
+        Ok(Self {
+            backend,
+            model,
+            model_id: model_id.to_string(),
+        })
+    }
+
+    pub fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
+fn system_prompt(language: &str) -> String {
+    let lang_name = match language {
+        "fr" => "French",
+        "en" => "English",
+        "es" => "Spanish",
+        "de" => "German",
+        _ => "the same language as the input",
+    };
+
+    format!(
+        "You are a dictation text cleaner. Your job is to clean up raw speech-to-text output.\n\
+         Rules:\n\
+         - Fix punctuation, capitalization, and spacing\n\
+         - Remove filler words and speech artifacts (um, uh, etc.)\n\
+         - Do NOT change the meaning or rephrase\n\
+         - Do NOT add information that wasn't in the original\n\
+         - Output language: {lang_name}\n\
+         - Reply with ONLY the cleaned text, nothing else\n\
+         - Do NOT use /think or reasoning tags"
+    )
+}
+
+/// Clean up transcribed text using a local LLM.
+pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str) -> Result<String, String> {
+    let messages = vec![
+        LlamaChatMessage::new("system".to_string(), system_prompt(language))
+            .map_err(|e| format!("Failed to create system message: {}", e))?,
+        LlamaChatMessage::new("user".to_string(), text.to_string())
+            .map_err(|e| format!("Failed to create user message: {}", e))?,
+    ];
+
+    // Apply the model's built-in chat template
+    let template = ctx.model.chat_template(None)
+        .map_err(|e| format!("Failed to get chat template: {}", e))?;
+    let prompt = ctx.model.apply_chat_template(&template, &messages, true)
+        .map_err(|e| format!("Failed to apply chat template: {}", e))?;
+
+    // Tokenize
+    let tokens = ctx.model.str_to_token(&prompt, AddBos::Always)
+        .map_err(|e| format!("Tokenization failed: {}", e))?;
+
+    let n_prompt_tokens = tokens.len();
+    let max_gen_tokens: usize = 512;
+
+    // Create context for this generation
+    let n_threads = std::thread::available_parallelism()
+        .map(|p| p.get() as i32)
+        .unwrap_or(4);
+
+    let ctx_size = (n_prompt_tokens + max_gen_tokens + 64) as u32;
+    let ctx_params = LlamaContextParams::default()
+        .with_n_ctx(NonZeroU32::new(ctx_size))
+        .with_n_batch(512)
+        .with_n_threads(n_threads)
+        .with_n_threads_batch(n_threads);
+
+    let mut llama_ctx = ctx.model.new_context(&ctx.backend, ctx_params)
+        .map_err(|e| format!("Failed to create LLM context: {}", e))?;
+
+    // Create batch and fill with prompt tokens
+    let mut batch = LlamaBatch::new(512, 1);
+    let last_index = tokens.len() as i32 - 1;
+    for (i, token) in (0_i32..).zip(tokens.into_iter()) {
+        batch.add(token, i, &[0], i == last_index)
+            .map_err(|e| format!("Batch add failed: {}", e))?;
+    }
+
+    // Decode prompt (prefill)
+    llama_ctx.decode(&mut batch)
+        .map_err(|e| format!("Prompt decode failed: {}", e))?;
+
+    // Set up sampler: low temperature for deterministic cleanup
+    let mut sampler = LlamaSampler::chain_simple([
+        LlamaSampler::top_k(40),
+        LlamaSampler::top_p(0.9, 1),
+        LlamaSampler::temp(0.1),
+        LlamaSampler::dist(42),
+    ]);
+
+    // Auto-regressive generation
+    let mut n_cur = batch.n_tokens();
+    let n_len = (n_prompt_tokens + max_gen_tokens) as i32;
+    let mut decoder = encoding_rs::UTF_8.new_decoder();
+    let mut output = String::new();
+
+    while n_cur < n_len {
+        let token = sampler.sample(&llama_ctx, batch.n_tokens() - 1);
+        sampler.accept(token);
+
+        if ctx.model.is_eog_token(token) {
+            break;
+        }
+
+        let piece = ctx.model.token_to_piece(token, &mut decoder, false, None)
+            .map_err(|e| format!("Token decode failed: {}", e))?;
+        output.push_str(&piece);
+
+        batch.clear();
+        batch.add(token, n_cur, &[0], true)
+            .map_err(|e| format!("Batch add failed: {}", e))?;
+
+        llama_ctx.decode(&mut batch)
+            .map_err(|e| format!("Decode failed: {}", e))?;
+
+        n_cur += 1;
+    }
+
+    let result = output.trim().to_string();
+
+    // Sanity check: discard if empty or 3x longer than input
+    if result.is_empty() || result.len() > text.len() * 3 {
+        log::warn!("LLM cleanup output suspicious (len={} vs input={}), discarding", result.len(), text.len());
+        return Err("LLM output failed sanity check".into());
+    }
+
+    Ok(result)
+}

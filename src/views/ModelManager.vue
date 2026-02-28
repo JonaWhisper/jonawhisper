@@ -57,7 +57,9 @@ onMounted(async () => {
   getCurrentWindow().setTitle(t('window.modelManager'))
   await Promise.all([store.fetchEngines(), store.fetchModels()])
   if (store.engines.length > 0 && !selectedEngineId.value) {
-    selectedEngineId.value = store.engines[0]?.id ?? null
+    // Default to first ASR engine
+    const firstAsr = store.asrEngines[0]
+    selectedEngineId.value = firstAsr?.id ?? store.engines[0]?.id ?? null
   }
 })
 </script>
@@ -73,7 +75,7 @@ onMounted(async () => {
       </div>
       <div class="space-y-1 px-1">
         <button
-          v-for="engine in store.engines"
+          v-for="engine in store.asrEngines"
           :key="engine.id"
           @click="selectEngine(engine)"
           class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"
@@ -84,6 +86,26 @@ onMounted(async () => {
           <span class="font-medium truncate">{{ engine.name }}</span>
         </button>
       </div>
+      <template v-if="store.llmEngines.length > 0">
+        <div class="px-3 pt-4 pb-1">
+          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            {{ t('modelManager.postProcessing') }}
+          </h2>
+        </div>
+        <div class="space-y-1 px-1">
+          <button
+            v-for="engine in store.llmEngines"
+            :key="engine.id"
+            @click="selectEngine(engine)"
+            class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"
+            :class="selectedEngineId === engine.id
+              ? 'bg-accent text-accent-foreground'
+              : 'hover:bg-accent/50 text-foreground'"
+          >
+            <span class="font-medium truncate">{{ engine.name }}</span>
+          </button>
+        </div>
+      </template>
     </div>
 
     <!-- Main content -->

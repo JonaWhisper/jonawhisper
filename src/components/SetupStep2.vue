@@ -52,7 +52,7 @@ async function onRecordingModeChange(mode: string) {
 }
 
 // -- Models --
-const availableEngines = computed(() => store.engines.filter(e => e.available))
+const availableEngines = computed(() => store.engines.filter(e => e.available && e.category === 'asr'))
 
 const recommendedModels = computed(() => {
   const result = store.models.filter(m => m.recommended)

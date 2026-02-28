@@ -56,6 +56,8 @@ pub struct AppState {
     pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
     /// Cached WhisperContext: (model_id, gpu_mode, context). Invalidated when model or GPU mode changes.
     pub whisper_context: Mutex<Option<(String, String, whisper_rs::WhisperContext)>>,
+    /// Cached LLM context for local inference. Invalidated when llm_local_model_id changes.
+    pub llm_context: Mutex<Option<crate::llm_local::LlmContext>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -117,6 +119,10 @@ pub struct Preferences {
     pub llm_provider_id: String,
     #[serde(default)]
     pub llm_model: String,
+    #[serde(default = "default_llm_source")]
+    pub llm_source: String,
+    #[serde(default)]
+    pub llm_local_model_id: String,
     #[serde(default)]
     pub asr_provider_id: String,
     #[serde(default = "default_asr_cloud_model")]
@@ -134,6 +140,7 @@ fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
+fn default_llm_source() -> String { "cloud".to_string() }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
 /// or %APPDATA%/WhisperDictate/ (Windows).
@@ -254,6 +261,11 @@ impl Preferences {
                 prefs.selected_model_id = default_model_id();
                 needs_save = true;
             }
+
+            // Migrate: if llm_enabled with a cloud provider but no llm_source set, default to cloud
+            if prefs.llm_enabled && !prefs.llm_provider_id.is_empty() && prefs.llm_source == "cloud" {
+                // Already correct default, no migration needed
+            }
         }
 
         if needs_save {
@@ -328,6 +340,7 @@ impl Default for AppState {
             history_db: Mutex::new(open_history_db()),
             tray_menu: Mutex::new(None),
             whisper_context: Mutex::new(None),
+            llm_context: Mutex::new(None),
         }
     }
 }

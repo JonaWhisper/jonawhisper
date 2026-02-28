@@ -150,6 +150,8 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "llm_enabled": s.llm_enabled,
         "llm_provider_id": s.llm_provider_id,
         "llm_model": s.llm_model,
+        "llm_source": s.llm_source,
+        "llm_local_model_id": s.llm_local_model_id,
         "asr_provider_id": s.asr_provider_id,
         "asr_cloud_model": s.asr_cloud_model,
         "gpu_mode": s.gpu_mode,
@@ -188,6 +190,8 @@ pub fn set_setting(
             "llm_enabled" => s.llm_enabled = value == "true",
             "llm_provider_id" => s.llm_provider_id = value.clone(),
             "llm_model" => s.llm_model = value.clone(),
+            "llm_source" => s.llm_source = value.clone(),
+            "llm_local_model_id" => s.llm_local_model_id = value.clone(),
             "asr_provider_id" => s.asr_provider_id = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
             "gpu_mode" => s.gpu_mode = value.clone(),
@@ -200,6 +204,10 @@ pub fn set_setting(
     // Invalidate cached whisper context when model or GPU mode changes
     if key == "selected_model_id" || key == "gpu_mode" {
         *state.whisper_context.lock().unwrap() = None;
+    }
+    // Invalidate cached LLM context when local model changes
+    if key == "llm_local_model_id" {
+        *state.llm_context.lock().unwrap() = None;
     }
     // Send hotkey updates outside the settings lock
     match key.as_str() {
