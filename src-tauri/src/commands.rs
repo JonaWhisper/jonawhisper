@@ -73,10 +73,12 @@ pub async fn download_model_cmd(
 }
 
 #[tauri::command]
-pub fn delete_model_cmd(id: String) -> bool {
-    catalog()
-        .model_by_id(&id)
-        .is_some_and(|m| downloader::delete_model(&m))
+pub async fn delete_model_cmd(id: String) -> bool {
+    tokio::task::spawn_blocking(move || {
+        catalog()
+            .model_by_id(&id)
+            .is_some_and(|m| downloader::delete_model(&m))
+    }).await.unwrap_or(false)
 }
 
 #[tauri::command]
