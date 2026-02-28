@@ -8,7 +8,7 @@
 ## UX / Polish
 
 - [ ] **Icones natives dans le tray menu** — Remplacer les emojis/caractères Unicode par des SF Symbols (`NSImage(systemSymbolName:)`) pour un rendu natif adapté au thème clair/sombre. Concerne les icones de transport type (micro), checkmarks, etc.
-- [ ] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Permet de comparer qualité vs rapidité avant de choisir un modèle.
+- [ ] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Représentation visuelle intuitive (barres, badges colorés, labels type "Précis"/"Rapide") plutôt que des chiffres bruts — doit être compréhensible sans connaître les termes techniques.
 
 
 ## Fonctionnalités
