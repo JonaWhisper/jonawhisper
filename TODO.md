@@ -31,7 +31,15 @@
 
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
 - [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo
-- [x] **Hotkey static atomics → struct user_info** — ✅ TapState struct passé via user_info, plus de static atomics
-- [x] **Event names centralisés** — ✅ Module `events.rs` avec 12 constantes, plus de strings bruts
 - [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)
+
+## Audits (à planifier)
+
+- [ ] **Audit global du codebase** — Re-vérifier l'ensemble après les refactorings récents (FFI, events, hotkey, crossbeam, mutex grouping). Couvrir :
+  - **Sécurité** — injections, gestion des clés API, permissions, sanitization des inputs
+  - **Performance** — allocations inutiles, locks trop larges, I/O bloquant sur le main thread
+  - **Code quality** — patterns incohérents, dead code, error handling, unwrap justifiés
+  - **Architecture** — couplage entre modules, séparation des responsabilités
+  - **Frontend** — listeners orphelins, memory leaks, réactivité, accessibilité
+  - **Tests** — couverture actuelle, identifier les zones critiques à tester en priorité
