@@ -1,4 +1,5 @@
 {
+  "_version": 1,
   "app.name": "WhisperDictate",
   "menu.microphone": "Microphone",
   "menu.language": "Language",
@@ -14,6 +15,9 @@
   "menu.clearHistory": "Clear history",
   "menu.manageModels": "Manage models…",
   "menu.noModel": "No model downloaded",
+  "menu.settings": "Settings\u2026",
+  "menu.setup": "Setup\u2026",
+  "menu.noDevices": "No input devices",
   "menu.quit": "Quit",
   "hotkey.rightCommand": "Right Command ⌘",
   "hotkey.rightOption": "Right Option ⌥",

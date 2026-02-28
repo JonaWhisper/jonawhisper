@@ -1,5 +1,6 @@
 use crate::platform::audio_devices;
 use crate::state::AppState;
+use rust_i18n::t;
 use std::sync::Arc;
 use tauri::{
     image::Image,
@@ -7,6 +8,17 @@ use tauri::{
     tray::TrayIconBuilder,
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
+
+/// Holds references to menu items for incremental updates.
+pub struct TrayMenuState {
+    pub menu: Menu<tauri::Wry>,
+    pub mic_submenu: Submenu<tauri::Wry>,
+    pub settings_item: MenuItem<tauri::Wry>,
+    pub models_item: MenuItem<tauri::Wry>,
+    pub history_item: MenuItem<tauri::Wry>,
+    pub setup_item: MenuItem<tauri::Wry>,
+    pub quit_item: MenuItem<tauri::Wry>,
+}
 
 const PILL_WIDTH: f64 = 80.0;
 const PILL_HEIGHT: f64 = 32.0;
@@ -187,10 +199,49 @@ unsafe fn set_subviews_transparent(content_view: *mut objc2::runtime::AnyObject)
 
 // -- Tray menu --
 
-fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::Error>> {
-    let state = get_state(app);
+fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::error::Error>> {
+    let mic_submenu = Submenu::with_id(app, "mic_submenu", &t!("menu.microphone"), true)?;
 
-    // Audio device submenu
+    let settings_item = MenuItem::with_id(app, "settings", &t!("menu.settings"), true, None::<&str>)?;
+    let models_item = MenuItem::with_id(app, "model_manager", &t!("menu.manageModels"), true, None::<&str>)?;
+    let history_item = MenuItem::with_id(app, "history", &t!("menu.history"), true, None::<&str>)?;
+    let setup_item = MenuItem::with_id(app, "setup", &t!("menu.setup"), true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", &t!("menu.quit"), true, Some("CmdOrCtrl+Q"))?;
+
+    let menu = Menu::with_items(
+        app,
+        &[
+            &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
+            &mic_submenu,
+            &PredefinedMenuItem::separator(app)?,
+            &settings_item,
+            &models_item,
+            &history_item,
+            &setup_item,
+            &PredefinedMenuItem::separator(app)?,
+            #[cfg(debug_assertions)]
+            &MenuItem::with_id(app, "test_pill", "Test Pill States", true, None::<&str>)?,
+            #[cfg(debug_assertions)]
+            &PredefinedMenuItem::separator(app)?,
+            &quit_item,
+        ],
+    )?;
+
+    Ok(TrayMenuState {
+        menu,
+        mic_submenu,
+        settings_item,
+        models_item,
+        history_item,
+        setup_item,
+        quit_item,
+    })
+}
+
+/// Incrementally update the microphone submenu (no full menu rebuild).
+pub fn update_mic_submenu(app: &AppHandle) {
+    let state = get_state(app);
     let devices = audio_devices::list_input_devices();
     let selected_uid = {
         let s = state.settings.lock().unwrap();
@@ -201,60 +252,70 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
         .is_some_and(|uid| devices.iter().any(|d| &d.uid == uid));
     let effective_uid = if uid_valid { selected_uid } else { None };
 
-    let active_device = devices
+    let tray_menu = state.tray_menu.lock().unwrap();
+    let Some(ref m) = *tray_menu else { return };
+
+    // Remove all existing items from the submenu
+    if let Ok(items) = m.mic_submenu.items() {
+        for item in &items {
+            let _ = m.mic_submenu.remove(item);
+        }
+    }
+
+    // Add device items
+    for device in &devices {
+        let is_selected = match &effective_uid {
+            Some(uid) => uid == &device.uid,
+            None => device.is_default,
+        };
+        let check = if is_selected { "✓ " } else { "   " };
+        let default_tag = if device.is_default {
+            format!(" ({})", t!("settings.microphone.defaultTag"))
+        } else {
+            String::new()
+        };
+        let label = format!("{}{} {}{}", check, device.transport_type.icon(), device.name, default_tag);
+        if let Ok(item) = MenuItem::with_id(app, &format!("device_{}", device.uid), &label, true, None::<&str>) {
+            let _ = m.mic_submenu.append(&item);
+        }
+    }
+
+    if devices.is_empty() {
+        if let Ok(item) = MenuItem::with_id(app, "no_devices", &t!("menu.noDevices"), false, None::<&str>) {
+            let _ = m.mic_submenu.append(&item);
+        }
+    }
+
+    // Update submenu title to show active device
+    let active_label = devices
         .iter()
         .find(|d| match &effective_uid {
             Some(uid) => uid == &d.uid,
             None => d.is_default,
         })
         .map(|d| format!("{} {}", d.transport_type.icon(), d.name))
-        .unwrap_or_else(|| "Microphone".to_string());
-
-    let mic_submenu = Submenu::with_id(app, "mic_submenu", &active_device, true)?;
-    for device in &devices {
-        let is_selected = match &effective_uid {
-            Some(uid) => uid == &device.uid,
-            None => device.is_default,
-        };
-        let default_tag = if device.is_default { " (Default)" } else { "" };
-        let check = if is_selected { "✓ " } else { "   " };
-        let label = format!("{}{} {}{}", check, device.transport_type.icon(), device.name, default_tag);
-        mic_submenu.append(&MenuItem::with_id(
-            app,
-            format!("device_{}", device.uid),
-            &label,
-            true,
-            None::<&str>,
-        )?)?;
-    }
-    if devices.is_empty() {
-        mic_submenu.append(&MenuItem::with_id(app, "no_devices", "No input devices", false, None::<&str>)?)?;
-    }
-
-    let menu = Menu::with_items(
-        app,
-        &[
-            &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
-            &PredefinedMenuItem::separator(app)?,
-            &mic_submenu,
-            &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "settings", "Settings\u{2026}", true, None::<&str>)?,
-            &MenuItem::with_id(app, "model_manager", "Models\u{2026}", true, None::<&str>)?,
-            &MenuItem::with_id(app, "history", "History", true, None::<&str>)?,
-            &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
-            &PredefinedMenuItem::separator(app)?,
-            #[cfg(debug_assertions)]
-            &MenuItem::with_id(app, "test_pill", "Test Pill States", true, None::<&str>)?,
-            #[cfg(debug_assertions)]
-            &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "quit", "Quit", true, Some("CmdOrCtrl+Q"))?,
-        ],
-    )?;
-
-    Ok(menu)
+        .unwrap_or_else(|| t!("menu.microphone").to_string());
+    let _ = m.mic_submenu.set_text(&active_label);
 }
 
-/// Update a preference from a menu selection and rebuild the tray menu.
+/// Update all static menu item labels (called when locale changes).
+pub fn update_tray_labels(app: &AppHandle) {
+    let state = get_state(app);
+    let tray_menu = state.tray_menu.lock().unwrap();
+    let Some(ref m) = *tray_menu else { return };
+
+    let _ = m.settings_item.set_text(&t!("menu.settings"));
+    let _ = m.models_item.set_text(&t!("menu.manageModels"));
+    let _ = m.history_item.set_text(&t!("menu.history"));
+    let _ = m.setup_item.set_text(&t!("menu.setup"));
+    let _ = m.quit_item.set_text(&t!("menu.quit"));
+
+    drop(tray_menu);
+    // Also refresh mic submenu (translated default tag)
+    update_mic_submenu(app);
+}
+
+/// Update a preference from a menu selection and refresh the mic submenu.
 fn handle_selection(app: &AppHandle, prefix: &str, value: &str) {
     let state = get_state(app);
     {
@@ -266,15 +327,7 @@ fn handle_selection(app: &AppHandle, prefix: &str, value: &str) {
     }
     state.save_preferences();
     log::info!("Selected {}: {}", prefix, value);
-    rebuild_menu(app);
-}
-
-fn rebuild_menu(app: &AppHandle) {
-    if let Ok(new_menu) = build_menu(app) {
-        if let Some(tray) = app.tray_by_id("main") {
-            let _ = tray.set_menu(Some(new_menu));
-        }
-    }
+    update_mic_submenu(app);
 }
 
 // -- Dynamic tray icon --
@@ -412,7 +465,7 @@ fn make_transcribing_icon() -> Image<'static> {
 }
 
 pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let menu = build_menu(app)?;
+    let menu_state = build_initial_menu(app)?;
 
     let _tray = TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
@@ -423,16 +476,16 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             match id {
                 "quit" => app.exit(0),
                 "settings" => {
-                    open_window_with_min(app, "settings", "Settings", "/settings", 580.0, 420.0, Some((460.0, 320.0)));
+                    open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 580.0, 420.0, Some((460.0, 320.0)));
                 }
                 "model_manager" => {
-                    open_window(app, "model-manager", "Model Manager", "/model-manager", 700.0, 500.0);
+                    open_window(app, "model-manager", &t!("window.modelManager"), "/model-manager", 700.0, 500.0);
                 }
                 "history" => {
-                    open_window(app, "history", "History", "/history", 500.0, 500.0);
+                    open_window(app, "history", &t!("window.history"), "/history", 500.0, 500.0);
                 }
                 "setup" => {
-                    open_window(app, "setup", "Setup", "/setup", 420.0, 420.0);
+                    open_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 420.0);
                 }
                 "test_pill" => {
                     let app_clone = app.clone();
@@ -452,14 +505,23 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
     // Attach menu after build (avoids macOS first-click-closes quirk)
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_menu(Some(menu));
+        let _ = tray.set_menu(Some(menu_state.menu.clone()));
     }
 
-    // Rebuild menu on audio device changes
+    // Store menu refs for incremental updates
+    {
+        let state = get_state(app);
+        *state.tray_menu.lock().unwrap() = Some(menu_state);
+    }
+
+    // Populate mic submenu with initial devices
+    update_mic_submenu(app);
+
+    // Update mic submenu on audio device changes (incremental, no flash)
     let app_handle = app.clone();
     audio_devices::start_device_change_listener(move || {
-        log::info!("Audio devices changed, rebuilding tray menu");
-        rebuild_menu(&app_handle);
+        log::info!("Audio devices changed, updating mic submenu");
+        update_mic_submenu(&app_handle);
     });
 
     Ok(())

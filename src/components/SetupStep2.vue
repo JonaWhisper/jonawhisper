@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { invoke } from '@tauri-apps/api/core'
 import { useAppStore, type ASRModel } from '@/stores/app'
 import { i18n } from '@/main'
 import { Button } from '@/components/ui/button'
@@ -34,11 +35,9 @@ const localeOptions = [
 async function onLocaleChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   await store.setSetting('app_locale', value)
-  if (value === 'auto') {
-    i18n.global.locale.value = navigator.language.startsWith('fr') ? 'fr' : 'en'
-  } else {
-    i18n.global.locale.value = value as 'fr' | 'en'
-  }
+  // Rust handles tray labels; resolve effective locale for frontend
+  const locale = await invoke<string>('get_system_locale')
+  i18n.global.locale.value = locale as 'fr' | 'en'
 }
 
 // -- Hotkey --

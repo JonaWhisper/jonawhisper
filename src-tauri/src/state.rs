@@ -51,6 +51,7 @@ pub struct AppState {
     pub download: Mutex<DownloadState>,
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
+    pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -208,6 +209,7 @@ impl Default for AppState {
             download: Mutex::new(DownloadState::default()),
             settings: Mutex::new(prefs),
             history_db: Mutex::new(open_history_db()),
+            tray_menu: Mutex::new(None),
         }
     }
 }

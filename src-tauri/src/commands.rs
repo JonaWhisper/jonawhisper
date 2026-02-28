@@ -14,6 +14,14 @@ fn catalog(state: &Arc<AppState>) -> EngineCatalog {
     EngineCatalog::new(&api_servers)
 }
 
+// -- Locale --
+
+#[tauri::command]
+pub fn get_system_locale(state: tauri::State<'_, Arc<AppState>>) -> String {
+    let locale = state.settings.lock().unwrap().app_locale.clone();
+    crate::resolve_locale(&locale)
+}
+
 // -- Audio --
 
 #[tauri::command]
@@ -138,7 +146,11 @@ pub fn set_setting(
     {
         let mut s = state.settings.lock().unwrap();
         match key.as_str() {
-            "app_locale" => s.app_locale = value.clone(),
+            "app_locale" => {
+                s.app_locale = value.clone();
+                let lang = crate::resolve_locale(&value);
+                rust_i18n::set_locale(&lang);
+            }
             "post_processing_enabled" => s.post_processing_enabled = value == "true",
             "hallucination_filter_enabled" => s.hallucination_filter_enabled = value == "true",
             "hotkey" => s.hotkey_option = value.clone(),
@@ -166,6 +178,9 @@ pub fn set_setting(
         _ => {}
     }
     state.save_preferences();
+    if key == "app_locale" {
+        crate::tray::update_tray_labels(&app);
+    }
     let _ = app.emit(crate::events::SETTINGS_CHANGED, &key);
 }
 

@@ -51,11 +51,9 @@ const localeOptions = [
 async function onLocaleChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   await store.setSetting('app_locale', value)
-  if (value === 'auto') {
-    i18n.global.locale.value = navigator.language.startsWith('fr') ? 'fr' : 'en'
-  } else {
-    i18n.global.locale.value = value as 'fr' | 'en'
-  }
+  // Rust handles tray labels; resolve effective locale for frontend
+  const locale = await invoke<string>('get_system_locale')
+  i18n.global.locale.value = locale as 'fr' | 'en'
 }
 
 async function onPostProcessingChange(enabled: boolean) {

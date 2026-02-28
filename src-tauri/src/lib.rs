@@ -12,10 +12,21 @@ mod state;
 mod transcriber;
 mod tray;
 
+rust_i18n::i18n!("../src/i18n");
+
 use state::AppState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::Manager;
+
+/// Resolve the effective locale ("fr" or "en") from preferences.
+pub fn resolve_locale(app_locale: &str) -> String {
+    if app_locale != "auto" {
+        return app_locale.to_string();
+    }
+    let sys = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
+    if sys.starts_with("fr") { "fr".to_string() } else { "en".to_string() }
+}
 
 /// Wrapper to store the hotkey update channel sender in Tauri managed state.
 pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::HotkeyUpdate>);
@@ -26,6 +37,12 @@ pub fn run() {
     recording::cleanup_orphan_audio_files();
 
     let app_state = Arc::new(AppState::default());
+
+    // Set Rust i18n locale from saved preferences
+    {
+        let locale = app_state.settings.lock().unwrap().app_locale.clone();
+        rust_i18n::set_locale(&resolve_locale(&locale));
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -62,6 +79,7 @@ pub fn run() {
             commands::start_shortcut_capture,
             commands::stop_shortcut_capture,
             commands::simulate_pill_test,
+            commands::get_system_locale,
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -112,7 +130,7 @@ pub fn run() {
             if report.all_granted() {
                 monitor_enabled.store(true, Ordering::SeqCst);
             } else {
-                tray::open_window(app.handle(), "setup", "Setup", "/setup", 420.0, 420.0);
+                tray::open_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 420.0);
             }
 
             // Spectrum emission (30fps) + stream error detection

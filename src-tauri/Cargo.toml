@@ -34,6 +34,8 @@ shellexpand = "3"
 thiserror = "2"
 crossbeam-channel = "0.5.15"
 rusqlite = { version = "0.32", features = ["bundled"] }
+rust-i18n = "3"
+sys-locale = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"

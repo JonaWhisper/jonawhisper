@@ -4,28 +4,29 @@ import { createI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import App from './App.vue'
 import router from './router'
-import en from './i18n/en.json'
-import fr from './i18n/fr.json'
+import enRaw from './i18n/en.json'
+import frRaw from './i18n/fr.json'
 import './assets/main.css'
 
-function systemLocale(): string {
-  return navigator.language.startsWith('fr') ? 'fr' : 'en'
-}
+// Strip _version (used by rust-i18n, not needed by vue-i18n)
+const { _version: _v1, ...en } = enRaw
+const { _version: _v2, ...fr } = frRaw
 
 export const i18n = createI18n({
   legacy: false,
-  locale: systemLocale(),
+  locale: 'en',
   fallbackLocale: 'en',
   messages: { en, fr },
 })
 
-// Load locale preference from backend (non-blocking)
-invoke<{ app_locale: string }>('get_settings').then((settings) => {
-  if (settings.app_locale && settings.app_locale !== 'auto') {
-    i18n.global.locale.value = settings.app_locale as 'fr' | 'en'
-  }
+// Load effective locale from Rust (single source of truth)
+invoke<string>('get_system_locale').then((locale) => {
+  i18n.global.locale.value = locale as 'fr' | 'en'
 }).catch(() => {
-  // Settings not available yet (e.g. during setup), use system locale
+  // Fallback to browser language if backend not ready
+  if (navigator.language.startsWith('fr')) {
+    i18n.global.locale.value = 'fr'
+  }
 })
 
 const pinia = createPinia()
