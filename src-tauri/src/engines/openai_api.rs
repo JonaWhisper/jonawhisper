@@ -29,7 +29,7 @@ impl ASREngine for OpenAIAPIEngine {
                 label: server.name.clone(),
                 filename: String::new(),
                 url: server.url.clone(),
-                size: String::new(),
+                size: 0,
                 storage_dir: String::new(),
                 download_type: DownloadType::RemoteAPI,
                 download_marker: None,

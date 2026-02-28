@@ -30,6 +30,12 @@ const isDownloaded = computed(() => {
 })
 
 const isRemoteAPI = computed(() => props.model.download_type.type === 'RemoteAPI')
+
+function formatSize(bytes: number): string {
+  if (bytes <= 0) return ''
+  if (bytes >= 1_000_000_000) return t('size.gb', [+(bytes / 1_000_000_000).toFixed(1)])
+  return t('size.mb', [Math.round(bytes / 1_000_000)])
+}
 </script>
 
 <template>
@@ -59,9 +65,9 @@ const isRemoteAPI = computed(() => props.model.download_type.type === 'RemoteAPI
     <div class="flex-1 min-w-0">
       <div class="font-medium text-sm truncate">{{ model.label }}</div>
       <div class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
-        <span v-if="model.size">{{ model.size }}</span>
+        <span v-if="model.size > 0">{{ formatSize(model.size) }}</span>
         <template v-if="model.wer != null || model.rtf != null">
-          <span v-if="model.size" class="opacity-40">&middot;</span>
+          <span v-if="model.size > 0" class="opacity-40">&middot;</span>
           <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" />
         </template>
       </div>

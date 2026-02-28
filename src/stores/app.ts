@@ -27,7 +27,7 @@ export interface ASRModel {
   label: string
   filename: string
   url: string
-  size: string
+  size: number
   storage_dir: string
   download_type: { type: string }
   download_marker: string | null

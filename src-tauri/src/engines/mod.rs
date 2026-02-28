@@ -31,7 +31,7 @@ pub struct ASRModel {
     pub label: String,
     pub filename: String,
     pub url: String,
-    pub size: String,
+    pub size: u64,
     pub storage_dir: String,
     pub download_type: DownloadType,
     pub download_marker: Option<String>,

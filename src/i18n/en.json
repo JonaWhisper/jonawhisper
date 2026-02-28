@@ -160,6 +160,8 @@
   "history.cancel": "Cancel",
   "shortcutCapture.waiting": "Press a shortcut…",
   "shortcutCapture.cancel": "Cancel",
+  "size.mb": "{0} MB",
+  "size.gb": "{0} GB",
   "benchmark.wer.excellent": "Excellent",
   "benchmark.wer.good": "Good",
   "benchmark.wer.fair": "Fair",

@@ -91,6 +91,12 @@ function isModelDownloaded(model: ASRModel): boolean {
   return !!model.is_downloaded
 }
 
+function formatSize(bytes: number): string {
+  if (bytes <= 0) return ''
+  if (bytes >= 1_000_000_000) return t('size.gb', [+(bytes / 1_000_000_000).toFixed(1)])
+  return t('size.mb', [Math.round(bytes / 1_000_000)])
+}
+
 async function handleDownload(model: ASRModel) {
   const success = await store.downloadModel(model.id)
   if (success) {
@@ -151,7 +157,7 @@ const canStart = computed(() => {
     <!-- Two-column content -->
     <div class="flex-1 flex gap-5 px-5 min-h-0">
       <!-- Left column: quick settings -->
-      <div class="w-[240px] shrink-0 space-y-3.5">
+      <div class="w-[240px] shrink-0 space-y-3.5 overflow-y-auto">
         <!-- UI Language -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.uiLanguage') }}</Label>
@@ -254,9 +260,9 @@ const canStart = computed(() => {
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium truncate">{{ model.label }}</div>
                 <div class="flex items-center gap-1 flex-wrap text-[11px] text-muted-foreground">
-                  <span v-if="model.size">{{ model.size }}</span>
+                  <span v-if="model.size > 0">{{ formatSize(model.size) }}</span>
                   <template v-if="model.wer != null || model.rtf != null">
-                    <span v-if="model.size" class="opacity-40">&middot;</span>
+                    <span v-if="model.size > 0" class="opacity-40">&middot;</span>
                     <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" compact />
                   </template>
                 </div>
@@ -305,9 +311,9 @@ const canStart = computed(() => {
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate">{{ model.label }}</div>
                     <div class="flex items-center gap-1 flex-wrap text-[11px] text-muted-foreground">
-                      <span v-if="model.size">{{ model.size }}</span>
+                      <span v-if="model.size > 0">{{ formatSize(model.size) }}</span>
                       <template v-if="model.wer != null || model.rtf != null">
-                        <span v-if="model.size" class="opacity-40">&middot;</span>
+                        <span v-if="model.size > 0" class="opacity-40">&middot;</span>
                         <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" compact />
                       </template>
                     </div>

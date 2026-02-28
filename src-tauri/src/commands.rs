@@ -29,8 +29,13 @@ pub fn get_engines(state: tauri::State<'_, Arc<AppState>>) -> Vec<EngineInfo> {
 }
 
 #[tauri::command]
-pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<engines::ASRModel> {
-    catalog(&state).all_models()
+pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Value> {
+    catalog(&state).all_models().into_iter().map(|m| {
+        let downloaded = m.is_downloaded();
+        let mut json = serde_json::to_value(&m).unwrap();
+        json.as_object_mut().unwrap().insert("is_downloaded".into(), downloaded.into());
+        json
+    }).collect()
 }
 
 #[tauri::command]

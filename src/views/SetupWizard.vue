@@ -141,7 +141,7 @@ onUnmounted(() => {
     <!-- Step 2: Configuration -->
     <SetupStep2
       v-if="step === 2"
-      class="flex-1"
+      class="flex-1 min-h-0"
       @start="handleStart"
       @back="goToStep1"
     />
