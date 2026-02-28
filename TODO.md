@@ -28,6 +28,7 @@
   - **MLX Whisper** — MLX est un framework Apple Python/Swift only. Pas de binding Rust. Avec whisper-rs + CoreML on obtient la même accélération Apple Silicon, donc MLX Whisper pourrait être retiré ou gardé comme option Python legacy.
   - **API** — Déjà natif Rust (reqwest). Rien à changer.
   - **Moteurs Python en fallback** — Garder le support subprocess Python en option (venv dédié `~/.whisper-dictate/venv/`) pour les utilisateurs qui préfèrent ou qui ont des modèles spécifiques. Mais ce n'est plus le chemin par défaut.
+  - **Téléchargement des modèles** — Source unifiée : quasi tous les modèles sont sur [Hugging Face](https://huggingface.co/) avec une API ouverte (`https://huggingface.co/{repo}/resolve/main/{file}` = téléchargement direct, pas besoin de lib). Vosk est hébergé sur alphacephei.com (URLs directes aussi). Le `downloader.rs` existant couvre déjà les deux cas. Pas besoin de catalogues multiples ni de bibliothèques tierces.
   - **UX cible** : les moteurs Rust natifs sont disponibles immédiatement (juste télécharger le modèle). Les moteurs Python optionnels affichent un bouton "Install" qui gère le venv automatiquement.
 - [ ] **Descriptions des moteurs dans le Model Manager** — Ajouter une description/sous-titre pour chaque moteur expliquant sa spécificité :
   - **Whisper** (whisper.cpp) — C++, rapide sur CPU, le plus léger. Moteur par défaut.
