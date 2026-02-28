@@ -136,7 +136,7 @@
   "settings.transcription.language": "Language",
   "settings.transcription.gpuMode": "Acceleration",
   "settings.transcription.gpuMode.auto": "Auto (recommended)",
-  "settings.transcription.gpuMode.gpu": "GPU (Metal)",
+  "settings.transcription.gpuMode.gpu": "GPU",
   "settings.transcription.gpuMode.cpu": "CPU",
   "settings.transcription.noModels": "No models downloaded. Use the model manager to download one.",
   "settings.cloudAsr.model": "Model",
