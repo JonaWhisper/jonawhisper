@@ -228,7 +228,10 @@ export const useAppStore = defineStore('app', () => {
       console.error('downloadModel failed:', e)
       return false
     } finally {
-      await fetchModels()
+      const freshModels = await invoke<ASRModel[]>('get_models')
+      // Update models and remove activeDownloads entry in the same synchronous tick
+      // to avoid a flash where the model is neither "downloading" nor "paused"
+      models.value = freshModels
       const { [id]: _, ...rest } = activeDownloads.value
       activeDownloads.value = rest
     }
