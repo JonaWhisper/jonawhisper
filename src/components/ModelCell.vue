@@ -98,9 +98,15 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
         </div>
       </template>
 
-      <!-- Deleting — greyed trash with indeterminate bar -->
+      <!-- Deleting — greyed trash with indeterminate bar, centered over badge -->
       <template v-else-if="isDeleting">
-        <div class="relative flex items-center justify-center w-8 h-8 rounded-md">
+        <Badge
+          variant="secondary"
+          class="bg-green-500/10 text-green-500 border-transparent invisible"
+        >
+          {{ t('modelManager.downloaded') }}
+        </Badge>
+        <div class="absolute inset-0 m-auto flex items-center justify-center w-8 h-8 rounded-md">
           <Trash2 class="w-4 h-4 text-muted-foreground/40" />
           <div class="absolute bottom-0.5 left-1 right-1 h-0.5 rounded-full overflow-hidden bg-muted-foreground/15">
             <div class="h-full w-1/3 rounded-full bg-muted-foreground/40 animate-indeterminate" />
