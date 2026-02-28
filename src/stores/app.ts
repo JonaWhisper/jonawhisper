@@ -117,6 +117,7 @@ export const useAppStore = defineStore('app', () => {
   const queueCount = ref(0)
   const downloadingModelId = ref<string | null>(null)
   const downloadProgress = ref(0)
+  const downloadStopping = ref(false)
   const selectedModelId = ref('whisper:large-v3-turbo')
   const selectedLanguage = ref('auto')
   const postProcessingEnabled = ref(true)
@@ -221,16 +222,19 @@ export const useAppStore = defineStore('app', () => {
     } finally {
       downloadingModelId.value = null
       downloadProgress.value = 0
+      downloadStopping.value = false
       await fetchModels()
     }
   }
 
   async function pauseDownload() {
+    downloadStopping.value = true
     try { await invoke('pause_download') }
     catch (e) { console.error('pauseDownload failed:', e) }
   }
 
   async function cancelDownload(id: string) {
+    downloadStopping.value = true
     try {
       await invoke('cancel_download', { id })
       await fetchModels()
@@ -474,7 +478,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     // State
     isRecording, isTranscribing, queueCount,
-    downloadingModelId, downloadProgress,
+    downloadingModelId, downloadProgress, downloadStopping,
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,

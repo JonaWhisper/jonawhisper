@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, type ASRModel } from '@/stores/app'
 import { Button } from '@/components/ui/button'
-import { Trash2, Pause, Play, X } from 'lucide-vue-next'
+import { Trash2, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
@@ -64,12 +64,17 @@ function formatSize(bytes: number): string {
           <span class="text-xs text-muted-foreground w-10 text-right">
             {{ Math.round(downloadProgress * 100) }}%
           </span>
-          <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
-            <Pause class="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-            <X class="w-3.5 h-3.5" />
-          </Button>
+          <template v-if="store.downloadStopping">
+            <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+          </template>
+          <template v-else>
+            <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+              <Pause class="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+              <X class="w-3.5 h-3.5" />
+            </Button>
+          </template>
         </div>
       </template>
 
