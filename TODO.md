@@ -5,13 +5,6 @@
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement
 - [ ] **Tray menu se ferme au premier clic après lancement** — Bug upstream `tray-icon` (manque `acceptsFirstMouse:` sur TrayTarget NSView). Issue ouverte : tray-icon#251. Workaround actuel (menu attaché après build) est le meilleur disponible. Fix = PR upstream ou fork.
 
-## UX / Polish
-
-- [x] **Icones natives dans le tray menu** — Remplacé par des icônes SDF bitmap (bulles colorées : bleu=sélectionné, gris=autre, icône blanche). Tray bar : micro (idle), barres audio (recording), bulle texte (transcribing).
-- [x] **Harmoniser select_model/select_language avec set_setting** — `select_model` et `select_language` sont des commandes dédiées qui font exactement la même chose que `set_setting` (set field + save). Les router via le mécanisme générique `set_setting` pour la cohérence. Touche aussi le frontend (appels `invoke`).
-- [x] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Double affichage : représentation visuelle intuitive (barres, badges colorés, labels type "Précis"/"Rapide") + valeurs numériques brutes en petit pour les utilisateurs techniques.
-- [x] **Déplacer les recommandations de modèles côté backend** — Actuellement, la map `RECOMMENDED` est hardcodée dans `SetupStep2.vue` (frontend). Problèmes : duplication de logique métier côté JS, et sélection du modèle Vosk par `navigator.language` au lieu de `selectedLanguage`/`appLocale`. Refactorer en ajoutant un champ `recommended: bool` sur `ASRModel` côté Rust, chaque engine déclare ses modèles recommandés. La recommandation par langue se fait côté backend en fonction de la langue de transcription sélectionnée.
-
 
 ## Fonctionnalités
 
@@ -42,7 +35,6 @@
 - [ ] **Filtre hallucinations via LLM** — Envisager de remplacer ou compléter le filtre regex actuel par un passage LLM. Le LLM peut détecter contextuellement les hallucinations (répétitions, texte sans rapport, artefacts de fin) là où le regex ne catch que des patterns connus. Approche combinée possible : regex rapide d'abord, puis LLM pour les cas complexes.
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue de transcription sur disque (fichiers audio en attente). En cas de crash ou kill pendant une transcription, les fichiers WAV restent dans /tmp mais la queue en mémoire est perdue. Persister la queue permettrait de reprendre automatiquement au relancement. Concerne uniquement la transcription, pas le téléchargement.
 - [ ] **Reprise de téléchargement de modèles** — Actuellement, quitter l'app pendant un download = progression perdue, il faut tout re-télécharger. Implémenter la reprise (HTTP Range headers pour les fichiers directs, cache natif de `hf-hub` pour HuggingFace). Fermer la fenêtre ne pose pas de problème (le download continue en arrière-plan), seul le quit de l'app est concerné.
-- [x] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches (ModifierOnly / Combo / Key)
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon le micro utilisé. À réfléchir :
   - **Détection automatique** — Matcher le device par pattern dans le nom (ex: "AirPods" → preset Bluetooth, "MacBook" → preset intégré). Fournir quelques presets par défaut pour les cas courants.
   - **Presets personnalisés** — Permettre à l'utilisateur de créer/éditer ses propres presets et de les associer à un device spécifique. Important car chaque micro a ses particularités.
