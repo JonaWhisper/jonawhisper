@@ -82,6 +82,9 @@ interface TranscriptionCompletePayload {
 interface DownloadProgressPayload {
   model_id?: string
   progress?: number
+  downloaded?: number
+  total_size?: number
+  speed?: number
 }
 
 interface AppStatePayload {
@@ -114,7 +117,7 @@ export const useAppStore = defineStore('app', () => {
   const isRecording = ref(false)
   const isTranscribing = ref(false)
   const queueCount = ref(0)
-  const activeDownloads = ref<Record<string, { progress: number; stopping: boolean }>>({})
+  const activeDownloads = ref<Record<string, { progress: number; stopping: boolean; downloaded: number; totalSize: number; speed: number }>>({})
   const deletingModels = ref<Record<string, boolean>>({})
   const selectedModelId = ref('whisper:large-v3-turbo')
   const selectedLanguage = ref('auto')
@@ -196,9 +199,9 @@ export const useAppStore = defineStore('app', () => {
       isTranscribing.value = state.is_transcribing
       queueCount.value = state.queue_count
       // Hydrate activeDownloads from backend (preserve stopping flags for entries we already track)
-      const hydrated: Record<string, { progress: number; stopping: boolean }> = {}
+      const hydrated: typeof activeDownloads.value = {}
       for (const [id, progress] of Object.entries(state.active_downloads ?? {})) {
-        hydrated[id] = { progress, stopping: activeDownloads.value[id]?.stopping ?? false }
+        hydrated[id] = { progress, stopping: activeDownloads.value[id]?.stopping ?? false, downloaded: 0, totalSize: 0, speed: 0 }
       }
       activeDownloads.value = hydrated
     } catch (e) { console.error('fetchState failed:', e) }
@@ -217,7 +220,7 @@ export const useAppStore = defineStore('app', () => {
     // Pre-fill progress from partial file (avoids 0% flash on resume)
     const model = models.value.find(m => m.id === id)
     const initialProgress = model?.partial_progress ?? 0
-    activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false } }
+    activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false, downloaded: 0, totalSize: model?.size ?? 0, speed: 0 } }
     try {
       const success = await invoke<boolean>('download_model_cmd', { id })
       return success
@@ -456,11 +459,15 @@ export const useAppStore = defineStore('app', () => {
     })
 
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
-      const { model_id, progress } = event.payload ?? {}
+      const { model_id, progress, downloaded, total_size, speed } = event.payload ?? {}
       if (model_id && progress !== undefined && activeDownloads.value[model_id]) {
+        const entry = activeDownloads.value[model_id]
         // Only accept forward progress (avoid jitter from out-of-order events)
-        if (progress >= activeDownloads.value[model_id].progress) {
-          activeDownloads.value[model_id].progress = progress
+        if (progress >= entry.progress) {
+          entry.progress = progress
+          if (downloaded !== undefined) entry.downloaded = downloaded
+          if (total_size !== undefined) entry.totalSize = total_size
+          if (speed !== undefined) entry.speed = speed
         }
       }
     })

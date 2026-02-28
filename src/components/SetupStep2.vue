@@ -18,6 +18,7 @@ import {
 import { ChevronRight, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
+import { formatSize, formatSpeed } from '@/utils/format'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -80,10 +81,14 @@ function isModelDownloaded(model: ASRModel): boolean {
   return !!model.is_downloaded
 }
 
-function formatSize(bytes: number): string {
-  if (bytes <= 0) return ''
-  if (bytes >= 1_000_000_000) return t('size.gb', [+(bytes / 1_000_000_000).toFixed(1)])
-  return t('size.mb', [Math.round(bytes / 1_000_000)])
+
+function downloadInfo(modelId: string): string {
+  const dl = store.activeDownloads[modelId]
+  if (!dl) return ''
+  const parts: string[] = []
+  if (dl.totalSize > 0) parts.push(`${formatSize(dl.downloaded)} / ${formatSize(dl.totalSize)}`)
+  if (dl.speed > 0) parts.push(formatSpeed(dl.speed))
+  return parts.join(' \u00b7 ')
 }
 
 async function handleDownload(model: ASRModel) {
@@ -257,7 +262,12 @@ const canStart = computed(() => {
               <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                 <!-- Downloading -->
                 <template v-if="store.activeDownloads[model.id]">
-                  <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" class="w-16" />
+                  <div class="w-16">
+                    <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" />
+                    <div v-if="downloadInfo(model.id)" class="text-[9px] text-muted-foreground mt-0.5 truncate">
+                      {{ downloadInfo(model.id) }}
+                    </div>
+                  </div>
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
                     {{ Math.round((store.activeDownloads[model.id]?.progress ?? 0) * 100) }}%
                   </span>

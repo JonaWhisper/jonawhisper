@@ -182,17 +182,30 @@ async fn download_single_file(
         }
     };
 
-    // Emit initial progress if resuming
-    if resumed && total_size > 0 {
-        let progress = downloaded as f64 / total_size as f64;
-        if let Some(entry) = state.download.lock().unwrap().active.get_mut(&model.id) {
+    // Emit helper — sends progress + size + speed
+    let emit_progress = |app: &AppHandle, state: &AppState, model_id: &str,
+                         downloaded: u64, total: u64, speed: u64| {
+        let progress = if total > 0 { downloaded as f64 / total as f64 } else { 0.0 };
+        if let Some(entry) = state.download.lock().unwrap().active.get_mut(model_id) {
             entry.progress = progress;
         }
         let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
-            "model_id": model.id,
+            "model_id": model_id,
             "progress": progress,
+            "downloaded": downloaded,
+            "total_size": total,
+            "speed": speed,
         }));
+    };
+
+    // Emit initial progress if resuming
+    if resumed && total_size > 0 {
+        emit_progress(app, state, &model.id, downloaded, total_size, 0);
     }
+
+    // Throttle: emit at most every 250ms
+    let mut last_emit_time = std::time::Instant::now();
+    let mut last_emit_bytes = downloaded;
 
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
@@ -207,14 +220,17 @@ async fn download_single_file(
                 }
                 downloaded += bytes.len() as u64;
                 if total_size > 0 {
-                    let progress = downloaded as f64 / total_size as f64;
-                    if let Some(entry) = state.download.lock().unwrap().active.get_mut(&model.id) {
-                        entry.progress = progress;
+                    let now = std::time::Instant::now();
+                    let elapsed = now.duration_since(last_emit_time);
+                    let is_done = downloaded >= total_size;
+                    if elapsed >= std::time::Duration::from_millis(250) || is_done {
+                        let speed = if elapsed.as_secs_f64() > 0.0 {
+                            ((downloaded - last_emit_bytes) as f64 / elapsed.as_secs_f64()) as u64
+                        } else { 0 };
+                        emit_progress(app, state, &model.id, downloaded, total_size, speed);
+                        last_emit_time = now;
+                        last_emit_bytes = downloaded;
                     }
-                    let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
-                        "model_id": model.id,
-                        "progress": progress,
-                    }));
                 }
             }
             Err(e) => {

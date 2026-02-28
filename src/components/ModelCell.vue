@@ -7,6 +7,7 @@ import { Trash2, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
+import { formatSize, formatSpeed } from '@/utils/format'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -37,11 +38,18 @@ const isPaused = computed(() => {
   return !isDownloading.value && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
 })
 
-function formatSize(bytes: number): string {
-  if (bytes <= 0) return ''
-  if (bytes >= 1_000_000_000) return t('size.gb', [+(bytes / 1_000_000_000).toFixed(1)])
-  return t('size.mb', [Math.round(bytes / 1_000_000)])
-}
+const downloadInfo = computed(() => {
+  if (!dl.value) return ''
+  const { downloaded, totalSize, speed } = dl.value
+  const parts: string[] = []
+  if (totalSize > 0) {
+    parts.push(`${formatSize(downloaded)} / ${formatSize(totalSize)}`)
+  }
+  if (speed > 0) {
+    parts.push(formatSpeed(speed))
+  }
+  return parts.join(' \u00b7 ')
+})
 </script>
 
 <template>
@@ -65,7 +73,12 @@ function formatSize(bytes: number): string {
       <!-- Downloading -->
       <template v-if="isDownloading">
         <div class="flex items-center gap-2">
-          <Progress :model-value="progress * 100" class="w-24" />
+          <div class="w-24">
+            <Progress :model-value="progress * 100" />
+            <div v-if="downloadInfo" class="text-[10px] text-muted-foreground mt-0.5 truncate">
+              {{ downloadInfo }}
+            </div>
+          </div>
           <span class="text-xs text-muted-foreground w-10 text-right">
             {{ Math.round(progress * 100) }}%
           </span>
