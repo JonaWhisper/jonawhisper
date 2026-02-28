@@ -16,6 +16,7 @@ impl ASREngine for MoonshineEngine {
                 url: "UsefulSensors/moonshine-tiny".into(),
                 size: "26 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(8.0), rtf: Some(0.01),
             },
             ASRModel {
                 id: "moonshine:base".into(), engine_id: "moonshine".into(),
@@ -23,6 +24,7 @@ impl ASREngine for MoonshineEngine {
                 url: "UsefulSensors/moonshine-base".into(),
                 size: "61 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(5.0), rtf: Some(0.03),
             },
         ]
     }

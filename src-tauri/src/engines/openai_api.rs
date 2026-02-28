@@ -33,6 +33,8 @@ impl ASREngine for OpenAIAPIEngine {
                 storage_dir: String::new(),
                 download_type: DownloadType::RemoteAPI,
                 download_marker: None,
+                wer: None,
+                rtf: None,
             })
             .collect()
     }

@@ -16,6 +16,7 @@ impl ASREngine for VoskEngine {
                 url: "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip".into(),
                 size: "40 Mo".into(), storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
+                wer: Some(10.0), rtf: Some(0.02),
             },
             ASRModel {
                 id: "vosk:en-large".into(), engine_id: "vosk".into(),
@@ -23,6 +24,7 @@ impl ASREngine for VoskEngine {
                 url: "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip".into(),
                 size: "1.8 Go".into(), storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
+                wer: Some(5.0), rtf: Some(0.15),
             },
             ASRModel {
                 id: "vosk:fr-small".into(), engine_id: "vosk".into(),
@@ -30,6 +32,7 @@ impl ASREngine for VoskEngine {
                 url: "https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip".into(),
                 size: "41 Mo".into(), storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
+                wer: Some(12.0), rtf: Some(0.02),
             },
             ASRModel {
                 id: "vosk:fr-large".into(), engine_id: "vosk".into(),
@@ -37,6 +40,7 @@ impl ASREngine for VoskEngine {
                 url: "https://alphacephei.com/vosk/models/vosk-model-fr-0.22.zip".into(),
                 size: "1.4 Go".into(), storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
+                wer: Some(6.0), rtf: Some(0.15),
             },
         ]
     }

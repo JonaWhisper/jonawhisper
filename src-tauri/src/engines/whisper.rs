@@ -16,6 +16,7 @@ impl ASREngine for WhisperEngine {
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin".into(),
                 size: "75 Mo".into(), storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(7.6), rtf: Some(0.05),
             },
             ASRModel {
                 id: "whisper:base".into(), engine_id: "whisper".into(),
@@ -23,6 +24,7 @@ impl ASREngine for WhisperEngine {
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin".into(),
                 size: "142 Mo".into(), storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(5.0), rtf: Some(0.08),
             },
             ASRModel {
                 id: "whisper:small".into(), engine_id: "whisper".into(),
@@ -30,6 +32,7 @@ impl ASREngine for WhisperEngine {
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin".into(),
                 size: "466 Mo".into(), storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(3.4), rtf: Some(0.15),
             },
             ASRModel {
                 id: "whisper:medium".into(), engine_id: "whisper".into(),
@@ -37,6 +40,7 @@ impl ASREngine for WhisperEngine {
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin".into(),
                 size: "1.5 Go".into(), storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.7), rtf: Some(0.35),
             },
             ASRModel {
                 id: "whisper:large-v3-turbo".into(), engine_id: "whisper".into(),
@@ -44,6 +48,7 @@ impl ASREngine for WhisperEngine {
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin".into(),
                 size: "1.6 Go".into(), storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(2.1), rtf: Some(0.25),
             },
             ASRModel {
                 id: "whisper:large-v3".into(), engine_id: "whisper".into(),
@@ -51,6 +56,7 @@ impl ASREngine for WhisperEngine {
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin".into(),
                 size: "3.1 Go".into(), storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(1.8), rtf: Some(0.50),
             },
         ]
     }

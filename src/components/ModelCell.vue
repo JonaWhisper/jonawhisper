@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Trash2 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 
 const { t } = useI18n()
 
@@ -57,7 +58,13 @@ const isRemoteAPI = computed(() => props.model.download_type.type === 'RemoteAPI
     <!-- Model info -->
     <div class="flex-1 min-w-0">
       <div class="font-medium text-sm truncate">{{ model.label }}</div>
-      <div v-if="model.size" class="text-xs text-muted-foreground">{{ model.size }}</div>
+      <div class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
+        <span v-if="model.size">{{ model.size }}</span>
+        <template v-if="model.wer != null || model.rtf != null">
+          <span v-if="model.size" class="opacity-40">&middot;</span>
+          <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" />
+        </template>
+      </div>
     </div>
 
     <!-- Status / Actions -->

@@ -159,5 +159,13 @@
   "history.yesterday": "Hier",
   "history.cancel": "Annuler",
   "shortcutCapture.waiting": "Appuyez sur un raccourci\u2026",
-  "shortcutCapture.cancel": "Annuler"
+  "shortcutCapture.cancel": "Annuler",
+  "benchmark.wer.excellent": "Excellent",
+  "benchmark.wer.good": "Bon",
+  "benchmark.wer.fair": "Correct",
+  "benchmark.wer.basic": "Basique",
+  "benchmark.rtf.lightning": "\u00c9clair",
+  "benchmark.rtf.fast": "Rapide",
+  "benchmark.rtf.normal": "Normal",
+  "benchmark.rtf.slow": "Lent"
 }

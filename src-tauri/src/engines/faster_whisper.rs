@@ -16,6 +16,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-whisper-tiny".into(),
                 size: "75 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(7.6), rtf: Some(0.02),
             },
             ASRModel {
                 id: "faster-whisper:base".into(), engine_id: "faster-whisper".into(),
@@ -23,6 +24,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-whisper-base".into(),
                 size: "142 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(5.0), rtf: Some(0.03),
             },
             ASRModel {
                 id: "faster-whisper:small".into(), engine_id: "faster-whisper".into(),
@@ -30,6 +32,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-whisper-small".into(),
                 size: "466 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(3.4), rtf: Some(0.06),
             },
             ASRModel {
                 id: "faster-whisper:medium".into(), engine_id: "faster-whisper".into(),
@@ -37,6 +40,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-whisper-medium".into(),
                 size: "1.5 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(2.7), rtf: Some(0.12),
             },
             ASRModel {
                 id: "faster-whisper:large-v3".into(), engine_id: "faster-whisper".into(),
@@ -44,6 +48,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-whisper-large-v3".into(),
                 size: "3.1 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(1.8), rtf: Some(0.18),
             },
             ASRModel {
                 id: "faster-whisper:large-v3-turbo".into(), engine_id: "faster-whisper".into(),
@@ -51,6 +56,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-whisper-large-v3-turbo".into(),
                 size: "1.6 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(2.1), rtf: Some(0.10),
             },
             ASRModel {
                 id: "faster-whisper:distil-large-v3".into(), engine_id: "faster-whisper".into(),
@@ -58,6 +64,7 @@ impl ASREngine for FasterWhisperEngine {
                 url: "Systran/faster-distil-whisper-large-v3".into(),
                 size: "1.5 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(2.3), rtf: Some(0.08),
             },
         ]
     }

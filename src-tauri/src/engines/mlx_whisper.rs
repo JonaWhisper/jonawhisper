@@ -16,6 +16,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-tiny-mlx".into(),
                 size: "75 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(7.6), rtf: Some(0.02),
             },
             ASRModel {
                 id: "mlx-whisper:base".into(), engine_id: "mlx-whisper".into(),
@@ -23,6 +24,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-base-mlx".into(),
                 size: "142 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(5.0), rtf: Some(0.04),
             },
             ASRModel {
                 id: "mlx-whisper:small".into(), engine_id: "mlx-whisper".into(),
@@ -30,6 +32,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-small-mlx".into(),
                 size: "466 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(3.4), rtf: Some(0.07),
             },
             ASRModel {
                 id: "mlx-whisper:medium".into(), engine_id: "mlx-whisper".into(),
@@ -37,6 +40,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-medium-mlx".into(),
                 size: "1.5 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(2.7), rtf: Some(0.15),
             },
             ASRModel {
                 id: "mlx-whisper:large-v3-turbo".into(), engine_id: "mlx-whisper".into(),
@@ -44,6 +48,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-large-v3-turbo".into(),
                 size: "1.6 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(2.1), rtf: Some(0.10),
             },
             ASRModel {
                 id: "mlx-whisper:large-v3".into(), engine_id: "mlx-whisper".into(),
@@ -51,6 +56,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-large-v3-mlx".into(),
                 size: "3.1 Go".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(1.8), rtf: Some(0.20),
             },
             ASRModel {
                 id: "mlx-whisper:large-v3-turbo-q4".into(), engine_id: "mlx-whisper".into(),
@@ -58,6 +64,7 @@ impl ASREngine for MLXWhisperEngine {
                 url: "mlx-community/whisper-large-v3-turbo-q4".into(),
                 size: "534 Mo".into(), storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
+                wer: Some(2.3), rtf: Some(0.06),
             },
         ]
     }

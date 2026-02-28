@@ -159,5 +159,13 @@
   "history.yesterday": "Yesterday",
   "history.cancel": "Cancel",
   "shortcutCapture.waiting": "Press a shortcut…",
-  "shortcutCapture.cancel": "Cancel"
+  "shortcutCapture.cancel": "Cancel",
+  "benchmark.wer.excellent": "Excellent",
+  "benchmark.wer.good": "Good",
+  "benchmark.wer.fair": "Fair",
+  "benchmark.wer.basic": "Basic",
+  "benchmark.rtf.lightning": "Lightning",
+  "benchmark.rtf.fast": "Fast",
+  "benchmark.rtf.normal": "Normal",
+  "benchmark.rtf.slow": "Slow"
 }

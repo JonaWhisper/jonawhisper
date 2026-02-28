@@ -35,6 +35,8 @@ pub struct ASRModel {
     pub storage_dir: String,
     pub download_type: DownloadType,
     pub download_marker: Option<String>,
+    pub wer: Option<f32>,
+    pub rtf: Option<f32>,
 }
 
 impl ASRModel {

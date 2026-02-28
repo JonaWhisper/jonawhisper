@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { ChevronRight } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
+import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -252,7 +253,13 @@ const canStart = computed(() => {
               </div>
               <div class="flex-1 min-w-0">
                 <div class="text-sm font-medium truncate">{{ model.label }}</div>
-                <div v-if="model.size" class="text-[11px] text-muted-foreground">{{ model.size }}</div>
+                <div class="flex items-center gap-1 flex-wrap text-[11px] text-muted-foreground">
+                  <span v-if="model.size">{{ model.size }}</span>
+                  <template v-if="model.wer != null || model.rtf != null">
+                    <span v-if="model.size" class="opacity-40">&middot;</span>
+                    <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" compact />
+                  </template>
+                </div>
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                 <template v-if="store.downloadingModelId === model.id">
@@ -297,7 +304,13 @@ const canStart = computed(() => {
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="text-sm font-medium truncate">{{ model.label }}</div>
-                    <div v-if="model.size" class="text-[11px] text-muted-foreground">{{ model.size }}</div>
+                    <div class="flex items-center gap-1 flex-wrap text-[11px] text-muted-foreground">
+                      <span v-if="model.size">{{ model.size }}</span>
+                      <template v-if="model.wer != null || model.rtf != null">
+                        <span v-if="model.size" class="opacity-40">&middot;</span>
+                        <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" compact />
+                      </template>
+                    </div>
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                     <template v-if="store.downloadingModelId === model.id">
