@@ -268,7 +268,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
 
     // Read settings once
     let (pp_enabled, lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
-         llm_provider_id, llm_model, llm_max_tokens, providers) = {
+         llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.post_processing_enabled,
@@ -276,7 +276,6 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.hallucination_filter_enabled,
             s.text_cleanup_enabled,
             s.cleanup_model_id.clone(),
-            s.llm_provider_id.clone(),
             s.llm_model.clone(),
             s.llm_max_tokens,
             s.providers.clone(),
@@ -323,12 +322,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             if pp_enabled {
                 processed = post_processor::finalize(&processed);
             }
-        } else if cleanup_model_id == "cloud" {
+        } else if let Some(cloud_provider_id) = cleanup_model_id.strip_prefix("cloud:") {
             // Cloud LLM (finalize before)
             if pp_enabled {
                 processed = post_processor::finalize(&processed);
             }
-            if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
+            if let Some(provider) = providers.iter().find(|p| p.id == cloud_provider_id) {
                 match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
                     Ok(cleaned) => {
                         log::info!("Cloud LLM cleanup: {} → {}", processed.len(), cleaned.len());
@@ -339,7 +338,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     }
                 }
             } else {
-                log::warn!("Cloud LLM cleanup enabled but provider '{}' not found", llm_provider_id);
+                log::warn!("Cloud LLM cleanup enabled but provider '{}' not found", cloud_provider_id);
             }
         } else {
             // Local LLM (llama:*) — finalize before

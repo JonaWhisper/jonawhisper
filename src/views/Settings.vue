@@ -273,7 +273,7 @@ const OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4o']
 const ANTHROPIC_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250514', 'claude-opus-4-6-20250626']
 
 const llmSelectedProvider = computed(() =>
-  store.providers.find(p => p.id === store.llmProviderId)
+  store.providers.find(p => p.id === store.cleanupCloudProviderId)
 )
 
 const llmModelOptions = computed(() => {
@@ -302,13 +302,6 @@ async function onCleanupModelChange(value: string | number | bigint | Record<str
 async function onLlmMaxTokensChange(value: string | number) {
   const parsed = Math.max(64, Math.min(4096, parseInt(String(value), 10) || 256))
   await store.setSetting('llm_max_tokens', String(parsed))
-}
-
-async function onLlmProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
-  await store.setSetting('llm_provider_id', value)
-  // Reset model when changing provider
-  await store.setSetting('llm_model', '')
 }
 
 async function onLlmModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
@@ -706,59 +699,35 @@ onUnmounted(() => {
                 </p>
               </div>
 
-              <!-- Cloud LLM sub-settings -->
-              <template v-if="store.isCloudLlm">
-                <div v-if="store.providers.length === 0" class="text-sm text-muted-foreground">
-                  {{ t('settings.llm.noProviders') }}
+              <!-- Cloud LLM sub-settings (provider already selected via model dropdown) -->
+              <template v-if="store.isCloudLlm && llmSelectedProvider">
+                <div class="space-y-1">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+                  <Select
+                    v-if="!isCustomLlmModel"
+                    :model-value="store.llmModel"
+                    @update:model-value="onLlmModelSelect"
+                  >
+                    <SelectTrigger class="w-full h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        v-for="m in llmModelOptions"
+                        :key="m"
+                        :value="m"
+                      >
+                        {{ m }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    v-else
+                    :value="store.llmModel"
+                    @input="onLlmModelInput"
+                    class="h-9 text-sm"
+                  />
                 </div>
-
-                <template v-else>
-                  <div class="space-y-1">
-                    <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
-                    <Select :model-value="store.llmProviderId" @update:model-value="onLlmProviderChange">
-                      <SelectTrigger class="w-full h-9 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          v-for="p in store.providers"
-                          :key="p.id"
-                          :value="p.id"
-                        >
-                          {{ p.name }}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div v-if="llmSelectedProvider" class="space-y-1">
-                    <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
-                    <Select
-                      v-if="!isCustomLlmModel"
-                      :model-value="store.llmModel"
-                      @update:model-value="onLlmModelSelect"
-                    >
-                      <SelectTrigger class="w-full h-9 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          v-for="m in llmModelOptions"
-                          :key="m"
-                          :value="m"
-                        >
-                          {{ m }}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      v-else
-                      :value="store.llmModel"
-                      @input="onLlmModelInput"
-                      class="h-9 text-sm"
-                    />
-                  </div>
-                </template>
 
                 <!-- Max tokens (cloud) -->
                 <div class="space-y-1">

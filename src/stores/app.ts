@@ -174,18 +174,23 @@ export const useAppStore = defineStore('app', () => {
   })
   const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
   const cleanupModels = computed(() => {
-    const models: { id: string; label: string; group: string }[] = []
+    const result: { id: string; label: string; group: string }[] = []
     for (const m of downloadedPunctuationModels.value) {
-      models.push({ id: m.id, label: m.label, group: 'bert' })
+      result.push({ id: m.id, label: m.label, group: 'bert' })
     }
     for (const m of downloadedLlmModels.value) {
-      models.push({ id: m.id, label: m.label, group: 'llm' })
+      result.push({ id: m.id, label: m.label, group: 'llm' })
     }
-    models.push({ id: 'cloud', label: 'Cloud LLM', group: 'cloud' })
-    return models
+    for (const p of providers.value) {
+      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
+    }
+    return result
   })
-  const isCloudLlm = computed(() => cleanupModelId.value === 'cloud')
+  const isCloudLlm = computed(() => cleanupModelId.value.startsWith('cloud:'))
   const isLocalLlm = computed(() => cleanupModelId.value.startsWith('llama:'))
+  const cleanupCloudProviderId = computed(() =>
+    isCloudLlm.value ? cleanupModelId.value.slice('cloud:'.length) : ''
+  )
 
   // Actions
   async function fetchEngines() {
@@ -574,7 +579,7 @@ export const useAppStore = defineStore('app', () => {
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed
-    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady, cleanupModels, isCloudLlm, isLocalLlm,
+    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady, cleanupModels, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     // Actions
     init, fetchEngines, fetchModels, fetchLanguages,
     fetchAudioDevices, fetchPermissions, fetchHistory,

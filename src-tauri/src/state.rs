@@ -211,9 +211,10 @@ impl Preferences {
                     let api_key = llm.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
                     let model = llm.get("model").and_then(|v| v.as_str()).unwrap_or("");
 
+                    // Mark cleanup enabled; cleanup_model_id will be finalized
+                    // after llm_provider_id is set below
                     if llm.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
                         prefs.text_cleanup_enabled = true;
-                        prefs.cleanup_model_id = "cloud".to_string();
                     }
                     prefs.llm_model = model.to_string();
 
@@ -272,6 +273,7 @@ impl Preferences {
                 let old_llm_source = raw.get("llm_source").and_then(|v| v.as_str()).unwrap_or("cloud");
                 let old_punctuation_model_id = raw.get("punctuation_model_id").and_then(|v| v.as_str()).unwrap_or("");
                 let old_llm_local_model_id = raw.get("llm_local_model_id").and_then(|v| v.as_str()).unwrap_or("");
+                let old_llm_provider_id = raw.get("llm_provider_id").and_then(|v| v.as_str()).unwrap_or("");
 
                 match cleanup_mode {
                     "punctuation" => {
@@ -290,8 +292,9 @@ impl Preferences {
                             log::info!("Migrating cleanup_mode=full, llm_source=local → cleanup_model_id={}", model_id);
                             prefs.cleanup_model_id = model_id;
                         } else {
-                            log::info!("Migrating cleanup_mode=full, llm_source=cloud → cleanup_model_id=cloud");
-                            prefs.cleanup_model_id = "cloud".to_string();
+                            let cloud_id = format!("cloud:{}", old_llm_provider_id);
+                            log::info!("Migrating cleanup_mode=full, llm_source=cloud → cleanup_model_id={}", cloud_id);
+                            prefs.cleanup_model_id = cloud_id;
                         }
                     }
                     _ => {
@@ -305,9 +308,16 @@ impl Preferences {
             // Migrate llm_enabled (even older format) → text_cleanup_enabled
             if let Some(llm_enabled) = raw.get("llm_enabled").and_then(|v| v.as_bool()) {
                 if llm_enabled && !prefs.text_cleanup_enabled {
-                    log::info!("Migrating llm_enabled=true → text_cleanup_enabled=true, cleanup_model_id=cloud");
+                    log::info!("Migrating llm_enabled=true → text_cleanup_enabled=true");
                     prefs.text_cleanup_enabled = true;
-                    prefs.cleanup_model_id = "cloud".to_string();
+                    needs_save = true;
+                }
+            }
+
+            // Finalize cloud cleanup_model_id: ensure "cloud:" prefix with provider ID
+            if prefs.text_cleanup_enabled && (prefs.cleanup_model_id.is_empty() || prefs.cleanup_model_id == "cloud") {
+                if !prefs.llm_provider_id.is_empty() {
+                    prefs.cleanup_model_id = format!("cloud:{}", prefs.llm_provider_id);
                     needs_save = true;
                 }
             }
