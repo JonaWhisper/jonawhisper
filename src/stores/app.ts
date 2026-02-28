@@ -196,17 +196,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function selectModel(id: string) {
-    try {
-      await invoke('select_model', { id })
-      selectedModelId.value = id
-    } catch (e) { console.error('selectModel failed:', e) }
+    await setSetting('selected_model_id', id)
   }
 
   async function selectLanguageAction(code: string) {
-    try {
-      await invoke('select_language', { code })
-      selectedLanguage.value = code
-    } catch (e) { console.error('selectLanguageAction failed:', e) }
+    await setSetting('selected_language', code)
   }
 
   async function downloadModel(id: string) {
@@ -267,6 +261,8 @@ export const useAppStore = defineStore('app', () => {
       case 'cancel_shortcut': return cancelShortcut.value
       case 'recording_mode': return recordingMode.value
       case 'selected_input_device_uid': return selectedInputDeviceUid.value ?? ''
+      case 'selected_model_id': return selectedModelId.value
+      case 'selected_language': return selectedLanguage.value
       default: return ''
     }
   }
@@ -280,6 +276,8 @@ export const useAppStore = defineStore('app', () => {
       case 'cancel_shortcut': cancelShortcut.value = value; break
       case 'recording_mode': recordingMode.value = value; break
       case 'selected_input_device_uid': selectedInputDeviceUid.value = value || null; break
+      case 'selected_model_id': selectedModelId.value = value; break
+      case 'selected_language': selectedLanguage.value = value; break
     }
   }
 

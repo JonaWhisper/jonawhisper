@@ -51,11 +51,6 @@ pub fn get_downloaded_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<engi
     catalog(&state).downloaded_models()
 }
 
-#[tauri::command]
-pub fn select_model(id: String, state: tauri::State<'_, Arc<AppState>>) {
-    state.settings.lock().unwrap().selected_model_id = id;
-    state.save_preferences();
-}
 
 #[tauri::command]
 pub async fn download_model_cmd(
@@ -84,11 +79,6 @@ pub fn get_languages(state: tauri::State<'_, Arc<AppState>>) -> Vec<Language> {
     catalog(&state).supported_languages()
 }
 
-#[tauri::command]
-pub fn select_language(code: String, state: tauri::State<'_, Arc<AppState>>) {
-    state.settings.lock().unwrap().selected_language = code;
-    state.save_preferences();
-}
 
 // -- Permissions --
 
@@ -159,6 +149,8 @@ pub fn set_setting(
             "selected_input_device_uid" => {
                 s.selected_input_device_uid = if value.is_empty() { None } else { Some(value.clone()) };
             }
+            "selected_model_id" => s.selected_model_id = value.clone(),
+            "selected_language" => s.selected_language = value.clone(),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;
