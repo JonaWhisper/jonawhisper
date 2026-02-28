@@ -47,14 +47,11 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
   >
     <!-- Model info -->
     <div class="flex-1 min-w-0">
-      <div class="font-medium text-sm truncate">{{ model.label }}</div>
-      <div class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
-        <span v-if="model.size > 0">{{ formatSize(model.size) }}</span>
-        <template v-if="model.wer != null || model.rtf != null">
-          <span v-if="model.size > 0" class="opacity-40">&middot;</span>
-          <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" />
-        </template>
+      <div class="flex items-center gap-2">
+        <span class="font-medium text-sm truncate">{{ model.label }}</span>
+        <span v-if="model.size > 0" class="text-xs text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
       </div>
+      <BenchmarkBadges v-if="model.wer != null || model.rtf != null" :wer="model.wer" :rtf="model.rtf" class="mt-0.5" />
     </div>
 
     <!-- Status / Actions -->
