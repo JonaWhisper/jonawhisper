@@ -9,19 +9,9 @@
 ## Fonctionnalités
 
 - [x] **Moteur natif Rust whisper-rs** — whisper-rs compilé nativement, Metal GPU sur macOS. Vosk et Moonshine retirés (pas de binaire macOS / qualité inférieure). Subprocess Python supprimé. Téléchargement direct (reqwest + HTTP Range pour reprise).
-- [x] **Système de providers unifié** — Providers = credentials purs (`id, name, kind, url, api_key`). Sélection de modèles centralisée dans Settings (ASR cloud + LLM). Model Manager simplifié (download/delete uniquement). Édition inline par card, ProviderForm réutilisable.
-  - Reste à faire : branchement LLM local (llama.cpp) quand le catalogue de modèles locaux sera prêt.
-- [ ] **Catalogue de modèles locaux** — Proposer un listing de modèles recommandés dans le Model Manager, couvrant ASR (speech-to-text) et post-processing (LLM cleanup). Permet aux utilisateurs de choisir sans connaître les noms de modèles.
-  - **Modèles ASR locaux** — Whisper (tiny → large-v3) : afficher taille, langues, vitesse estimée.
-  - **Modèles LLM post-processing locaux** — Listing de modèles légers pour le cleanup de texte en local :
-    - Qwen3-1.7B-Instruct (~1 GB Q4, sweet spot qualité/taille)
-    - SmolLM2-1.7B-Instruct (~1 GB Q4, Apache 2.0)
-    - Gemma 3 1B-IT (~700 MB Q4, bon multilingual FR/EN)
-    - Qwen3-4B-Instruct (~2.5 GB Q4, meilleure qualité)
-    - Phi-4-mini 3.8B (~2.3 GB Q4, excellent reasoning)
-  - **Modèles spécialisés ponctuation** — bert-restore-punctuation (~436 MB, sub-10ms), fullstop-punctuation-multilingual (~440 MB, FR/EN/DE/IT)
-  - **Runtime local** — llama.cpp via [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) (Rust natif, Metal/CUDA, format GGUF) ou ONNX Runtime via [`ort`](https://github.com/pykeIO/ort) pour les modèles BERT
-  - **Outils d'inférence locale** — Lister les logiciels recommandés pour faire tourner un LLM en local (tous compatibles API OpenAI) : [Ollama](https://ollama.com/), [LM Studio](https://lmstudio.ai/), [llama.cpp](https://github.com/ggerganov/llama.cpp), [vLLM](https://github.com/vllm-project/vllm)
+- [x] **Système de providers unifié** — Providers = credentials purs (`id, name, kind, url, api_key`). Sélection de modèles centralisée dans Settings (ASR cloud + LLM). Model Manager simplifié (download/delete uniquement). Édition inline par card, ProviderForm réutilisable. LLM local branché via llama.cpp.
+- [x] **Catalogue de modèles locaux** — Listing de modèles recommandés dans le Model Manager, couvrant ASR (Whisper tiny → large-v3-turbo-q8) et LLM post-processing (Qwen3 1.7B/4B, SmolLM2 1.7B, Gemma 3 1B, Phi-4 Mini). Badges params, RAM, langues. Runtime llama.cpp via `llama-cpp-2` avec Metal GPU. Défaut : turbo Q8 (ASR) + Qwen3 1.7B recommandé (LLM).
+  - [ ] **Modèles spécialisés ponctuation** — bert-restore-punctuation (~436 MB, sub-10ms), fullstop-punctuation-multilingual (~440 MB, FR/EN/DE/IT). Nécessite ONNX Runtime via [`ort`](https://github.com/pykeIO/ort).
 - [ ] **Raccourci pour historique rapide** — Touche configurable pour afficher un popup flottant avec les dernières transcriptions. Permet de re-coller rapidement un texte récent sans ouvrir la fenêtre d'historique complète. Style popup léger (comme Spotlight/Alfred), clic ou Enter pour coller l'entrée sélectionnée.
 - [ ] **Détection de silence avant transcription** — Analyser l'audio avant de l'envoyer au modèle ASR. Si l'enregistrement ne contient que du silence (énergie RMS sous un seuil), le jeter directement sans transcrire. Évite les hallucinations sur audio vide (le modèle invente du texte quand il n'y a rien à transcrire).
 - [ ] **Filtre hallucinations via LLM** — Envisager de remplacer ou compléter le filtre regex actuel par un passage LLM. Le LLM peut détecter contextuellement les hallucinations (répétitions, texte sans rapport, artefacts de fin) là où le regex ne catch que des patterns connus. Approche combinée possible : regex rapide d'abord, puis LLM pour les cas complexes.

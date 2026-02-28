@@ -6,8 +6,8 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
-- **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible API
-- **Post-processing** — hallucination filtering, dictation commands (new line, new paragraph), optional LLM text cleanup
+- **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible API (Local/Cloud toggle)
+- **Post-processing** — hallucination filtering, dictation commands (new line, new paragraph), LLM text cleanup (local via llama.cpp or cloud)
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual recording indicator with real-time spectrum bars
 - **Mic test** — test your microphone with live spectrum visualization in Settings
@@ -77,15 +77,16 @@ Press Escape while recording to cancel without transcribing.
 
 Open Settings from the tray menu to configure:
 
-- Interface language (Auto / Francais / English)
-- Post-processing (hallucination filter, LLM cleanup)
+- Interface language (Auto / Français / English)
+- Transcription source (Local / Cloud) with model and GPU mode selection
+- Post-processing (hallucination filter, LLM cleanup with configurable max tokens)
 - Recording mode (push-to-talk / toggle)
 - Hotkey and cancel shortcut
 - Input microphone
 
 ### LLM text cleanup
 
-Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthropic). Corrects punctuation, capitalization, and transcription artifacts without changing meaning. Configure in Settings > Post-processing.
+Optional post-transcription cleanup via LLM — local (llama.cpp with Metal GPU) or cloud (OpenAI-compatible or Anthropic API). Corrects punctuation, capitalization, and transcription artifacts without changing meaning. Max tokens is configurable (default 256). Configure in Settings > Post-processing.
 
 ## Tech stack
 
@@ -124,6 +125,8 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | [`hound`](https://github.com/ruuda/hound) | Écriture fichiers WAV |
 | [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT pour spectre audio (visualisation) |
 | [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Transcription native Whisper (GGML, Metal GPU sur macOS) |
+| [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Inférence LLM locale (GGUF, Metal GPU, text cleanup) |
+| [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Décodage UTF-8 incrémental (sortie LLM token par token) |
 
 **Réseau / IO**
 
@@ -221,7 +224,8 @@ src-tauri/               Rust backend
     audio.rs             cpal recording & FFT
     transcriber.rs       Transcription dispatcher (native whisper / cloud API)
     post_processor.rs    Text post-processing
-    llm_cleanup.rs       LLM text cleanup client
+    llm_cleanup.rs       Cloud LLM text cleanup (OpenAI/Anthropic)
+    llm_local.rs         Local LLM text cleanup (llama.cpp)
     tray.rs              Menu bar menu & tray icon states
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
     events.rs            Centralised event name constants

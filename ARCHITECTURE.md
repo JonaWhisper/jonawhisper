@@ -78,7 +78,8 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. |
 | `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if a provider is configured, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands |
-| `llm_cleanup.rs` | Optional LLM-based text cleanup via OpenAI or Anthropic API |
+| `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (configurable `max_tokens`) |
+| `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. |
 
 ### Tray & icons
 
@@ -128,7 +129,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 |-----------|-------------|
 | `ShortcutCapture.vue` | Press-to-record shortcut input. Invokes `start_shortcut_capture` on the backend, listens for `shortcut-capture-update` and `shortcut-capture-complete` events. |
 | `SpectrumBars.vue` | Reusable audio spectrum visualization (used in pill and mic test) |
-| `SetupStep2.vue` | Initial configuration form (locale, hotkey, model, language) — embedded in SetupWizard |
+| `SetupStep2.vue` | Initial configuration form (hotkey, recording mode, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
 | `ProviderForm.vue` | Reusable form for configuring cloud ASR providers (OpenAI-compatible API endpoints) |
