@@ -246,14 +246,11 @@ const canStart = computed(() => {
                 <div v-if="model.id === store.selectedModelId" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
               </div>
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium truncate">{{ model.label }}</div>
-                <div class="flex items-center gap-1 flex-wrap text-[11px] text-muted-foreground">
-                  <span v-if="model.size > 0">{{ formatSize(model.size) }}</span>
-                  <template v-if="model.wer != null || model.rtf != null">
-                    <span v-if="model.size > 0" class="opacity-40">&middot;</span>
-                    <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" compact />
-                  </template>
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm font-medium truncate">{{ model.label }}</span>
+                  <span v-if="model.size > 0" class="text-[11px] text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
                 </div>
+                <BenchmarkBadges v-if="model.wer != null || model.rtf != null" :wer="model.wer" :rtf="model.rtf" compact class="mt-0.5" />
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                 <!-- Downloading -->
@@ -321,14 +318,11 @@ const canStart = computed(() => {
                     <div v-if="model.id === store.selectedModelId" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <div class="text-sm font-medium truncate">{{ model.label }}</div>
-                    <div class="flex items-center gap-1 flex-wrap text-[11px] text-muted-foreground">
-                      <span v-if="model.size > 0">{{ formatSize(model.size) }}</span>
-                      <template v-if="model.wer != null || model.rtf != null">
-                        <span v-if="model.size > 0" class="opacity-40">&middot;</span>
-                        <BenchmarkBadges :wer="model.wer" :rtf="model.rtf" compact />
-                      </template>
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-sm font-medium truncate">{{ model.label }}</span>
+                      <span v-if="model.size > 0" class="text-[11px] text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
                     </div>
+                    <BenchmarkBadges v-if="model.wer != null || model.rtf != null" :wer="model.wer" :rtf="model.rtf" compact class="mt-0.5" />
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                     <!-- Downloading -->
