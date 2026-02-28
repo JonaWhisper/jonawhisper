@@ -7,6 +7,8 @@
 
 ## UX / Polish
 
+- [ ] **Icones natives dans le tray menu** — Remplacer les emojis/caractères Unicode par des SF Symbols (`NSImage(systemSymbolName:)`) pour un rendu natif adapté au thème clair/sombre. Concerne les icones de transport type (micro), checkmarks, etc.
+
 
 ## Fonctionnalités
 
