@@ -172,11 +172,7 @@ fn run_event_tap(
         // CGEventGetIntegerValueField and CGEventGetFlags are CoreGraphics C functions.
         // user_info is a leaked Box<Sender<HotkeyEvent>> — valid for the lifetime of the tap.
         unsafe {
-            #[link(name = "CoreGraphics", kind = "framework")]
-            extern "C" {
-                fn CGEventGetIntegerValueField(event: *mut c_void, field: u32) -> i64;
-                fn CGEventGetFlags(event: *mut c_void) -> u64;
-            }
+            use super::ffi::{CGEventGetIntegerValueField, CGEventGetFlags};
 
             // kCGKeyboardEventKeycode = 9 (CGEventField enum)
             let key_code = CGEventGetIntegerValueField(event, 9) as u16;
@@ -228,49 +224,12 @@ fn run_event_tap(
     // CFMachPortCreateRunLoopSource/CFRunLoopAddSource wire the tap into the current runloop.
     // The loop re-enables the tap periodically (macOS may disable it on timeout).
     unsafe {
-        #[link(name = "CoreGraphics", kind = "framework")]
-        extern "C" {
-            fn CGEventTapCreate(
-                tap: u32,
-                place: u32,
-                options: u32,
-                events_of_interest: u64,
-                callback: extern "C" fn(*mut c_void, u32, *mut c_void, *mut c_void) -> *mut c_void,
-                user_info: *mut c_void,
-            ) -> *mut c_void; // CFMachPortRef
-
-            fn CGEventTapEnable(tap: *mut c_void, enable: bool);
-        }
-
-        #[link(name = "CoreFoundation", kind = "framework")]
-        extern "C" {
-            fn CFMachPortCreateRunLoopSource(
-                allocator: *const c_void,
-                port: *mut c_void,
-                order: i64,
-            ) -> *mut c_void; // CFRunLoopSourceRef
-
-            fn CFRunLoopAddSource(
-                rl: *mut c_void,
-                source: *mut c_void,
-                mode: *const c_void,
-            );
-
-            fn CFRunLoopGetCurrent() -> *mut c_void;
-            fn CFRunLoopRunInMode(
-                mode: *const c_void,
-                seconds: f64,
-                return_after_source_handled: bool,
-            ) -> i32;
-
-            static kCFRunLoopCommonModes: *const c_void;
-            static kCFRunLoopDefaultMode: *const c_void;
-        }
+        use super::ffi;
 
         // CGEventMask for keyDown (bit 10) + flagsChanged (bit 12)
         let event_mask: u64 = (1 << 10) | (1 << 12);
 
-        let tap = CGEventTapCreate(
+        let tap = ffi::CGEventTapCreate(
             1, // cgSessionEventTap
             0, // headInsertEventTap
             0, // defaultTap (not listenOnly — we need to intercept)
@@ -284,20 +243,20 @@ fn run_event_tap(
             return;
         }
 
-        let source = CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
-        let rl = CFRunLoopGetCurrent();
-        CFRunLoopAddSource(rl, source, kCFRunLoopCommonModes);
-        CGEventTapEnable(tap, true);
+        let source = ffi::CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
+        let rl = ffi::CFRunLoopGetCurrent();
+        ffi::CFRunLoopAddSource(rl, source, ffi::kCFRunLoopCommonModes);
+        ffi::CGEventTapEnable(tap, true);
 
         log::info!("Hotkey monitor started ({})", initial_hotkey.label);
 
         // Run the event loop, periodically checking for hotkey updates
         loop {
             // Run the loop for a short interval
-            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false);
+            ffi::CFRunLoopRunInMode(ffi::kCFRunLoopDefaultMode, 0.5, false);
 
             // Re-enable tap in case macOS disabled it
-            CGEventTapEnable(tap, true);
+            ffi::CGEventTapEnable(tap, true);
 
             // Check for updates
             while let Ok(update) = update_rx.try_recv() {

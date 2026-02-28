@@ -28,7 +28,7 @@
   - **MLX Whisper** — MLX est un framework Apple Python/Swift only. Pas de binding Rust. Avec whisper-rs + CoreML on obtient la même accélération Apple Silicon, donc MLX Whisper pourrait être retiré ou gardé comme option Python legacy.
   - **API** — Déjà natif Rust (reqwest). Rien à changer.
   - **Moteurs Python en fallback** — Garder le support subprocess Python en option (venv dédié `~/.whisper-dictate/venv/`) pour les utilisateurs qui préfèrent ou qui ont des modèles spécifiques. Mais ce n'est plus le chemin par défaut.
-  - **Téléchargement des modèles** — Source unifiée : quasi tous les modèles sont sur [Hugging Face](https://huggingface.co/) avec une API ouverte (`https://huggingface.co/{repo}/resolve/main/{file}` = téléchargement direct, pas besoin de lib). Vosk est hébergé sur alphacephei.com (URLs directes aussi). Le `downloader.rs` existant couvre déjà les deux cas. Pas besoin de catalogues multiples ni de bibliothèques tierces.
+  - **Téléchargement des modèles** — Utiliser le crate officiel [hf-hub](https://github.com/huggingface/hf-hub) (maintenu par Hugging Face) pour les modèles HF : gestion du cache, progression, reprise de téléchargement, auth tokens. Pour Vosk (hébergé sur alphacephei.com), garder du reqwest classique (URLs directes).
   - **UX cible** : les moteurs Rust natifs sont disponibles immédiatement (juste télécharger le modèle). Les moteurs Python optionnels affichent un bouton "Install" qui gère le venv automatiquement.
 - [ ] **Descriptions des moteurs dans le Model Manager** — Ajouter une description/sous-titre pour chaque moteur expliquant sa spécificité :
   - **Whisper** (whisper.cpp) — C++, rapide sur CPU, le plus léger. Moteur par défaut.
@@ -45,7 +45,7 @@
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
 - [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo, en plus du changelog dans les releases GitHub
 - [x] **Audit des approches et patterns** — ✅ Fait. Fixes appliqués : cache FFT, temp files, shared HTTP clients, lock ordering, Mutex inutiles. Reste à faire ci-dessous.
-- [ ] **FFI consolidation** — Regrouper les déclarations `extern "C"` CoreGraphics/CoreFoundation dupliquées (hotkey.rs + macos.rs) dans un module `ffi.rs` partagé
+- [x] **FFI consolidation** — ✅ Module `platform/ffi.rs` partagé (CGEventTapCreate, CGEventGetFlags, CFRunLoop, etc.)
 - [ ] **Hotkey static atomics → struct user_info** — Remplacer les 4 static atomics dans hotkey.rs par un struct passé via le user_info du CGEvent callback
 - [ ] **Event names centralisés** — Définir les noms d'events Tauri en constantes dans un module `events.rs` (éviter les strings éparpillés)
 - [x] **Moonshine shell injection** — ✅ Chemin audio passé via sys.argv

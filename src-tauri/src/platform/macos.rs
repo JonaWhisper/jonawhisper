@@ -74,19 +74,7 @@ fn check_input_monitoring_permission() -> PermissionStatus {
     // (options=1) that returns immediately. If tap creation fails (null), we lack permission.
     // The returned CFMachPortRef is released immediately via CFRelease.
     unsafe {
-        #[link(name = "CoreGraphics", kind = "framework")]
-        extern "C" {
-            fn CGEventTapCreate(
-                tap: u32,
-                place: u32,
-                options: u32,
-                events_of_interest: u64,
-                callback: extern "C" fn(*mut c_void, u32, *mut c_void, *mut c_void) -> *mut c_void,
-                user_info: *mut c_void,
-            ) -> *mut c_void;
-        }
-
-        let tap = CGEventTapCreate(
+        let tap = super::ffi::CGEventTapCreate(
             1,           // kCGSessionEventTap
             0,           // kCGHeadInsertEventTap
             1,           // kCGEventTapOptionListenOnly
