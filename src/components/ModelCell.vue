@@ -61,7 +61,7 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
         <div class="flex items-center gap-2">
           <div class="w-24">
             <Progress :model-value="progress * 100" />
-            <div v-if="speedText" class="text-[10px] text-muted-foreground mt-0.5">
+            <div class="text-[10px] text-muted-foreground mt-0.5">
               {{ speedText }}
             </div>
           </div>

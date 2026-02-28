@@ -268,7 +268,7 @@ const canStart = computed(() => {
                     <template v-if="store.activeDownloads[model.id]">
                       <div class="w-16">
                         <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" />
-                        <div v-if="store.activeDownloads[model.id]?.speed" class="text-[9px] text-muted-foreground mt-0.5">
+                        <div class="text-[9px] text-muted-foreground mt-0.5">
                           {{ formatSpeed(store.activeDownloads[model.id]!.speed) }}
                         </div>
                       </div>

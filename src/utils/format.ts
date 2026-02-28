@@ -18,6 +18,5 @@ export function formatSize(bytes: number): string {
 
 /** Format a bytes-per-second speed (e.g. "24.5 Mo/s"). */
 export function formatSpeed(bytesPerSec: number): string {
-  if (bytesPerSec <= 0) return ''
   return formatBytes(bytesPerSec, '/s')
 }
