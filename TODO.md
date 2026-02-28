@@ -26,7 +26,12 @@
 
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
 - [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo, en plus du changelog dans les releases GitHub
-- [ ] **Audit des approches et patterns** — Lister toutes les approches utilisées (channels, mutex, FFI, async, spawning, etc.), comparer aux best practices Rust/Tauri, identifier doublons (ex: config+code), incohérences et améliorations possibles
+- [x] **Audit des approches et patterns** — ✅ Fait. Fixes appliqués : cache FFT, temp files, shared HTTP clients, lock ordering, Mutex inutiles. Reste à faire ci-dessous.
+- [ ] **FFI consolidation** — Regrouper les déclarations `extern "C"` CoreGraphics/CoreFoundation dupliquées (hotkey.rs + macos.rs) dans un module `ffi.rs` partagé
+- [ ] **Hotkey static atomics → struct user_info** — Remplacer les 4 static atomics dans hotkey.rs par un struct passé via le user_info du CGEvent callback
+- [ ] **Event names centralisés** — Définir les noms d'events Tauri en constantes dans un module `events.rs` (éviter les strings éparpillés)
+- [ ] **Moonshine shell injection** — Passer le chemin audio via sys.argv au lieu de format! dans la string Python
+- [ ] **activateIgnoringOtherApps deprecated** — Remplacer par `activate()` (macOS 14+)
 - [ ] **Audit event listeners / doublons** — Vérifier qu'on n'a pas de doubles `on`/`listen` à plusieurs endroits (config Tauri + code Rust), comme le problème qu'on avait eu avec le tray icon
 - [ ] **Script de test visuel + screenshots** — Pouvoir lancer des flows de test (pill, settings, etc.) et capturer des screenshots automatiquement pour vérifier le rendu sans intervention manuelle
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)
