@@ -18,7 +18,7 @@ import {
 import { ChevronRight, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
-import { formatSize } from '@/utils/format'
+import { formatSize, formatSpeed } from '@/utils/format'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -266,7 +266,12 @@ const canStart = computed(() => {
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                     <!-- Downloading -->
                     <template v-if="store.activeDownloads[model.id]">
-                      <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" class="w-16" />
+                      <div class="w-16">
+                        <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" />
+                        <div v-if="store.activeDownloads[model.id]?.speed" class="text-[9px] text-muted-foreground mt-0.5">
+                          {{ formatSpeed(store.activeDownloads[model.id]!.speed) }}
+                        </div>
+                      </div>
                       <template v-if="store.activeDownloads[model.id]?.stopping">
                         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                       </template>
