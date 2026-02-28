@@ -3,7 +3,7 @@ pub mod openai_api;
 pub mod downloader;
 
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 // -- Download type --
 
@@ -73,9 +73,6 @@ pub trait ASREngine: Send + Sync {
     fn models(&self) -> Vec<ASRModel>;
     fn supported_languages(&self) -> Vec<Language>;
     fn description(&self) -> &str;
-    fn install_hint(&self) -> &str;
-    fn resolve_executable(&self) -> Option<String>;
-    fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError>;
     fn recommended_model_id(&self, _language: &str) -> Option<String> {
         self.models().into_iter().find(|m| m.recommended).map(|m| m.id)
     }
@@ -88,9 +85,7 @@ pub struct EngineInfo {
     pub id: String,
     pub name: String,
     pub description: String,
-    pub install_hint: String,
     pub available: bool,
-    pub tool_name: Option<String>,
     pub supported_language_codes: Vec<String>,
 }
 
@@ -100,10 +95,6 @@ pub struct EngineInfo {
 pub enum EngineError {
     #[error("Model not found at {0}")]
     ModelNotFound(String),
-    #[error("No engine found for {0}")]
-    EngineNotFound(String),
-    #[error("Engine {engine_id} is not installed: {install_hint}")]
-    EngineUnavailable { engine_id: String, install_hint: String },
     #[error("Failed to launch: {0}")]
     LaunchFailed(String),
     #[error("API error: {0}")]
@@ -155,14 +146,7 @@ impl EngineCatalog {
                 id: e.engine_id().to_string(),
                 name: e.display_name().to_string(),
                 description: e.description().to_string(),
-                install_hint: e.install_hint().to_string(),
-                available: e.resolve_executable().is_some(),
-                tool_name: e.resolve_executable().map(|p| {
-                    Path::new(&p)
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or(p)
-                }),
+                available: true,
                 supported_language_codes: e.supported_languages().into_iter().map(|l| l.code).collect(),
             })
             .collect()
@@ -170,13 +154,6 @@ impl EngineCatalog {
 
     pub fn model_by_id(&self, id: &str) -> Option<ASRModel> {
         self.all_models().into_iter().find(|m| m.id == id)
-    }
-
-    pub fn engine_for_model(&self, model: &ASRModel) -> Option<&dyn ASREngine> {
-        self.engines
-            .iter()
-            .find(|e| e.engine_id() == model.engine_id)
-            .map(|e| e.as_ref())
     }
 
     pub fn downloaded_models(&self) -> Vec<ASRModel> {

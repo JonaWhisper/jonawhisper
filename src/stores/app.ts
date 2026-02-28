@@ -15,9 +15,7 @@ export interface EngineInfo {
   id: string
   name: string
   description: string
-  install_hint: string
   available: boolean
-  tool_name: string | null
   supported_language_codes: string[]
 }
 

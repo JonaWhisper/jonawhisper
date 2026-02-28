@@ -124,15 +124,6 @@ impl ASREngine for WhisperEngine {
             "Native Whisper engine with CPU inference."
         }
     }
-    fn install_hint(&self) -> &str { "Built-in, no installation needed." }
-
-    fn resolve_executable(&self) -> Option<String> {
-        Some("built-in".into())
-    }
-
-    fn transcribe(&self, _model: &ASRModel, _audio_path: &Path, _language: &str) -> Result<String, EngineError> {
-        Err(EngineError::LaunchFailed("Use transcribe_native() for whisper engine".into()))
-    }
 }
 
 /// Native whisper-rs transcription — bypasses subprocess entirely.
