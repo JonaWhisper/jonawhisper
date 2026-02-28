@@ -419,7 +419,7 @@ onUnmounted(() => {
               <Button
                 variant="outline"
                 size="sm"
-                class="shrink-0"
+                class="shrink-0 h-9"
                 @click="onDisableCancel"
               >
                 {{ t('settings.shortcut.cancel.none') }}

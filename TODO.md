@@ -55,7 +55,9 @@
 
 ## Audits (à planifier)
 
-- [ ] **Audit cohérence des spacings (padding/margin)** — Vérifier que tous les composants et vues utilisent les mêmes valeurs de padding et margin pour les mêmes types d'éléments (cards, listes, sections, headers, footers). Définir une échelle de spacing cohérente et l'appliquer partout. Concerne : ModelCell, SetupStep2, SetupWizard, ModelManager, Settings, History, etc.
+- [ ] **Audit cohérence des spacings (padding/margin)** — Vérifier que tous les composants et vues utilisent les mêmes valeurs de padding et margin pour les mêmes types d'éléments (cards, listes, sections, headers, footers). Définir une échelle de spacing cohérente et l'appliquer partout. Concerne : ModelCell, SetupStep2, SetupWizard, ModelManager, Settings, History, etc. Inclut la hauteur des éléments côte à côte (ex: boutons et inputs dans la même ligne doivent avoir la même hauteur).
+
+- [ ] **Audit i18n — repasse traductions complète** — Vérifier que TOUT le texte visible est traduit et utilise vue-i18n (pas de strings en dur). Inclut : tray menu (actuellement tout en anglais, nécessite un système i18n côté Rust), labels dans Settings/Setup/ModelManager/History, messages d'erreur, tooltips, placeholders. Rationaliser les clés existantes (doublons, naming incohérent entre sections).
 
 - [ ] **Audit complet architecture & séparation des modules** — Passer en revue tout le codebase :
   - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée (ex: recording.rs ne devrait pas connaître le tray, commands.rs ne devrait pas contenir de logique)
