@@ -77,6 +77,19 @@ pub fn delete_model_cmd(id: String) -> bool {
         .is_some_and(|m| downloader::delete_model(&m))
 }
 
+#[tauri::command]
+pub fn stop_download(state: tauri::State<'_, Arc<AppState>>) {
+    let dl = state.download.lock().unwrap();
+    dl.cancel_requested.store(true, Ordering::SeqCst);
+}
+
+#[tauri::command]
+pub fn cancel_download(state: tauri::State<'_, Arc<AppState>>) {
+    let dl = state.download.lock().unwrap();
+    dl.cancel_requested.store(true, Ordering::SeqCst);
+    dl.delete_partial.store(true, Ordering::SeqCst);
+}
+
 // -- Language --
 
 #[tauri::command]

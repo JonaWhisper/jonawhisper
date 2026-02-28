@@ -226,6 +226,16 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  async function stopDownload() {
+    try { await invoke('stop_download') }
+    catch (e) { console.error('stopDownload failed:', e) }
+  }
+
+  async function cancelDownload() {
+    try { await invoke('cancel_download') }
+    catch (e) { console.error('cancelDownload failed:', e) }
+  }
+
   async function deleteModel(id: string) {
     try {
       const success = await invoke<boolean>('delete_model_cmd', { id })
@@ -477,7 +487,7 @@ export const useAppStore = defineStore('app', () => {
     fetchAudioDevices, fetchPermissions, fetchHistory,
     fetchProviders, fetchState,
     selectModel, selectLanguageAction,
-    downloadModel, deleteModel,
+    downloadModel, stopDownload, cancelDownload, deleteModel,
     fetchSettings, setSetting,
     clearHistoryAction, searchHistory, deleteHistoryEntry, deleteHistoryDay,
     requestPermission,

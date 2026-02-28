@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronRight } from 'lucide-vue-next'
+import { ChevronRight, X } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 
@@ -260,6 +260,9 @@ const canStart = computed(() => {
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
                     {{ Math.round(store.downloadProgress * 100) }}%
                   </span>
+                  <Button variant="ghost" size="icon-sm" @click="store.cancelDownload()" :title="t('modelManager.cancel')">
+                    <X class="w-3.5 h-3.5" />
+                  </Button>
                 </template>
                 <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                   {{ t('modelManager.downloaded') }}
@@ -311,6 +314,9 @@ const canStart = computed(() => {
                       <span class="text-[11px] text-muted-foreground w-8 text-right">
                         {{ Math.round(store.downloadProgress * 100) }}%
                       </span>
+                      <Button variant="ghost" size="icon-sm" @click="store.cancelDownload()" :title="t('modelManager.cancel')">
+                        <X class="w-3.5 h-3.5" />
+                      </Button>
                     </template>
                     <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                       {{ t('modelManager.downloaded') }}

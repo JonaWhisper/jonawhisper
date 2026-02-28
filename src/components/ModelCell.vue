@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ASRModel } from '@/stores/app'
 import { Button } from '@/components/ui/button'
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2, Square, X } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
@@ -19,6 +19,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   download: [model: ASRModel]
   delete: [model: ASRModel]
+  stop: []
+  cancel: []
 }>()
 
 const isDownloaded = computed(() => {
@@ -59,6 +61,12 @@ function formatSize(bytes: number): string {
           <span class="text-xs text-muted-foreground w-10 text-right">
             {{ Math.round(downloadProgress * 100) }}%
           </span>
+          <Button variant="ghost" size="icon-sm" @click="emit('stop')" :title="t('modelManager.stop')">
+            <Square class="w-3.5 h-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon-sm" @click="emit('cancel')" :title="t('modelManager.cancel')">
+            <X class="w-3.5 h-3.5" />
+          </Button>
         </div>
       </template>
 

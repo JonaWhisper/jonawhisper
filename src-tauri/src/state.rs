@@ -1,7 +1,8 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 
 const APP_DIR_NAME: &str = "WhisperDictate";
@@ -36,11 +37,18 @@ pub struct RuntimeState {
 pub struct DownloadState {
     pub model_id: Option<String>,
     pub progress: f64,
+    pub cancel_requested: Arc<AtomicBool>,
+    pub delete_partial: Arc<AtomicBool>,
 }
 
 impl Default for DownloadState {
     fn default() -> Self {
-        Self { model_id: None, progress: 0.0 }
+        Self {
+            model_id: None,
+            progress: 0.0,
+            cancel_requested: Arc::new(AtomicBool::new(false)),
+            delete_partial: Arc::new(AtomicBool::new(false)),
+        }
     }
 }
 

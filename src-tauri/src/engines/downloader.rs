@@ -4,6 +4,7 @@ use futures_util::StreamExt;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, LazyLock};
 use tauri::{AppHandle, Emitter};
 
@@ -60,12 +61,30 @@ pub async fn download_model(
         "progress": initial_progress,
     }));
 
+    // Clone cancel flags before download (checked in the loop)
+    let cancel_flag = state.download.lock().unwrap().cancel_requested.clone();
+    let delete_flag = state.download.lock().unwrap().delete_partial.clone();
+
     let success = match &model.download_type {
         DownloadType::RemoteAPI | DownloadType::System => true,
         DownloadType::SingleFile => {
-            download_single_file(&app, &state, &model).await
+            download_single_file(&app, &state, &model, &cancel_flag).await
         }
     };
+
+    // If cancel was requested and delete_partial is set, remove the .partial file
+    let was_cancelled = cancel_flag.load(Ordering::SeqCst);
+    if was_cancelled && delete_flag.load(Ordering::SeqCst) {
+        let tmp_path = partial_path(&model);
+        let _ = fs::remove_file(&tmp_path);
+        log::info!("Cancelled download for {} — partial file deleted", model.id);
+    } else if was_cancelled {
+        log::info!("Stopped download for {} — partial file kept for resume", model.id);
+    }
+
+    // Reset flags
+    cancel_flag.store(false, Ordering::SeqCst);
+    delete_flag.store(false, Ordering::SeqCst);
 
     clear_pending_state(&model);
     {
@@ -81,6 +100,7 @@ async fn download_single_file(
     app: &AppHandle,
     state: &AppState,
     model: &ASRModel,
+    cancel_flag: &std::sync::atomic::AtomicBool,
 ) -> bool {
     let storage_dir = shellexpand::tilde(&model.storage_dir).to_string();
     let _ = fs::create_dir_all(&storage_dir);
@@ -113,7 +133,7 @@ async fn download_single_file(
     if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
         log::warn!("Server returned 416 for {}, deleting partial and retrying", model.id);
         let _ = fs::remove_file(&tmp_path);
-        return Box::pin(download_single_file(app, state, model)).await;
+        return Box::pin(download_single_file(app, state, model, cancel_flag)).await;
     }
 
     // 206 = partial content (resume accepted), 200 = full file (server ignores Range)
@@ -161,6 +181,10 @@ async fn download_single_file(
 
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
+        if cancel_flag.load(Ordering::SeqCst) {
+            log::info!("Download cancelled for {}", model.id);
+            return false;
+        }
         match chunk {
             Ok(bytes) => {
                 if file.write_all(&bytes).is_err() {
