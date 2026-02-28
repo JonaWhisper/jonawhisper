@@ -118,8 +118,7 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Crate | Rôle |
 |-------|------|
 | [`tauri`](https://github.com/tauri-apps/tauri) | Framework app (webview, tray, IPC, windows) |
-| [`tauri-plugin-shell`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/shell) | Lancement subprocess (moteurs ASR Python/CLI) |
-| [`tauri-plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Accès clipboard |
+| [`tauri-plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Accès clipboard (paste simulation) |
 | [`serde`](https://github.com/serde-rs/serde) / [`serde_json`](https://github.com/serde-rs/json) | Sérialisation JSON (settings, IPC) |
 | [`tokio`](https://github.com/tokio-rs/tokio) | Runtime async (transcription, téléchargements) |
 | [`log`](https://github.com/rust-lang/log) / [`env_logger`](https://github.com/rust-cli/env_logger) | Logging |
@@ -196,7 +195,6 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 
 | Package | Rôle |
 |---------|------|
-| [`@tauri-apps/plugin-shell`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/shell) | Lancement subprocess (moteurs ASR) |
 | [`@tauri-apps/plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Écriture clipboard avant paste |
 
 **Dev**

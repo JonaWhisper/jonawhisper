@@ -28,7 +28,6 @@ pub fn run() {
     let app_state = Arc::new(AppState::default());
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
 
 
