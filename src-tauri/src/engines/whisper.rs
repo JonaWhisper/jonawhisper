@@ -117,7 +117,13 @@ impl ASREngine for WhisperEngine {
 
     fn supported_languages(&self) -> Vec<Language> { common_languages() }
 
-    fn description(&self) -> &str { "Native Whisper engine with Metal GPU acceleration." }
+    fn description(&self) -> &str {
+        if cfg!(target_os = "macos") {
+            "Native Whisper engine with Metal GPU acceleration."
+        } else {
+            "Native Whisper engine with CPU inference."
+        }
+    }
     fn install_hint(&self) -> &str { "Built-in, no installation needed." }
 
     fn resolve_executable(&self) -> Option<String> {
