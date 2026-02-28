@@ -37,6 +37,24 @@ pub fn open_window(app: &AppHandle, label: &str, title: &str, url: &str, width: 
     open_window_with_min(app, label, title, url, width, height, None);
 }
 
+pub fn open_fixed_window(app: &AppHandle, label: &str, title: &str, url: &str, width: f64, height: f64) {
+    if let Some(window) = app.get_webview_window(label) {
+        activate_app();
+        let _ = window.set_focus();
+        return;
+    }
+
+    if let Ok(win) = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
+        .title(title)
+        .inner_size(width, height)
+        .resizable(false)
+        .build()
+    {
+        activate_app();
+        let _ = win.set_focus();
+    }
+}
+
 pub fn open_window_with_min(
     app: &AppHandle,
     label: &str,
@@ -476,7 +494,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             match id {
                 "quit" => app.exit(0),
                 "settings" => {
-                    open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 580.0, 420.0, Some((460.0, 320.0)));
+                    open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 580.0, 420.0, Some((540.0, 320.0)));
                 }
                 "model_manager" => {
                     open_window(app, "model-manager", &t!("window.modelManager"), "/model-manager", 700.0, 500.0);
@@ -485,7 +503,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     open_window(app, "history", &t!("window.history"), "/history", 500.0, 500.0);
                 }
                 "setup" => {
-                    open_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 420.0);
+                    open_fixed_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 420.0);
                 }
                 "test_pill" => {
                     let app_clone = app.clone();
