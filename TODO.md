@@ -37,7 +37,7 @@
   - **Outils d'inférence locale** — Lister les logiciels recommandés pour faire tourner un LLM en local (tous compatibles API OpenAI) : [Ollama](https://ollama.com/), [LM Studio](https://lmstudio.ai/), [llama.cpp](https://github.com/ggerganov/llama.cpp), [vLLM](https://github.com/vllm-project/vllm)
 - [ ] **Filtre hallucinations via LLM** — Envisager de remplacer ou compléter le filtre regex actuel par un passage LLM. Le LLM peut détecter contextuellement les hallucinations (répétitions, texte sans rapport, artefacts de fin) là où le regex ne catch que des patterns connus. Approche combinée possible : regex rapide d'abord, puis LLM pour les cas complexes.
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue sur disque
-- [ ] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches
+- [x] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches (ModifierOnly / Combo / Key)
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon le micro utilisé. À réfléchir :
   - **Détection automatique** — Matcher le device par pattern dans le nom (ex: "AirPods" → preset Bluetooth, "MacBook" → preset intégré). Fournir quelques presets par défaut pour les cas courants.
   - **Presets personnalisés** — Permettre à l'utilisateur de créer/éditer ses propres presets et de les associer à un device spécifique. Important car chaque micro a ses particularités.
@@ -52,6 +52,7 @@
 ## Audits (à planifier)
 
 - [ ] **Audit post setup wizard step 2** — Vérifier la séparation des modules, le code dupliqué entre SetupStep2/Settings/ModelManager, et la cohérence des patterns après cette feature. À chaque grosse feature, relancer un audit complet.
+- [ ] **Audit post raccourcis custom** — Vérifier la séparation des modules après l'ajout du système de raccourcis (hotkey.rs, ShortcutCapture.vue, shortcut.ts). Checker : duplication frontend/backend des tables de keycodes, cohérence des events, code mort.
 
 - [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier.
 

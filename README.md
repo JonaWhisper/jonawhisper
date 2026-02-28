@@ -5,7 +5,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 ## Features
 
 - **Menu bar app** — lives in the system tray, no dock icon
-- **Global hotkey** — push-to-talk or toggle mode (Right Command, Right Option, Right Control, or Right Shift)
+- **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
 - **Multiple speech engines** — Whisper (C++), Faster Whisper, MLX Whisper, Vosk, Moonshine, or any OpenAI-compatible API
 - **Post-processing** — hallucination filtering, dictation commands (new line, new paragraph), optional LLM text cleanup
 - **Bilingual UI** — French and English, auto-detected or manual override
@@ -208,11 +208,14 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 
 ## Project structure
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed architecture guide with data flows, threading model, and module responsibilities.
+
 ```
 src/                     Vue frontend
   views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
-  components/            UI components
+  components/            UI components (ShortcutCapture, SpectrumBars, …)
   stores/app.ts          Pinia store
+  utils/                 Shared utilities (shortcut types & formatting)
   i18n/                  Translations (en.json, fr.json)
 src-tauri/               Rust backend
   src/
