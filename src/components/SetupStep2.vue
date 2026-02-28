@@ -64,12 +64,18 @@ const availableEngines = computed(() => store.engines.filter(e => e.available))
 
 const recommendedModels = computed(() => {
   const result: ASRModel[] = []
+  const addedIds = new Set<string>()
   for (const engine of availableEngines.value) {
     const recId = RECOMMENDED[engine.id]
     if (recId) {
       const model = store.models.find(m => m.id === recId)
-      if (model) result.push(model)
+      if (model) { result.push(model); addedIds.add(model.id) }
     }
+  }
+  // Include the currently selected model if not already in the list
+  if (store.selectedModelId && !addedIds.has(store.selectedModelId)) {
+    const selected = store.models.find(m => m.id === store.selectedModelId)
+    if (selected) result.unshift(selected)
   }
   return result
 })
@@ -236,8 +242,8 @@ const canStart = computed(() => {
             <div
               v-for="model in recommendedModels"
               :key="model.id"
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border cursor-pointer transition-colors hover:bg-accent/30"
-              :class="model.id === store.selectedModelId ? 'bg-accent/40' : 'bg-card'"
+              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
+              :class="model.id === store.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
               @click="handleSelectModel(model)"
             >
               <div
