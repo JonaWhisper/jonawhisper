@@ -212,6 +212,7 @@ export const useAppStore = defineStore('app', () => {
 
   async function downloadModel(id: string) {
     if (downloadingModelId.value) return false
+    downloadStopping.value = false
     // Pre-fill progress from partial file (avoids 0% flash on resume)
     const model = models.value.find(m => m.id === id)
     if (model?.partial_progress) {
