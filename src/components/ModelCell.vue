@@ -40,7 +40,7 @@ function formatSize(bytes: number): string {
 
 <template>
   <div
-    class="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card transition-colors hover:bg-accent/30"
+    class="group flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card transition-colors hover:bg-accent/30"
     :class="{ 'ring-2 ring-primary/30': isSelected }"
   >
     <!-- Radio button -->
@@ -88,7 +88,12 @@ function formatSize(bytes: number): string {
         <Badge variant="secondary" class="bg-green-500/10 text-green-500 border-transparent">
           {{ t('modelManager.downloaded') }}
         </Badge>
-        <Button variant="ghost" size="icon-sm" @click="emit('delete', model)" :title="t('modelManager.delete')">
+        <Button
+          variant="ghost" size="icon-sm"
+          class="opacity-0 group-hover:opacity-100 transition-opacity"
+          @click="emit('delete', model)"
+          :title="t('modelManager.delete')"
+        >
           <Trash2 class="w-4 h-4" />
         </Button>
       </template>
@@ -96,7 +101,12 @@ function formatSize(bytes: number): string {
       <!-- Remote API -->
       <template v-else-if="isRemoteAPI">
         <Badge variant="secondary" class="bg-blue-500/10 text-blue-500 border-transparent">API</Badge>
-        <Button variant="ghost" size="icon-sm" @click="emit('delete', model)" :title="t('modelManager.delete')">
+        <Button
+          variant="ghost" size="icon-sm"
+          class="opacity-0 group-hover:opacity-100 transition-opacity"
+          @click="emit('delete', model)"
+          :title="t('modelManager.delete')"
+        >
           <Trash2 class="w-4 h-4" />
         </Button>
       </template>
