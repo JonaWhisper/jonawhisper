@@ -8,9 +8,9 @@
 ## UX / Polish
 
 - [x] **Icones natives dans le tray menu** — Remplacé par des icônes SDF bitmap (bulles colorées : bleu=sélectionné, gris=autre, icône blanche). Tray bar : micro (idle), barres audio (recording), bulle texte (transcribing).
-- [ ] **Harmoniser select_model/select_language avec set_setting** — `select_model` et `select_language` sont des commandes dédiées qui font exactement la même chose que `set_setting` (set field + save). Les router via le mécanisme générique `set_setting` pour la cohérence. Touche aussi le frontend (appels `invoke`).
+- [x] **Harmoniser select_model/select_language avec set_setting** — `select_model` et `select_language` sont des commandes dédiées qui font exactement la même chose que `set_setting` (set field + save). Les router via le mécanisme générique `set_setting` pour la cohérence. Touche aussi le frontend (appels `invoke`).
 - [x] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Double affichage : représentation visuelle intuitive (barres, badges colorés, labels type "Précis"/"Rapide") + valeurs numériques brutes en petit pour les utilisateurs techniques.
-- [ ] **Déplacer les recommandations de modèles côté backend** — Actuellement, la map `RECOMMENDED` est hardcodée dans `SetupStep2.vue` (frontend). Problèmes : duplication de logique métier côté JS, et sélection du modèle Vosk par `navigator.language` au lieu de `selectedLanguage`/`appLocale`. Refactorer en ajoutant un champ `recommended: bool` sur `ASRModel` côté Rust, chaque engine déclare ses modèles recommandés. La recommandation par langue se fait côté backend en fonction de la langue de transcription sélectionnée.
+- [x] **Déplacer les recommandations de modèles côté backend** — Actuellement, la map `RECOMMENDED` est hardcodée dans `SetupStep2.vue` (frontend). Problèmes : duplication de logique métier côté JS, et sélection du modèle Vosk par `navigator.language` au lieu de `selectedLanguage`/`appLocale`. Refactorer en ajoutant un champ `recommended: bool` sur `ASRModel` côté Rust, chaque engine déclare ses modèles recommandés. La recommandation par langue se fait côté backend en fonction de la langue de transcription sélectionnée.
 
 
 ## Fonctionnalités
