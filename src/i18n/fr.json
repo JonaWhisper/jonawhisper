@@ -90,7 +90,7 @@
   "validation.required": "Requis",
   "pill.recording": "Enregistrement…",
   "pill.transcribing": "Transcription…",
-  "pill.downloading": "Téléchargement…",
+
   "error.modelUnavailable.title": "Modèle indisponible",
   "error.modelUnavailable.body": "Le modèle sélectionné n'est pas téléchargé.",
   "error.engineNotFound.title": "Moteur introuvable",

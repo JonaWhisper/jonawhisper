@@ -131,7 +131,7 @@ export const useAppStore = defineStore('app', () => {
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
   const spectrumData = ref<number[]>(new Array(12).fill(0))
-  const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
+  const pillMode = ref<'recording' | 'transcribing' | 'error' | 'idle'>('recording')
 
   const engines = ref<EngineInfo[]>([])
   const models = ref<ASRModel[]>([])

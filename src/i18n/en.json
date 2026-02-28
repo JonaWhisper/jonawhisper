@@ -90,7 +90,7 @@
   "validation.required": "Required",
   "pill.recording": "Recording…",
   "pill.transcribing": "Transcribing…",
-  "pill.downloading": "Downloading…",
+
   "error.modelUnavailable.title": "Model Unavailable",
   "error.modelUnavailable.body": "The selected model is not downloaded.",
   "error.engineNotFound.title": "Engine Not Found",

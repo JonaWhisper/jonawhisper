@@ -8,7 +8,7 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 let animFrame = 0
 let dotPhase = 0
 
-type PillMode = 'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'
+type PillMode = 'recording' | 'transcribing' | 'error' | 'idle'
 
 const mode = computed<PillMode>(() => store.pillMode)
 
@@ -57,8 +57,6 @@ function draw() {
     drawSpectrum(ctx, cw, ch)
   } else if (m === 'transcribing') {
     drawDots(ctx, cw, ch)
-  } else if (m === 'downloading') {
-    drawProgress(ctx, cw, ch)
   } else if (m === 'error') {
     drawError(ctx, cw, ch)
   }
@@ -123,31 +121,6 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number) {
     ctx.beginPath()
     ctx.arc(x, y, (dotSize / 2) * bounce, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + bounce * 0.6})`
-    ctx.fill()
-  }
-}
-
-function drawProgress(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const barWidth = w * 0.7
-  const barHeight = Math.max(2, Math.round(h * 0.1))
-  const x = (w - barWidth) / 2
-  const y = h / 2 - barHeight / 2
-
-  // Background
-  ctx.beginPath()
-  ctx.roundRect(x, y, barWidth, barHeight, barHeight / 2)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
-  ctx.fill()
-
-  // Progress — aggregate from all active downloads
-  const entries = Object.values(store.activeDownloads)
-  const progress = entries.length > 0
-    ? entries.reduce((sum, d) => sum + d.progress, 0) / entries.length
-    : 0
-  if (progress > 0) {
-    ctx.beginPath()
-    ctx.roundRect(x, y, barWidth * progress, barHeight, barHeight / 2)
-    ctx.fillStyle = '#ffffff'
     ctx.fill()
   }
 }
