@@ -11,7 +11,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual recording indicator with real-time spectrum bars
 - **Mic test** — test your microphone with live spectrum visualization in Settings
-- **Model manager** — download, select, and manage models per engine
+- **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
 
 ## Requirements
 
@@ -216,7 +216,7 @@ src/                     Vue frontend
   views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
   components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, BenchmarkBadges, …)
   stores/app.ts          Pinia store
-  utils/                 Shared utilities (shortcut types & formatting)
+  utils/                 Shared utilities (shortcut types, formatting, byte/speed formatters)
   i18n/                  Translations (en.json, fr.json)
 src-tauri/               Rust backend
   src/

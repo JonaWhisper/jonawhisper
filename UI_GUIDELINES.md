@@ -135,6 +135,37 @@ Always `variant="secondary"` with custom color override:
 <Badge variant="secondary" class="bg-green-500/10 text-green-500 border-transparent">
 ```
 
+**Benchmark badges** use tier-based colors with dimmed values:
+
+```html
+<Badge variant="secondary"
+  :class="[info.bg, 'border-transparent font-medium', 'text-[10px] px-1.5 py-0']">
+  {{ info.label }} <span class="opacity-50 font-normal">{{ value }}</span>
+</Badge>
+```
+
+Color tiers: `bg-emerald-500/10 text-emerald-600` (excellent), `bg-blue-500/10 text-blue-600` (good), `bg-amber-500/10 text-amber-600` (fair), `bg-orange-500/10 text-orange-600` (basic), `bg-violet-500/10 text-violet-600` (lightning).
+
+### Download progress
+
+Progress bars use `w-24` width. Speed text underneath in `text-[10px] text-muted-foreground`. No percentage text (the bar is sufficient).
+
+**Optimistic pause transitions**: when the user clicks pause, immediately set `partial_progress` on the model and remove the `activeDownloads` entry in the same synchronous tick. This avoids any flash from DOM swapping between the "downloading" and "paused" template branches.
+
+### Delete indicator
+
+When a model is being deleted, show a greyed trash icon centered over an invisible badge (same position as the hover trash), with an indeterminate progress bar underneath:
+
+```html
+<Badge variant="secondary" class="... invisible"><!-- spacer --></Badge>
+<div class="absolute inset-0 m-auto flex items-center justify-center w-8 h-8">
+  <Trash2 class="w-4 h-4 text-muted-foreground/40" />
+  <div class="absolute bottom-0.5 left-1 right-1 h-0.5 rounded-full overflow-hidden bg-muted-foreground/15">
+    <div class="h-full w-1/3 rounded-full bg-muted-foreground/40 animate-indeterminate" />
+  </div>
+</div>
+```
+
 ### Alert dialogs
 
 Always controlled externally (no `AlertDialogTrigger`):

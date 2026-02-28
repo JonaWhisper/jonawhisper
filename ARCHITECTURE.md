@@ -42,7 +42,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules |
-| `state.rs` | `AppState` with four fine-grained mutexes: runtime state, download state, preferences, and history DB |
+| `state.rs` | `AppState` with four fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, and history DB |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
@@ -72,7 +72,7 @@ Each speech engine implements the `ASREngine` trait (with a `recommended_model_i
 | `vosk.rs` | Vosk (Python CLI) |
 | `moonshine.rs` | Moonshine (Python CLI) |
 | `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) |
-| `downloader.rs` | Model downloads: streaming HTTP, HuggingFace repos, ZIP extraction |
+| `downloader.rs` | Model downloads: streaming HTTP with resume (Range headers), per-model state tracking, 250ms-throttled progress events with speed, HuggingFace repos, ZIP extraction |
 
 The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup, language listing, availability checks, and recommended model selection per language.
 
@@ -134,17 +134,19 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `ShortcutCapture.vue` | Press-to-record shortcut input. Invokes `start_shortcut_capture` on the backend, listens for `shortcut-capture-update` and `shortcut-capture-complete` events. |
 | `SpectrumBars.vue` | Reusable audio spectrum visualization (used in pill and mic test) |
 | `SetupStep2.vue` | Initial configuration form (locale, hotkey, model, language) — embedded in SetupWizard |
-| `ModelCell.vue` | Model list item with download progress, actions, and benchmark display |
-| `BenchmarkBadges.vue` | WER/RTF benchmark badges with visual indicators for model quality/speed |
+| `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
+| `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
 | `ApiServerForm.vue` | Reusable form for configuring OpenAI-compatible API server endpoints |
 
 ### State management
 
-`stores/app.ts` is the single Pinia store. It holds all reactive state, wraps every `invoke()` call with optimistic updates and rollback, and sets up Tauri event listeners on init.
+`stores/app.ts` is the single Pinia store. It holds all reactive state, wraps every `invoke()` call with optimistic updates and rollback, and sets up Tauri event listeners on init. Download state uses an `activeDownloads` map (model ID → progress/speed/stopping) enabling parallel downloads. Pause transitions use optimistic updates (immediate state swap, no async gap) to avoid visual flash.
 
 ### Utilities
 
 `utils/shortcut.ts` mirrors the Rust `Shortcut` type: parse, format, serialize, and a key code → label table matching the backend.
+
+`utils/format.ts` provides unified byte formatting (`formatBytes`, `formatSize`, `formatSpeed`) used for model sizes and download speeds.
 
 ## Threading model
 
