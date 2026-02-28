@@ -18,7 +18,7 @@ import {
 import { ChevronRight, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
-import { formatSize, formatSpeed } from '@/utils/format'
+import { formatSize } from '@/utils/format'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -64,6 +64,17 @@ const recommendedModels = computed(() => {
   return result
 })
 
+const recommendedByEngine = computed(() => {
+  const groups: { engine: string; engineName: string; models: ASRModel[] }[] = []
+  for (const engine of availableEngines.value) {
+    const models = recommendedModels.value.filter(m => m.engine_id === engine.id)
+    if (models.length > 0) {
+      groups.push({ engine: engine.id, engineName: engine.name, models })
+    }
+  }
+  return groups
+})
+
 const allModelsByEngine = computed(() => {
   const groups: { engine: string; engineName: string; models: ASRModel[] }[] = []
   for (const engine of availableEngines.value) {
@@ -82,11 +93,6 @@ function isModelDownloaded(model: ASRModel): boolean {
 }
 
 
-function speedText(modelId: string): string {
-  const dl = store.activeDownloads[modelId]
-  return dl ? formatSpeed(dl.speed) : ''
-}
-
 async function handleDownload(model: ASRModel) {
   const success = await store.downloadModel(model.id)
   if (success) {
@@ -104,10 +110,6 @@ async function handleSelectModel(model: ASRModel) {
     }
   }
   await store.selectModel(model.id)
-}
-
-function engineName(model: ASRModel): string {
-  return store.engines.find(e => e.id === model.engine_id)?.name ?? ''
 }
 
 // -- Transcription language --
@@ -230,77 +232,9 @@ const canStart = computed(() => {
         </div>
 
         <div class="flex-1 overflow-y-auto space-y-2">
-          <!-- Recommended models (flat list) -->
-          <template v-if="!showAllModels">
-            <div
-              v-for="model in recommendedModels"
-              :key="model.id"
-              class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
-              :class="model.id === store.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
-              @click="handleSelectModel(model)"
-            >
-              <div
-                class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                :class="model.id === store.selectedModelId
-                  ? 'border-primary bg-primary'
-                  : isModelDownloaded(model)
-                    ? 'border-muted-foreground'
-                    : 'border-muted opacity-50'"
-              >
-                <div v-if="model.id === store.selectedModelId" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-sm font-medium truncate">{{ model.label }}</span>
-                  <span v-if="model.size > 0" class="text-[11px] text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
-                  <span class="text-[11px] text-muted-foreground/60 shrink-0">{{ engineName(model) }}</span>
-                </div>
-                <BenchmarkBadges v-if="model.wer != null || model.rtf != null" :wer="model.wer" :rtf="model.rtf" compact class="mt-0.5" />
-              </div>
-              <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
-                <!-- Downloading -->
-                <template v-if="store.activeDownloads[model.id]">
-                  <div class="w-16">
-                    <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" />
-                    <div v-if="speedText(model.id)" class="text-[9px] text-muted-foreground mt-0.5">
-                      {{ speedText(model.id) }}
-                    </div>
-                  </div>
-                  <template v-if="store.activeDownloads[model.id]?.stopping">
-                    <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                  </template>
-                  <template v-else>
-                    <Button variant="ghost" size="icon-sm" @click="store.pauseDownload(model.id)" :title="t('modelManager.pause')">
-                      <Pause class="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-                      <X class="w-3.5 h-3.5" />
-                    </Button>
-                  </template>
-                </template>
-                <!-- Paused (partial exists) -->
-                <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
-                  <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-16" />
-                  <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
-                    <Play class="w-3.5 h-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-                    <X class="w-3.5 h-3.5" />
-                  </Button>
-                </template>
-                <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
-                  {{ t('modelManager.downloaded') }}
-                </Badge>
-                <Button v-else size="sm" @click="handleDownload(model)">
-                  {{ t('modelManager.download') }}
-                </Button>
-              </div>
-            </div>
-          </template>
-
-          <!-- All models (grouped by engine) -->
-          <template v-else>
-            <div v-for="group in allModelsByEngine" :key="group.engine" class="mb-2">
+          <!-- Models grouped by engine (recommended or all) -->
+          <template v-for="group in (showAllModels ? allModelsByEngine : recommendedByEngine)" :key="group.engine">
+            <div class="mb-2">
               <div class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                 {{ group.engineName }}
               </div>
