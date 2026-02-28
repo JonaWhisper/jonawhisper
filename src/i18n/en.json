@@ -70,8 +70,6 @@
   "modelManager.deleteConfirmDesc": "The model \"{0}\" will be removed from disk. You can re-download it later.",
   "modelManager.select": "Select",
   "modelManager.selected": "Selected",
-  "modelManager.notInstalled": "Engine not installed",
-  "modelManager.installWith": "Install with:",
   "modelManager.noModels": "No models available",
   "modelManager.languageWarning": "\"{0}\" is not supported by this model. Switched to Auto.",
   "modelManager.language": "Language",

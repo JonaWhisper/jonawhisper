@@ -88,8 +88,8 @@ onMounted(async () => {
             />
             <div class="min-w-0">
               <div class="font-medium truncate">{{ engine.name }}</div>
-              <div class="text-xs text-muted-foreground truncate">
-                {{ engine.tool_name || (engine.available ? '' : t('modelManager.notInstalled')) }}
+              <div v-if="engine.tool_name" class="text-xs text-muted-foreground truncate">
+                {{ engine.tool_name }}
               </div>
             </div>
           </div>
@@ -109,10 +109,6 @@ onMounted(async () => {
           <p v-if="selectedEngineInfo?.description" class="text-sm text-muted-foreground mt-0.5">
             {{ selectedEngineInfo.description }}
           </p>
-          <div v-if="selectedEngineInfo?.install_hint" class="mt-1 text-sm text-muted-foreground">
-            {{ t('modelManager.installWith') }}
-            <code class="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">{{ selectedEngineInfo.install_hint }}</code>
-          </div>
         </div>
 
         <div class="space-y-2">
