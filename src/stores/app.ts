@@ -212,8 +212,12 @@ export const useAppStore = defineStore('app', () => {
 
   async function downloadModel(id: string) {
     if (downloadingModelId.value) return false
+    // Pre-fill progress from partial file (avoids 0% flash on resume)
+    const model = models.value.find(m => m.id === id)
+    if (model?.partial_progress) {
+      downloadProgress.value = model.partial_progress
+    }
     downloadingModelId.value = id
-    // Don't reset progress here — backend emits initial progress (0% or resume %) immediately
     try {
       const success = await invoke<boolean>('download_model_cmd', { id })
       return success
