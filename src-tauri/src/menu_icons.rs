@@ -87,7 +87,7 @@ fn sample_shape(shape: &[u8], fx: f32, fy: f32) -> f32 {
 
 // Bubble colors
 const BLUE: (u8, u8, u8) = (0, 122, 255);   // macOS system blue
-const GRAY: (u8, u8, u8) = (174, 174, 178);  // macOS systemGray3
+const GRAY: (u8, u8, u8) = (142, 142, 147);  // macOS systemGray
 
 /// Get a 36×36 icon with colored bubble for an audio transport type.
 /// `selected`: blue bubble (active device), otherwise gray bubble.
