@@ -368,17 +368,17 @@ pub fn set_tray_state(app: &AppHandle, state: &str) {
         "recording" => {
             let _ = tray.set_icon(Some(make_recording_icon()));
             let _ = tray.set_icon_as_template(true);
-            let _ = tray.set_tooltip(Some("Recording\u{2026}"));
+            let _ = tray.set_tooltip(Some(&t!("pill.recording")));
         }
         "transcribing" => {
             let _ = tray.set_icon(Some(make_transcribing_icon()));
             let _ = tray.set_icon_as_template(true);
-            let _ = tray.set_tooltip(Some("Transcribing\u{2026}"));
+            let _ = tray.set_tooltip(Some(&t!("pill.transcribing")));
         }
         _ => {
             let _ = tray.set_icon(Some(make_idle_icon()));
             let _ = tray.set_icon_as_template(true);
-            let _ = tray.set_tooltip(Some("WhisperDictate"));
+            let _ = tray.set_tooltip(Some(&t!("app.name")));
         }
     }
 }
@@ -504,7 +504,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let _tray = TrayIconBuilder::with_id("main")
         .icon(make_idle_icon())
         .icon_as_template(true)
-        .tooltip("WhisperDictate")
+        .tooltip(&t!("app.name"))
         .on_menu_event(move |app, event| {
             let id = event.id().0.as_str();
             match id {

@@ -135,7 +135,7 @@ async function doClearAll() {
 <template>
   <div class="flex flex-col h-full select-none">
     <!-- Header -->
-    <div class="flex items-center justify-between px-4 pt-4 pb-2">
+    <div class="flex items-center justify-between px-5 pt-4 pb-2">
       <h1 class="text-lg font-semibold">{{ t('history.title') }}</h1>
       <Button
         v-if="store.history.length > 0"
@@ -149,7 +149,7 @@ async function doClearAll() {
     </div>
 
     <!-- Search -->
-    <div class="relative px-4 pb-3">
+    <div class="relative px-5 pb-3">
       <Search class="absolute left-6 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
       <Input
         v-model="searchQuery"
@@ -159,7 +159,7 @@ async function doClearAll() {
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto px-4 pb-4">
+    <div class="flex-1 overflow-y-auto px-5 pb-4">
       <!-- Empty state -->
       <div v-if="store.history.length === 0" class="flex items-center justify-center h-full text-muted-foreground text-sm">
         {{ t('history.empty') }}

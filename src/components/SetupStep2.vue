@@ -151,7 +151,7 @@ const canStart = computed(() => {
     <!-- Two-column content -->
     <div class="flex-1 flex gap-5 px-5 min-h-0">
       <!-- Left column: quick settings -->
-      <div class="w-[240px] shrink-0 space-y-3.5 overflow-y-auto">
+      <div class="w-[240px] shrink-0 space-y-4 overflow-y-auto">
         <!-- UI Language -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.uiLanguage') }}</Label>
@@ -170,6 +170,7 @@ const canStart = computed(() => {
         <!-- Hotkey -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.hotkey') }}</Label>
+          <p class="text-xs text-muted-foreground">{{ t('setup.step2.hotkeyDesc') }}</p>
           <ShortcutCapture
             :model-value="store.hotkey"
             @update:model-value="onHotkeyChange"
@@ -199,6 +200,7 @@ const canStart = computed(() => {
               {{ t('setup.step2.toggle') }}
             </button>
           </div>
+          <p class="text-xs text-muted-foreground">{{ t('setup.step2.recordingModeDesc.' + store.recordingMode) }}</p>
         </div>
 
         <!-- Transcription language -->
@@ -224,13 +226,13 @@ const canStart = computed(() => {
           <p class="text-[11px] text-muted-foreground">{{ t('setup.step2.modelDesc') }}</p>
         </div>
 
-        <div class="flex-1 overflow-y-auto space-y-1.5">
+        <div class="flex-1 overflow-y-auto space-y-2">
           <!-- Recommended models (flat list) -->
           <template v-if="!showAllModels">
             <div
               v-for="model in recommendedModels"
               :key="model.id"
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
+              class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
               :class="model.id === store.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
               @click="handleSelectModel(model)"
             >
@@ -264,7 +266,7 @@ const canStart = computed(() => {
                 <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                   {{ t('modelManager.downloaded') }}
                 </Badge>
-                <Button v-else size="sm" class="h-6 text-xs px-2" @click="handleDownload(model)">
+                <Button v-else size="sm" @click="handleDownload(model)">
                   {{ t('modelManager.download') }}
                 </Button>
               </div>
@@ -281,7 +283,7 @@ const canStart = computed(() => {
                 <div
                   v-for="model in group.models"
                   :key="model.id"
-                  class="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
+                  class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
                   :class="model.id === store.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
                   @click="handleSelectModel(model)"
                 >
@@ -315,7 +317,7 @@ const canStart = computed(() => {
                     <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                       {{ t('modelManager.downloaded') }}
                     </Badge>
-                    <Button v-else size="sm" class="h-6 text-xs px-2" @click="handleDownload(model)">
+                    <Button v-else size="sm" @click="handleDownload(model)">
                       {{ t('modelManager.download') }}
                     </Button>
                   </div>

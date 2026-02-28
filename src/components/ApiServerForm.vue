@@ -29,9 +29,9 @@ const errors = ref<Record<string, string>>({})
 
 function validate(): boolean {
   errors.value = {}
-  if (!name.value.trim()) errors.value.name = 'Required'
-  if (!url.value.trim()) errors.value.url = 'Required'
-  if (!model.value.trim()) errors.value.model = 'Required'
+  if (!name.value.trim()) errors.value.name = t('validation.required')
+  if (!url.value.trim()) errors.value.url = t('validation.required')
+  if (!model.value.trim()) errors.value.model = t('validation.required')
   return Object.keys(errors.value).length === 0
 }
 

@@ -233,7 +233,7 @@ onUnmounted(() => {
           {{ t('settings.title') }}
         </h2>
       </div>
-      <div class="space-y-0.5 px-1">
+      <div class="space-y-1 px-1">
         <button
           v-for="section in sections"
           :key="section.id"
@@ -258,7 +258,7 @@ onUnmounted(() => {
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.general') }}</h2>
 
         <div class="space-y-4">
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.locale') }}</Label>
             <Select :model-value="store.appLocale" @update:model-value="onLocaleChange">
               <SelectTrigger class="w-full">
@@ -292,7 +292,7 @@ onUnmounted(() => {
           </div>
 
           <div
-            class="space-y-3 pl-4 border-l-2 border-border"
+            class="space-y-4 pl-4 border-l-2 border-border"
             :class="{ 'opacity-40 pointer-events-none': !store.postProcessingEnabled }"
           >
             <div class="flex items-center justify-between gap-4">
@@ -313,12 +313,12 @@ onUnmounted(() => {
             <!-- LLM config form -->
             <div
               v-if="store.llmConfig.enabled"
-              class="space-y-3 pl-4 border-l-2 border-border"
+              class="space-y-4 pl-4 border-l-2 border-border"
             >
               <div class="space-y-1">
                 <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
                 <Select :model-value="llmProvider" @update:model-value="onLlmProviderChange">
-                  <SelectTrigger class="w-full h-8 text-sm">
+                  <SelectTrigger class="w-full h-9 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -333,7 +333,7 @@ onUnmounted(() => {
                 <Input
                   v-model="llmApiUrl"
                   :placeholder="llmApiUrlPlaceholder"
-                  class="h-8 text-sm"
+                  class="h-9 text-sm"
                 />
               </div>
 
@@ -343,7 +343,7 @@ onUnmounted(() => {
                   v-model="llmApiKey"
                   type="password"
                   :placeholder="t('settings.llm.apiKey.placeholder')"
-                  class="h-8 text-sm"
+                  class="h-9 text-sm"
                 />
               </div>
 
@@ -352,7 +352,7 @@ onUnmounted(() => {
                 <Input
                   v-model="llmModel"
                   :placeholder="llmModelPlaceholder"
-                  class="h-8 text-sm"
+                  class="h-9 text-sm"
                 />
               </div>
 
@@ -398,7 +398,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.record') }}</Label>
             <ShortcutCapture
               :model-value="store.hotkey"
@@ -406,7 +406,7 @@ onUnmounted(() => {
             />
           </div>
 
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
             <div class="flex gap-2">
               <ShortcutCapture
@@ -432,7 +432,7 @@ onUnmounted(() => {
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.microphone') }}</h2>
 
         <div class="space-y-4">
-          <div class="space-y-1.5">
+          <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.microphone') }}</Label>
             <Select
               :model-value="selectedDeviceUid"

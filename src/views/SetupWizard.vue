@@ -116,11 +116,11 @@ onUnmounted(() => {
         <div
           v-for="item in permissionItems"
           :key="item.key"
-          class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg border border-border bg-card"
+          class="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-card"
         >
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium leading-tight">{{ item.label }}</div>
-            <div class="text-[11px] text-muted-foreground mt-0.5 leading-snug">{{ item.desc }}</div>
+            <div class="text-xs text-muted-foreground mt-0.5 leading-snug">{{ item.desc }}</div>
           </div>
           <Badge v-if="item.status === 'Granted'" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent">
             <Check class="w-3 h-3" />

@@ -90,6 +90,7 @@
   "apiServer.urlPlaceholder": "https://api.openai.com",
   "apiServer.apiKeyPlaceholder": "sk-...",
   "apiServer.modelPlaceholder": "whisper-1",
+  "validation.required": "Required",
   "pill.recording": "Recording…",
   "pill.transcribing": "Transcribing…",
   "pill.downloading": "Downloading…",
