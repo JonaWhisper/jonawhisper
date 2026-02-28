@@ -227,7 +227,7 @@ onUnmounted(() => {
 <template>
   <div class="flex h-full min-w-0 select-none">
     <!-- Sidebar -->
-    <div class="w-40 min-w-[8rem] border-r border-border bg-muted/30 overflow-y-auto flex-shrink-0">
+    <div class="w-48 min-w-[10rem] border-r border-border bg-muted/30 overflow-y-auto flex-shrink-0">
       <div class="p-3">
         <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           {{ t('settings.title') }}
@@ -436,6 +436,7 @@ onUnmounted(() => {
             <Label class="text-sm font-medium">{{ t('settings.microphone') }}</Label>
             <Select
               :model-value="selectedDeviceUid"
+              :disabled="store.audioDevices.length === 0"
               @update:model-value="onDeviceChange"
             >
               <SelectTrigger class="w-full">
@@ -443,7 +444,7 @@ onUnmounted(() => {
                   <component :is="deviceIcon(selectedDevice.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                   <span class="truncate">{{ selectedDevice.name }}{{ selectedDevice.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
                 </span>
-                <SelectValue v-else />
+                <span v-else class="text-muted-foreground">{{ t('menu.noDevices') }}</span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -465,6 +466,7 @@ onUnmounted(() => {
               variant="outline"
               size="sm"
               class="w-20"
+              :disabled="store.audioDevices.length === 0"
               @click="isTesting ? stopMicTest() : startMicTest()"
             >
               {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
