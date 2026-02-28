@@ -18,6 +18,13 @@ fn pending_download_path() -> PathBuf {
         .join(".pending-download")
 }
 
+/// Stable partial file path for a model (deterministic, survives app restart).
+fn partial_path(model: &ASRModel) -> PathBuf {
+    let hash = model.id.replace([':', '/'], "_");
+    let storage_dir = shellexpand::tilde(&model.storage_dir).to_string();
+    PathBuf::from(storage_dir).join(format!(".{}.partial", hash))
+}
+
 pub async fn download_model(
     app: AppHandle,
     state: Arc<AppState>,
@@ -62,9 +69,20 @@ async fn download_single_file(
     let _ = fs::create_dir_all(&storage_dir);
 
     let client = &*DOWNLOAD_CLIENT;
-
     let dest_path = model.local_path();
-    let response = match client.get(&model.url).send().await {
+    let tmp_path = partial_path(model);
+
+    // Check for existing partial download
+    let existing_size = fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
+
+    // Build request with Range header if resuming
+    let mut request = client.get(&model.url);
+    if existing_size > 0 {
+        log::info!("Resuming download for {} from {} bytes", model.id, existing_size);
+        request = request.header("Range", format!("bytes={}-", existing_size));
+    }
+
+    let response = match request.send().await {
         Ok(r) => r,
         Err(e) => {
             log::error!("Download failed: {}", e);
@@ -72,18 +90,47 @@ async fn download_single_file(
         }
     };
 
-    let total_size = response.content_length().unwrap_or(0);
-    let mut downloaded: u64 = 0;
+    let status = response.status();
 
-    let tmp_path = std::env::temp_dir().join(format!("whisper_dl_{}", uuid_simple()));
+    // 206 = partial content (resume accepted), 200 = full file (server ignores Range)
+    let (resumed, total_size) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
+        let remaining = response.content_length().unwrap_or(0);
+        (true, existing_size + remaining)
+    } else {
+        // Server doesn't support Range or sent full file — start from scratch
+        (false, response.content_length().unwrap_or(0))
+    };
 
-    let mut file = match fs::File::create(&tmp_path) {
-        Ok(f) => f,
-        Err(e) => {
-            log::error!("Failed to create temp file: {}", e);
-            return false;
+    let mut downloaded: u64 = if resumed { existing_size } else { 0 };
+
+    // Open file: append if resuming, create if fresh
+    let mut file = if resumed {
+        match fs::OpenOptions::new().append(true).open(&tmp_path) {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("Failed to open partial file for append: {}", e);
+                return false;
+            }
+        }
+    } else {
+        match fs::File::create(&tmp_path) {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("Failed to create temp file: {}", e);
+                return false;
+            }
         }
     };
+
+    // Emit initial progress if resuming
+    if resumed && total_size > 0 {
+        let progress = downloaded as f64 / total_size as f64;
+        state.download.lock().unwrap().progress = progress;
+        let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+            "model_id": model.id,
+            "progress": progress,
+        }));
+    }
 
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
@@ -104,13 +151,21 @@ async fn download_single_file(
             }
             Err(e) => {
                 log::error!("Download stream error: {}", e);
-                let _ = fs::remove_file(&tmp_path);
+                // Keep partial file for resume on next attempt
                 return false;
             }
         }
     }
 
-    // Move to final destination
+    // Verify size if known from model catalog
+    if model.size > 0 && downloaded < model.size / 2 {
+        log::error!("Downloaded size ({}) is suspiciously small for model {} (expected ~{})",
+            downloaded, model.id, model.size);
+        let _ = fs::remove_file(&tmp_path);
+        return false;
+    }
+
+    // Move to final destination, remove partial file
     if dest_path.exists() {
         let _ = fs::remove_file(&dest_path);
     }
@@ -147,10 +202,4 @@ pub fn delete_model(model: &ASRModel) -> bool {
 
 fn clear_pending_state(_model: &ASRModel) {
     let _ = fs::remove_file(pending_download_path());
-}
-
-fn uuid_simple() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-    format!("{:x}{:x}", t.as_secs(), t.subsec_nanos())
 }

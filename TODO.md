@@ -8,19 +8,11 @@
 
 ## Fonctionnalités
 
-- [ ] **Moteurs natifs Rust (stratégie "zéro Python")** — Remplacer les subprocess Python/CLI par des bindings Rust natifs. Binaire unique sans dépendances externes, cross-platform (macOS + Windows).
-  - **whisper.cpp → [whisper-rs](https://github.com/tazz4843/whisper-rs)** — Binding Rust natif, compilé par `build.rs`. CoreML/Metal sur macOS, CUDA/DirectML sur Windows. Moteur par défaut out-of-the-box. Sélection automatique du backend (GPU > Neural Engine > CPU). Option avancée dans Settings pour forcer (Auto / CPU / GPU).
-  - **Vosk → [vosk-rs](https://github.com/Bear-03/vosk-rs)** — Binding Rust vers la lib C de Vosk. Léger, cross-platform.
-  - **Moonshine → [ort](https://github.com/pykeIO/ort)** (ONNX Runtime) — Charge les modèles ONNX directement depuis Rust. Cross-platform, CPU/GPU/CoreML/DirectML.
-  - **Faster Whisper → [ct2rs](https://github.com/jkawamoto/ctranslate2-rs)** — Binding CTranslate2. Moins mature, potentiellement redondant si whisper-rs + CoreML/Metal suffit.
-  - **MLX Whisper** — Pas de binding Rust (framework Apple Python/Swift only). Remplacé par whisper-rs + CoreML. Garder en option Python legacy si besoin.
-  - **Téléchargement des modèles** — Utiliser le crate officiel [hf-hub](https://github.com/huggingface/hf-hub) (Hugging Face) pour les modèles HF : cache, progression, reprise. Reqwest classique pour Vosk (alphacephei.com).
-  - **Moteurs Python en fallback** — Garder le subprocess Python en option (venv dédié `~/.whisper-dictate/venv/`). Bouton "Install" dans le Model Manager qui gère le venv automatiquement. Plus le chemin par défaut.
-- [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique. Chaque provider déclare ses capacités (audio→texte, texte→texte, ou les deux).
-  - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et modèles prédéfinis (dropdown), champs verrouillés. Custom uniquement pour serveurs locaux.
-  - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings.
+- [x] **Moteur natif Rust whisper-rs** — whisper-rs compilé nativement, Metal GPU sur macOS. Vosk et Moonshine retirés (pas de binaire macOS / qualité inférieure). Subprocess Python supprimé. Téléchargement direct (reqwest + HTTP Range pour reprise).
+- [x] **Système de providers unifié** — Providers = credentials purs (`id, name, kind, url, api_key`). Sélection de modèles centralisée dans Settings (ASR cloud + LLM). Model Manager simplifié (download/delete uniquement). Édition inline par card, ProviderForm réutilisable.
+  - Reste à faire : branchement LLM local (llama.cpp) quand le catalogue de modèles locaux sera prêt.
 - [ ] **Catalogue de modèles locaux** — Proposer un listing de modèles recommandés dans le Model Manager, couvrant ASR (speech-to-text) et post-processing (LLM cleanup). Permet aux utilisateurs de choisir sans connaître les noms de modèles.
-  - **Modèles ASR locaux** — Whisper (tiny → large-v3), Vosk (small/large), Moonshine (tiny/base) : afficher taille, langues, vitesse estimée.
+  - **Modèles ASR locaux** — Whisper (tiny → large-v3) : afficher taille, langues, vitesse estimée.
   - **Modèles LLM post-processing locaux** — Listing de modèles légers pour le cleanup de texte en local :
     - Qwen3-1.7B-Instruct (~1 GB Q4, sweet spot qualité/taille)
     - SmolLM2-1.7B-Instruct (~1 GB Q4, Apache 2.0)
@@ -34,7 +26,7 @@
 - [ ] **Détection de silence avant transcription** — Analyser l'audio avant de l'envoyer au modèle ASR. Si l'enregistrement ne contient que du silence (énergie RMS sous un seuil), le jeter directement sans transcrire. Évite les hallucinations sur audio vide (le modèle invente du texte quand il n'y a rien à transcrire).
 - [ ] **Filtre hallucinations via LLM** — Envisager de remplacer ou compléter le filtre regex actuel par un passage LLM. Le LLM peut détecter contextuellement les hallucinations (répétitions, texte sans rapport, artefacts de fin) là où le regex ne catch que des patterns connus. Approche combinée possible : regex rapide d'abord, puis LLM pour les cas complexes.
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue de transcription sur disque (fichiers audio en attente). En cas de crash ou kill pendant une transcription, les fichiers WAV restent dans /tmp mais la queue en mémoire est perdue. Persister la queue permettrait de reprendre automatiquement au relancement. Concerne uniquement la transcription, pas le téléchargement.
-- [ ] **Reprise de téléchargement de modèles** — Actuellement, quitter l'app pendant un download = progression perdue, il faut tout re-télécharger. Implémenter la reprise (HTTP Range headers pour les fichiers directs, cache natif de `hf-hub` pour HuggingFace). Fermer la fenêtre ne pose pas de problème (le download continue en arrière-plan), seul le quit de l'app est concerné.
+- [x] **Reprise de téléchargement de modèles** — Fichier `.partial` stable par modèle + HTTP Range headers. Si l'app est tuée pendant un download, le fichier partiel reste sur disque et le téléchargement reprend automatiquement au prochain essai.
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon le micro utilisé. À réfléchir :
   - **Détection automatique** — Matcher le device par pattern dans le nom (ex: "AirPods" → preset Bluetooth, "MacBook" → preset intégré). Fournir quelques presets par défaut pour les cas courants.
   - **Presets personnalisés** — Permettre à l'utilisateur de créer/éditer ses propres presets et de les associer à un device spécifique. Important car chaque micro a ses particularités.
