@@ -105,6 +105,7 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum) |
+| Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted en Rust, rendues en bitmap RGBA — zéro dépendance image, inspirées [Lucide](https://lucide.dev/) |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
 | Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
 | i18n | [vue-i18n](https://vue-i18n.intlify.dev/) |
@@ -226,7 +227,8 @@ src-tauri/               Rust backend
     llm_cleanup.rs       LLM text cleanup client
     commands.rs          Tauri IPC commands
     state.rs             App state & persistent preferences
-    tray.rs              Menu bar menu
+    tray.rs              Menu bar menu & tray icon states
+    menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
     audio.rs             cpal recording & FFT
     engines/             Speech recognition engine adapters
     platform/            OS-specific code (permissions, hotkey, paste)
