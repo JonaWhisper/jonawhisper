@@ -7,7 +7,7 @@
 
 ## UX / Polish
 
-- [ ] **README** — Écrire un README propre pour le repo (description, screenshots, install, usage, build)
+- [x] **README** — ✅ Fait. Description, build, permissions, engines, usage, tech stack, structure
 - [x] **Model Manager : langue en haut** — ✅ Déplacé dans une toolbar fixe en haut du contenu principal
 - [x] **Model Manager : layout toolbar en haut (Option A)** — ✅ Langue + bouton "Add Server" en header fixe, liste scrollable en dessous
 - [x] **Model Manager : commande d'install visible pour tous les moteurs** — ✅ Affiche la commande même quand le moteur est installé
