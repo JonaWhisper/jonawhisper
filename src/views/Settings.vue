@@ -428,7 +428,7 @@ onUnmounted(() => {
           <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.locale') }}</Label>
             <Select :model-value="store.appLocale" @update:model-value="onLocaleChange">
-              <SelectTrigger class="w-full">
+              <SelectTrigger class="w-full h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -879,7 +879,7 @@ onUnmounted(() => {
               :disabled="store.audioDevices.length === 0"
               @update:model-value="onDeviceChange"
             >
-              <SelectTrigger class="w-full">
+              <SelectTrigger class="w-full h-9 text-sm">
                 <span v-if="selectedDevice" class="inline-flex items-center gap-1.5 truncate">
                   <component :is="deviceIcon(selectedDevice.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                   <span class="truncate">{{ selectedDevice.name }}{{ selectedDevice.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>

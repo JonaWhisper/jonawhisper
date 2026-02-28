@@ -154,7 +154,7 @@ async function doClearAll() {
       <Input
         v-model="searchQuery"
         :placeholder="t('history.search')"
-        class="h-8 pl-8"
+        class="h-9 pl-8 text-sm"
       />
     </div>
 
