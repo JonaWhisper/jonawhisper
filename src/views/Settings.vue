@@ -363,7 +363,7 @@ onUnmounted(() => {
 
         <div class="space-y-4">
           <!-- Recording mode toggle -->
-          <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.mode') }}</Label>
             <div class="inline-flex rounded-md border border-border overflow-hidden">
               <button
