@@ -8,7 +8,7 @@
 ## UX / Polish
 
 - [ ] **Icones natives dans le tray menu** — Remplacer les emojis/caractères Unicode par des SF Symbols (`NSImage(systemSymbolName:)`) pour un rendu natif adapté au thème clair/sombre. Concerne les icones de transport type (micro), checkmarks, etc.
-- [ ] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Représentation visuelle intuitive (barres, badges colorés, labels type "Précis"/"Rapide") plutôt que des chiffres bruts — doit être compréhensible sans connaître les termes techniques.
+- [ ] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Double affichage : représentation visuelle intuitive (barres, badges colorés, labels type "Précis"/"Rapide") + valeurs numériques brutes en petit pour les utilisateurs techniques.
 
 
 ## Fonctionnalités
@@ -24,6 +24,18 @@
 - [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique. Chaque provider déclare ses capacités (audio→texte, texte→texte, ou les deux).
   - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et modèles prédéfinis (dropdown), champs verrouillés. Custom uniquement pour serveurs locaux.
   - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings.
+- [ ] **Catalogue de modèles locaux** — Proposer un listing de modèles recommandés dans le Model Manager, couvrant ASR (speech-to-text) et post-processing (LLM cleanup). Permet aux utilisateurs de choisir sans connaître les noms de modèles.
+  - **Modèles ASR locaux** — Whisper (tiny → large-v3), Vosk (small/large), Moonshine (tiny/base) : afficher taille, langues, vitesse estimée.
+  - **Modèles LLM post-processing locaux** — Listing de modèles légers pour le cleanup de texte en local :
+    - Qwen3-1.7B-Instruct (~1 GB Q4, sweet spot qualité/taille)
+    - SmolLM2-1.7B-Instruct (~1 GB Q4, Apache 2.0)
+    - Gemma 3 1B-IT (~700 MB Q4, bon multilingual FR/EN)
+    - Qwen3-4B-Instruct (~2.5 GB Q4, meilleure qualité)
+    - Phi-4-mini 3.8B (~2.3 GB Q4, excellent reasoning)
+  - **Modèles spécialisés ponctuation** — bert-restore-punctuation (~436 MB, sub-10ms), fullstop-punctuation-multilingual (~440 MB, FR/EN/DE/IT)
+  - **Runtime local** — llama.cpp via [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) (Rust natif, Metal/CUDA, format GGUF) ou ONNX Runtime via [`ort`](https://github.com/pykeIO/ort) pour les modèles BERT
+  - **Outils d'inférence locale** — Lister les logiciels recommandés pour faire tourner un LLM en local (tous compatibles API OpenAI) : [Ollama](https://ollama.com/), [LM Studio](https://lmstudio.ai/), [llama.cpp](https://github.com/ggerganov/llama.cpp), [vLLM](https://github.com/vllm-project/vllm)
+- [ ] **Filtre hallucinations via LLM** — Envisager de remplacer ou compléter le filtre regex actuel par un passage LLM. Le LLM peut détecter contextuellement les hallucinations (répétitions, texte sans rapport, artefacts de fin) là où le regex ne catch que des patterns connus. Approche combinée possible : regex rapide d'abord, puis LLM pour les cas complexes.
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue sur disque
 - [ ] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon micro intégré/AirPods/casque/USB
