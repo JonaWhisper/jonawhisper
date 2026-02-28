@@ -143,7 +143,7 @@ const canStart = computed(() => {
 <template>
   <div class="flex flex-col h-full select-none">
     <!-- Header -->
-    <div class="text-center px-5 pt-4 pb-3">
+    <div class="text-center px-5 pt-2 pb-3">
       <h1 class="text-lg font-bold">{{ t('setup.step2.title') }}</h1>
       <p class="text-xs text-muted-foreground mt-0.5">{{ t('setup.step2.subtitle') }}</p>
     </div>
@@ -170,7 +170,6 @@ const canStart = computed(() => {
         <!-- Hotkey -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.hotkey') }}</Label>
-          <p class="text-xs text-muted-foreground">{{ t('setup.step2.hotkeyDesc') }}</p>
           <ShortcutCapture
             :model-value="store.hotkey"
             @update:model-value="onHotkeyChange"
@@ -184,7 +183,7 @@ const canStart = computed(() => {
             <button
               class="flex-1 px-3 py-1.5 text-sm transition-colors"
               :class="store.recordingMode === 'push_to_talk'
-                ? 'bg-accent text-accent-foreground font-medium'
+                ? 'bg-accent text-accent-foreground'
                 : 'hover:bg-accent/50 text-muted-foreground'"
               @click="onRecordingModeChange('push_to_talk')"
             >
@@ -193,14 +192,13 @@ const canStart = computed(() => {
             <button
               class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
               :class="store.recordingMode === 'toggle'
-                ? 'bg-accent text-accent-foreground font-medium'
+                ? 'bg-accent text-accent-foreground'
                 : 'hover:bg-accent/50 text-muted-foreground'"
               @click="onRecordingModeChange('toggle')"
             >
               {{ t('setup.step2.toggle') }}
             </button>
           </div>
-          <p class="text-xs text-muted-foreground">{{ t('setup.step2.recordingModeDesc.' + store.recordingMode) }}</p>
         </div>
 
         <!-- Transcription language -->
@@ -339,7 +337,7 @@ const canStart = computed(() => {
     </div>
 
     <!-- Fixed bottom -->
-    <div class="px-5 pt-3 pb-5 border-t border-border mt-3">
+    <div class="px-5 pt-3 pb-4 border-t border-border mt-2">
       <Button class="w-full" :disabled="!canStart" @click="emit('start')">
         {{ t('setup.step2.start') }}
       </Button>

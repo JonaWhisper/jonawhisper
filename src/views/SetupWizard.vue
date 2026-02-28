@@ -74,7 +74,7 @@ watch(step, async (newStep) => {
     if (!pollInterval) {
       pollInterval = setInterval(() => store.fetchPermissions(), 1500)
     }
-    await win.setSize(new LogicalSize(420, 420))
+    await win.setSize(new LogicalSize(420, 450))
   }
 })
 
@@ -94,7 +94,7 @@ onUnmounted(() => {
 <template>
   <div class="flex flex-col h-full">
     <!-- Step indicator -->
-    <div class="flex items-center justify-center gap-2 pt-3">
+    <div class="flex items-center justify-center gap-2 pt-5">
       <div
         class="w-2 h-2 rounded-full transition-colors"
         :class="step === 1 ? 'bg-primary' : 'bg-muted-foreground/30'"
@@ -106,7 +106,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Step 1: Permissions -->
-    <div v-if="step === 1" class="flex flex-col flex-1 p-5 select-none">
+    <div v-if="step === 1" class="flex flex-col flex-1 px-5 pt-2 pb-5 select-none">
       <div class="text-center mb-4">
         <h1 class="text-lg font-bold">{{ t('setup.title') }}</h1>
         <p class="text-xs text-muted-foreground mt-0.5">{{ t('setup.subtitle') }}</p>

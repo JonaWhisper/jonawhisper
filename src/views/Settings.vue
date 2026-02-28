@@ -380,7 +380,7 @@ onUnmounted(() => {
               <button
                 class="px-3 py-1.5 text-sm transition-colors whitespace-nowrap"
                 :class="store.recordingMode === 'push_to_talk'
-                  ? 'bg-accent text-accent-foreground font-medium'
+                  ? 'bg-accent text-accent-foreground'
                   : 'hover:bg-accent/50 text-muted-foreground'"
                 @click="onRecordingModeChange('push_to_talk')"
               >
@@ -389,7 +389,7 @@ onUnmounted(() => {
               <button
                 class="px-3 py-1.5 text-sm border-l border-border transition-colors whitespace-nowrap"
                 :class="store.recordingMode === 'toggle'
-                  ? 'bg-accent text-accent-foreground font-medium'
+                  ? 'bg-accent text-accent-foreground'
                   : 'hover:bg-accent/50 text-muted-foreground'"
                 @click="onRecordingModeChange('toggle')"
               >
