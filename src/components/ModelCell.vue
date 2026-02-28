@@ -82,7 +82,12 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
       <!-- Paused (partial exists) -->
       <template v-else-if="isPaused">
         <div class="flex items-center gap-2">
-          <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-24" />
+          <div class="w-24">
+            <Progress :model-value="(model.partial_progress ?? 0) * 100" />
+            <div v-if="model.size > 0" class="text-[10px] text-muted-foreground mt-0.5">
+              {{ formatSize(Math.round((model.partial_progress ?? 0) * model.size)) }} / {{ formatSize(model.size) }}
+            </div>
+          </div>
           <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
             <Play class="w-3.5 h-3.5" />
           </Button>

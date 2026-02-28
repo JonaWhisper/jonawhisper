@@ -286,7 +286,12 @@ const canStart = computed(() => {
                     </template>
                     <!-- Paused (partial exists) -->
                     <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
-                      <Progress :model-value="(model.partial_progress ?? 0) * 100" class="w-16" />
+                      <div class="w-16">
+                        <Progress :model-value="(model.partial_progress ?? 0) * 100" />
+                        <div v-if="model.size > 0" class="text-[9px] text-muted-foreground mt-0.5">
+                          {{ formatSize(Math.round((model.partial_progress ?? 0) * model.size)) }} / {{ formatSize(model.size) }}
+                        </div>
+                      </div>
                       <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
                         <Play class="w-3.5 h-3.5" />
                       </Button>
