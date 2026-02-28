@@ -92,12 +92,22 @@ async fn download_single_file(
 
     let status = response.status();
 
+    // 416 = Range not satisfiable (partial file corrupted or larger than remote)
+    if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+        log::warn!("Server returned 416 for {}, deleting partial and retrying", model.id);
+        let _ = fs::remove_file(&tmp_path);
+        return Box::pin(download_single_file(app, state, model)).await;
+    }
+
     // 206 = partial content (resume accepted), 200 = full file (server ignores Range)
     let (resumed, total_size) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
         let remaining = response.content_length().unwrap_or(0);
+        log::info!("Resuming {} — server accepted Range ({} + {} bytes)", model.id, existing_size, remaining);
         (true, existing_size + remaining)
     } else {
-        // Server doesn't support Range or sent full file — start from scratch
+        if existing_size > 0 {
+            log::info!("Server does not support Range for {} — restarting download", model.id);
+        }
         (false, response.content_length().unwrap_or(0))
     };
 

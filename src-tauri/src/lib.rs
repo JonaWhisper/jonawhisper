@@ -145,9 +145,12 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_app, event| {
-            // Keep the app running when the last window closes (menu bar app)
-            if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+            // Keep the app running when the last window closes (menu bar app).
+            // code=None → window close, code=Some → explicit app.exit() (e.g. quit menu item)
+            if let tauri::RunEvent::ExitRequested { api, code, .. } = event {
+                if code.is_none() {
+                    api.prevent_exit();
+                }
             }
         });
 }
