@@ -63,6 +63,7 @@ fn system_prompt(language: &str) -> String {
          - Do NOT add information that wasn't in the original\n\
          - Output language: {lang_name}\n\
          - Reply with ONLY the cleaned text, nothing else\n\
+         - Do NOT use HTML, markdown, or any formatting\n\
          - Do NOT use /think or reasoning tags"
     )
 }
@@ -99,7 +100,8 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str) -> Result<Stri
         .with_n_ctx(NonZeroU32::new(ctx_size))
         .with_n_batch(512)
         .with_n_threads(n_threads)
-        .with_n_threads_batch(n_threads);
+        .with_n_threads_batch(n_threads)
+        .with_flash_attention_policy(1); // LLAMA_FLASH_ATTN_TYPE_ENABLED
 
     let mut llama_ctx = ctx.model.new_context(&ctx.backend, ctx_params)
         .map_err(|e| format!("Failed to create LLM context: {}", e))?;

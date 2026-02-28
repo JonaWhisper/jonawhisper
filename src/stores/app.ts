@@ -520,6 +520,10 @@ export const useAppStore = defineStore('app', () => {
     listen('permission-changed', () => {
       fetchPermissions()
     })
+
+    listen('models-changed', () => {
+      fetchModels()
+    })
   }
 
   // Initialize (don't fetch audio devices here — that triggers mic permission dialog on macOS 14+)

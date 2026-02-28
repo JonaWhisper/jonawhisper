@@ -69,16 +69,20 @@ pub async fn download_model_cmd(
         .model_by_id(&id)
         .ok_or_else(|| AppError::Other(format!("Model not found: {}", id)))?;
 
-    Ok(downloader::download_model(app, Arc::clone(&state), model).await)
+    let result = downloader::download_model(app.clone(), Arc::clone(&state), model).await;
+    let _ = app.emit("models-changed", ());
+    Ok(result)
 }
 
 #[tauri::command]
-pub async fn delete_model_cmd(id: String) -> bool {
-    tokio::task::spawn_blocking(move || {
+pub async fn delete_model_cmd(app: AppHandle, id: String) -> bool {
+    let result = tokio::task::spawn_blocking(move || {
         catalog()
             .model_by_id(&id)
             .is_some_and(|m| downloader::delete_model(&m))
-    }).await.unwrap_or(false)
+    }).await.unwrap_or(false);
+    let _ = app.emit("models-changed", ());
+    result
 }
 
 #[tauri::command]
@@ -90,7 +94,7 @@ pub fn pause_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
 }
 
 #[tauri::command]
-pub fn cancel_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
+pub fn cancel_download(app: AppHandle, id: String, state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
     let is_active = dl.active.contains_key(&id);
     if let Some(entry) = dl.active.get(&id) {
@@ -104,6 +108,7 @@ pub fn cancel_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
         if let Some(model) = catalog().model_by_id(&id) {
             downloader::delete_partial(&model);
         }
+        let _ = app.emit("models-changed", ());
     }
 }
 
