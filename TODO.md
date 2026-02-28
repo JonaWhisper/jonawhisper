@@ -51,15 +51,18 @@
 
 ## Audits (à planifier)
 
-- [ ] **Audit post setup wizard step 2** — Vérifier la séparation des modules, le code dupliqué entre SetupStep2/Settings/ModelManager, et la cohérence des patterns après cette feature. À chaque grosse feature, relancer un audit complet.
-- [ ] **Audit post raccourcis custom** — Vérifier la séparation des modules après l'ajout du système de raccourcis (hotkey.rs, ShortcutCapture.vue, shortcut.ts). Checker : duplication frontend/backend des tables de keycodes, cohérence des events, code mort.
+- [ ] **Audit complet architecture & séparation des modules** — Passer en revue tout le codebase :
+  - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée (ex: recording.rs ne devrait pas connaître le tray, commands.rs ne devrait pas contenir de logique)
+  - **Duplication** — code dupliqué entre SetupStep2/Settings/ModelManager, tables de keycodes frontend/backend, patterns répétés
+  - **Couplage** — dépendances entre modules, imports croisés, qui connaît qui
+  - **Code mort** — fonctions/types/imports inutilisés après les refactorings successifs
+  - **Frontend → backend** — logique faite côté JS qui devrait être côté Rust (filtrage, calculs, formatage). Le frontend = affichage, le Rust = logique métier.
 
-- [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier.
-
-- [ ] **Audit global du codebase** — Re-vérifier l'ensemble après les refactorings récents (FFI, events, hotkey, crossbeam, mutex grouping). Couvrir :
-  - **Sécurité** — injections, gestion des clés API, permissions, sanitization des inputs
-  - **Performance** — allocations inutiles, locks trop larges, I/O bloquant sur le main thread
-  - **Code quality** — patterns incohérents, dead code, error handling, unwrap justifiés
-  - **Architecture** — couplage entre modules, séparation des responsabilités
-  - **Frontend** — listeners orphelins, memory leaks, réactivité, accessibilité
-  - **Tests** — couverture actuelle, identifier les zones critiques à tester en priorité
+- [ ] **Audit patterns & bonnes pratiques** — Vérifier la cohérence des patterns sur tout le projet :
+  - **Error handling** — utilisation cohérente de Result vs unwrap, propagation d'erreurs, messages clairs
+  - **Sécurité** — gestion des clés API, sanitization des inputs, permissions
+  - **Performance** — locks trop larges, allocations inutiles, I/O bloquant sur le main thread
+  - **Concurrence** — bon usage des Mutex/Atomics/channels, pas de deadlock possible, ordering des atomics
+  - **Frontend** — listeners orphelins, memory leaks, réactivité, cleanup dans onUnmounted
+  - **Naming** — conventions cohérentes (Rust snake_case, TS camelCase, events kebab-case)
+  - **Tests** — couverture actuelle, zones critiques à tester en priorité
