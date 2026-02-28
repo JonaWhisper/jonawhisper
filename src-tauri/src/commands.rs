@@ -122,6 +122,8 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "llm_model": s.llm_model,
         "asr_provider_id": s.asr_provider_id,
         "asr_cloud_model": s.asr_cloud_model,
+        "audio_ducking_enabled": s.audio_ducking_enabled,
+        "audio_ducking_level": s.audio_ducking_level,
     })
 }
 
@@ -159,6 +161,8 @@ pub fn set_setting(
             "llm_model" => s.llm_model = value.clone(),
             "asr_provider_id" => s.asr_provider_id = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
+            "audio_ducking_enabled" => s.audio_ducking_enabled = value == "true",
+            "audio_ducking_level" => s.audio_ducking_level = value.parse().unwrap_or(0.8),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;

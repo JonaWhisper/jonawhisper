@@ -61,7 +61,13 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     }
     rec.key_down_time = Some(Instant::now());
 
-    let device_uid = state.settings.lock().unwrap().selected_input_device_uid.clone();
+    let (device_uid, ducking_enabled, ducking_level) = {
+        let s = state.settings.lock().unwrap();
+        (s.selected_input_device_uid.clone(), s.audio_ducking_enabled, s.audio_ducking_level)
+    };
+    if ducking_enabled {
+        platform::audio_ducking::duck_volume(ducking_level);
+    }
     let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
     let _ = rec.audio_rx.recv();
 
@@ -86,6 +92,7 @@ pub fn stop_recording_and_enqueue(
     }
 
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
+    platform::audio_ducking::restore_volume();
     let audio_path = match rec.audio_rx.recv() {
         Ok(AudioReply::Stopped { path }) => path,
         _ => None,

@@ -106,6 +106,8 @@ export interface SettingsPayload {
   llm_model: string
   asr_provider_id: string
   asr_cloud_model: string
+  audio_ducking_enabled: boolean
+  audio_ducking_level: number
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -129,6 +131,8 @@ export const useAppStore = defineStore('app', () => {
   const llmModel = ref('')
   const asrProviderId = ref('')
   const asrCloudModel = ref('whisper-1')
+  const audioDuckingEnabled = ref(false)
+  const audioDuckingLevel = ref(0.8)
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
 
@@ -256,6 +260,8 @@ export const useAppStore = defineStore('app', () => {
       llmModel.value = s.llm_model ?? ''
       asrProviderId.value = s.asr_provider_id ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
+      audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
+      audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -275,6 +281,8 @@ export const useAppStore = defineStore('app', () => {
       case 'llm_model': return llmModel.value
       case 'asr_provider_id': return asrProviderId.value
       case 'asr_cloud_model': return asrCloudModel.value
+      case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
+      case 'audio_ducking_level': return String(audioDuckingLevel.value)
       default: return ''
     }
   }
@@ -295,6 +303,8 @@ export const useAppStore = defineStore('app', () => {
       case 'llm_model': llmModel.value = value; break
       case 'asr_provider_id': asrProviderId.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
+      case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
+      case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
     }
   }
 
@@ -463,6 +473,7 @@ export const useAppStore = defineStore('app', () => {
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
     llmEnabled, llmProviderId, llmModel, asrProviderId, asrCloudModel,
+    audioDuckingEnabled, audioDuckingLevel,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed
