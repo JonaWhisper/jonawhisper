@@ -96,12 +96,12 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Layer | Technologies |
 |---|---|
 | Framework | [Tauri 2](https://v2.tauri.app/) |
-| Backend | Rust |
-| Frontend | Vue 3, TypeScript, Pinia, Tailwind CSS, [shadcn-vue](https://www.shadcn-vue.com/) |
-| Audio | cpal + hound (recording), rustfft (spectrum) |
+| Backend | [Rust](https://www.rust-lang.org/) |
+| Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
+| Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum) |
 | Hotkey | Raw CGEvent tap (CoreGraphics FFI) |
-| Permissions | objc2 (AVFoundation), CoreGraphics, ApplicationServices |
-| i18n | vue-i18n |
+| Permissions | [objc2](https://github.com/madsmtm/objc2) (AVFoundation), CoreGraphics, ApplicationServices |
+| i18n | [vue-i18n](https://vue-i18n.intlify.dev/) |
 
 ## Project structure
 
