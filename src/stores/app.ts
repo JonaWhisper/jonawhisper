@@ -240,7 +240,10 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function cancelDownload(id: string) {
-    downloadStopping.value = true
+    // Only show stopping state if cancelling the active download
+    if (downloadingModelId.value === id) {
+      downloadStopping.value = true
+    }
     try {
       await invoke('cancel_download', { id })
       await fetchModels()
