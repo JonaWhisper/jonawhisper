@@ -9,6 +9,7 @@
 
 - [ ] **Icones natives dans le tray menu** — Remplacer les emojis/caractères Unicode par des SF Symbols (`NSImage(systemSymbolName:)`) pour un rendu natif adapté au thème clair/sombre. Concerne les icones de transport type (micro), checkmarks, etc.
 - [ ] **Afficher WER et RTF sur les modèles** — Ajouter les scores de benchmark par modèle dans le Model Manager : WER (Word Error Rate, taux d'erreur) et RTF (Real-Time Factor, vitesse de traitement). Double affichage : représentation visuelle intuitive (barres, badges colorés, labels type "Précis"/"Rapide") + valeurs numériques brutes en petit pour les utilisateurs techniques.
+- [ ] **Déplacer les recommandations de modèles côté backend** — Actuellement, la map `RECOMMENDED` est hardcodée dans `SetupStep2.vue` (frontend). Problèmes : duplication de logique métier côté JS, et sélection du modèle Vosk par `navigator.language` au lieu de `selectedLanguage`/`appLocale`. Refactorer en ajoutant un champ `recommended: bool` sur `ASRModel` côté Rust, chaque engine déclare ses modèles recommandés. La recommandation par langue se fait côté backend en fonction de la langue de transcription sélectionnée.
 
 
 ## Fonctionnalités
