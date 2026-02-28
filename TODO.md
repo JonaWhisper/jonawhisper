@@ -46,35 +46,43 @@
 - [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
-## Spacings (audit fait)
+## Corrections spacings (audit du 28/02/2026)
 
-- [ ] **Standardiser le padding de page** — ModelManager utilise `p-4`, Settings/SetupStep2 utilisent `p-5`, History utilise `px-4` variable. Passer tout à `px-5`.
-- [ ] **Standardiser la hauteur des inputs** — ShortcutCapture = `h-9`, inputs LLM dans Settings = `h-8`, selects = default. Aligner tout sur `h-9` (36px).
-- [ ] **Standardiser le padding des cards/items** — 4 valeurs différentes : ModelCell `px-4 py-3`, permissions Setup `px-3.5 py-2.5`, modèles SetupStep2 `px-2.5 py-1.5`, History `px-3 py-2`. Définir 2 standards : compact (`px-3 py-2`) et normal (`px-4 py-3`).
-- [ ] **Réduire les variantes de space-y** — 7 valeurs utilisées (0.5 à 4). Garder 3 : compact `space-y-1`, normal `space-y-2`, section `space-y-4`.
-- [ ] **Aligner les boutons download** — SetupStep2 utilise `h-6` (24px), ModelCell utilise default `sm` (~32px) pour la même action. Harmoniser.
-- [ ] **Remplacer `text-[11px]` des descriptions permissions** — SetupWizard utilise `text-[11px]` custom, devrait être `text-xs` (12px) comme partout ailleurs. Les `text-[10px]`/`text-[9px]` dans BenchmarkBadges sont acceptables (besoin spécifique).
+Plan d'action par ordre de priorité :
 
-## i18n (audit fait)
+1. [ ] **Padding de page → `px-5` partout** — ModelManager `p-4` → `p-5`, History `px-4` → `px-5`.
+2. [ ] **Hauteur inputs → `h-9` partout** — Settings inputs LLM `h-8` → `h-9`. Vérifier que les selects shadcn ont la même hauteur.
+3. [ ] **Padding cards/items → 2 standards** — Normal (`px-4 py-3`) : ModelCell, permissions SetupWizard. Compact (`px-3 py-2`) : modèles SetupStep2, History entries. Supprimer les variantes `px-2.5 py-1.5` et `px-3.5 py-2.5`.
+4. [ ] **Réduire space-y → 3 valeurs** — Compact `space-y-1`, normal `space-y-2`, section `space-y-4`. Éliminer `space-y-0.5`, `space-y-1.5`, `space-y-3`, `space-y-3.5`.
+5. [ ] **Boutons download → même taille** — SetupStep2 `h-6` et ModelCell default `sm` → choisir un standard unique (`size="sm"`).
+6. [ ] **`text-[11px]` permissions → `text-xs`** — SetupWizard descriptions permissions. BenchmarkBadges `text-[10px]`/`text-[9px]` OK (spécifique).
 
-- [ ] **Localiser les tooltips tray** — 4 strings hardcodées dans `tray.rs` : `"Recording…"` (l.371), `"Transcribing…"` (l.376), `"WhisperDictate"` (l.381, l.507). Remplacer par `t!("pill.recording")`, `t!("pill.transcribing")`, `t!("app.name")`.
-- [ ] **Afficher les descriptions SetupStep2** — Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `setup.step2.recordingModeDesc.toggle` existent dans en.json/fr.json mais ne sont jamais affichées dans le composant.
-- [ ] **Localiser la validation ApiServerForm** — `'Required'` en dur (lignes 32-34). Remplacer par une clé i18n.
+## Corrections i18n (audit du 28/02/2026)
 
-## Audits (à planifier)
+1. [ ] **Localiser tooltips tray** — `tray.rs` : `"Recording…"` (l.371) → `t!("pill.recording")`, `"Transcribing…"` (l.376) → `t!("pill.transcribing")`, `"WhisperDictate"` (l.381, l.507) → `t!("app.name")`.
+2. [ ] **Afficher descriptions SetupStep2** — Ajouter les textes d'aide sous hotkey et recording mode. Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `.toggle` existent déjà dans en.json/fr.json.
+3. [ ] **Localiser validation ApiServerForm** — `'Required'` en dur (l.32-34) → clé i18n `validation.required`.
 
-- [ ] **Audit complet architecture & séparation des modules** — Passer en revue tout le codebase :
-  - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée (ex: recording.rs ne devrait pas connaître le tray, commands.rs ne devrait pas contenir de logique)
-  - **Duplication** — code dupliqué entre SetupStep2/Settings/ModelManager, tables de keycodes frontend/backend, patterns répétés
-  - **Couplage** — dépendances entre modules, imports croisés, qui connaît qui
-  - **Code mort** — fonctions/types/imports inutilisés après les refactorings successifs
-  - **Frontend → backend** — logique faite côté JS qui devrait être côté Rust (filtrage, calculs, formatage). Le frontend = affichage, le Rust = logique métier.
+## Audits récurrents
 
-- [ ] **Audit patterns & bonnes pratiques** — Vérifier la cohérence des patterns sur tout le projet :
-  - **Error handling** — utilisation cohérente de Result vs unwrap, propagation d'erreurs, messages clairs
-  - **Sécurité** — gestion des clés API, sanitization des inputs, permissions
-  - **Performance** — locks trop larges, allocations inutiles, I/O bloquant sur le main thread
-  - **Concurrence** — bon usage des Mutex/Atomics/channels, pas de deadlock possible, ordering des atomics
-  - **Frontend** — listeners orphelins, memory leaks, réactivité, cleanup dans onUnmounted
-  - **Naming** — conventions cohérentes (Rust snake_case, TS camelCase, events kebab-case)
-  - **Tests** — couverture actuelle, zones critiques à tester en priorité
+À relancer après chaque grosse feature ou refactoring.
+
+- [ ] **Audit spacings (padding/margin/hauteurs)** — Vérifier la cohérence des paddings de page, cards/items, inputs, boutons, space-y, et tailles de texte sur toutes les vues et composants.
+
+- [ ] **Audit i18n** — Vérifier que tout texte visible passe par `t()` (Vue) ou `t!()` (Rust). Chercher les strings hardcodées, clés manquantes, clés inutilisées, incohérences entre en.json et fr.json.
+
+- [ ] **Audit architecture & séparation des modules** — Passer en revue tout le codebase :
+  - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée
+  - **Duplication** — code dupliqué entre composants, patterns répétés
+  - **Couplage** — dépendances entre modules, imports croisés
+  - **Code mort** — fonctions/types/imports inutilisés après refactorings
+  - **Frontend → backend** — logique métier côté JS qui devrait être côté Rust
+
+- [ ] **Audit patterns & bonnes pratiques** — Vérifier la cohérence sur tout le projet :
+  - **Error handling** — Result vs unwrap, propagation, messages clairs
+  - **Sécurité** — clés API, sanitization, permissions
+  - **Performance** — locks, allocations, I/O bloquant
+  - **Concurrence** — Mutex/Atomics/channels, deadlocks, ordering
+  - **Frontend** — listeners orphelins, memory leaks, cleanup onUnmounted
+  - **Naming** — conventions (Rust snake_case, TS camelCase, events kebab-case)
+  - **Tests** — couverture, zones critiques
