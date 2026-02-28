@@ -1,6 +1,10 @@
 use super::*;
 use crate::state::ApiServerConfig;
 use std::path::Path;
+use std::sync::LazyLock;
+
+static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> =
+    LazyLock::new(reqwest::blocking::Client::new);
 
 pub struct OpenAIAPIEngine {
     servers: Vec<ApiServerConfig>,
@@ -47,8 +51,7 @@ impl ASREngine for OpenAIAPIEngine {
         let server = self.servers.iter().find(|s| s.id == server_id)
             .ok_or_else(|| EngineError::ApiError("Server config not found".into()))?;
 
-        // Use reqwest blocking client for sync interface
-        let client = reqwest::blocking::Client::new();
+        let client = &*BLOCKING_CLIENT;
 
         let file_bytes = std::fs::read(audio_path)
             .map_err(|e| EngineError::LaunchFailed(e.to_string()))?;

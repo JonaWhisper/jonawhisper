@@ -431,13 +431,10 @@ pub fn spawn_hotkey_handler(
         match hotkey_rx.recv() {
             Ok(hotkey::HotkeyEvent::KeyDown) => {
                 let mode = state.settings.lock().unwrap().recording_mode.clone();
+                let is_recording = state.runtime.lock().unwrap().is_recording;
                 let mut rec = rec_state.lock().unwrap();
-                if mode == "toggle" {
-                    if state.runtime.lock().unwrap().is_recording {
-                        stop_recording_and_enqueue(&app, &state, &mut rec);
-                    } else {
-                        start_recording(&app, &state, &mut rec);
-                    }
+                if mode == "toggle" && is_recording {
+                    stop_recording_and_enqueue(&app, &state, &mut rec);
                 } else {
                     start_recording(&app, &state, &mut rec);
                 }
@@ -501,7 +498,7 @@ pub fn spawn_spectrum_emitter(
 }
 
 /// Wrapper around audio command sender for mic test (managed by Tauri).
-pub struct MicTestSender(pub std::sync::Mutex<crossbeam_channel::Sender<AudioCmd>>);
+pub struct MicTestSender(pub crossbeam_channel::Sender<AudioCmd>);
 
 pub fn new_recording_state(
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,

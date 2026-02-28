@@ -150,11 +150,11 @@ pub fn set_setting(
     match key.as_str() {
         "hotkey" => {
             let new_hotkey = hotkey::HotkeyOption::from_name(&value);
-            let _ = hotkey_sender.0.lock().unwrap().send(hotkey::HotkeyUpdate::SetHotkey(new_hotkey));
+            let _ = hotkey_sender.0.send(hotkey::HotkeyUpdate::SetHotkey(new_hotkey));
         }
         "cancel_shortcut" => {
             let new_cancel_key = hotkey::cancel_keys::from_name(&value);
-            let _ = hotkey_sender.0.lock().unwrap().send(hotkey::HotkeyUpdate::SetCancelKey(new_cancel_key));
+            let _ = hotkey_sender.0.send(hotkey::HotkeyUpdate::SetCancelKey(new_cancel_key));
         }
         _ => {}
     }
@@ -168,13 +168,13 @@ pub fn set_setting(
 pub fn start_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
     let device_uid = state.settings.lock().unwrap().selected_input_device_uid.clone();
     state.runtime.lock().unwrap().mic_testing = true;
-    let _ = sender.0.lock().unwrap().send(crate::recording::AudioCmd::StartMicTest { device_uid });
+    let _ = sender.0.send(crate::recording::AudioCmd::StartMicTest { device_uid });
 }
 
 #[tauri::command]
 pub fn stop_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
     state.runtime.lock().unwrap().mic_testing = false;
-    let _ = sender.0.lock().unwrap().send(crate::recording::AudioCmd::StopMicTest);
+    let _ = sender.0.send(crate::recording::AudioCmd::StopMicTest);
 }
 
 // -- LLM Config --

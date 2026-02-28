@@ -299,8 +299,10 @@ fn process_samples(
 }
 
 fn compute_spectrum(samples: &[f32]) -> Vec<f32> {
-    let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(FFT_SIZE);
+    use std::sync::LazyLock;
+    static FFT: LazyLock<std::sync::Arc<dyn rustfft::Fft<f32>>> =
+        LazyLock::new(|| FftPlanner::new().plan_fft_forward(FFT_SIZE));
+    let fft = &*FFT;
 
     let mut buffer: Vec<Complex<f32>> = samples
         .iter()

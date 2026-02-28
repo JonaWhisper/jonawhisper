@@ -6,8 +6,10 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tauri::{AppHandle, Emitter};
+
+static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 const PENDING_DIR: &str = ".local/share/whisper-dictate";
 
@@ -84,7 +86,7 @@ async fn download_single_file(
     let storage_dir = shellexpand::tilde(&model.storage_dir).to_string();
     let _ = fs::create_dir_all(&storage_dir);
 
-    let client = reqwest::Client::new();
+    let client = &*DOWNLOAD_CLIENT;
 
     // Try resume for non-zip downloads
     let dest_path = model.local_path();

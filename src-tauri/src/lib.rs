@@ -17,9 +17,7 @@ use std::sync::Arc;
 use tauri::Manager;
 
 /// Wrapper to store the hotkey update channel sender in Tauri managed state.
-pub struct HotkeyUpdateSender(
-    pub std::sync::Mutex<crossbeam_channel::Sender<platform::hotkey::HotkeyUpdate>>,
-);
+pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::HotkeyUpdate>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -73,7 +71,7 @@ pub fn run() {
                 recording::spawn_audio_thread();
 
             // Mic test sender (clone before cmd_tx is moved)
-            app.manage(recording::MicTestSender(std::sync::Mutex::new(cmd_tx.clone())));
+            app.manage(recording::MicTestSender(cmd_tx.clone()));
 
             // Recording state (Send-safe: only channels, no cpal::Stream)
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
@@ -94,7 +92,7 @@ pub fn run() {
             let initial_cancel_key = platform::hotkey::cancel_keys::from_name(&cancel_name);
             let (hotkey_rx, hotkey_update_tx) =
                 platform::hotkey::start_monitor(initial_hotkey, initial_cancel_key, monitor_enabled.clone());
-            app.manage(HotkeyUpdateSender(std::sync::Mutex::new(hotkey_update_tx)));
+            app.manage(HotkeyUpdateSender(hotkey_update_tx));
 
             // Hotkey event processing thread
             recording::spawn_hotkey_handler(
