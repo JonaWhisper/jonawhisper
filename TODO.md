@@ -60,7 +60,7 @@ Plan d'action par ordre de priorité :
 ## Corrections i18n (audit du 28/02/2026)
 
 1. [x] **Localiser tooltips tray** — `tray.rs` : `"Recording…"` (l.371) → `t!("pill.recording")`, `"Transcribing…"` (l.376) → `t!("pill.transcribing")`, `"WhisperDictate"` (l.381, l.507) → `t!("app.name")`.
-2. [x] **Afficher descriptions SetupStep2** — Ajouter les textes d'aide sous hotkey et recording mode. Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `.toggle` existent déjà dans en.json/fr.json.
+2. [ ] **Afficher descriptions SetupStep2** — Les clés `setup.step2.hotkeyDesc`, `setup.step2.recordingModeDesc.push_to_talk`, `.toggle` existent dans en.json/fr.json mais ne sont pas affichées (pas souhaité pour le moment — trop verbeux dans le wizard compact).
 3. [x] **Localiser validation ApiServerForm** — `'Required'` en dur (l.32-34) → clé i18n `validation.required`.
 
 ## Audits récurrents
