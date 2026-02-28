@@ -139,8 +139,8 @@ pub fn request_permission(kind: String, app: AppHandle) -> bool {
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     let s = state.settings.lock().unwrap();
-    log::info!("get_settings: post_processing={}, hallucination_filter={}, cleanup_mode={}",
-        s.post_processing_enabled, s.hallucination_filter_enabled, s.cleanup_mode,
+    log::info!("get_settings: post_processing={}, hallucination_filter={}, text_cleanup_enabled={}, cleanup_model_id={}",
+        s.post_processing_enabled, s.hallucination_filter_enabled, s.text_cleanup_enabled, s.cleanup_model_id,
     );
     serde_json::json!({
         "app_locale": s.app_locale,
@@ -152,12 +152,10 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "selected_language": s.selected_language,
         "cancel_shortcut": s.cancel_shortcut,
         "recording_mode": s.recording_mode,
-        "cleanup_mode": s.cleanup_mode,
-        "punctuation_model_id": s.punctuation_model_id,
+        "text_cleanup_enabled": s.text_cleanup_enabled,
+        "cleanup_model_id": s.cleanup_model_id,
         "llm_provider_id": s.llm_provider_id,
         "llm_model": s.llm_model,
-        "llm_source": s.llm_source,
-        "llm_local_model_id": s.llm_local_model_id,
         "asr_provider_id": s.asr_provider_id,
         "asr_cloud_model": s.asr_cloud_model,
         "gpu_mode": s.gpu_mode,
@@ -194,12 +192,10 @@ pub fn set_setting(
             }
             "selected_model_id" => s.selected_model_id = value.clone(),
             "selected_language" => s.selected_language = value.clone(),
-            "cleanup_mode" => s.cleanup_mode = value.clone(),
-            "punctuation_model_id" => s.punctuation_model_id = value.clone(),
+            "text_cleanup_enabled" => s.text_cleanup_enabled = value == "true",
+            "cleanup_model_id" => s.cleanup_model_id = value.clone(),
             "llm_provider_id" => s.llm_provider_id = value.clone(),
             "llm_model" => s.llm_model = value.clone(),
-            "llm_source" => s.llm_source = value.clone(),
-            "llm_local_model_id" => s.llm_local_model_id = value.clone(),
             "asr_provider_id" => s.asr_provider_id = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
             "gpu_mode" => s.gpu_mode = value.clone(),
@@ -214,12 +210,9 @@ pub fn set_setting(
     if key == "selected_model_id" || key == "gpu_mode" {
         *state.whisper_context.lock().unwrap() = None;
     }
-    // Invalidate cached LLM context when local model changes
-    if key == "llm_local_model_id" {
+    // Invalidate cached contexts when cleanup model changes
+    if key == "cleanup_model_id" {
         *state.llm_context.lock().unwrap() = None;
-    }
-    // Invalidate cached BERT context when punctuation model changes
-    if key == "punctuation_model_id" || key == "cleanup_mode" {
         *state.bert_context.lock().unwrap() = None;
     }
     // Send hotkey updates outside the settings lock

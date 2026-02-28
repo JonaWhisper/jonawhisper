@@ -267,19 +267,17 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (pp_enabled, lang, hall_filter, cleanup_mode, punctuation_model_id,
-         llm_source, llm_provider_id, llm_model, llm_local_model_id, llm_max_tokens, providers) = {
+    let (pp_enabled, lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
+         llm_provider_id, llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.post_processing_enabled,
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
-            s.cleanup_mode.clone(),
-            s.punctuation_model_id.clone(),
-            s.llm_source.clone(),
+            s.text_cleanup_enabled,
+            s.cleanup_model_id.clone(),
             s.llm_provider_id.clone(),
             s.llm_model.clone(),
-            s.llm_local_model_id.clone(),
             s.llm_max_tokens,
             s.providers.clone(),
         )
@@ -301,14 +299,15 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         return;
     }
 
-    // Step 2: mode-specific cleanup
-    match cleanup_mode.as_str() {
-        "punctuation" => {
-            // BERT punctuation restoration
+    // Step 2: cleanup based on selected model
+    if text_cleanup_enabled && !cleanup_model_id.is_empty() {
+        if cleanup_model_id.starts_with("bert-punctuation:") {
+            // BERT punctuation restoration (finalize after)
             let state_clone = Arc::clone(state);
             let text_for_bert = processed.clone();
+            let model_id = cleanup_model_id.clone();
             match tokio::task::spawn_blocking(move || {
-                run_bert_punctuation(&state_clone, &text_for_bert, &punctuation_model_id)
+                run_bert_punctuation(&state_clone, &text_for_bert, &model_id)
             }).await {
                 Ok(Ok(punctuated)) => {
                     log::info!("BERT punctuation: {} → {}", processed.len(), punctuated.len());
@@ -321,57 +320,55 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     log::warn!("BERT punctuation task panicked: {}", e);
                 }
             }
-            // Finalize spacing + capitalization after BERT
             if pp_enabled {
                 processed = post_processor::finalize(&processed);
             }
-        }
-        "full" => {
-            // Finalize before LLM (clean input, matches previous behavior)
+        } else if cleanup_model_id == "cloud" {
+            // Cloud LLM (finalize before)
             if pp_enabled {
                 processed = post_processor::finalize(&processed);
             }
-            // LLM cleanup
-            if llm_source == "local" {
-                let state_clone = Arc::clone(state);
-                let text_for_llm = processed.clone();
-                let lang_for_llm = lang.clone();
-                match tokio::task::spawn_blocking(move || {
-                    run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &llm_local_model_id, llm_max_tokens)
-                }).await {
-                    Ok(Ok(cleaned)) => {
-                        log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
+            if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
+                match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
+                    Ok(cleaned) => {
+                        log::info!("Cloud LLM cleanup: {} → {}", processed.len(), cleaned.len());
                         processed = cleaned;
                     }
-                    Ok(Err(e)) => {
-                        log::warn!("Local LLM cleanup failed, using regex result: {}", e);
-                    }
                     Err(e) => {
-                        log::warn!("Local LLM cleanup task panicked: {}", e);
+                        log::warn!("Cloud LLM cleanup failed, using finalized result: {}", e);
                     }
                 }
             } else {
-                // Cloud LLM cleanup
-                if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
-                    match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
-                        Ok(cleaned) => {
-                            log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
-                            processed = cleaned;
-                        }
-                        Err(e) => {
-                            log::warn!("LLM cleanup failed, using regex result: {}", e);
-                        }
-                    }
-                } else {
-                    log::warn!("LLM cleanup enabled but provider '{}' not found", llm_provider_id);
-                }
+                log::warn!("Cloud LLM cleanup enabled but provider '{}' not found", llm_provider_id);
             }
-        }
-        _ => {
-            // "none": just finalize
+        } else {
+            // Local LLM (llama:*) — finalize before
             if pp_enabled {
                 processed = post_processor::finalize(&processed);
             }
+            let state_clone = Arc::clone(state);
+            let text_for_llm = processed.clone();
+            let lang_for_llm = lang.clone();
+            let model_id = cleanup_model_id.clone();
+            match tokio::task::spawn_blocking(move || {
+                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, llm_max_tokens)
+            }).await {
+                Ok(Ok(cleaned)) => {
+                    log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                    processed = cleaned;
+                }
+                Ok(Err(e)) => {
+                    log::warn!("Local LLM cleanup failed, using finalized result: {}", e);
+                }
+                Err(e) => {
+                    log::warn!("Local LLM cleanup task panicked: {}", e);
+                }
+            }
+        }
+    } else {
+        // No cleanup: just finalize
+        if pp_enabled {
+            processed = post_processor::finalize(&processed);
         }
     }
 

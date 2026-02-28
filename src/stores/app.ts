@@ -106,12 +106,10 @@ export interface SettingsPayload {
   selected_input_device_uid: string | null
   selected_model_id: string
   selected_language: string
-  cleanup_mode: string
-  punctuation_model_id: string
+  text_cleanup_enabled: boolean
+  cleanup_model_id: string
   llm_provider_id: string
   llm_model: string
-  llm_source: string
-  llm_local_model_id: string
   asr_provider_id: string
   asr_cloud_model: string
   gpu_mode: string
@@ -134,12 +132,10 @@ export const useAppStore = defineStore('app', () => {
   const recordingMode = ref('push_to_talk')
   const selectedInputDeviceUid = ref<string | null>(null)
   const hotkey = ref('right_command')
-  const cleanupMode = ref<'none' | 'punctuation' | 'full'>('none')
-  const punctuationModelId = ref('')
+  const textCleanupEnabled = ref(false)
+  const cleanupModelId = ref('')
   const llmProviderId = ref('')
   const llmModel = ref('')
-  const llmSource = ref<'local' | 'cloud'>('cloud')
-  const llmLocalModelId = ref('')
   const asrProviderId = ref('')
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
@@ -177,6 +173,19 @@ export const useAppStore = defineStore('app', () => {
     return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
   })
   const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
+  const cleanupModels = computed(() => {
+    const models: { id: string; label: string; group: string }[] = []
+    for (const m of downloadedPunctuationModels.value) {
+      models.push({ id: m.id, label: m.label, group: 'bert' })
+    }
+    for (const m of downloadedLlmModels.value) {
+      models.push({ id: m.id, label: m.label, group: 'llm' })
+    }
+    models.push({ id: 'cloud', label: 'Cloud LLM', group: 'cloud' })
+    return models
+  })
+  const isCloudLlm = computed(() => cleanupModelId.value === 'cloud')
+  const isLocalLlm = computed(() => cleanupModelId.value.startsWith('llama:'))
 
   // Actions
   async function fetchEngines() {
@@ -332,12 +341,10 @@ export const useAppStore = defineStore('app', () => {
       recordingMode.value = s.recording_mode
       selectedModelId.value = s.selected_model_id
       selectedLanguage.value = s.selected_language
-      cleanupMode.value = (s.cleanup_mode as 'none' | 'punctuation' | 'full') ?? 'none'
-      punctuationModelId.value = s.punctuation_model_id ?? ''
+      textCleanupEnabled.value = s.text_cleanup_enabled ?? false
+      cleanupModelId.value = s.cleanup_model_id ?? ''
       llmProviderId.value = s.llm_provider_id ?? ''
       llmModel.value = s.llm_model ?? ''
-      llmSource.value = (s.llm_source as 'local' | 'cloud') ?? 'cloud'
-      llmLocalModelId.value = s.llm_local_model_id ?? ''
       asrProviderId.value = s.asr_provider_id ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
@@ -356,12 +363,10 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_input_device_uid': return selectedInputDeviceUid.value ?? ''
       case 'selected_model_id': return selectedModelId.value
       case 'selected_language': return selectedLanguage.value
-      case 'cleanup_mode': return cleanupMode.value
-      case 'punctuation_model_id': return punctuationModelId.value
+      case 'text_cleanup_enabled': return String(textCleanupEnabled.value)
+      case 'cleanup_model_id': return cleanupModelId.value
       case 'llm_provider_id': return llmProviderId.value
       case 'llm_model': return llmModel.value
-      case 'llm_source': return llmSource.value
-      case 'llm_local_model_id': return llmLocalModelId.value
       case 'asr_provider_id': return asrProviderId.value
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
@@ -381,12 +386,10 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_input_device_uid': selectedInputDeviceUid.value = value || null; break
       case 'selected_model_id': selectedModelId.value = value; break
       case 'selected_language': selectedLanguage.value = value; break
-      case 'cleanup_mode': cleanupMode.value = value as 'none' | 'punctuation' | 'full'; break
-      case 'punctuation_model_id': punctuationModelId.value = value; break
+      case 'text_cleanup_enabled': textCleanupEnabled.value = value === 'true'; break
+      case 'cleanup_model_id': cleanupModelId.value = value; break
       case 'llm_provider_id': llmProviderId.value = value; break
       case 'llm_model': llmModel.value = value; break
-      case 'llm_source': llmSource.value = value as 'local' | 'cloud'; break
-      case 'llm_local_model_id': llmLocalModelId.value = value; break
       case 'asr_provider_id': asrProviderId.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
@@ -567,11 +570,11 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    cleanupMode, punctuationModelId, llmProviderId, llmModel, llmSource, llmLocalModelId, llmMaxTokens, asrProviderId, asrCloudModel, gpuMode,
+    textCleanupEnabled, cleanupModelId, llmProviderId, llmModel, llmMaxTokens, asrProviderId, asrCloudModel, gpuMode,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed
-    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady,
+    isBusy, selectedEngine, downloadedModels, asrEngines, llmEngines, downloadedLlmModels, punctuationEngines, downloadedPunctuationModels, bertModelReady, cleanupModels, isCloudLlm, isLocalLlm,
     // Actions
     init, fetchEngines, fetchModels, fetchLanguages,
     fetchAudioDevices, fetchPermissions, fetchHistory,

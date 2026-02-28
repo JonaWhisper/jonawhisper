@@ -56,9 +56,9 @@ pub struct AppState {
     pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
     /// Cached WhisperContext: (model_id, gpu_mode, context). Invalidated when model or GPU mode changes.
     pub whisper_context: Mutex<Option<(String, String, whisper_rs::WhisperContext)>>,
-    /// Cached LLM context for local inference. Invalidated when llm_local_model_id changes.
+    /// Cached LLM context for local inference. Invalidated when cleanup_model_id changes to a different LLM.
     pub llm_context: Mutex<Option<crate::llm_local::LlmContext>>,
-    /// Cached BERT punctuation context. Invalidated when punctuation_model_id changes.
+    /// Cached BERT punctuation context. Invalidated when cleanup_model_id changes to a different BERT model.
     pub bert_context: Mutex<Option<crate::bert_punctuation::BertContext>>,
 }
 
@@ -115,19 +115,15 @@ pub struct Preferences {
     pub cancel_shortcut: String,
     #[serde(default = "default_recording_mode")]
     pub recording_mode: String,
-    /// "none" | "punctuation" | "full"
-    #[serde(default = "default_none")]
-    pub cleanup_mode: String,
     #[serde(default)]
-    pub punctuation_model_id: String,
+    pub text_cleanup_enabled: bool,
+    /// Model ID for cleanup: "bert-punctuation:*", "llama:*", or "cloud"
+    #[serde(default)]
+    pub cleanup_model_id: String,
     #[serde(default)]
     pub llm_provider_id: String,
     #[serde(default)]
     pub llm_model: String,
-    #[serde(default = "default_llm_source")]
-    pub llm_source: String,
-    #[serde(default)]
-    pub llm_local_model_id: String,
     #[serde(default)]
     pub asr_provider_id: String,
     #[serde(default = "default_asr_cloud_model")]
@@ -147,8 +143,6 @@ fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
-fn default_none() -> String { "none".to_string() }
-fn default_llm_source() -> String { "cloud".to_string() }
 fn default_llm_max_tokens() -> u32 { 256 }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
@@ -218,7 +212,8 @@ impl Preferences {
                     let model = llm.get("model").and_then(|v| v.as_str()).unwrap_or("");
 
                     if llm.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                        prefs.cleanup_mode = "full".to_string();
+                        prefs.text_cleanup_enabled = true;
+                        prefs.cleanup_model_id = "cloud".to_string();
                     }
                     prefs.llm_model = model.to_string();
 
@@ -272,19 +267,47 @@ impl Preferences {
                 needs_save = true;
             }
 
-            // Migrate llm_local_model_id from old "llm-local:" prefix to "llama:"
-            if prefs.llm_local_model_id.starts_with("llm-local:") {
-                let new_id = prefs.llm_local_model_id.replacen("llm-local:", "llama:", 1);
-                log::info!("Migrating llm_local_model_id: {} → {}", prefs.llm_local_model_id, new_id);
-                prefs.llm_local_model_id = new_id;
+            // Migrate old cleanup_mode/punctuation_model_id/llm_source/llm_local_model_id → unified text_cleanup_enabled + cleanup_model_id
+            if let Some(cleanup_mode) = raw.get("cleanup_mode").and_then(|v| v.as_str()) {
+                let old_llm_source = raw.get("llm_source").and_then(|v| v.as_str()).unwrap_or("cloud");
+                let old_punctuation_model_id = raw.get("punctuation_model_id").and_then(|v| v.as_str()).unwrap_or("");
+                let old_llm_local_model_id = raw.get("llm_local_model_id").and_then(|v| v.as_str()).unwrap_or("");
+
+                match cleanup_mode {
+                    "punctuation" => {
+                        log::info!("Migrating cleanup_mode=punctuation → text_cleanup_enabled=true, cleanup_model_id={}", old_punctuation_model_id);
+                        prefs.text_cleanup_enabled = true;
+                        prefs.cleanup_model_id = old_punctuation_model_id.to_string();
+                    }
+                    "full" => {
+                        prefs.text_cleanup_enabled = true;
+                        if old_llm_source == "local" {
+                            let mut model_id = old_llm_local_model_id.to_string();
+                            // Also migrate llm-local: prefix
+                            if model_id.starts_with("llm-local:") {
+                                model_id = model_id.replacen("llm-local:", "llama:", 1);
+                            }
+                            log::info!("Migrating cleanup_mode=full, llm_source=local → cleanup_model_id={}", model_id);
+                            prefs.cleanup_model_id = model_id;
+                        } else {
+                            log::info!("Migrating cleanup_mode=full, llm_source=cloud → cleanup_model_id=cloud");
+                            prefs.cleanup_model_id = "cloud".to_string();
+                        }
+                    }
+                    _ => {
+                        // "none" or unknown
+                        prefs.text_cleanup_enabled = false;
+                    }
+                }
                 needs_save = true;
             }
 
-            // Migrate llm_enabled → cleanup_mode
+            // Migrate llm_enabled (even older format) → text_cleanup_enabled
             if let Some(llm_enabled) = raw.get("llm_enabled").and_then(|v| v.as_bool()) {
-                if llm_enabled && prefs.cleanup_mode == "none" {
-                    log::info!("Migrating llm_enabled=true → cleanup_mode=full");
-                    prefs.cleanup_mode = "full".to_string();
+                if llm_enabled && !prefs.text_cleanup_enabled {
+                    log::info!("Migrating llm_enabled=true → text_cleanup_enabled=true, cleanup_model_id=cloud");
+                    prefs.text_cleanup_enabled = true;
+                    prefs.cleanup_model_id = "cloud".to_string();
                     needs_save = true;
                 }
             }
