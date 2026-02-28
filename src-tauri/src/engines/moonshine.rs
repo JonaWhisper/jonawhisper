@@ -47,15 +47,16 @@ impl ASREngine for MoonshineEngine {
                 install_hint: self.install_hint().into(),
             })?;
 
-        // Use a Python one-liner to run moonshine
+        // Pass audio path and model name via sys.argv to avoid shell injection
         let model_name = if model.id.contains("tiny") { "moonshine/tiny" } else { "moonshine/base" };
-        let script = format!(
-            "import moonshine; print(moonshine.transcribe('{}', model='{}')[0])",
-            audio_path.to_string_lossy(),
-            model_name
-        );
+        let script = "import sys, moonshine; print(moonshine.transcribe(sys.argv[1], model=sys.argv[2])[0])";
 
-        let args = vec!["-c".to_string(), script];
+        let args = vec![
+            "-c".to_string(),
+            script.to_string(),
+            audio_path.to_string_lossy().to_string(),
+            model_name.to_string(),
+        ];
         let result = process_runner::run(&python, &args)?;
         Ok(result.stdout)
     }

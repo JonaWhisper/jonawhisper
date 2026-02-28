@@ -45,11 +45,11 @@ For a debug build:
 
 On first launch, a setup wizard asks for three macOS permissions:
 
-| Permission | Used for |
-|---|---|
-| **Microphone** | Audio recording |
-| **Accessibility** | Paste simulation (Cmd+V via CGEvent) |
-| **Input Monitoring** | Global hotkey detection (CGEvent tap) |
+| Permission | Used for | macOS API |
+|---|---|---|
+| **Microphone** | Audio recording | [AVCaptureDevice](https://developer.apple.com/documentation/avfoundation/avcapturedevice) authorization |
+| **Accessibility** | Paste simulation (Cmd+V via [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent)) | [AXIsProcessTrusted](https://developer.apple.com/documentation/applicationservices/1459186-axisprocesstrusted) |
+| **Input Monitoring** | Global hotkey detection ([CGEvent tap](https://developer.apple.com/documentation/coregraphics/1454426-cgeventtapcreate)) | [TCC](https://support.apple.com/guide/security/controlling-app-access-to-files-secddd1d86a6/web) ListenEvent |
 
 ## Engines
 
@@ -105,8 +105,8 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum) |
-| Hotkey | Raw CGEvent tap (CoreGraphics FFI) |
-| Permissions | [objc2](https://github.com/madsmtm/objc2) (AVFoundation), CoreGraphics, ApplicationServices |
+| Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
+| Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
 | i18n | [vue-i18n](https://vue-i18n.intlify.dev/) |
 
 ## Project structure

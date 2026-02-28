@@ -57,6 +57,9 @@ pub fn open_window_with_min(
 }
 
 /// Activate the app so windows can become key/focused (needed for Accessory policy).
+/// Uses `activate()` on macOS 14+ (cooperative activation), falls back to
+/// `activateIgnoringOtherApps:` on macOS 13.
+/// See: https://developer.apple.com/documentation/appkit/nsapplication/activate()
 #[cfg(target_os = "macos")]
 fn activate_app() {
     use objc2::msg_send;
@@ -66,7 +69,17 @@ fn activate_app() {
             objc2::runtime::AnyClass::get(c"NSApplication").unwrap(),
             sharedApplication
         ];
-        let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
+        let info: *mut AnyObject = msg_send![
+            objc2::runtime::AnyClass::get(c"NSProcessInfo").unwrap(),
+            processInfo
+        ];
+        let version: objc2_foundation::NSOperatingSystemVersion = msg_send![info, operatingSystemVersion];
+        if version.majorVersion >= 14 {
+            let _: () = msg_send![ns_app, activate];
+        } else {
+            #[allow(deprecated)]
+            let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
+        }
     }
 }
 
