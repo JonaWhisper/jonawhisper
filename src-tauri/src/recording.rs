@@ -267,13 +267,16 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (pp_enabled, lang, hall_filter, llm_config) = {
+    let (pp_enabled, lang, hall_filter, llm_enabled, llm_provider_id, llm_model, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.post_processing_enabled,
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
-            s.llm_config.clone(),
+            s.llm_enabled,
+            s.llm_provider_id.clone(),
+            s.llm_model.clone(),
+            s.providers.clone(),
         )
     };
 
@@ -288,15 +291,19 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     };
 
     // Step 2: LLM cleanup (if enabled)
-    if llm_config.enabled {
-        match crate::llm_cleanup::cleanup_text(&processed, &lang, &llm_config).await {
-            Ok(cleaned) => {
-                log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
-                processed = cleaned;
+    if llm_enabled {
+        if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
+            match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model).await {
+                Ok(cleaned) => {
+                    log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                    processed = cleaned;
+                }
+                Err(e) => {
+                    log::warn!("LLM cleanup failed, using regex result: {}", e);
+                }
             }
-            Err(e) => {
-                log::warn!("LLM cleanup failed, using regex result: {}", e);
-            }
+        } else {
+            log::warn!("LLM cleanup enabled but provider '{}' not found", llm_provider_id);
         }
     }
 

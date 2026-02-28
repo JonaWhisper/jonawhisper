@@ -1,4 +1,4 @@
-use crate::state::LlmConfig;
+use crate::state::Provider;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
@@ -93,22 +93,23 @@ fn system_prompt(language: &str) -> String {
 
 /// Clean up transcribed text using an LLM.
 /// Returns the cleaned text, or an error.
-pub async fn cleanup_text(text: &str, language: &str, config: &LlmConfig) -> Result<String, LlmError> {
-    if config.api_url.is_empty() || config.model.is_empty() {
+pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model: &str) -> Result<String, LlmError> {
+    if provider.url.is_empty() || model.is_empty() {
         return Err(LlmError::NotConfigured);
     }
 
-    match config.provider.as_str() {
-        "anthropic" => call_anthropic(text, language, config).await,
-        _ => call_openai_compatible(text, language, config).await,
+    if provider.kind.is_anthropic_format() {
+        call_anthropic(text, language, provider, model).await
+    } else {
+        call_openai_compatible(text, language, provider, model).await
     }
 }
 
-async fn call_openai_compatible(text: &str, language: &str, config: &LlmConfig) -> Result<String, LlmError> {
-    let url = format!("{}/v1/chat/completions", config.api_url.trim_end_matches('/'));
+async fn call_openai_compatible(text: &str, language: &str, provider: &Provider, model: &str) -> Result<String, LlmError> {
+    let url = format!("{}/v1/chat/completions", provider.url.trim_end_matches('/'));
 
     let request = ChatRequest {
-        model: config.model.clone(),
+        model: model.to_string(),
         messages: vec![
             ChatMessage { role: "system", content: system_prompt(language) },
             ChatMessage { role: "user", content: text.to_string() },
@@ -118,8 +119,8 @@ async fn call_openai_compatible(text: &str, language: &str, config: &LlmConfig) 
     };
 
     let mut req = HTTP_CLIENT.post(&url).json(&request);
-    if !config.api_key.is_empty() {
-        req = req.header("Authorization", format!("Bearer {}", config.api_key));
+    if !provider.api_key.is_empty() {
+        req = req.header("Authorization", format!("Bearer {}", provider.api_key));
     }
 
     let response = req.send().await.map_err(|e| LlmError::Http(e.to_string()))?;
@@ -143,11 +144,11 @@ async fn call_openai_compatible(text: &str, language: &str, config: &LlmConfig) 
         .ok_or_else(|| LlmError::InvalidResponse("No choices in response".into()))
 }
 
-async fn call_anthropic(text: &str, language: &str, config: &LlmConfig) -> Result<String, LlmError> {
-    let url = format!("{}/v1/messages", config.api_url.trim_end_matches('/'));
+async fn call_anthropic(text: &str, language: &str, provider: &Provider, model: &str) -> Result<String, LlmError> {
+    let url = format!("{}/v1/messages", provider.url.trim_end_matches('/'));
 
     let request = AnthropicRequest {
-        model: config.model.clone(),
+        model: model.to_string(),
         max_tokens: 4096,
         system: system_prompt(language),
         messages: vec![AnthropicMessage {
@@ -160,8 +161,8 @@ async fn call_anthropic(text: &str, language: &str, config: &LlmConfig) -> Resul
         .post(&url)
         .header("anthropic-version", "2023-06-01")
         .json(&request);
-    if !config.api_key.is_empty() {
-        req = req.header("x-api-key", &config.api_key);
+    if !provider.api_key.is_empty() {
+        req = req.header("x-api-key", &provider.api_key);
     }
 
     let response = req.send().await.map_err(|e| LlmError::Http(e.to_string()))?;

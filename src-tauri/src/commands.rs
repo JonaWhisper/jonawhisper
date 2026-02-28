@@ -3,15 +3,14 @@ use crate::engines::downloader;
 use crate::engines::{self, EngineCatalog, EngineInfo, Language};
 use crate::errors::AppError;
 use crate::platform;
-use crate::state::{ApiServerConfig, AppState, HistoryEntry};
+use crate::state::{AppState, HistoryEntry, Provider};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Build an engine catalog from current state.
-fn catalog(state: &Arc<AppState>) -> EngineCatalog {
-    let api_servers = state.settings.lock().unwrap().api_servers.clone();
-    EngineCatalog::new(&api_servers)
+/// Build the local-only engine catalog.
+fn catalog() -> EngineCatalog {
+    EngineCatalog::new()
 }
 
 // -- Locale --
@@ -32,13 +31,13 @@ pub fn get_audio_devices() -> Vec<crate::platform::audio_devices::AudioDevice> {
 // -- Engines & Models --
 
 #[tauri::command]
-pub fn get_engines(state: tauri::State<'_, Arc<AppState>>) -> Vec<EngineInfo> {
-    catalog(&state).engine_infos()
+pub fn get_engines() -> Vec<EngineInfo> {
+    catalog().engine_infos()
 }
 
 #[tauri::command]
 pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Value> {
-    let cat = catalog(&state);
+    let cat = catalog();
     let language = state.settings.lock().unwrap().selected_language.clone();
     let recommended_ids = cat.recommended_model_ids(&language);
     cat.all_models().into_iter().map(|m| {
@@ -53,8 +52,8 @@ pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Val
 }
 
 #[tauri::command]
-pub fn get_downloaded_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<engines::ASRModel> {
-    catalog(&state).downloaded_models()
+pub fn get_downloaded_models() -> Vec<engines::ASRModel> {
+    catalog().downloaded_models()
 }
 
 
@@ -64,7 +63,7 @@ pub async fn download_model_cmd(
     id: String,
     state: tauri::State<'_, Arc<AppState>>,
 ) -> Result<bool, AppError> {
-    let model = catalog(&state)
+    let model = catalog()
         .model_by_id(&id)
         .ok_or_else(|| AppError::Other(format!("Model not found: {}", id)))?;
 
@@ -72,8 +71,8 @@ pub async fn download_model_cmd(
 }
 
 #[tauri::command]
-pub fn delete_model_cmd(id: String, state: tauri::State<'_, Arc<AppState>>) -> bool {
-    catalog(&state)
+pub fn delete_model_cmd(id: String) -> bool {
+    catalog()
         .model_by_id(&id)
         .is_some_and(|m| downloader::delete_model(&m))
 }
@@ -81,8 +80,8 @@ pub fn delete_model_cmd(id: String, state: tauri::State<'_, Arc<AppState>>) -> b
 // -- Language --
 
 #[tauri::command]
-pub fn get_languages(state: tauri::State<'_, Arc<AppState>>) -> Vec<Language> {
-    catalog(&state).supported_languages()
+pub fn get_languages() -> Vec<Language> {
+    catalog().supported_languages()
 }
 
 
@@ -106,7 +105,7 @@ pub fn request_permission(kind: String, app: AppHandle) -> bool {
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     let s = state.settings.lock().unwrap();
     log::info!("get_settings: post_processing={}, hallucination_filter={}, llm_enabled={}",
-        s.post_processing_enabled, s.hallucination_filter_enabled, s.llm_config.enabled,
+        s.post_processing_enabled, s.hallucination_filter_enabled, s.llm_enabled,
     );
     serde_json::json!({
         "app_locale": s.app_locale,
@@ -118,13 +117,11 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "selected_language": s.selected_language,
         "cancel_shortcut": s.cancel_shortcut,
         "recording_mode": s.recording_mode,
-        "llm_config": {
-            "enabled": s.llm_config.enabled,
-            "provider": s.llm_config.provider,
-            "api_url": s.llm_config.api_url,
-            "api_key": s.llm_config.api_key,
-            "model": s.llm_config.model,
-        },
+        "llm_enabled": s.llm_enabled,
+        "llm_provider_id": s.llm_provider_id,
+        "llm_model": s.llm_model,
+        "asr_provider_id": s.asr_provider_id,
+        "asr_cloud_model": s.asr_cloud_model,
     })
 }
 
@@ -157,6 +154,11 @@ pub fn set_setting(
             }
             "selected_model_id" => s.selected_model_id = value.clone(),
             "selected_language" => s.selected_language = value.clone(),
+            "llm_enabled" => s.llm_enabled = value == "true",
+            "llm_provider_id" => s.llm_provider_id = value.clone(),
+            "llm_model" => s.llm_model = value.clone(),
+            "asr_provider_id" => s.asr_provider_id = value.clone(),
+            "asr_cloud_model" => s.asr_cloud_model = value.clone(),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;
@@ -197,18 +199,6 @@ pub fn stop_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::Stat
     let _ = sender.0.send(crate::recording::AudioCmd::StopMicTest);
 }
 
-// -- LLM Config --
-
-#[tauri::command]
-pub fn set_llm_config(
-    config: crate::state::LlmConfig,
-    state: tauri::State<'_, Arc<AppState>>,
-    app: AppHandle,
-) {
-    state.settings.lock().unwrap().llm_config = config;
-    state.save_preferences();
-    let _ = app.emit(crate::events::SETTINGS_CHANGED, "llm_config");
-}
 
 // -- History --
 
@@ -240,23 +230,36 @@ pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) {
     state.clear_history();
 }
 
-// -- API Servers --
+// -- Providers --
 
 #[tauri::command]
-pub fn add_api_server(config: ApiServerConfig, state: tauri::State<'_, Arc<AppState>>) {
-    state.settings.lock().unwrap().api_servers.push(config);
+pub fn add_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    state.settings.lock().unwrap().providers.push(provider);
     state.save_preferences();
+    let _ = app.emit(crate::events::SETTINGS_CHANGED, "providers");
 }
 
 #[tauri::command]
-pub fn remove_api_server(id: String, state: tauri::State<'_, Arc<AppState>>) {
-    state.settings.lock().unwrap().api_servers.retain(|s| s.id != id);
+pub fn remove_provider(id: String, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    state.settings.lock().unwrap().providers.retain(|p| p.id != id);
     state.save_preferences();
+    let _ = app.emit(crate::events::SETTINGS_CHANGED, "providers");
 }
 
 #[tauri::command]
-pub fn get_api_servers(state: tauri::State<'_, Arc<AppState>>) -> Vec<ApiServerConfig> {
-    state.settings.lock().unwrap().api_servers.clone()
+pub fn update_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    let mut s = state.settings.lock().unwrap();
+    if let Some(existing) = s.providers.iter_mut().find(|p| p.id == provider.id) {
+        *existing = provider;
+    }
+    drop(s);
+    state.save_preferences();
+    let _ = app.emit(crate::events::SETTINGS_CHANGED, "providers");
+}
+
+#[tauri::command]
+pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
+    state.settings.lock().unwrap().providers.clone()
 }
 
 // -- App lifecycle --
@@ -275,11 +278,15 @@ pub fn start_monitoring(
         let _ = win.destroy();
     }
 
-    // Open model manager if no model is ready
-    let selected_id = state.settings.lock().unwrap().selected_model_id.clone();
-    let model_ready = catalog(&state)
-        .model_by_id(&selected_id)
-        .is_some_and(|m| m.is_downloaded());
+    // Open model manager if no model is ready (skip if using cloud ASR)
+    let (selected_id, asr_provider_id) = {
+        let s = state.settings.lock().unwrap();
+        (s.selected_model_id.clone(), s.asr_provider_id.clone())
+    };
+    let model_ready = !asr_provider_id.is_empty()
+        || catalog()
+            .model_by_id(&selected_id)
+            .is_some_and(|m| m.is_downloaded());
 
     if !model_ready {
         crate::tray::open_window(

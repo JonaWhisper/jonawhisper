@@ -12,24 +12,20 @@ const { t } = useI18n()
 
 const props = defineProps<{
   model: ASRModel
-  isSelected: boolean
   isDownloading: boolean
   downloadProgress: number
 }>()
 
 const emit = defineEmits<{
-  select: [model: ASRModel]
   download: [model: ASRModel]
   delete: [model: ASRModel]
 }>()
 
 const isDownloaded = computed(() => {
   const dt = props.model.download_type.type
-  if (dt === 'RemoteAPI' || dt === 'System') return true
+  if (dt === 'System') return true
   return props.model.is_downloaded
 })
-
-const isRemoteAPI = computed(() => props.model.download_type.type === 'RemoteAPI')
 
 function formatSize(bytes: number): string {
   if (bytes <= 0) return ''
@@ -40,27 +36,8 @@ function formatSize(bytes: number): string {
 
 <template>
   <div
-    class="group flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors hover:bg-accent/30"
-    :class="isSelected ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
+    class="group flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors hover:bg-accent/30 bg-card border-border"
   >
-    <!-- Radio button -->
-    <button
-      @click="isDownloaded ? emit('select', model) : null"
-      :disabled="!isDownloaded"
-      class="flex-shrink-0"
-    >
-      <div
-        class="w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors"
-        :class="isSelected
-          ? 'border-primary bg-primary'
-          : isDownloaded
-            ? 'border-muted-foreground hover:border-primary'
-            : 'border-muted opacity-50'"
-      >
-        <div v-if="isSelected" class="w-2 h-2 rounded-full bg-primary-foreground" />
-      </div>
-    </button>
-
     <!-- Model info -->
     <div class="flex-1 min-w-0">
       <div class="font-medium text-sm truncate">{{ model.label }}</div>
@@ -85,15 +62,9 @@ function formatSize(bytes: number): string {
         </div>
       </template>
 
-      <!-- Downloaded / API — badge swaps to trash on hover -->
+      <!-- Downloaded — badge swaps to trash on hover -->
       <template v-else-if="isDownloaded">
         <Badge
-          v-if="isRemoteAPI"
-          variant="secondary"
-          class="bg-blue-500/10 text-blue-500 border-transparent group-hover:opacity-0 transition-opacity"
-        >API</Badge>
-        <Badge
-          v-else
           variant="secondary"
           class="bg-green-500/10 text-green-500 border-transparent group-hover:opacity-0 transition-opacity"
         >

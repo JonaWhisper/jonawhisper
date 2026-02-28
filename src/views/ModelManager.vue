@@ -1,18 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore, type ASRModel, type EngineInfo } from '@/stores/app'
 import ModelCell from '@/components/ModelCell.vue'
-import ApiServerForm from '@/components/ApiServerForm.vue'
-import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,10 +19,8 @@ const { t } = useI18n()
 const store = useAppStore()
 
 const selectedEngineId = ref<string | null>(null)
-const showApiServerForm = ref(false)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
-const languageWarning = ref<string | null>(null)
 
 const filteredModels = computed(() => {
   if (!selectedEngineId.value) return store.models
@@ -42,41 +31,12 @@ const selectedEngineInfo = computed(() => {
   return store.engines.find(e => e.id === selectedEngineId.value)
 })
 
-// Languages filtered to the currently selected engine
-const availableLanguages = computed(() => {
-  const engine = store.engines.find(e => {
-    const model = store.models.find(m => m.id === store.selectedModelId)
-    return model && e.id === model.engine_id
-  })
-  if (!engine) return store.languages
-  return store.languages.filter(l => engine.supported_language_codes.includes(l.code))
-})
-
 function selectEngine(engine: EngineInfo) {
   selectedEngineId.value = engine.id
 }
 
-async function handleLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value === 'string') {
-    await store.selectLanguageAction(value)
-  }
-}
-
 async function handleDownload(model: ASRModel) {
   await store.downloadModel(model.id)
-}
-
-async function handleSelect(model: ASRModel) {
-  // Check language compatibility before selecting
-  const engine = store.engines.find(e => e.id === model.engine_id)
-  if (engine && store.selectedLanguage !== 'auto') {
-    if (!engine.supported_language_codes.includes(store.selectedLanguage)) {
-      const langLabel = store.languages.find(l => l.code === store.selectedLanguage)?.label || store.selectedLanguage
-      languageWarning.value = t('modelManager.languageWarning', [langLabel])
-      await store.selectLanguageAction('auto')
-    }
-  }
-  await store.selectModel(model.id)
 }
 
 function handleDeleteRequest(model: ASRModel) {
@@ -92,16 +52,9 @@ async function confirmDelete() {
   deleteTarget.value = null
 }
 
-// Auto-dismiss language warning
-watch(languageWarning, (val) => {
-  if (val) {
-    setTimeout(() => { languageWarning.value = null }, 4000)
-  }
-})
-
 onMounted(async () => {
   getCurrentWindow().setTitle(t('window.modelManager'))
-  await Promise.all([store.fetchEngines(), store.fetchModels(), store.fetchLanguages()])
+  await Promise.all([store.fetchEngines(), store.fetchModels()])
   if (store.engines.length > 0 && !selectedEngineId.value) {
     selectedEngineId.value = store.engines[0]?.id ?? null
   }
@@ -141,44 +94,13 @@ onMounted(async () => {
           </div>
         </button>
       </div>
-
     </div>
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <!-- Fixed toolbar: language + add server -->
-      <div class="flex items-center gap-3 px-5 py-2.5 border-b border-border bg-background flex-shrink-0">
-        <label class="text-xs font-medium text-muted-foreground whitespace-nowrap">
-          {{ t('modelManager.language') }}
-        </label>
-        <Select :model-value="store.selectedLanguage" @update:model-value="handleLanguageChange">
-          <SelectTrigger class="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem
-              v-for="lang in availableLanguages"
-              :key="lang.code"
-              :value="lang.code"
-            >
-              {{ lang.label }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <div class="flex-1" />
-        <Button variant="outline" size="sm" @click="showApiServerForm = true">
-          + {{ t('modelManager.addApiServer') }}
-        </Button>
-      </div>
-
       <!-- Scrollable model list -->
       <div class="flex-1 overflow-y-auto p-5">
-        <!-- Language warning -->
-        <div v-if="languageWarning" class="mb-4 px-3 py-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-yellow-600 dark:text-yellow-400 text-sm">
-          {{ languageWarning }}
-        </div>
-
-        <!-- Engine header with install hint (always shown when hint exists) -->
+        <!-- Engine header with install hint -->
         <div class="mb-4">
           <h2 class="text-lg font-semibold">
             {{ selectedEngineInfo?.name || t('modelManager.models') }}
@@ -197,10 +119,8 @@ onMounted(async () => {
             v-for="model in filteredModels"
             :key="model.id"
             :model="model"
-            :is-selected="model.id === store.selectedModelId"
             :is-downloading="model.id === store.downloadingModelId"
             :download-progress="model.id === store.downloadingModelId ? store.downloadProgress : 0"
-            @select="handleSelect"
             @download="handleDownload"
             @delete="handleDeleteRequest"
           />
@@ -229,11 +149,5 @@ onMounted(async () => {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-
-    <!-- API Server form dialog -->
-    <ApiServerForm
-      v-if="showApiServerForm"
-      @close="showApiServerForm = false"
-    />
   </div>
 </template>

@@ -54,42 +54,35 @@ pub struct AppState {
     pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApiServerConfig {
-    pub id: String,
-    pub name: String,
-    pub url: String,
-    pub api_key: String,
-    pub model: String,
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ProviderKind {
+    OpenAI,
+    Anthropic,
+    Custom,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LlmConfig {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default = "default_llm_provider")]
-    pub provider: String,
-    #[serde(default)]
-    pub api_url: String,
-    #[serde(default)]
-    pub api_key: String,
-    #[serde(default)]
-    pub model: String,
-}
+impl ProviderKind {
+    pub fn is_anthropic_format(&self) -> bool {
+        matches!(self, Self::Anthropic)
+    }
 
-impl Default for LlmConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            provider: default_llm_provider(),
-            api_url: String::new(),
-            api_key: String::new(),
-            model: String::new(),
+    pub fn display_name(&self) -> &str {
+        match self {
+            Self::OpenAI => "OpenAI",
+            Self::Anthropic => "Anthropic",
+            Self::Custom => "Custom",
         }
     }
 }
 
-fn default_llm_provider() -> String { "openai".to_string() }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Provider {
+    pub id: String,
+    pub name: String,
+    pub kind: ProviderKind,
+    pub url: String,
+    pub api_key: String,
+}
 
 /// Persistent preferences (subset of AppState that survives restarts).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -105,7 +98,7 @@ pub struct Preferences {
     #[serde(default)]
     pub selected_input_device_uid: Option<String>,
     #[serde(default)]
-    pub api_servers: Vec<ApiServerConfig>,
+    pub providers: Vec<Provider>,
     #[serde(default = "default_auto")]
     pub app_locale: String,
     #[serde(default = "default_true")]
@@ -115,7 +108,15 @@ pub struct Preferences {
     #[serde(default = "default_recording_mode")]
     pub recording_mode: String,
     #[serde(default)]
-    pub llm_config: LlmConfig,
+    pub llm_enabled: bool,
+    #[serde(default)]
+    pub llm_provider_id: String,
+    #[serde(default)]
+    pub llm_model: String,
+    #[serde(default)]
+    pub asr_provider_id: String,
+    #[serde(default = "default_asr_cloud_model")]
+    pub asr_cloud_model: String,
 }
 
 fn default_model_id() -> String { "whisper:large-v3-turbo".to_string() }
@@ -124,6 +125,7 @@ fn default_true() -> bool { true }
 fn default_hotkey() -> String { "right_command".to_string() }
 fn default_auto() -> String { "auto".to_string() }
 fn default_cancel_shortcut() -> String { "escape".to_string() }
+fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
@@ -141,10 +143,118 @@ fn prefs_path() -> PathBuf {
 impl Preferences {
     pub fn load() -> Self {
         let path = prefs_path();
-        match std::fs::read_to_string(&path) {
-            Ok(data) => serde_json::from_str(&data).unwrap_or_default(),
-            Err(_) => Self::default(),
+        let data = match std::fs::read_to_string(&path) {
+            Ok(d) => d,
+            Err(_) => return Self::default(),
+        };
+
+        // Try parsing as new format first
+        let mut prefs: Preferences = serde_json::from_str(&data).unwrap_or_default();
+        let mut needs_save = false;
+
+        // Detect old format and migrate
+        if let Ok(raw) = serde_json::from_str::<serde_json::Value>(&data) {
+            let has_old_api_servers = raw.get("api_servers").is_some();
+            let has_old_llm_config = raw.get("llm_config").is_some();
+
+            if has_old_api_servers || has_old_llm_config {
+                log::info!("Migrating preferences from old format to unified providers");
+                needs_save = true;
+
+                // 1. Convert api_servers → providers
+                if let Some(servers) = raw.get("api_servers").and_then(|v| v.as_array()) {
+                    for server in servers {
+                        if let (Some(id), Some(name), Some(url), Some(model)) = (
+                            server.get("id").and_then(|v| v.as_str()),
+                            server.get("name").and_then(|v| v.as_str()),
+                            server.get("url").and_then(|v| v.as_str()),
+                            server.get("model").and_then(|v| v.as_str()),
+                        ) {
+                            let api_key = server.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
+                            prefs.providers.push(Provider {
+                                id: id.to_string(),
+                                name: name.to_string(),
+                                kind: ProviderKind::Custom,
+                                url: url.to_string(),
+                                api_key: api_key.to_string(),
+                            });
+                            // Migrate ASR model to settings
+                            if !model.is_empty() && prefs.asr_provider_id.is_empty() {
+                                prefs.asr_provider_id = id.to_string();
+                                prefs.asr_cloud_model = model.to_string();
+                            }
+                        }
+                    }
+                }
+
+                // 2. Convert llm_config → provider + settings
+                if let Some(llm) = raw.get("llm_config") {
+                    let enabled = llm.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let provider_str = llm.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
+                    let api_url = llm.get("api_url").and_then(|v| v.as_str()).unwrap_or("");
+                    let api_key = llm.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
+                    let model = llm.get("model").and_then(|v| v.as_str()).unwrap_or("");
+
+                    prefs.llm_enabled = enabled;
+                    prefs.llm_model = model.to_string();
+
+                    if !api_url.is_empty() {
+                        // Check if an existing provider has the same url+key
+                        let existing = prefs.providers.iter().find(|p|
+                            p.url == api_url && p.api_key == api_key
+                        );
+                        if let Some(p) = existing {
+                            prefs.llm_provider_id = p.id.clone();
+                        } else {
+                            let kind = if provider_str == "anthropic" {
+                                ProviderKind::Anthropic
+                            } else {
+                                ProviderKind::OpenAI
+                            };
+                            let id = format!("provider-{}", provider_str);
+                            prefs.providers.push(Provider {
+                                id: id.clone(),
+                                name: kind.display_name().to_string(),
+                                kind,
+                                url: api_url.to_string(),
+                                api_key: api_key.to_string(),
+                            });
+                            prefs.llm_provider_id = id;
+                        }
+                    }
+                }
+            }
+
+            // Migrate providers that still have asr_model in JSON (old unified format)
+            if let Some(providers_json) = raw.get("providers").and_then(|v| v.as_array()) {
+                for pj in providers_json {
+                    if let Some(asr_model) = pj.get("asr_model").and_then(|v| v.as_str()) {
+                        if !asr_model.is_empty() && prefs.asr_provider_id.is_empty() {
+                            if let Some(pid) = pj.get("id").and_then(|v| v.as_str()) {
+                                log::info!("Migrating asr_model from provider {} to settings", pid);
+                                prefs.asr_provider_id = pid.to_string();
+                                prefs.asr_cloud_model = asr_model.to_string();
+                                needs_save = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Reset selected_model_id if it was pointing to old openai-api: pseudo-model
+            if prefs.selected_model_id.starts_with("openai-api:") {
+                log::info!("Resetting selected_model_id from old openai-api: format");
+                prefs.selected_model_id = default_model_id();
+                needs_save = true;
+            }
         }
+
+        if needs_save {
+            prefs.save();
+            log::info!("Migration complete: {} providers", prefs.providers.len());
+        }
+
+        prefs
     }
 
     pub fn save(&self) {

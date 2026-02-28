@@ -2,9 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useAppStore } from '@/stores/app'
-import type { LlmConfig } from '@/stores/app'
-import { Settings, Sparkles, Keyboard, Mic, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor } from 'lucide-vue-next'
+import { useAppStore, type Provider } from '@/stores/app'
+import { Settings, Cloud, Sparkles, Keyboard, Mic, AudioLines, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Pencil, Trash2, Plus } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -20,8 +19,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import SpectrumBars from '@/components/SpectrumBars.vue'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
+import ProviderForm from '@/components/ProviderForm.vue'
 import { serializeShortcut } from '@/utils/shortcut'
 
 const { t } = useI18n()
@@ -32,6 +42,8 @@ const activeSection = ref('general')
 
 const sections = [
   { id: 'general', icon: Settings, label: 'settings.section.general' },
+  { id: 'providers', icon: Cloud, label: 'settings.section.providers' },
+  { id: 'transcription', icon: AudioLines, label: 'settings.section.transcription' },
   { id: 'postprocessing', icon: Sparkles, label: 'settings.section.postProcessing' },
   { id: 'shortcuts', icon: Keyboard, label: 'settings.section.shortcuts' },
   { id: 'microphone', icon: Mic, label: 'settings.section.microphone' },
@@ -109,60 +121,179 @@ async function onDeviceChange(value: string | number | bigint | Record<string, u
   await store.setSetting('selected_input_device_uid', uid)
 }
 
-// LLM config — local refs for form fields, synced with store on mount
-const llmProvider = ref('openai')
-const llmApiUrl = ref('')
-const llmApiKey = ref('')
-const llmModel = ref('')
-const llmSaved = ref(false)
+// -- Providers management --
+const showAddForm = ref(false)
+const addFormKey = ref(0)
+const editingProviderIds = ref(new Set<string>())
+const showRemoveConfirm = ref(false)
+const removeTarget = ref<Provider | null>(null)
 
-const llmApiUrlPlaceholder = computed(() =>
-  llmProvider.value === 'anthropic'
-    ? t('settings.llm.apiUrl.placeholder.anthropic')
-    : t('settings.llm.apiUrl.placeholder.openai')
-)
-
-const llmModelPlaceholder = computed(() =>
-  llmProvider.value === 'anthropic'
-    ? t('settings.llm.model.placeholder.anthropic')
-    : t('settings.llm.model.placeholder.openai')
-)
-
-function loadLlmFormFields() {
-  const c = store.llmConfig
-  llmProvider.value = c.provider || 'openai'
-  llmApiUrl.value = c.api_url || ''
-  llmApiKey.value = c.api_key || ''
-  llmModel.value = c.model || ''
+function startAddProvider() {
+  addFormKey.value++
+  showAddForm.value = true
 }
+
+function cancelAddProvider() {
+  showAddForm.value = false
+}
+
+async function saveNewProvider(provider: Provider) {
+  await store.addProvider(provider)
+  showAddForm.value = false
+}
+
+function startEditProvider(provider: Provider) {
+  editingProviderIds.value.add(provider.id)
+}
+
+function cancelEditProvider(providerId: string) {
+  editingProviderIds.value.delete(providerId)
+}
+
+async function saveEditedProvider(provider: Provider) {
+  await store.updateProvider(provider)
+  editingProviderIds.value.delete(provider.id)
+}
+
+function requestRemoveProvider(provider: Provider) {
+  removeTarget.value = provider
+  showRemoveConfirm.value = true
+}
+
+async function confirmRemoveProvider() {
+  if (removeTarget.value) {
+    await store.removeProvider(removeTarget.value.id)
+  }
+  showRemoveConfirm.value = false
+  removeTarget.value = null
+}
+
+// -- Transcription (ASR source + model + language) --
+const OPENAI_ASR_MODELS = ['whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe']
+const CUSTOM_MODEL_VALUE = '_custom'
+
+// Local model: only show downloaded models
+const localDownloadedModels = computed(() =>
+  store.models.filter(m => {
+    if (m.download_type.type === 'System') return true
+    return m.is_downloaded
+  })
+)
+
+async function onLocalModelChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('selected_model_id', value)
+}
+
+async function onLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('selected_language', value)
+}
+
+const asrCapableProviders = computed(() =>
+  store.providers.filter(p => p.kind === 'OpenAI' || p.kind === 'Custom')
+)
+
+const asrSelectedProvider = computed(() =>
+  store.providers.find(p => p.id === store.asrProviderId)
+)
+
+const asrModelOptions = computed(() => {
+  const provider = asrSelectedProvider.value
+  if (!provider) return []
+  if (provider.kind === 'OpenAI') return OPENAI_ASR_MODELS
+  return [] // Custom → free text only
+})
+
+const isCustomAsrModel = computed(() => {
+  if (asrModelOptions.value.length === 0) return true
+  return !asrModelOptions.value.includes(store.asrCloudModel)
+})
+
+// For the dropdown: show the actual value if it's in the list, otherwise show "_custom"
+const asrModelSelectValue = computed(() => {
+  if (asrModelOptions.value.length === 0) return CUSTOM_MODEL_VALUE
+  if (asrModelOptions.value.includes(store.asrCloudModel)) return store.asrCloudModel
+  return CUSTOM_MODEL_VALUE
+})
+
+async function onAsrProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('asr_provider_id', value === '_local' ? '' : value)
+  // Reset to default model when changing provider
+  if (value !== '_local') {
+    const provider = store.providers.find(p => p.id === value)
+    const defaultModel = provider?.kind === 'OpenAI' ? 'whisper-1' : ''
+    await store.setSetting('asr_cloud_model', defaultModel)
+  }
+}
+
+async function onAsrModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  if (value === CUSTOM_MODEL_VALUE) {
+    // Switch to custom mode — clear the model so the user types a new one
+    await store.setSetting('asr_cloud_model', '')
+    return
+  }
+  await store.setSetting('asr_cloud_model', value)
+}
+
+let asrModelDebounce: ReturnType<typeof setTimeout> | null = null
+
+function onAsrModelInput(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  store.asrCloudModel = value
+  if (asrModelDebounce) clearTimeout(asrModelDebounce)
+  asrModelDebounce = setTimeout(() => {
+    store.setSetting('asr_cloud_model', value)
+  }, 500)
+}
+
+// -- LLM config --
+const OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4o']
+const ANTHROPIC_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250514', 'claude-opus-4-6-20250626']
+
+const llmSelectedProvider = computed(() =>
+  store.providers.find(p => p.id === store.llmProviderId)
+)
+
+const llmModelOptions = computed(() => {
+  const provider = llmSelectedProvider.value
+  if (!provider) return []
+  switch (provider.kind) {
+    case 'OpenAI': return OPENAI_MODELS
+    case 'Anthropic': return ANTHROPIC_MODELS
+    default: return []
+  }
+})
+
+const isCustomLlmModel = computed(() => llmModelOptions.value.length === 0)
+
+let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
 
 async function onLlmEnabledChange(enabled: boolean) {
-  const config: LlmConfig = {
-    enabled,
-    provider: llmProvider.value,
-    api_url: llmApiUrl.value,
-    api_key: llmApiKey.value,
-    model: llmModel.value,
-  }
-  await store.setLlmConfig(config)
+  await store.setSetting('llm_enabled', String(enabled))
 }
 
-function onLlmProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
+async function onLlmProviderChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  llmProvider.value = value
+  await store.setSetting('llm_provider_id', value)
+  // Reset model when changing provider
+  await store.setSetting('llm_model', '')
 }
 
-async function saveLlmConfig() {
-  const config: LlmConfig = {
-    enabled: store.llmConfig.enabled,
-    provider: llmProvider.value,
-    api_url: llmApiUrl.value,
-    api_key: llmApiKey.value,
-    model: llmModel.value,
-  }
-  await store.setLlmConfig(config)
-  llmSaved.value = true
-  setTimeout(() => { llmSaved.value = false }, 1500)
+async function onLlmModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('llm_model', value)
+}
+
+function onLlmModelInput(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  store.llmModel = value
+  if (llmModelDebounce) clearTimeout(llmModelDebounce)
+  llmModelDebounce = setTimeout(() => {
+    store.setSetting('llm_model', value)
+  }, 500)
 }
 
 async function startMicTest() {
@@ -201,8 +332,11 @@ onMounted(async () => {
   await Promise.all([
     store.fetchSettings(),
     store.fetchAudioDevices(),
+    store.fetchProviders(),
+    store.fetchEngines(),
+    store.fetchModels(),
+    store.fetchLanguages(),
   ])
-  loadLlmFormFields()
 
   // Listen for mic test being auto-cancelled (e.g. recording started while testing)
   micTestStoppedUnlisten = await listen('mic-test-stopped', () => {
@@ -278,6 +412,162 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <!-- Providers -->
+      <div v-if="activeSection === 'providers'">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">{{ t('settings.section.providers') }}</h2>
+          <Button v-if="!showAddForm" variant="outline" size="sm" @click="startAddProvider">
+            <Plus class="w-4 h-4 mr-1" />
+            {{ t('settings.providers.add') }}
+          </Button>
+        </div>
+
+        <div class="space-y-3">
+          <div v-if="store.providers.length === 0 && !showAddForm" class="text-sm text-muted-foreground">
+            {{ t('settings.providers.empty') }}
+          </div>
+
+          <div v-for="provider in store.providers" :key="provider.id" class="rounded-md border border-border">
+            <!-- Edit mode: inline form -->
+            <div v-if="editingProviderIds.has(provider.id)" class="p-4">
+              <ProviderForm
+                :provider="provider"
+                @save="saveEditedProvider"
+                @cancel="cancelEditProvider(provider.id)"
+              />
+            </div>
+            <!-- Display mode -->
+            <div v-else class="flex items-center gap-3 px-3 py-2">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate">{{ provider.name }}</div>
+                <div v-if="provider.kind === 'Custom'" class="text-xs text-muted-foreground truncate">{{ provider.url }}</div>
+              </div>
+              <span class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">{{ provider.kind }}</span>
+              <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" @click="startEditProvider(provider)">
+                <Pencil class="w-3.5 h-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0 text-destructive hover:text-destructive" @click="requestRemoveProvider(provider)">
+                <Trash2 class="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          <!-- Add new provider form -->
+          <div v-if="showAddForm" class="rounded-md border border-border p-4">
+            <ProviderForm
+              :key="addFormKey"
+              @save="saveNewProvider"
+              @cancel="cancelAddProvider"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Transcription -->
+      <div v-if="activeSection === 'transcription'">
+        <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.transcription') }}</h2>
+
+        <div class="space-y-4">
+          <!-- Source: local or cloud provider -->
+          <div class="space-y-1">
+            <Label class="text-sm font-medium">{{ t('settings.transcription.source') }}</Label>
+            <Select :model-value="store.asrProviderId || '_local'" @update:model-value="onAsrProviderChange">
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_local">{{ t('settings.transcription.local') }}</SelectItem>
+                <SelectItem
+                  v-for="p in asrCapableProviders"
+                  :key="p.id"
+                  :value="p.id"
+                >
+                  {{ p.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Cloud model selection -->
+          <div v-if="store.asrProviderId" class="space-y-1">
+            <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
+            <!-- Known models: dropdown with Custom option -->
+            <Select
+              v-if="asrModelOptions.length > 0"
+              :model-value="asrModelSelectValue"
+              @update:model-value="onAsrModelSelect"
+            >
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="m in asrModelOptions"
+                  :key="m"
+                  :value="m"
+                >
+                  {{ m }}
+                </SelectItem>
+                <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <!-- Custom model text input (shown for Custom providers, or when "Custom" is selected) -->
+            <Input
+              v-if="isCustomAsrModel"
+              :value="store.asrCloudModel"
+              @input="onAsrModelInput"
+              :placeholder="t('settings.cloudAsr.customPlaceholder')"
+              class="h-9 text-sm mt-1.5"
+            />
+          </div>
+
+          <!-- Local model selection -->
+          <div v-if="!store.asrProviderId" class="space-y-1">
+            <Label class="text-sm font-medium">{{ t('settings.transcription.model') }}</Label>
+            <Select
+              v-if="localDownloadedModels.length > 0"
+              :model-value="store.selectedModelId"
+              @update:model-value="onLocalModelChange"
+            >
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="m in localDownloadedModels"
+                  :key="m.id"
+                  :value="m.id"
+                >
+                  {{ m.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p v-else class="text-sm text-muted-foreground">
+              {{ t('settings.transcription.noModels') }}
+            </p>
+          </div>
+
+          <!-- Language -->
+          <div class="space-y-1">
+            <Label class="text-sm font-medium">{{ t('settings.transcription.language') }}</Label>
+            <Select :model-value="store.selectedLanguage" @update:model-value="onLanguageChange">
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="lang in store.languages"
+                  :key="lang.code"
+                  :value="lang.code"
+                >
+                  {{ lang.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
       <!-- Post-processing -->
       <div v-if="activeSection === 'postprocessing'">
         <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.postProcessing') }}</h2>
@@ -305,64 +595,69 @@ onUnmounted(() => {
             <div class="flex items-center justify-between gap-4">
               <Label class="text-sm shrink-0">{{ t('settings.postProcessing.llm') }}</Label>
               <Switch
-                :model-value="store.llmConfig.enabled"
+                :model-value="store.llmEnabled"
                 @update:model-value="onLlmEnabledChange"
               />
             </div>
 
-            <!-- LLM config form -->
+            <!-- LLM config -->
             <div
-              v-if="store.llmConfig.enabled"
+              v-if="store.llmEnabled"
               class="space-y-4 pl-4 border-l-2 border-border"
             >
-              <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
-                <Select :model-value="llmProvider" @update:model-value="onLlmProviderChange">
-                  <SelectTrigger class="w-full h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai">{{ t('settings.llm.provider.openai') }}</SelectItem>
-                    <SelectItem value="anthropic">{{ t('settings.llm.provider.anthropic') }}</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div v-if="store.providers.length === 0" class="text-sm text-muted-foreground">
+                {{ t('settings.llm.noProviders') }}
               </div>
 
-              <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.apiUrl') }}</Label>
-                <Input
-                  v-model="llmApiUrl"
-                  :placeholder="llmApiUrlPlaceholder"
-                  class="h-9 text-sm"
-                />
-              </div>
+              <template v-else>
+                <div class="space-y-1">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.provider') }}</Label>
+                  <Select :model-value="store.llmProviderId" @update:model-value="onLlmProviderChange">
+                    <SelectTrigger class="w-full h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        v-for="p in store.providers"
+                        :key="p.id"
+                        :value="p.id"
+                      >
+                        {{ p.name }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.apiKey') }}</Label>
-                <Input
-                  v-model="llmApiKey"
-                  type="password"
-                  :placeholder="t('settings.llm.apiKey.placeholder')"
-                  class="h-9 text-sm"
-                />
-              </div>
-
-              <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
-                <Input
-                  v-model="llmModel"
-                  :placeholder="llmModelPlaceholder"
-                  class="h-9 text-sm"
-                />
-              </div>
-
-              <Button
-                size="sm"
-                class="w-full"
-                @click="saveLlmConfig"
-              >
-                {{ llmSaved ? t('settings.llm.saved') : t('settings.llm.save') }}
-              </Button>
+                <div v-if="llmSelectedProvider" class="space-y-1">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+                  <!-- Preconfigured: dropdown -->
+                  <Select
+                    v-if="!isCustomLlmModel"
+                    :model-value="store.llmModel"
+                    @update:model-value="onLlmModelSelect"
+                  >
+                    <SelectTrigger class="w-full h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        v-for="m in llmModelOptions"
+                        :key="m"
+                        :value="m"
+                      >
+                        {{ m }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <!-- Custom: free text input -->
+                  <Input
+                    v-else
+                    :value="store.llmModel"
+                    @input="onLlmModelInput"
+                    class="h-9 text-sm"
+                  />
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -478,5 +773,23 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Remove provider confirmation dialog -->
+    <AlertDialog :open="showRemoveConfirm" @update:open="showRemoveConfirm = $event">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('settings.providers.removeConfirm') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('settings.providers.removeConfirmDesc') }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="showRemoveConfirm = false">{{ t('modelManager.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction @click="confirmRemoveProvider" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            {{ t('modelManager.delete') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>

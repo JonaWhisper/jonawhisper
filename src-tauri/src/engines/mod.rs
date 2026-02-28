@@ -62,9 +62,6 @@ impl ASRModel {
         }
     }
 
-    pub fn is_remote_api(&self) -> bool {
-        matches!(self.download_type, DownloadType::RemoteAPI)
-    }
 }
 
 // -- Language --
@@ -161,25 +158,19 @@ pub fn find_executable(name: &str, extra_paths: &[&str]) -> Option<String> {
 
 // -- Catalog --
 
-use crate::state::ApiServerConfig;
-
 pub struct EngineCatalog {
     engines: Vec<Box<dyn ASREngine>>,
 }
 
 impl EngineCatalog {
-    pub fn new(api_servers: &[ApiServerConfig]) -> Self {
-        let mut engines: Vec<Box<dyn ASREngine>> = vec![
+    pub fn new() -> Self {
+        let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
             Box::new(mlx_whisper::MLXWhisperEngine),
             Box::new(faster_whisper::FasterWhisperEngine),
             Box::new(vosk::VoskEngine),
             Box::new(moonshine::MoonshineEngine),
         ];
-
-        if !api_servers.is_empty() {
-            engines.push(Box::new(openai_api::OpenAIAPIEngine::new(api_servers.to_vec())));
-        }
 
         Self { engines }
     }
@@ -196,8 +187,7 @@ impl EngineCatalog {
                 name: e.display_name().to_string(),
                 description: e.description().to_string(),
                 install_hint: e.install_hint().to_string(),
-                available: e.resolve_executable().is_some()
-                    || e.engine_id() == "openai-api",
+                available: e.resolve_executable().is_some(),
                 tool_name: e.resolve_executable().map(|p| {
                     Path::new(&p)
                         .file_name()

@@ -49,12 +49,14 @@ export interface HistoryEntry {
   language: string
 }
 
-export interface ApiServerConfig {
+export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom'
+
+export interface Provider {
   id: string
   name: string
+  kind: ProviderKind
   url: string
   api_key: string
-  model: string
 }
 
 export interface PermissionReport {
@@ -89,14 +91,6 @@ interface AppStatePayload {
   download_progress: number
 }
 
-export interface LlmConfig {
-  enabled: boolean
-  provider: string
-  api_url: string
-  api_key: string
-  model: string
-}
-
 export interface SettingsPayload {
   app_locale: string
   post_processing_enabled: boolean
@@ -107,7 +101,11 @@ export interface SettingsPayload {
   selected_input_device_uid: string | null
   selected_model_id: string
   selected_language: string
-  llm_config: LlmConfig
+  llm_enabled: boolean
+  llm_provider_id: string
+  llm_model: string
+  asr_provider_id: string
+  asr_cloud_model: string
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -126,7 +124,11 @@ export const useAppStore = defineStore('app', () => {
   const recordingMode = ref('push_to_talk')
   const selectedInputDeviceUid = ref<string | null>(null)
   const hotkey = ref('right_command')
-  const llmConfig = ref<LlmConfig>({ enabled: false, provider: 'openai', api_url: '', api_key: '', model: '' })
+  const llmEnabled = ref(false)
+  const llmProviderId = ref('')
+  const llmModel = ref('')
+  const asrProviderId = ref('')
+  const asrCloudModel = ref('whisper-1')
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'downloading' | 'error' | 'idle'>('recording')
 
@@ -136,7 +138,7 @@ export const useAppStore = defineStore('app', () => {
   const history = ref<HistoryEntry[]>([])
   const audioDevices = ref<AudioDevice[]>([])
   const permissions = ref<PermissionReport>({ microphone: 'Undetermined', accessibility: 'Denied', input_monitoring: 'Denied' })
-  const apiServers = ref<ApiServerConfig[]>([])
+  const providers = ref<Provider[]>([])
 
   // Computed
   const isBusy = computed(() => isRecording.value || isTranscribing.value || queueCount.value > 0 || downloadingModelId.value !== null)
@@ -180,9 +182,9 @@ export const useAppStore = defineStore('app', () => {
     catch (e) { console.error('fetchHistory failed:', e) }
   }
 
-  async function fetchApiServers() {
-    try { apiServers.value = await invoke('get_api_servers') }
-    catch (e) { console.error('fetchApiServers failed:', e) }
+  async function fetchProviders() {
+    try { providers.value = await invoke('get_providers') }
+    catch (e) { console.error('fetchProviders failed:', e) }
   }
 
   async function fetchState() {
@@ -249,7 +251,11 @@ export const useAppStore = defineStore('app', () => {
       recordingMode.value = s.recording_mode
       selectedModelId.value = s.selected_model_id
       selectedLanguage.value = s.selected_language
-      if (s.llm_config) llmConfig.value = s.llm_config
+      llmEnabled.value = s.llm_enabled ?? false
+      llmProviderId.value = s.llm_provider_id ?? ''
+      llmModel.value = s.llm_model ?? ''
+      asrProviderId.value = s.asr_provider_id ?? ''
+      asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -264,6 +270,11 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_input_device_uid': return selectedInputDeviceUid.value ?? ''
       case 'selected_model_id': return selectedModelId.value
       case 'selected_language': return selectedLanguage.value
+      case 'llm_enabled': return String(llmEnabled.value)
+      case 'llm_provider_id': return llmProviderId.value
+      case 'llm_model': return llmModel.value
+      case 'asr_provider_id': return asrProviderId.value
+      case 'asr_cloud_model': return asrCloudModel.value
       default: return ''
     }
   }
@@ -279,6 +290,11 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_input_device_uid': selectedInputDeviceUid.value = value || null; break
       case 'selected_model_id': selectedModelId.value = value; break
       case 'selected_language': selectedLanguage.value = value; break
+      case 'llm_enabled': llmEnabled.value = value === 'true'; break
+      case 'llm_provider_id': llmProviderId.value = value; break
+      case 'llm_model': llmModel.value = value; break
+      case 'asr_provider_id': asrProviderId.value = value; break
+      case 'asr_cloud_model': asrCloudModel.value = value; break
     }
   }
 
@@ -298,16 +314,6 @@ export const useAppStore = defineStore('app', () => {
     catch (e) { console.error('startMonitoring failed:', e) }
   }
 
-  async function setLlmConfig(config: LlmConfig) {
-    const prev = { ...llmConfig.value }
-    llmConfig.value = config
-    try {
-      await invoke('set_llm_config', { config })
-    } catch (e) {
-      console.error('setLlmConfig failed, rolling back:', e)
-      llmConfig.value = prev
-    }
-  }
 
   async function clearHistoryAction() {
     try {
@@ -345,22 +351,25 @@ export const useAppStore = defineStore('app', () => {
     catch (e) { console.error('requestPermission failed:', e) }
   }
 
-  async function addApiServer(config: ApiServerConfig) {
+  async function addProvider(provider: Provider) {
     try {
-      await invoke('add_api_server', { config })
-      await fetchApiServers()
-      await fetchEngines()
-      await fetchModels()
-    } catch (e) { console.error('addApiServer failed:', e) }
+      await invoke('add_provider', { provider })
+      await fetchProviders()
+    } catch (e) { console.error('addProvider failed:', e) }
   }
 
-  async function removeApiServer(id: string) {
+  async function removeProvider(id: string) {
     try {
-      await invoke('remove_api_server', { id })
-      await fetchApiServers()
-      await fetchEngines()
-      await fetchModels()
-    } catch (e) { console.error('removeApiServer failed:', e) }
+      await invoke('remove_provider', { id })
+      await fetchProviders()
+    } catch (e) { console.error('removeProvider failed:', e) }
+  }
+
+  async function updateProvider(provider: Provider) {
+    try {
+      await invoke('update_provider', { provider })
+      await fetchProviders()
+    } catch (e) { console.error('updateProvider failed:', e) }
   }
 
   // Event listeners (store is a singleton — listeners live for the app's lifetime)
@@ -442,7 +451,7 @@ export const useAppStore = defineStore('app', () => {
       fetchLanguages(),
       fetchPermissions(),
       fetchHistory(),
-      fetchApiServers(),
+      fetchProviders(),
     ])
   }
 
@@ -453,21 +462,21 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    llmConfig,
+    llmEnabled, llmProviderId, llmModel, asrProviderId, asrCloudModel,
     engines, models, languages, history,
-    audioDevices, permissions, apiServers,
+    audioDevices, permissions, providers,
     // Computed
     isBusy, selectedEngine, downloadedModels,
     // Actions
     init, fetchEngines, fetchModels, fetchLanguages,
     fetchAudioDevices, fetchPermissions, fetchHistory,
-    fetchApiServers, fetchState,
+    fetchProviders, fetchState,
     selectModel, selectLanguageAction,
     downloadModel, deleteModel,
-    fetchSettings, setSetting, setLlmConfig,
+    fetchSettings, setSetting,
     clearHistoryAction, searchHistory, deleteHistoryEntry, deleteHistoryDay,
     requestPermission,
     startMonitoring,
-    addApiServer, removeApiServer,
+    addProvider, removeProvider, updateProvider,
   }
 })

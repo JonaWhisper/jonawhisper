@@ -510,7 +510,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             match id {
                 "quit" => app.exit(0),
                 "settings" => {
-                    open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 580.0, 420.0, Some((540.0, 320.0)));
+                    open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 600.0, 440.0, Some((580.0, 380.0)));
                 }
                 "model_manager" => {
                     open_window(app, "model-manager", &t!("window.modelManager"), "/model-manager", 700.0, 500.0);
