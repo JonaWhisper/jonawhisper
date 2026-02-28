@@ -17,6 +17,7 @@ impl ASREngine for MoonshineEngine {
                 size: 26_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(8.0), rtf: Some(0.01),
+                ..Default::default()
             },
             ASRModel {
                 id: "moonshine:base".into(), engine_id: "moonshine".into(),
@@ -25,6 +26,8 @@ impl ASREngine for MoonshineEngine {
                 size: 61_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(5.0), rtf: Some(0.03),
+                recommended: true,
+                ..Default::default()
             },
         ]
     }
@@ -41,12 +44,6 @@ impl ASREngine for MoonshineEngine {
     fn resolve_executable(&self) -> Option<String> {
         // Moonshine uses Python module
         find_executable("python3", &[])
-    }
-
-    fn recommended_model_id(&self, _language: &str) -> Option<String> {
-        self.models().iter()
-            .find(|m| m.id.contains("base"))
-            .map(|m| m.id.clone())
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, _language: &str) -> Result<String, EngineError> {

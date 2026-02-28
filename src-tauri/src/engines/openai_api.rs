@@ -35,6 +35,7 @@ impl ASREngine for OpenAIAPIEngine {
                 download_marker: None,
                 wer: None,
                 rtf: None,
+                ..Default::default()
             })
             .collect()
     }

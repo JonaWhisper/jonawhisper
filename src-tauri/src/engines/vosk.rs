@@ -17,6 +17,8 @@ impl ASREngine for VoskEngine {
                 size: 40_000_000, storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
                 wer: Some(10.0), rtf: Some(0.02),
+                recommended: true,
+                ..Default::default()
             },
             ASRModel {
                 id: "vosk:en-large".into(), engine_id: "vosk".into(),
@@ -25,6 +27,7 @@ impl ASREngine for VoskEngine {
                 size: 1_800_000_000, storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
                 wer: Some(5.0), rtf: Some(0.15),
+                ..Default::default()
             },
             ASRModel {
                 id: "vosk:fr-small".into(), engine_id: "vosk".into(),
@@ -33,6 +36,8 @@ impl ASREngine for VoskEngine {
                 size: 41_000_000, storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
                 wer: Some(12.0), rtf: Some(0.02),
+                recommended: true,
+                ..Default::default()
             },
             ASRModel {
                 id: "vosk:fr-large".into(), engine_id: "vosk".into(),
@@ -41,6 +46,7 @@ impl ASREngine for VoskEngine {
                 size: 1_400_000_000, storage_dir: "~/.cache/vosk".into(),
                 download_type: DownloadType::ZipArchive, download_marker: Some("conf/model.conf".into()),
                 wer: Some(6.0), rtf: Some(0.15),
+                ..Default::default()
             },
         ]
     }
@@ -60,10 +66,10 @@ impl ASREngine for VoskEngine {
     }
 
     fn recommended_model_id(&self, language: &str) -> Option<String> {
-        let prefix = if language.starts_with("fr") { "vosk:fr-" } else { "vosk:en-" };
-        self.models().iter()
-            .find(|m| m.id.starts_with(prefix))
-            .map(|m| m.id.clone())
+        let lang = if language.starts_with("fr") { "fr" } else { "en" };
+        self.models().into_iter()
+            .find(|m| m.recommended && m.id.contains(lang))
+            .map(|m| m.id)
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, _language: &str) -> Result<String, EngineError> {

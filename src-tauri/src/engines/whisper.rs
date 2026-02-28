@@ -17,6 +17,7 @@ impl ASREngine for WhisperEngine {
                 size: 75_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(7.6), rtf: Some(0.05),
+                ..Default::default()
             },
             ASRModel {
                 id: "whisper:base".into(), engine_id: "whisper".into(),
@@ -25,6 +26,7 @@ impl ASREngine for WhisperEngine {
                 size: 142_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(5.0), rtf: Some(0.08),
+                ..Default::default()
             },
             ASRModel {
                 id: "whisper:small".into(), engine_id: "whisper".into(),
@@ -33,6 +35,7 @@ impl ASREngine for WhisperEngine {
                 size: 466_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(3.4), rtf: Some(0.15),
+                ..Default::default()
             },
             ASRModel {
                 id: "whisper:medium".into(), engine_id: "whisper".into(),
@@ -41,6 +44,7 @@ impl ASREngine for WhisperEngine {
                 size: 1_500_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.7), rtf: Some(0.35),
+                ..Default::default()
             },
             ASRModel {
                 id: "whisper:large-v3-turbo".into(), engine_id: "whisper".into(),
@@ -49,6 +53,8 @@ impl ASREngine for WhisperEngine {
                 size: 1_600_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.1), rtf: Some(0.25),
+                recommended: true,
+                ..Default::default()
             },
             ASRModel {
                 id: "whisper:large-v3".into(), engine_id: "whisper".into(),
@@ -57,6 +63,7 @@ impl ASREngine for WhisperEngine {
                 size: 3_100_000_000, storage_dir: "~/.local/share/whisper-cpp".into(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(1.8), rtf: Some(0.50),
+                ..Default::default()
             },
         ]
     }
@@ -70,12 +77,6 @@ impl ASREngine for WhisperEngine {
         find_executable("whisper-cli", &[])
             .or_else(|| find_executable("whisper-cpp", &[]))
             .or_else(|| find_executable("main", &["/opt/homebrew/bin"]))
-    }
-
-    fn recommended_model_id(&self, _language: &str) -> Option<String> {
-        self.models().iter()
-            .find(|m| m.id.contains("large-v3-turbo"))
-            .map(|m| m.id.clone())
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {

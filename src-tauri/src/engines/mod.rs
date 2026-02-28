@@ -11,9 +11,10 @@ use std::path::{Path, PathBuf};
 
 // -- Download type --
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum DownloadType {
+    #[default]
     SingleFile,
     HuggingFaceRepo,
     ZipArchive,
@@ -24,7 +25,7 @@ pub enum DownloadType {
 
 // -- Model --
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ASRModel {
     pub id: String,
     pub engine_id: String,
@@ -37,6 +38,8 @@ pub struct ASRModel {
     pub download_marker: Option<String>,
     pub wer: Option<f32>,
     pub rtf: Option<f32>,
+    #[serde(default)]
+    pub recommended: bool,
 }
 
 impl ASRModel {
@@ -83,7 +86,9 @@ pub trait ASREngine: Send + Sync {
     fn install_hint(&self) -> &str;
     fn resolve_executable(&self) -> Option<String>;
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError>;
-    fn recommended_model_id(&self, _language: &str) -> Option<String> { None }
+    fn recommended_model_id(&self, _language: &str) -> Option<String> {
+        self.models().into_iter().find(|m| m.recommended).map(|m| m.id)
+    }
 }
 
 // -- Engine info (serializable for frontend) --

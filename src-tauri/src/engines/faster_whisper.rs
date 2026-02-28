@@ -17,6 +17,7 @@ impl ASREngine for FasterWhisperEngine {
                 size: 75_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(7.6), rtf: Some(0.02),
+                ..Default::default()
             },
             ASRModel {
                 id: "faster-whisper:base".into(), engine_id: "faster-whisper".into(),
@@ -25,6 +26,7 @@ impl ASREngine for FasterWhisperEngine {
                 size: 142_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(5.0), rtf: Some(0.03),
+                ..Default::default()
             },
             ASRModel {
                 id: "faster-whisper:small".into(), engine_id: "faster-whisper".into(),
@@ -33,6 +35,7 @@ impl ASREngine for FasterWhisperEngine {
                 size: 466_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(3.4), rtf: Some(0.06),
+                ..Default::default()
             },
             ASRModel {
                 id: "faster-whisper:medium".into(), engine_id: "faster-whisper".into(),
@@ -41,6 +44,7 @@ impl ASREngine for FasterWhisperEngine {
                 size: 1_500_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(2.7), rtf: Some(0.12),
+                ..Default::default()
             },
             ASRModel {
                 id: "faster-whisper:large-v3".into(), engine_id: "faster-whisper".into(),
@@ -49,6 +53,7 @@ impl ASREngine for FasterWhisperEngine {
                 size: 3_100_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(1.8), rtf: Some(0.18),
+                ..Default::default()
             },
             ASRModel {
                 id: "faster-whisper:large-v3-turbo".into(), engine_id: "faster-whisper".into(),
@@ -57,6 +62,8 @@ impl ASREngine for FasterWhisperEngine {
                 size: 1_600_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(2.1), rtf: Some(0.10),
+                recommended: true,
+                ..Default::default()
             },
             ASRModel {
                 id: "faster-whisper:distil-large-v3".into(), engine_id: "faster-whisper".into(),
@@ -65,6 +72,7 @@ impl ASREngine for FasterWhisperEngine {
                 size: 1_500_000_000, storage_dir: "~/.cache/huggingface/hub".into(),
                 download_type: DownloadType::HuggingFaceRepo, download_marker: Some("refs/main".into()),
                 wer: Some(2.3), rtf: Some(0.08),
+                ..Default::default()
             },
         ]
     }
@@ -76,12 +84,6 @@ impl ASREngine for FasterWhisperEngine {
 
     fn resolve_executable(&self) -> Option<String> {
         find_executable("whisper-ctranslate2", &[])
-    }
-
-    fn recommended_model_id(&self, _language: &str) -> Option<String> {
-        self.models().iter()
-            .find(|m| m.id.contains("large-v3-turbo"))
-            .map(|m| m.id.clone())
     }
 
     fn transcribe(&self, model: &ASRModel, audio_path: &Path, language: &str) -> Result<String, EngineError> {
