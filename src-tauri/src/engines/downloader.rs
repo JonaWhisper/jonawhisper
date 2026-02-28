@@ -1,10 +1,10 @@
 use super::{ASRModel, DownloadType};
-use crate::state::AppState;
+use crate::state::{ActiveDownload, AppState};
 use futures_util::StreamExt;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 use tauri::{AppHandle, Emitter};
 
@@ -65,20 +65,22 @@ pub async fn download_model(
         0.0
     };
 
+    // Register this download in the per-model HashMap
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    let delete_flag = Arc::new(AtomicBool::new(false));
     {
         let mut dl = state.download.lock().unwrap();
-        dl.model_id = Some(model.id.clone());
-        dl.progress = initial_progress;
+        dl.active.insert(model.id.clone(), ActiveDownload {
+            progress: initial_progress,
+            cancel_requested: cancel_flag.clone(),
+            delete_partial: delete_flag.clone(),
+        });
     }
 
     let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
         "model_id": model.id,
         "progress": initial_progress,
     }));
-
-    // Clone cancel flags before download (checked in the loop)
-    let cancel_flag = state.download.lock().unwrap().cancel_requested.clone();
-    let delete_flag = state.download.lock().unwrap().delete_partial.clone();
 
     let success = match &model.download_type {
         DownloadType::RemoteAPI | DownloadType::System => true,
@@ -97,15 +99,11 @@ pub async fn download_model(
         log::info!("Stopped download for {} — partial file kept for resume", model.id);
     }
 
-    // Reset flags
-    cancel_flag.store(false, Ordering::SeqCst);
-    delete_flag.store(false, Ordering::SeqCst);
-
     clear_pending_state(&model);
+    // Remove this download from the HashMap
     {
         let mut dl = state.download.lock().unwrap();
-        dl.model_id = None;
-        dl.progress = 0.0;
+        dl.active.remove(&model.id);
     }
 
     success
@@ -187,7 +185,9 @@ async fn download_single_file(
     // Emit initial progress if resuming
     if resumed && total_size > 0 {
         let progress = downloaded as f64 / total_size as f64;
-        state.download.lock().unwrap().progress = progress;
+        if let Some(entry) = state.download.lock().unwrap().active.get_mut(&model.id) {
+            entry.progress = progress;
+        }
         let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
             "model_id": model.id,
             "progress": progress,
@@ -208,7 +208,9 @@ async fn download_single_file(
                 downloaded += bytes.len() as u64;
                 if total_size > 0 {
                     let progress = downloaded as f64 / total_size as f64;
-                    state.download.lock().unwrap().progress = progress;
+                    if let Some(entry) = state.download.lock().unwrap().active.get_mut(&model.id) {
+                        entry.progress = progress;
+                    }
                     let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
                         "model_id": model.id,
                         "progress": progress,

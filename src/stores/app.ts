@@ -88,8 +88,7 @@ interface AppStatePayload {
   is_recording: boolean
   is_transcribing: boolean
   queue_count: number
-  downloading_model_id: string | null
-  download_progress: number
+  active_downloads: Record<string, number>
 }
 
 export interface SettingsPayload {
@@ -115,9 +114,7 @@ export const useAppStore = defineStore('app', () => {
   const isRecording = ref(false)
   const isTranscribing = ref(false)
   const queueCount = ref(0)
-  const downloadingModelId = ref<string | null>(null)
-  const downloadProgress = ref(0)
-  const downloadStopping = ref(false)
+  const activeDownloads = ref<Record<string, { progress: number; stopping: boolean }>>({})
   const selectedModelId = ref('whisper:large-v3-turbo')
   const selectedLanguage = ref('auto')
   const postProcessingEnabled = ref(true)
@@ -145,7 +142,7 @@ export const useAppStore = defineStore('app', () => {
   const providers = ref<Provider[]>([])
 
   // Computed
-  const isBusy = computed(() => isRecording.value || isTranscribing.value || queueCount.value > 0 || downloadingModelId.value !== null)
+  const isBusy = computed(() => isRecording.value || isTranscribing.value || queueCount.value > 0 || Object.keys(activeDownloads.value).length > 0)
   const selectedEngine = computed(() => {
     const model = models.value.find(m => m.id === selectedModelId.value)
     return model ? engines.value.find(e => e.id === model.engine_id) : null
@@ -197,8 +194,12 @@ export const useAppStore = defineStore('app', () => {
       isRecording.value = state.is_recording
       isTranscribing.value = state.is_transcribing
       queueCount.value = state.queue_count
-      downloadingModelId.value = state.downloading_model_id
-      downloadProgress.value = state.download_progress
+      // Hydrate activeDownloads from backend (preserve stopping flags for entries we already track)
+      const hydrated: Record<string, { progress: number; stopping: boolean }> = {}
+      for (const [id, progress] of Object.entries(state.active_downloads ?? {})) {
+        hydrated[id] = { progress, stopping: activeDownloads.value[id]?.stopping ?? false }
+      }
+      activeDownloads.value = hydrated
     } catch (e) { console.error('fetchState failed:', e) }
   }
 
@@ -211,14 +212,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function downloadModel(id: string) {
-    if (downloadingModelId.value) return false
-    downloadStopping.value = false
+    if (activeDownloads.value[id]) return false
     // Pre-fill progress from partial file (avoids 0% flash on resume)
     const model = models.value.find(m => m.id === id)
-    if (model?.partial_progress) {
-      downloadProgress.value = model.partial_progress
-    }
-    downloadingModelId.value = id
+    const initialProgress = model?.partial_progress ?? 0
+    activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false } }
     try {
       const success = await invoke<boolean>('download_model_cmd', { id })
       return success
@@ -226,23 +224,23 @@ export const useAppStore = defineStore('app', () => {
       console.error('downloadModel failed:', e)
       return false
     } finally {
-      downloadingModelId.value = null
-      downloadProgress.value = 0
-      downloadStopping.value = false
+      const { [id]: _, ...rest } = activeDownloads.value
+      activeDownloads.value = rest
       await fetchModels()
     }
   }
 
-  async function pauseDownload() {
-    downloadStopping.value = true
-    try { await invoke('pause_download') }
+  async function pauseDownload(id: string) {
+    if (activeDownloads.value[id]) {
+      activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
+    }
+    try { await invoke('pause_download', { id }) }
     catch (e) { console.error('pauseDownload failed:', e) }
   }
 
   async function cancelDownload(id: string) {
-    // Only show stopping state if cancelling the active download
-    if (downloadingModelId.value === id) {
-      downloadStopping.value = true
+    if (activeDownloads.value[id]) {
+      activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
     }
     try {
       await invoke('cancel_download', { id })
@@ -453,11 +451,12 @@ export const useAppStore = defineStore('app', () => {
     })
 
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
-      if (event.payload?.progress !== undefined) {
-        downloadProgress.value = event.payload.progress
-      }
-      if (event.payload?.model_id) {
-        downloadingModelId.value = event.payload.model_id
+      const { model_id, progress } = event.payload ?? {}
+      if (model_id && progress !== undefined && activeDownloads.value[model_id]) {
+        activeDownloads.value = {
+          ...activeDownloads.value,
+          [model_id]: { ...activeDownloads.value[model_id], progress },
+        }
       }
     })
 
@@ -487,7 +486,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     // State
     isRecording, isTranscribing, queueCount,
-    downloadingModelId, downloadProgress, downloadStopping,
+    activeDownloads,
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,

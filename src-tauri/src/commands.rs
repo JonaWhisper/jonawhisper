@@ -80,18 +80,20 @@ pub fn delete_model_cmd(id: String) -> bool {
 }
 
 #[tauri::command]
-pub fn pause_download(state: tauri::State<'_, Arc<AppState>>) {
+pub fn pause_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
-    dl.cancel_requested.store(true, Ordering::SeqCst);
+    if let Some(entry) = dl.active.get(&id) {
+        entry.cancel_requested.store(true, Ordering::SeqCst);
+    }
 }
 
 #[tauri::command]
 pub fn cancel_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
-    let is_active = dl.model_id.as_deref() == Some(id.as_str());
-    if is_active {
-        dl.cancel_requested.store(true, Ordering::SeqCst);
-        dl.delete_partial.store(true, Ordering::SeqCst);
+    let is_active = dl.active.contains_key(&id);
+    if let Some(entry) = dl.active.get(&id) {
+        entry.cancel_requested.store(true, Ordering::SeqCst);
+        entry.delete_partial.store(true, Ordering::SeqCst);
     }
     drop(dl);
 

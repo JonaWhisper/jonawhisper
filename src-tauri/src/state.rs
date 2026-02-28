@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
@@ -33,23 +33,17 @@ pub struct RuntimeState {
     pub mic_testing: bool,
 }
 
-/// Model download progress.
-pub struct DownloadState {
-    pub model_id: Option<String>,
+/// Per-model download state.
+pub struct ActiveDownload {
     pub progress: f64,
     pub cancel_requested: Arc<AtomicBool>,
     pub delete_partial: Arc<AtomicBool>,
 }
 
-impl Default for DownloadState {
-    fn default() -> Self {
-        Self {
-            model_id: None,
-            progress: 0.0,
-            cancel_requested: Arc::new(AtomicBool::new(false)),
-            delete_partial: Arc::new(AtomicBool::new(false)),
-        }
-    }
+/// All active model downloads (keyed by model ID).
+#[derive(Default)]
+pub struct DownloadState {
+    pub active: HashMap<String, ActiveDownload>,
 }
 
 // -- Main AppState --
@@ -367,12 +361,14 @@ impl AppState {
     pub fn to_frontend_json(&self) -> serde_json::Value {
         let rt = self.runtime.lock().unwrap();
         let dl = self.download.lock().unwrap();
+        let active_downloads: serde_json::Map<String, serde_json::Value> = dl.active.iter()
+            .map(|(id, d)| (id.clone(), serde_json::json!(d.progress)))
+            .collect();
         serde_json::json!({
             "is_recording": rt.is_recording,
             "is_transcribing": rt.is_transcribing,
             "queue_count": rt.queue.len(),
-            "downloading_model_id": dl.model_id,
-            "download_progress": dl.progress,
+            "active_downloads": active_downloads,
         })
     }
 

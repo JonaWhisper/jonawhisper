@@ -119,8 +119,6 @@ onMounted(async () => {
             v-for="model in filteredModels"
             :key="model.id"
             :model="model"
-            :is-downloading="model.id === store.downloadingModelId"
-            :download-progress="model.id === store.downloadingModelId ? store.downloadProgress : 0"
             @download="handleDownload"
             @delete="handleDeleteRequest"
           />

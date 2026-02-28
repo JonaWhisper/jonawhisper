@@ -256,16 +256,16 @@ const canStart = computed(() => {
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                 <!-- Downloading -->
-                <template v-if="store.downloadingModelId === model.id">
-                  <Progress :model-value="store.downloadProgress * 100" class="w-16" />
+                <template v-if="store.activeDownloads[model.id]">
+                  <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" class="w-16" />
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
-                    {{ Math.round(store.downloadProgress * 100) }}%
+                    {{ Math.round((store.activeDownloads[model.id]?.progress ?? 0) * 100) }}%
                   </span>
-                  <template v-if="store.downloadStopping">
+                  <template v-if="store.activeDownloads[model.id]?.stopping">
                     <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                   </template>
                   <template v-else>
-                    <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+                    <Button variant="ghost" size="icon-sm" @click="store.pauseDownload(model.id)" :title="t('modelManager.pause')">
                       <Pause class="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -279,7 +279,7 @@ const canStart = computed(() => {
                   <span class="text-[11px] text-muted-foreground w-8 text-right">
                     {{ Math.round((model.partial_progress ?? 0) * 100) }}%
                   </span>
-                  <Button variant="ghost" size="icon-sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)" :title="t('modelManager.resume')">
+                  <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
                     <Play class="w-3.5 h-3.5" />
                   </Button>
                   <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -289,7 +289,7 @@ const canStart = computed(() => {
                 <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                   {{ t('modelManager.downloaded') }}
                 </Badge>
-                <Button v-else size="sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)">
+                <Button v-else size="sm" @click="handleDownload(model)">
                   {{ t('modelManager.download') }}
                 </Button>
               </div>
@@ -332,16 +332,16 @@ const canStart = computed(() => {
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                     <!-- Downloading -->
-                    <template v-if="store.downloadingModelId === model.id">
-                      <Progress :model-value="store.downloadProgress * 100" class="w-16" />
+                    <template v-if="store.activeDownloads[model.id]">
+                      <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" class="w-16" />
                       <span class="text-[11px] text-muted-foreground w-8 text-right">
-                        {{ Math.round(store.downloadProgress * 100) }}%
+                        {{ Math.round((store.activeDownloads[model.id]?.progress ?? 0) * 100) }}%
                       </span>
-                      <template v-if="store.downloadStopping">
+                      <template v-if="store.activeDownloads[model.id]?.stopping">
                         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                       </template>
                       <template v-else>
-                        <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+                        <Button variant="ghost" size="icon-sm" @click="store.pauseDownload(model.id)" :title="t('modelManager.pause')">
                           <Pause class="w-3.5 h-3.5" />
                         </Button>
                         <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -355,7 +355,7 @@ const canStart = computed(() => {
                       <span class="text-[11px] text-muted-foreground w-8 text-right">
                         {{ Math.round((model.partial_progress ?? 0) * 100) }}%
                       </span>
-                      <Button variant="ghost" size="icon-sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)" :title="t('modelManager.resume')">
+                      <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
                         <Play class="w-3.5 h-3.5" />
                       </Button>
                       <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -365,7 +365,7 @@ const canStart = computed(() => {
                     <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-[11px]">
                       {{ t('modelManager.downloaded') }}
                     </Badge>
-                    <Button v-else size="sm" :disabled="store.downloadingModelId != null" @click="handleDownload(model)">
+                    <Button v-else size="sm" @click="handleDownload(model)">
                       {{ t('modelManager.download') }}
                     </Button>
                   </div>

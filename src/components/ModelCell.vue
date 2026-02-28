@@ -13,14 +13,17 @@ const store = useAppStore()
 
 const props = defineProps<{
   model: ASRModel
-  isDownloading: boolean
-  downloadProgress: number
 }>()
 
 const emit = defineEmits<{
   download: [model: ASRModel]
   delete: [model: ASRModel]
 }>()
+
+const dl = computed(() => store.activeDownloads[props.model.id])
+const isDownloading = computed(() => !!dl.value)
+const progress = computed(() => dl.value?.progress ?? 0)
+const isStopping = computed(() => dl.value?.stopping ?? false)
 
 const isDownloaded = computed(() => {
   const dt = props.model.download_type.type
@@ -29,7 +32,7 @@ const isDownloaded = computed(() => {
 })
 
 const isPaused = computed(() => {
-  return !props.isDownloading && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
+  return !isDownloading.value && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
 })
 
 function formatSize(bytes: number): string {
@@ -60,15 +63,15 @@ function formatSize(bytes: number): string {
       <!-- Downloading -->
       <template v-if="isDownloading">
         <div class="flex items-center gap-2">
-          <Progress :model-value="downloadProgress * 100" class="w-24" />
+          <Progress :model-value="progress * 100" class="w-24" />
           <span class="text-xs text-muted-foreground w-10 text-right">
-            {{ Math.round(downloadProgress * 100) }}%
+            {{ Math.round(progress * 100) }}%
           </span>
-          <template v-if="store.downloadStopping">
+          <template v-if="isStopping">
             <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
           </template>
           <template v-else>
-            <Button variant="ghost" size="icon-sm" @click="store.pauseDownload()" :title="t('modelManager.pause')">
+            <Button variant="ghost" size="icon-sm" @click="store.pauseDownload(model.id)" :title="t('modelManager.pause')">
               <Pause class="w-3.5 h-3.5" />
             </Button>
             <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -85,7 +88,7 @@ function formatSize(bytes: number): string {
           <span class="text-xs text-muted-foreground w-10 text-right">
             {{ Math.round((model.partial_progress ?? 0) * 100) }}%
           </span>
-          <Button variant="ghost" size="icon-sm" :disabled="store.downloadingModelId != null" @click="emit('download', model)" :title="t('modelManager.resume')">
+          <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
             <Play class="w-3.5 h-3.5" />
           </Button>
           <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
@@ -114,7 +117,7 @@ function formatSize(bytes: number): string {
 
       <!-- Not downloaded -->
       <template v-else>
-        <Button size="sm" :disabled="store.downloadingModelId != null" @click="emit('download', model)">
+        <Button size="sm" @click="emit('download', model)">
           {{ t('modelManager.download') }}
         </Button>
       </template>

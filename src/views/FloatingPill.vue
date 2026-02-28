@@ -139,8 +139,11 @@ function drawProgress(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
   ctx.fill()
 
-  // Progress
-  const progress = store.downloadProgress
+  // Progress — aggregate from all active downloads
+  const entries = Object.values(store.activeDownloads)
+  const progress = entries.length > 0
+    ? entries.reduce((sum, d) => sum + d.progress, 0) / entries.length
+    : 0
   if (progress > 0) {
     ctx.beginPath()
     ctx.roundRect(x, y, barWidth * progress, barHeight, barHeight / 2)
