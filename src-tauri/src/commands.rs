@@ -160,6 +160,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "asr_provider_id": s.asr_provider_id,
         "asr_cloud_model": s.asr_cloud_model,
         "gpu_mode": s.gpu_mode,
+        "llm_max_tokens": s.llm_max_tokens,
     })
 }
 
@@ -200,6 +201,7 @@ pub fn set_setting(
             "asr_provider_id" => s.asr_provider_id = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
             "gpu_mode" => s.gpu_mode = value.clone(),
+            "llm_max_tokens" => s.llm_max_tokens = value.parse::<u32>().unwrap_or(256),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;

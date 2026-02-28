@@ -267,7 +267,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (pp_enabled, lang, hall_filter, llm_enabled, llm_source, llm_provider_id, llm_model, llm_local_model_id, providers) = {
+    let (pp_enabled, lang, hall_filter, llm_enabled, llm_source, llm_provider_id, llm_model, llm_local_model_id, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.post_processing_enabled,
@@ -278,6 +278,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.llm_provider_id.clone(),
             s.llm_model.clone(),
             s.llm_local_model_id.clone(),
+            s.llm_max_tokens,
             s.providers.clone(),
         )
     };
@@ -300,7 +301,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             let text_for_llm = processed.clone();
             let lang_for_llm = lang.clone();
             match tokio::task::spawn_blocking(move || {
-                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &llm_local_model_id)
+                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &llm_local_model_id, llm_max_tokens)
             }).await {
                 Ok(Ok(cleaned)) => {
                     log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
@@ -316,7 +317,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         } else {
             // Cloud LLM cleanup
             if let Some(provider) = providers.iter().find(|p| p.id == llm_provider_id) {
-                match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model).await {
+                match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
                     Ok(cleaned) => {
                         log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
                         processed = cleaned;
@@ -365,6 +366,7 @@ fn run_local_llm_cleanup(
     text: &str,
     language: &str,
     llm_local_model_id: &str,
+    max_tokens: u32,
 ) -> Result<String, String> {
     if llm_local_model_id.is_empty() {
         return Err("No local LLM model selected".into());
@@ -390,7 +392,7 @@ fn run_local_llm_cleanup(
     }
 
     let ctx = ctx_guard.as_ref().unwrap();
-    crate::llm_local::cleanup_text(ctx, text, language)
+    crate::llm_local::cleanup_text(ctx, text, language, max_tokens as usize)
 }
 
 // -- Cleanup helpers --

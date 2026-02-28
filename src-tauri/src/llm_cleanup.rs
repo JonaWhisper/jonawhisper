@@ -93,19 +93,19 @@ fn system_prompt(language: &str) -> String {
 
 /// Clean up transcribed text using an LLM.
 /// Returns the cleaned text, or an error.
-pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model: &str) -> Result<String, LlmError> {
+pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
     if provider.url.is_empty() || model.is_empty() {
         return Err(LlmError::NotConfigured);
     }
 
     if provider.kind.is_anthropic_format() {
-        call_anthropic(text, language, provider, model).await
+        call_anthropic(text, language, provider, model, max_tokens).await
     } else {
-        call_openai_compatible(text, language, provider, model).await
+        call_openai_compatible(text, language, provider, model, max_tokens).await
     }
 }
 
-async fn call_openai_compatible(text: &str, language: &str, provider: &Provider, model: &str) -> Result<String, LlmError> {
+async fn call_openai_compatible(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
     let url = format!("{}/v1/chat/completions", provider.url.trim_end_matches('/'));
 
     let request = ChatRequest {
@@ -115,7 +115,7 @@ async fn call_openai_compatible(text: &str, language: &str, provider: &Provider,
             ChatMessage { role: "user", content: text.to_string() },
         ],
         temperature: 0.1,
-        max_tokens: 4096,
+        max_tokens,
     };
 
     let mut req = HTTP_CLIENT.post(&url).json(&request);
@@ -144,12 +144,12 @@ async fn call_openai_compatible(text: &str, language: &str, provider: &Provider,
         .ok_or_else(|| LlmError::InvalidResponse("No choices in response".into()))
 }
 
-async fn call_anthropic(text: &str, language: &str, provider: &Provider, model: &str) -> Result<String, LlmError> {
+async fn call_anthropic(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
     let url = format!("{}/v1/messages", provider.url.trim_end_matches('/'));
 
     let request = AnthropicRequest {
         model: model.to_string(),
-        max_tokens: 4096,
+        max_tokens,
         system: system_prompt(language),
         messages: vec![AnthropicMessage {
             role: "user",

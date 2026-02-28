@@ -114,6 +114,7 @@ export interface SettingsPayload {
   asr_provider_id: string
   asr_cloud_model: string
   gpu_mode: string
+  llm_max_tokens: number
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -123,7 +124,7 @@ export const useAppStore = defineStore('app', () => {
   const queueCount = ref(0)
   const activeDownloads = ref<Record<string, { progress: number; stopping: boolean; downloaded: number; totalSize: number; speed: number }>>({})
   const deletingModels = ref<Record<string, boolean>>({})
-  const selectedModelId = ref('whisper:large-v3-turbo')
+  const selectedModelId = ref('whisper:large-v3-turbo-q8')
   const selectedLanguage = ref('auto')
   const postProcessingEnabled = ref(true)
   const hallucinationFilterEnabled = ref(true)
@@ -140,6 +141,7 @@ export const useAppStore = defineStore('app', () => {
   const asrProviderId = ref('')
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
+  const llmMaxTokens = ref(256)
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'error' | 'idle'>('recording')
 
@@ -330,6 +332,7 @@ export const useAppStore = defineStore('app', () => {
       asrProviderId.value = s.asr_provider_id ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
+      llmMaxTokens.value = s.llm_max_tokens ?? 256
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -352,6 +355,7 @@ export const useAppStore = defineStore('app', () => {
       case 'asr_provider_id': return asrProviderId.value
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
+      case 'llm_max_tokens': return String(llmMaxTokens.value)
       default: return ''
     }
   }
@@ -375,6 +379,7 @@ export const useAppStore = defineStore('app', () => {
       case 'asr_provider_id': asrProviderId.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
+      case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 256; break
     }
   }
 
@@ -551,7 +556,7 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     postProcessingEnabled, hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    llmEnabled, llmProviderId, llmModel, llmSource, llmLocalModelId, asrProviderId, asrCloudModel, gpuMode,
+    llmEnabled, llmProviderId, llmModel, llmSource, llmLocalModelId, llmMaxTokens, asrProviderId, asrCloudModel, gpuMode,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed

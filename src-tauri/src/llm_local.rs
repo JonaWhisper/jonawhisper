@@ -69,7 +69,7 @@ fn system_prompt(language: &str) -> String {
 }
 
 /// Clean up transcribed text using a local LLM.
-pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str) -> Result<String, String> {
+pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: usize) -> Result<String, String> {
     let messages = vec![
         LlamaChatMessage::new("system".to_string(), system_prompt(language))
             .map_err(|e| format!("Failed to create system message: {}", e))?,
@@ -88,7 +88,7 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str) -> Result<Stri
         .map_err(|e| format!("Tokenization failed: {}", e))?;
 
     let n_prompt_tokens = tokens.len();
-    let max_gen_tokens: usize = 512;
+    let max_gen_tokens = max_tokens;
 
     // Create context for this generation
     let n_threads = std::thread::available_parallelism()

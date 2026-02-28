@@ -129,9 +129,11 @@ pub struct Preferences {
     pub asr_cloud_model: String,
     #[serde(default = "default_gpu_mode")]
     pub gpu_mode: String,
+    #[serde(default = "default_llm_max_tokens")]
+    pub llm_max_tokens: u32,
 }
 
-fn default_model_id() -> String { "whisper:large-v3-turbo".to_string() }
+fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
 fn default_language() -> String { "auto".to_string() }
 fn default_true() -> bool { true }
 fn default_hotkey() -> String { "right_command".to_string() }
@@ -141,6 +143,7 @@ fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
 fn default_llm_source() -> String { "cloud".to_string() }
+fn default_llm_max_tokens() -> u32 { 256 }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
 /// or %APPDATA%/WhisperDictate/ (Windows).
