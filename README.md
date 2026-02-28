@@ -109,11 +109,112 @@ Optional post-transcription cleanup via an LLM API (OpenAI-compatible or Anthrop
 | Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
 | i18n | [vue-i18n](https://vue-i18n.intlify.dev/) |
 
+## Dependencies
+
+### Backend (Rust crates)
+
+**Core / Framework**
+
+| Crate | Rôle |
+|-------|------|
+| `tauri` | Framework app (webview, tray, IPC, windows) |
+| `tauri-plugin-shell` | Lancement subprocess (moteurs ASR Python/CLI) |
+| `tauri-plugin-clipboard-manager` | Accès clipboard |
+| `tauri-plugin-notification` | Notifications système |
+| `tauri-plugin-fs` | Accès filesystem |
+| `serde` / `serde_json` | Sérialisation JSON (settings, IPC) |
+| `tokio` | Runtime async (transcription, téléchargements) |
+| `log` / `env_logger` | Logging |
+| `thiserror` | Dérivation d'erreurs typées |
+
+**Audio**
+
+| Crate | Rôle |
+|-------|------|
+| `cpal` | Capture audio cross-platform (enregistrement micro) |
+| `hound` | Écriture fichiers WAV |
+| `rustfft` | FFT pour spectre audio (visualisation) |
+
+**Réseau / IO**
+
+| Crate | Rôle |
+|-------|------|
+| `reqwest` | HTTP client (téléchargement modèles, API ASR/LLM) |
+| `futures-util` | Utilitaires async (streams de téléchargement) |
+| `dirs` | Chemins système (`~/Library/Application Support/`, etc.) |
+| `shellexpand` | Expansion de chemins (`~`, variables d'env) |
+| `rusqlite` | SQLite embarqué (historique des transcriptions, WAL) |
+
+**Concurrence**
+
+| Crate | Rôle |
+|-------|------|
+| `crossbeam-channel` | Canaux multi-producteur (thread audio, hotkey) |
+
+**Traitement texte**
+
+| Crate | Rôle |
+|-------|------|
+| `regex` | Post-traitement transcriptions (filtrage hallucinations) |
+
+**macOS uniquement**
+
+| Crate | Rôle |
+|-------|------|
+| `core-graphics` / `core-foundation` | CGEvent tap (hotkey), CGEvent paste (Cmd+V) |
+| `objc2` / `objc2-foundation` / `objc2-app-kit` | FFI Objective-C (permissions micro, NSPasteboard, NSSound, activation app) |
+| `block2` | Blocks Objective-C (callback `requestAccessForMediaType`) |
+
+### Frontend (npm)
+
+**App**
+
+| Package | Rôle |
+|---------|------|
+| `vue` | Framework UI |
+| `vue-router` | Routing (pill, settings, model-manager, history, setup) |
+| `pinia` | State management |
+| `vue-i18n` | Internationalisation (FR/EN) |
+| `@tauri-apps/api` | Bridge IPC vers le backend Rust |
+
+**UI**
+
+| Package | Rôle |
+|---------|------|
+| `lucide-vue-next` | Icones (tree-shakeable, ~1500 icones) |
+| `reka-ui` | Primitives UI headless (base de shadcn-vue) |
+| `class-variance-authority` | Variants CSS pour composants (shadcn-vue) |
+| `clsx` / `tailwind-merge` | Utilitaires classes CSS |
+| `@vueuse/core` | Composables Vue (utilisé par shadcn-vue) |
+
+**Styling**
+
+| Package | Rôle |
+|---------|------|
+| `tailwindcss` / `tailwindcss-animate` | CSS utility-first + animations |
+| `autoprefixer` / `postcss` | Post-traitement CSS |
+
+**Plugins Tauri (JS bindings)**
+
+| Package | Rôle |
+|---------|------|
+| `@tauri-apps/plugin-shell` | Lancement subprocess (moteurs ASR) |
+| `@tauri-apps/plugin-clipboard-manager` | Écriture clipboard avant paste |
+
+**Dev**
+
+| Package | Rôle |
+|---------|------|
+| `@tauri-apps/cli` | CLI Tauri (build, dev) |
+| `vite` / `@vitejs/plugin-vue` | Bundler + plugin Vue SFC |
+| `typescript` / `vue-tsc` | Type checking |
+| `@vue/tsconfig` / `@types/node` | Config TypeScript |
+
 ## Project structure
 
 ```
 src/                     Vue frontend
-  views/                 Pages (Settings, ModelManager, FloatingPill, SetupWizard)
+  views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
   components/            UI components
   stores/app.ts          Pinia store
   i18n/                  Translations (en.json, fr.json)

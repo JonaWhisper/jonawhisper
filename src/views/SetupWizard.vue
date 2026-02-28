@@ -59,7 +59,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-screen p-5 select-none">
+  <div class="flex flex-col h-full p-5 select-none">
     <div class="text-center mb-4">
       <h1 class="text-lg font-bold">{{ t('setup.title') }}</h1>
       <p class="text-xs text-muted-foreground mt-0.5">{{ t('setup.subtitle') }}</p>

@@ -7,6 +7,7 @@
 
 ## UX / Polish
 
+- [ ] **Remplacer emojis/SVG inline par Lucide icons** — Unifier toutes les icones du projet avec `lucide-vue-next` (déjà installé). Fichiers concernés : Settings.vue (⚙ ✨ ⌨ 🎙 dans la sidebar), ModelCell.vue (SVG inline delete), SetupWizard.vue (SVG inline checkmark).
 - [ ] **Descriptions des moteurs dans le Model Manager** — Ajouter une description/sous-titre pour chaque moteur expliquant sa spécificité. Afficher dans la sidebar et/ou le header du panneau principal.
 
 ## Fonctionnalités
@@ -22,7 +23,7 @@
 - [ ] **Système de providers LLM unifié** — Fusionner `engines/ApiServerConfig` (transcription) et `LlmConfig` (cleanup) en un système unique. Chaque provider déclare ses capacités (audio→texte, texte→texte, ou les deux).
   - **Providers cloud pré-configurés** — OpenAI, Anthropic, Gemini : URL et modèles prédéfinis (dropdown), champs verrouillés. Custom uniquement pour serveurs locaux.
   - **Formulaire provider unifié** — Un seul composant Vue partagé entre Model Manager et Settings.
-- [ ] **Historique des transcriptions (infini)** — Stockage persistant (SQLite ou append-only), UI de consultation/recherche
+- [x] **Historique des transcriptions (infini)** — Persistance JSON, timeline groupée par jour, recherche, copier/supprimer
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue sur disque
 - [ ] **Système de raccourcis personnalisés** — "Press to record" pour choisir n'importe quelle combinaison de touches
 - [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon micro intégré/AirPods/casque/USB
@@ -32,9 +33,11 @@
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
 - [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo
 - [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
-- [ ] **Windows support** — Implémenter les vrais bindings (hotkey, permissions, paste, audio devices)
+- [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
 ## Audits (à planifier)
+
+- [ ] **Audit frontend → backend** — Identifier la logique faite côté JavaScript qui serait mieux côté Rust via IPC (filtrage, calculs, formatage). Le frontend devrait idéalement ne faire que de l'affichage, le Rust gère la logique métier.
 
 - [ ] **Audit global du codebase** — Re-vérifier l'ensemble après les refactorings récents (FFI, events, hotkey, crossbeam, mutex grouping). Couvrir :
   - **Sécurité** — injections, gestion des clés API, permissions, sanitization des inputs

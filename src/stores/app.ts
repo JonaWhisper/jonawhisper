@@ -14,6 +14,7 @@ export interface AudioDevice {
 export interface EngineInfo {
   id: string
   name: string
+  description: string
   install_hint: string
   available: boolean
   tool_name: string | null
@@ -41,6 +42,8 @@ export interface Language {
 export interface HistoryEntry {
   text: string
   timestamp: number
+  model_id: string
+  language: string
 }
 
 export interface ApiServerConfig {
@@ -312,6 +315,30 @@ export const useAppStore = defineStore('app', () => {
     } catch (e) { console.error('clearHistory failed:', e) }
   }
 
+  async function searchHistory(query: string): Promise<HistoryEntry[]> {
+    try {
+      return await invoke<HistoryEntry[]>('search_history', { query })
+    } catch (e) {
+      console.error('searchHistory failed:', e)
+      return []
+    }
+  }
+
+  async function deleteHistoryEntry(timestamp: number) {
+    try {
+      await invoke('delete_history_entry', { timestamp: Math.floor(timestamp) })
+      history.value = history.value.filter(e => e.timestamp !== timestamp)
+    } catch (e) { console.error('deleteHistoryEntry failed:', e) }
+  }
+
+  async function deleteHistoryDay(dayTimestamp: number) {
+    try {
+      await invoke('delete_history_day', { dayTimestamp: Math.floor(dayTimestamp) })
+      const dayEnd = dayTimestamp + 86400
+      history.value = history.value.filter(e => e.timestamp < dayTimestamp || e.timestamp >= dayEnd)
+    } catch (e) { console.error('deleteHistoryDay failed:', e) }
+  }
+
   async function requestPermission(kind: string) {
     try { await invoke('request_permission', { kind }) }
     catch (e) { console.error('requestPermission failed:', e) }
@@ -366,10 +393,9 @@ export const useAppStore = defineStore('app', () => {
         history.value.unshift({
           text: event.payload.text,
           timestamp: Date.now() / 1000,
+          model_id: selectedModelId.value,
+          language: selectedLanguage.value,
         })
-        if (history.value.length > 20) {
-          history.value = history.value.slice(0, 20)
-        }
       }
     })
 
@@ -438,7 +464,8 @@ export const useAppStore = defineStore('app', () => {
     selectModel, selectLanguageAction,
     downloadModel, deleteModel,
     fetchSettings, setSetting, setLlmConfig,
-    clearHistoryAction, requestPermission,
+    clearHistoryAction, searchHistory, deleteHistoryEntry, deleteHistoryDay,
+    requestPermission,
     startMonitoring,
     addApiServer, removeApiServer,
   }

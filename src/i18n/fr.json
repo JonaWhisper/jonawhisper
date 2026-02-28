@@ -123,5 +123,20 @@
   "settings.microphone.defaultTag": "Défaut",
   "settings.microphone.test": "Tester",
   "settings.microphone.stop": "Arrêter",
-  "settings.microphone.testing": "Écoute…"
+  "settings.microphone.testing": "Écoute…",
+  "history.title": "Historique",
+  "history.search": "Rechercher...",
+  "history.clearAll": "Tout effacer",
+  "history.clearAllConfirm": "Effacer tout l'historique ?",
+  "history.clearAllDesc": "Tout l'historique de transcription sera définitivement supprimé.",
+  "history.deleteDay": "Supprimer le jour",
+  "history.deleteDayConfirm": "Supprimer toutes les entrées de ce jour ?",
+  "history.copy": "Copier",
+  "history.copied": "Copié !",
+  "history.delete": "Supprimer",
+  "history.empty": "Aucun historique de transcription",
+  "history.emptySearch": "Aucun résultat pour \u00ab {0} \u00bb",
+  "history.today": "Aujourd'hui",
+  "history.yesterday": "Hier",
+  "history.cancel": "Annuler"
 }

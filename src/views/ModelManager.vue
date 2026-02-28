@@ -107,7 +107,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex h-screen">
+  <div class="flex h-full">
     <!-- Engine sidebar -->
     <div class="w-48 border-r border-border bg-muted/30 overflow-y-auto flex-shrink-0">
       <div class="p-3">
@@ -143,7 +143,7 @@ onMounted(async () => {
     </div>
 
     <!-- Main content -->
-    <div class="flex-1 flex flex-col min-w-0">
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <!-- Fixed toolbar: language + add server -->
       <div class="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-background flex-shrink-0">
         <label class="text-xs font-medium text-muted-foreground whitespace-nowrap">
@@ -181,6 +181,9 @@ onMounted(async () => {
           <h2 class="text-lg font-semibold">
             {{ selectedEngineInfo?.name || t('modelManager.models') }}
           </h2>
+          <p v-if="selectedEngineInfo?.description" class="text-sm text-muted-foreground mt-0.5">
+            {{ selectedEngineInfo.description }}
+          </p>
           <div v-if="selectedEngineInfo?.install_hint" class="mt-1 text-sm text-muted-foreground">
             {{ t('modelManager.installWith') }}
             <code class="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">{{ selectedEngineInfo.install_hint }}</code>

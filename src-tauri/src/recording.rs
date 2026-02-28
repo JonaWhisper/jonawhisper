@@ -314,7 +314,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     })
     .await;
     state.runtime.lock().unwrap().last_paste_had_content = true;
-    state.add_history(processed.clone());
+    let (model_id, language) = {
+        let s = state.settings.lock().unwrap();
+        (s.selected_model_id.clone(), s.selected_language.clone())
+    };
+    state.add_history(processed.clone(), model_id, language);
     platform::play_sound("Glass");
 
     let _ = app.emit(

@@ -196,12 +196,30 @@ pub fn set_llm_config(
 
 #[tauri::command]
 pub fn get_history(state: tauri::State<'_, Arc<AppState>>) -> Vec<HistoryEntry> {
-    state.history.lock().unwrap().clone()
+    state.get_history()
+}
+
+#[tauri::command]
+pub fn search_history(query: String, state: tauri::State<'_, Arc<AppState>>) -> Vec<HistoryEntry> {
+    if query.is_empty() {
+        return state.get_history();
+    }
+    state.search_history(&query)
+}
+
+#[tauri::command]
+pub fn delete_history_entry(timestamp: u64, state: tauri::State<'_, Arc<AppState>>) {
+    state.delete_history_entry(timestamp);
+}
+
+#[tauri::command]
+pub fn delete_history_day(day_timestamp: u64, state: tauri::State<'_, Arc<AppState>>) {
+    state.delete_history_day(day_timestamp);
 }
 
 #[tauri::command]
 pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) {
-    state.history.lock().unwrap().clear();
+    state.clear_history();
 }
 
 // -- API Servers --

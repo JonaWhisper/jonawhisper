@@ -8,6 +8,7 @@ const router = createRouter({
     { path: '/model-manager', component: () => import('./views/ModelManager.vue') },
     { path: '/setup', component: () => import('./views/SetupWizard.vue') },
     { path: '/settings', component: () => import('./views/Settings.vue') },
+    { path: '/history', component: () => import('./views/History.vue') },
   ],
 })
 

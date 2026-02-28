@@ -1,3 +1,4 @@
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Mutex;
@@ -5,11 +6,17 @@ use std::path::PathBuf;
 
 const APP_DIR_NAME: &str = "WhisperDictate";
 const PREFS_FILE: &str = "preferences.json";
+const HISTORY_DB: &str = "history.db";
+const HISTORY_JSON_LEGACY: &str = "history.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub text: String,
     pub timestamp: u64,
+    #[serde(default)]
+    pub model_id: String,
+    #[serde(default)]
+    pub language: String,
 }
 
 // -- Grouped state --
@@ -43,7 +50,7 @@ pub struct AppState {
     pub runtime: Mutex<RuntimeState>,
     pub download: Mutex<DownloadState>,
     pub settings: Mutex<Preferences>,
-    pub history: Mutex<Vec<HistoryEntry>>,
+    pub history_db: Mutex<Connection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,6 +160,46 @@ impl Preferences {
     }
 }
 
+fn open_history_db() -> Connection {
+    let dir = config_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let db_path = dir.join(HISTORY_DB);
+    let conn = Connection::open(&db_path).expect("Failed to open history database");
+
+    conn.execute_batch(
+        "PRAGMA journal_mode = WAL;
+         PRAGMA synchronous = NORMAL;
+         CREATE TABLE IF NOT EXISTS history (
+             timestamp INTEGER NOT NULL,
+             text TEXT NOT NULL,
+             model_id TEXT NOT NULL DEFAULT '',
+             language TEXT NOT NULL DEFAULT ''
+         );
+         CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);"
+    ).expect("Failed to initialize history schema");
+
+    // Migrate legacy history.json if it exists
+    let json_path = dir.join(HISTORY_JSON_LEGACY);
+    if json_path.exists() {
+        if let Ok(data) = std::fs::read_to_string(&json_path) {
+            if let Ok(entries) = serde_json::from_str::<Vec<HistoryEntry>>(&data) {
+                let tx = conn.unchecked_transaction().expect("Failed to start migration tx");
+                for entry in &entries {
+                    let _ = tx.execute(
+                        "INSERT OR IGNORE INTO history (timestamp, text, model_id, language) VALUES (?1, ?2, ?3, ?4)",
+                        rusqlite::params![entry.timestamp, entry.text, entry.model_id, entry.language],
+                    );
+                }
+                let _ = tx.commit();
+                log::info!("Migrated {} history entries from JSON to SQLite", entries.len());
+            }
+        }
+        let _ = std::fs::remove_file(&json_path);
+    }
+
+    conn
+}
+
 impl Default for AppState {
     fn default() -> Self {
         let prefs = Preferences::load();
@@ -160,7 +207,7 @@ impl Default for AppState {
             runtime: Mutex::new(RuntimeState::default()),
             download: Mutex::new(DownloadState::default()),
             settings: Mutex::new(prefs),
-            history: Mutex::new(Vec::new()),
+            history_db: Mutex::new(open_history_db()),
         }
     }
 }
@@ -203,18 +250,67 @@ impl AppState {
         })
     }
 
-    pub fn add_history(&self, text: String) {
-        let mut history = self.history.lock().unwrap();
-        let entry = HistoryEntry {
-            text,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        };
-        history.insert(0, entry);
-        if history.len() > 20 {
-            history.truncate(20);
+    pub fn add_history(&self, text: String, model_id: String, language: String) {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let db = self.history_db.lock().unwrap();
+        if let Err(e) = db.execute(
+            "INSERT INTO history (timestamp, text, model_id, language) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![timestamp, text, model_id, language],
+        ) {
+            log::error!("Failed to insert history entry: {}", e);
         }
+    }
+
+    pub fn get_history(&self) -> Vec<HistoryEntry> {
+        let db = self.history_db.lock().unwrap();
+        let mut stmt = db.prepare(
+            "SELECT timestamp, text, model_id, language FROM history ORDER BY timestamp DESC"
+        ).unwrap();
+        stmt.query_map([], |row| {
+            Ok(HistoryEntry {
+                timestamp: row.get(0)?,
+                text: row.get(1)?,
+                model_id: row.get(2)?,
+                language: row.get(3)?,
+            })
+        }).unwrap().filter_map(|r| r.ok()).collect()
+    }
+
+    pub fn search_history(&self, query: &str) -> Vec<HistoryEntry> {
+        let db = self.history_db.lock().unwrap();
+        let pattern = format!("%{}%", query);
+        let mut stmt = db.prepare(
+            "SELECT timestamp, text, model_id, language FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC"
+        ).unwrap();
+        stmt.query_map([&pattern], |row| {
+            Ok(HistoryEntry {
+                timestamp: row.get(0)?,
+                text: row.get(1)?,
+                model_id: row.get(2)?,
+                language: row.get(3)?,
+            })
+        }).unwrap().filter_map(|r| r.ok()).collect()
+    }
+
+    pub fn delete_history_entry(&self, timestamp: u64) {
+        let db = self.history_db.lock().unwrap();
+        let _ = db.execute("DELETE FROM history WHERE timestamp = ?1", [timestamp]);
+    }
+
+    pub fn delete_history_day(&self, day_timestamp: u64) {
+        let db = self.history_db.lock().unwrap();
+        let day_end = day_timestamp + 86400;
+        let _ = db.execute(
+            "DELETE FROM history WHERE timestamp >= ?1 AND timestamp < ?2",
+            [day_timestamp, day_end],
+        );
+    }
+
+    pub fn clear_history(&self) {
+        let db = self.history_db.lock().unwrap();
+        let _ = db.execute("DELETE FROM history", []);
     }
 }

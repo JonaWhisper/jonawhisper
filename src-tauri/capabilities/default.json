@@ -11,8 +11,6 @@
     "core:window:allow-set-size",
     "core:window:allow-set-title",
     "shell:allow-open",
-    "clipboard-manager:default",
-    "notification:default",
-    "fs:default"
+    "clipboard-manager:default"
   ]
 }

@@ -123,5 +123,20 @@
   "settings.microphone.defaultTag": "Default",
   "settings.microphone.test": "Test",
   "settings.microphone.stop": "Stop",
-  "settings.microphone.testing": "Listening…"
+  "settings.microphone.testing": "Listening…",
+  "history.title": "History",
+  "history.search": "Search...",
+  "history.clearAll": "Clear All",
+  "history.clearAllConfirm": "Clear all history?",
+  "history.clearAllDesc": "All transcription history will be permanently deleted.",
+  "history.deleteDay": "Delete day",
+  "history.deleteDayConfirm": "Delete all entries for this day?",
+  "history.copy": "Copy",
+  "history.copied": "Copied!",
+  "history.delete": "Delete",
+  "history.empty": "No transcription history",
+  "history.emptySearch": "No results for \"{0}\"",
+  "history.today": "Today",
+  "history.yesterday": "Yesterday",
+  "history.cancel": "Cancel"
 }

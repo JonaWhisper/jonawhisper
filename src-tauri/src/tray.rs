@@ -299,6 +299,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, Box<dyn std::error::E
             &lang_submenu,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "settings", "Settings\u{2026}", true, None::<&str>)?,
+            &MenuItem::with_id(app, "history", "History", true, None::<&str>)?,
             &MenuItem::with_id(app, "setup", "Setup\u{2026}", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             #[cfg(debug_assertions)]
@@ -487,6 +488,9 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 "settings" => {
                     open_window_with_min(app, "settings", "Settings", "/settings", 580.0, 420.0, Some((460.0, 320.0)));
+                }
+                "history" => {
+                    open_window(app, "history", "History", "/history", 500.0, 500.0);
                 }
                 "setup" => {
                     open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
