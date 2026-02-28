@@ -85,9 +85,10 @@ fn sample_shape(shape: &[u8], fx: f32, fy: f32) -> f32 {
     top * (1.0 - dy) + bot * dy
 }
 
-// Bubble colors
-const BLUE: (u8, u8, u8) = (0, 122, 255);   // macOS system blue
-const GRAY: (u8, u8, u8) = (99, 99, 102);    // dark gray, good contrast with white icon
+// Bubble colors — Apple system colors (developer.apple.com/documentation/appkit/nscolor)
+// Static bitmaps can't adapt to light/dark, so we pick values that work in both modes.
+const BLUE: (u8, u8, u8) = (0, 122, 255);  // NSColor.systemBlue (light mode)
+const GRAY: (u8, u8, u8) = (99, 99, 102);  // NSColor.systemGray2 (dark mode) — 3.9:1 contrast with white
 
 /// Get a 36×36 icon with colored bubble for an audio transport type.
 /// `selected`: blue bubble (active device), otherwise gray bubble.
