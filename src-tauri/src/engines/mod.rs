@@ -47,6 +47,9 @@ pub struct ASRModel {
     pub params: Option<f32>,
     /// Estimated RAM usage in bytes when loaded.
     pub ram: Option<u64>,
+    /// Language codes this specific model excels at (None = inherits from engine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lang_codes: Option<Vec<String>>,
 }
 
 impl ASRModel {
