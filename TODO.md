@@ -8,7 +8,7 @@
 ## UX / Polish
 
 - [ ] **Remplacer emojis/SVG inline par Lucide icons** — Unifier toutes les icones du projet avec `lucide-vue-next` (déjà installé). Fichiers concernés : Settings.vue (⚙ ✨ ⌨ 🎙 dans la sidebar), ModelCell.vue (SVG inline delete), SetupWizard.vue (SVG inline checkmark).
-- [ ] **Descriptions des moteurs dans le Model Manager** — Ajouter une description/sous-titre pour chaque moteur expliquant sa spécificité. Afficher dans la sidebar et/ou le header du panneau principal.
+- [x] **Descriptions des moteurs dans le Model Manager** — Description par moteur affichée dans le panneau principal.
 
 ## Fonctionnalités
 
