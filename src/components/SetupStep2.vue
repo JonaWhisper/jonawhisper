@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import { useAppStore, type ASRModel } from '@/stores/app'
-import { i18n } from '@/main'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -25,21 +23,6 @@ const store = useAppStore()
 const emit = defineEmits<{ start: []; back: [] }>()
 
 const showAllModels = ref(false)
-
-// -- Locale --
-const localeOptions = [
-  { value: 'auto', label: 'settings.locale.auto' },
-  { value: 'fr', label: 'settings.locale.fr' },
-  { value: 'en', label: 'settings.locale.en' },
-]
-
-async function onLocaleChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
-  await store.setSetting('app_locale', value)
-  // Rust handles tray labels; resolve effective locale for frontend
-  const locale = await invoke<string>('get_system_locale')
-  i18n.global.locale.value = locale as 'fr' | 'en'
-}
 
 // -- Hotkey --
 async function onHotkeyChange(value: string) {
@@ -159,21 +142,6 @@ const canStart = computed(() => {
     <div class="flex-1 flex gap-5 px-5 min-h-0">
       <!-- Left column: quick settings -->
       <div class="w-[240px] shrink-0 space-y-4 overflow-y-auto">
-        <!-- UI Language -->
-        <div class="space-y-1">
-          <Label class="text-sm font-medium">{{ t('setup.step2.uiLanguage') }}</Label>
-          <Select :model-value="store.appLocale" @update:model-value="onLocaleChange">
-            <SelectTrigger class="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="opt in localeOptions" :key="opt.value" :value="opt.value">
-                {{ t(opt.label) }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <!-- Hotkey -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.hotkey') }}</Label>
