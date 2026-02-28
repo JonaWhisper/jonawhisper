@@ -74,36 +74,34 @@ function formatSize(bytes: number): string {
     </div>
 
     <!-- Status / Actions -->
-    <div class="flex items-center gap-2 flex-shrink-0">
+    <div class="relative flex-shrink-0">
       <!-- Downloading -->
       <template v-if="isDownloading">
-        <Progress :model-value="downloadProgress * 100" class="w-24" />
-        <span class="text-xs text-muted-foreground w-10 text-right">
-          {{ Math.round(downloadProgress * 100) }}%
-        </span>
+        <div class="flex items-center gap-2">
+          <Progress :model-value="downloadProgress * 100" class="w-24" />
+          <span class="text-xs text-muted-foreground w-10 text-right">
+            {{ Math.round(downloadProgress * 100) }}%
+          </span>
+        </div>
       </template>
 
-      <!-- Downloaded -->
-      <template v-else-if="isDownloaded && !isRemoteAPI">
-        <Badge variant="secondary" class="bg-green-500/10 text-green-500 border-transparent">
+      <!-- Downloaded / API — badge swaps to trash on hover -->
+      <template v-else-if="isDownloaded">
+        <Badge
+          v-if="isRemoteAPI"
+          variant="secondary"
+          class="bg-blue-500/10 text-blue-500 border-transparent group-hover:opacity-0 transition-opacity"
+        >API</Badge>
+        <Badge
+          v-else
+          variant="secondary"
+          class="bg-green-500/10 text-green-500 border-transparent group-hover:opacity-0 transition-opacity"
+        >
           {{ t('modelManager.downloaded') }}
         </Badge>
         <Button
           variant="ghost" size="icon-sm"
-          class="opacity-0 group-hover:opacity-100 transition-opacity"
-          @click="emit('delete', model)"
-          :title="t('modelManager.delete')"
-        >
-          <Trash2 class="w-4 h-4" />
-        </Button>
-      </template>
-
-      <!-- Remote API -->
-      <template v-else-if="isRemoteAPI">
-        <Badge variant="secondary" class="bg-blue-500/10 text-blue-500 border-transparent">API</Badge>
-        <Button
-          variant="ghost" size="icon-sm"
-          class="opacity-0 group-hover:opacity-100 transition-opacity"
+          class="absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition-opacity"
           @click="emit('delete', model)"
           :title="t('modelManager.delete')"
         >
