@@ -68,13 +68,13 @@ watch(step, async (newStep) => {
       clearInterval(pollInterval)
       pollInterval = null
     }
-    await win.setSize(new LogicalSize(440, 600))
+    await win.setSize(new LogicalSize(680, 480))
   } else {
     // Resume polling
     if (!pollInterval) {
       pollInterval = setInterval(() => store.fetchPermissions(), 1500)
     }
-    await win.setSize(new LogicalSize(420, 380))
+    await win.setSize(new LogicalSize(420, 420))
   }
 })
 

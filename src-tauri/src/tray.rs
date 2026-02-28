@@ -493,7 +493,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     open_window(app, "history", "History", "/history", 500.0, 500.0);
                 }
                 "setup" => {
-                    open_window(app, "setup", "Setup", "/setup", 420.0, 380.0);
+                    open_window(app, "setup", "Setup", "/setup", 420.0, 420.0);
                 }
                 "test_pill" => {
                     let app_clone = app.clone();
