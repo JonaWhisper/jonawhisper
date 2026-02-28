@@ -548,128 +548,124 @@ onUnmounted(() => {
 
       <!-- Post-processing -->
       <div v-if="activeSection === 'postprocessing'">
-        <h2 class="text-lg font-semibold mb-4">{{ t('settings.section.postProcessing') }}</h2>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold">{{ t('settings.section.postProcessing') }}</h2>
+          <Switch
+            :model-value="store.postProcessingEnabled"
+            @update:model-value="onPostProcessingChange"
+          />
+        </div>
 
-        <div class="space-y-4">
+        <div
+          class="space-y-4"
+          :class="{ 'opacity-40 pointer-events-none': !store.postProcessingEnabled }"
+        >
           <div class="flex items-center justify-between gap-4">
-            <Label class="text-sm shrink-0">{{ t('settings.postProcessing.enable') }}</Label>
+            <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
             <Switch
-              :model-value="store.postProcessingEnabled"
-              @update:model-value="onPostProcessingChange"
+              :model-value="store.hallucinationFilterEnabled"
+              @update:model-value="onHallucinationFilterChange"
             />
           </div>
 
+          <!-- Text cleanup toggle -->
+          <div class="flex items-center justify-between gap-4">
+            <Label class="text-sm shrink-0">{{ t('settings.postProcessing.textCleanup') }}</Label>
+            <Switch
+              :model-value="store.textCleanupEnabled"
+              @update:model-value="onTextCleanupChange"
+            />
+          </div>
+
+          <!-- Cleanup model selector + sub-settings (only when cleanup enabled) -->
           <div
+            v-if="store.textCleanupEnabled"
             class="space-y-4 pl-4 border-l-2 border-border"
-            :class="{ 'opacity-40 pointer-events-none': !store.postProcessingEnabled }"
           >
-            <div class="flex items-center justify-between gap-4">
-              <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
-              <Switch
-                :model-value="store.hallucinationFilterEnabled"
-                @update:model-value="onHallucinationFilterChange"
-              />
+            <!-- Model selector -->
+            <div class="space-y-1">
+              <Label class="text-xs text-muted-foreground">{{ t('settings.postProcessing.cleanupModel') }}</Label>
+              <Select
+                v-if="store.cleanupModels.length > 0"
+                :model-value="store.cleanupModelId"
+                @update:model-value="onCleanupModelChange"
+              >
+                <SelectTrigger class="w-full h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <template v-for="m in store.cleanupModels" :key="m.id">
+                    <SelectItem :value="m.id">
+                      {{ m.label }}
+                    </SelectItem>
+                  </template>
+                </SelectContent>
+              </Select>
+              <p v-else class="text-sm text-muted-foreground">
+                {{ t('settings.postProcessing.cleanupModel.none') }}
+              </p>
             </div>
 
-            <!-- Text cleanup toggle -->
-            <div class="flex items-center justify-between gap-4">
-              <Label class="text-sm shrink-0">{{ t('settings.postProcessing.textCleanup') }}</Label>
-              <Switch
-                :model-value="store.textCleanupEnabled"
-                @update:model-value="onTextCleanupChange"
-              />
-            </div>
-
-            <!-- Cleanup model selector + sub-settings (only when cleanup enabled) -->
-            <div
-              v-if="store.textCleanupEnabled"
-              class="space-y-4 pl-4 border-l-2 border-border"
-            >
-              <!-- Model selector -->
+            <!-- Cloud LLM sub-settings (provider already selected via model dropdown) -->
+            <template v-if="store.isCloudLlm && llmSelectedProvider">
               <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.postProcessing.cleanupModel') }}</Label>
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
                 <Select
-                  v-if="store.cleanupModels.length > 0"
-                  :model-value="store.cleanupModelId"
-                  @update:model-value="onCleanupModelChange"
+                  v-if="!isCustomLlmModel"
+                  :model-value="store.llmModel"
+                  @update:model-value="onLlmModelSelect"
                 >
                   <SelectTrigger class="w-full h-9 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <template v-for="m in store.cleanupModels" :key="m.id">
-                      <SelectItem :value="m.id">
-                        {{ m.label }}
-                      </SelectItem>
-                    </template>
+                    <SelectItem
+                      v-for="m in llmModelOptions"
+                      :key="m"
+                      :value="m"
+                    >
+                      {{ m }}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
-                <p v-else class="text-sm text-muted-foreground">
-                  {{ t('settings.postProcessing.cleanupModel.none') }}
-                </p>
+                <Input
+                  v-else
+                  :value="store.llmModel"
+                  @input="onLlmModelInput"
+                  class="h-9 text-sm"
+                />
               </div>
 
-              <!-- Cloud LLM sub-settings (provider already selected via model dropdown) -->
-              <template v-if="store.isCloudLlm && llmSelectedProvider">
-                <div class="space-y-1">
-                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
-                  <Select
-                    v-if="!isCustomLlmModel"
-                    :model-value="store.llmModel"
-                    @update:model-value="onLlmModelSelect"
-                  >
-                    <SelectTrigger class="w-full h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        v-for="m in llmModelOptions"
-                        :key="m"
-                        :value="m"
-                      >
-                        {{ m }}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    v-else
-                    :value="store.llmModel"
-                    @input="onLlmModelInput"
-                    class="h-9 text-sm"
-                  />
-                </div>
+              <!-- Max tokens (cloud) -->
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
+                <Input
+                  type="number"
+                  :model-value="String(store.llmMaxTokens)"
+                  @update:model-value="onLlmMaxTokensChange"
+                  min="64"
+                  max="4096"
+                  step="64"
+                  class="h-9 text-sm w-28"
+                />
+              </div>
+            </template>
 
-                <!-- Max tokens (cloud) -->
-                <div class="space-y-1">
-                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-                  <Input
-                    type="number"
-                    :model-value="String(store.llmMaxTokens)"
-                    @update:model-value="onLlmMaxTokensChange"
-                    min="64"
-                    max="4096"
-                    step="64"
-                    class="h-9 text-sm w-28"
-                  />
-                </div>
-              </template>
-
-              <!-- Local LLM sub-settings (max tokens only) -->
-              <template v-if="store.isLocalLlm">
-                <div class="space-y-1">
-                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-                  <Input
-                    type="number"
-                    :model-value="String(store.llmMaxTokens)"
-                    @update:model-value="onLlmMaxTokensChange"
-                    min="64"
-                    max="4096"
-                    step="64"
-                    class="h-9 text-sm w-28"
-                  />
-                </div>
-              </template>
-            </div>
+            <!-- Local LLM sub-settings (max tokens only) -->
+            <template v-if="store.isLocalLlm">
+              <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
+                <Input
+                  type="number"
+                  :model-value="String(store.llmMaxTokens)"
+                  @update:model-value="onLlmMaxTokensChange"
+                  min="64"
+                  max="4096"
+                  step="64"
+                  class="h-9 text-sm w-28"
+                />
+              </div>
+            </template>
           </div>
         </div>
       </div>
