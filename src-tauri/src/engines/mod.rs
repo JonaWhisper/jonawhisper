@@ -1,6 +1,4 @@
 pub mod whisper;
-pub mod vosk;
-pub mod moonshine;
 pub mod openai_api;
 pub mod downloader;
 
@@ -14,9 +12,6 @@ use std::path::{Path, PathBuf};
 pub enum DownloadType {
     #[default]
     SingleFile,
-    HuggingFaceRepo,
-    ZipArchive,
-    Command { executable: String, arguments: Vec<String> },
     RemoteAPI,
     System,
 }
@@ -111,8 +106,6 @@ pub enum EngineError {
     EngineUnavailable { engine_id: String, install_hint: String },
     #[error("Failed to launch: {0}")]
     LaunchFailed(String),
-    #[error("Process exited with code {code}: {stderr}")]
-    ProcessFailed { code: i32, stderr: String },
     #[error("API error: {0}")]
     ApiError(String),
 }
@@ -136,24 +129,6 @@ pub fn common_languages() -> Vec<Language> {
     ]
 }
 
-// -- Executable finder --
-
-pub fn find_executable(name: &str, extra_paths: &[&str]) -> Option<String> {
-    let search_paths: Vec<&str> = extra_paths
-        .iter()
-        .copied()
-        .chain(["/opt/homebrew/bin", "/usr/local/bin"].iter().copied())
-        .collect();
-
-    for dir in search_paths {
-        let path = format!("{}/{}", dir, name);
-        if Path::new(&path).exists() {
-            return Some(path);
-        }
-    }
-    None
-}
-
 // -- Catalog --
 
 pub struct EngineCatalog {
@@ -164,8 +139,6 @@ impl EngineCatalog {
     pub fn new() -> Self {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
-            Box::new(vosk::VoskEngine),
-            Box::new(moonshine::MoonshineEngine),
         ];
 
         Self { engines }
