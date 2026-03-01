@@ -7,9 +7,10 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
 - **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible cloud API — unified model selector
-- **Post-processing** — hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) — unified model selector
+- **9 cloud providers** — preconfigured presets (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) with API key testing and dynamic model discovery
+- **Post-processing** — hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
 - **Bilingual UI** — French and English, auto-detected or manual override
-- **Floating pill** — visual recording indicator with real-time spectrum bars
+- **Floating pill** — instant visual feedback (preparing → recording → transcribing), real-time spectrum bars, cancel support during recording or transcription
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
 - **Mic test** — test your microphone with live spectrum visualization in Settings
 - **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
@@ -71,9 +72,11 @@ Models are downloaded and managed from within the app (Model Manager). All model
 3. Release to transcribe - the text is pasted into the active app
 4. In toggle mode, press once to start recording, press again to stop
 
-### Cancel a recording
+### Cancel
 
-Press Escape while recording to cancel without transcribing.
+Press Escape at any time to cancel:
+- **During recording** — stops recording, discards audio
+- **During transcription** — cancels the transcription in progress, discards text
 
 ### Settings
 
@@ -93,7 +96,7 @@ Optional post-transcription cleanup via a unified model selector:
 - **Local LLM** — full text correction via llama.cpp with Metal GPU (GGUF models)
 - **Cloud LLM** — full text correction via OpenAI-compatible or Anthropic API
 
-Corrects punctuation, capitalization, and transcription artifacts without changing meaning. LLM max tokens is configurable (default 256). Configure in Settings > Post-processing.
+Corrects punctuation, capitalization, and transcription artifacts without changing meaning. LLM max tokens auto-scales based on input length, with a configurable hard cap (default 4096, adjustable via slider 128–8192). On any LLM error (timeout, API failure, etc.), the raw transcription is preserved as fallback — text is never lost. Configure in Settings > Post-processing.
 
 ## Tech stack
 
@@ -221,6 +224,7 @@ src/                     Vue frontend
   views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
   components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, BenchmarkBadges, …)
   stores/app.ts          Pinia store
+  config/providers.ts    Cloud provider presets and model filter helpers
   utils/                 Shared utilities (shortcut types, formatting, byte/speed formatters)
   i18n/                  Translations (en.json, fr.json)
 src-tauri/               Rust backend

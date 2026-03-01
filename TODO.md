@@ -16,7 +16,7 @@
 
 ## Intégrations Cloud & Modèles
 
-- [ ] **Presets provider préconfigurés** — Ajouter des presets dans l'UI pour les principaux providers cloud OpenAI-compatible. L'utilisateur choisit "Groq", "OpenAI", "Cerebras", etc. et l'URL/modèle sont pré-remplis. Reste à entrer la clé API. Zéro changement backend, frontend seul. Voir `docs/CLOUD-INTEGRATION.md` pour les URLs/modèles.
+- [x] **Presets provider préconfigurés** — 9 providers préconfigurés (OpenAI, Anthropic, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek). URLs résolues dynamiquement via `ProviderKind::base_url()` (pas de migration si les URLs changent). Bouton Test pour valider la clé API + récupérer les modèles disponibles. Cache des modèles sur le Provider (persiste entre restarts). Boutons Refresh dans Settings pour actualiser les listes.
 - [ ] **Enrichir le catalogue LLM natif** — Ajouter les modèles GGUF manquants au catalogue `engines/llama.rs` (juste des entrées, pas de code) :
   - Qwen3 0.6B (~400 MB, ultra rapide)
   - Gemma 3 4B (~2.5 GB, alternative à Qwen3 4B)

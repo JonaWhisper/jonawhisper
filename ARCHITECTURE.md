@@ -41,10 +41,10 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 | File | Role |
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
-| `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules |
-| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL with additive migrations for `cleanup_model_id` and `hallucination_filter` columns), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext |
-| `migrations.rs` | Versioned preference migrations. Each migration is a numbered function receiving raw JSON + typed `Preferences`. Runs on startup if `_version` < current. v1: legacy format unification (api_servers, llm_config, cleanup_mode). v2: model file relocation to `~/Library/Application Support/WhisperDictate/models/`. |
-| `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
+| `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL with additive migrations for `cleanup_model_id` and `hallucination_filter` columns), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext. `Provider` struct includes `cached_models: Vec<String>`. `ProviderKind::base_url()` resolves canonical API URLs at runtime for known providers (Custom uses stored URL). |
+| `migrations.rs` | Versioned preference migrations. Each migration is a numbered function receiving raw JSON + typed `Preferences`. Runs on startup if `_version` < current. v1: legacy format unification (api_servers, llm_config, cleanup_mode). v2: model file relocation to `~/Library/Application Support/WhisperDictate/models/`. v3: update llm_max_tokens default from 256 to 4096 (autoscale hard cap). |
+| `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning. Cancel support during both recording (discard audio) and transcription (cancel flag checked before paste). LLM cleanup uses autoscale max_tokens (capped by user hard cap, default 4096) with fallback to raw text on any error. |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
 
@@ -81,7 +81,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if `selected_model_id` starts with `cloud:`, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (punctuation spacing, capitalization) |
 | `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime (`ort`). Cached `BertContext` in `AppState`. Sentence-level batching with tokenizer. |
-| `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (configurable `max_tokens`). Uses shared `LlmError` and `sanitize_output` from `llm_prompt`. |
+| `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API with 30s HTTP timeout. Uses `Provider::base_url()` for URL resolution. On any error, recording.rs falls back to raw transcription. Uses shared `LlmError` and `sanitize_output` from `llm_prompt`. |
 | `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. Uses shared `LlmError` and `sanitize_output` from `llm_prompt`. |
 | `llm_prompt.rs` | Shared LLM module: `LlmError` enum (unified error type for local and cloud), `sanitize_output` (think-block stripping + sanity check), and system prompt template. |
 
@@ -89,7 +89,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 
 | File | Role |
 |------|------|
-| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), floating pill window lifecycle. Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
+| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), floating pill window lifecycle. Uses hide/show (not destroy/recreate) for fast pill transitions, with a `PILL_GENERATION` atomic counter to prevent stale delayed closes from killing a freshly opened pill. Idle pill webview is auto-destroyed after 60s. Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
 | `menu_icons.rs` | SDF (Signed Distance Field) icon rendering — shared primitives (`sdf_aa`, `sdf_rrect`, `sdf_circle`, `sdf_segment`, `point_in_triangle`) and 8 transport type icons (laptop, USB, bluetooth, waves, hard drive, zap, monitor, mic). Icons are rendered at 16×16, cached in a `LazyLock`, and composited onto 36×36 colored bubbles (blue=selected, gray=other) for menu items. Inspired by [Lucide](https://lucide.dev/) icon paths, hand-crafted as SDF shapes — zero image dependencies. |
 
 ### SDF icon rendering — how it works
@@ -122,8 +122,8 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | View | Route | Description |
 |------|-------|-------------|
 | `SetupWizard.vue` | `/setup` | Two-step wizard: permissions, then initial configuration |
-| `FloatingPill.vue` | `/pill` | Overlay showing recording/transcribing state with spectrum animation |
-| `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). |
+| `FloatingPill.vue` | `/pill` | Overlay showing recording state with spectrum animation. Five modes: **preparing** (pulsing dot, shown instantly on key press), **recording** (spectrum bars), **transcribing** (bouncing dots), **error** (red cross), **idle**. |
+| `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). Refresh buttons to re-fetch models from cloud providers. Token hard cap slider (128–8192). |
 | `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
 | `History.vue` | `/history` | Transcription history timeline with search, deletion, and processing badges (ASR local/cloud, language, cleanup method, hallucination filter) |
 
@@ -136,7 +136,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `SetupStep2.vue` | Initial configuration form (hotkey, recording mode, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
-| `ProviderForm.vue` | Reusable form for configuring cloud providers (OpenAI, Anthropic, or custom API endpoints) — used for both ASR and LLM cleanup |
+| `ProviderForm.vue` | Reusable form for configuring cloud providers (9 presets + custom). Includes a Test button that validates the API key and fetches available models (`fetch_provider_models`). Fetched models are cached on the Provider and used in Settings dropdowns. |
 
 ### State management
 
@@ -178,13 +178,17 @@ Main thread (Tauri + Tokio runtime)
 
 1. **Hotkey press** → CGEvent callback detects the configured shortcut → sends `HotkeyEvent::KeyDown`
 2. **Hotkey handler** receives the event → calls `start_recording()`
-3. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing → pill window opens
-4. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
-5. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
-6. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
-7. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM), then finalize (spacing, capitalization)
-8. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
-9. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
+3. **Pill opens immediately** in "preparing" mode (pulsing dot) for instant visual feedback
+4. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing → pill switches to "recording" mode (spectrum bars)
+5. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
+6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
+7. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
+8. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM with autoscale max_tokens), then finalize (spacing, capitalization). On any LLM error, falls back to raw transcription.
+9. **Cancel check** → `transcription_cancelled` flag verified before paste — if cancel arrived during cleanup, text is discarded
+10. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
+11. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
+
+**Cancel flow:** Escape during recording → `cancel_recording()` stops audio, discards file, shows error cross. Escape during transcription → `cancel_transcription()` sets cancel flag, clears queue. Pill close uses `PILL_GENERATION` counter to prevent stale delayed closes from interfering with new recordings.
 
 ## Configuration
 
