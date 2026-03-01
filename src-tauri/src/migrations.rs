@@ -2,13 +2,14 @@ use serde_json::Value;
 use crate::state::{config_dir, default_model_id, Provider, ProviderKind, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 2;
+const CURRENT_VERSION: u32 = 3;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
 const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (1, "Unify providers and cleanup settings", migrate_v1),
     (2, "Centralize model storage", migrate_v2),
+    (3, "Update llm_max_tokens default to 4096", migrate_v3),
 ];
 
 /// Run all pending migrations. Returns true if any migration was applied (needs save).
@@ -263,5 +264,13 @@ fn migrate_v2(raw: &mut Value, prefs: &mut Preferences) {
             let _ = std::fs::remove_dir(&wd_dir);
             log::info!("Migration v2: removed empty dir {}", wd_dir.display());
         }
+    }
+}
+
+/// v3: Update llm_max_tokens from old default (256) to new default (4096)
+fn migrate_v3(_raw: &mut Value, prefs: &mut Preferences) {
+    if prefs.llm_max_tokens <= 256 {
+        log::info!("Migration v3: updating llm_max_tokens from {} to 4096", prefs.llm_max_tokens);
+        prefs.llm_max_tokens = 4096;
     }
 }

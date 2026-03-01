@@ -287,9 +287,12 @@ async function onCleanupModelChange(value: string | number | bigint | Record<str
   await store.setSetting('cleanup_model_id', value)
 }
 
-async function onLlmMaxTokensChange(value: string | number) {
-  const parsed = Math.max(128, Math.min(8192, parseInt(String(value), 10) || 4096))
-  await store.setSetting('llm_max_tokens', String(parsed))
+function onMaxTokensSliderUpdate(v: number[] | undefined) {
+  if (v?.[0] != null) store.llmMaxTokens = v[0]
+}
+function onMaxTokensSliderCommit(v: number[]) {
+  const val = v[0] ?? store.llmMaxTokens
+  store.setSetting('llm_max_tokens', String(val))
 }
 
 async function onLlmModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
@@ -682,32 +685,36 @@ onUnmounted(() => {
               </div>
 
               <!-- Token hard cap (cloud) -->
-              <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-                <Input
-                  type="number"
-                  :model-value="String(store.llmMaxTokens)"
-                  @update:model-value="onLlmMaxTokensChange"
-                  min="128"
-                  max="8192"
-                  step="128"
-                  class="h-9 text-sm w-28"
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
+                  <span class="text-xs text-muted-foreground tabular-nums">{{ store.llmMaxTokens }}</span>
+                </div>
+                <Slider
+                  :model-value="[store.llmMaxTokens]"
+                  :min="128"
+                  :max="8192"
+                  :step="128"
+                  @update:model-value="onMaxTokensSliderUpdate"
+                  @value-commit="onMaxTokensSliderCommit"
                 />
               </div>
             </template>
 
             <!-- Local LLM sub-settings (token hard cap) -->
             <template v-if="store.isLocalLlm">
-              <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-                <Input
-                  type="number"
-                  :model-value="String(store.llmMaxTokens)"
-                  @update:model-value="onLlmMaxTokensChange"
-                  min="128"
-                  max="8192"
-                  step="128"
-                  class="h-9 text-sm w-28"
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
+                  <span class="text-xs text-muted-foreground tabular-nums">{{ store.llmMaxTokens }}</span>
+                </div>
+                <Slider
+                  :model-value="[store.llmMaxTokens]"
+                  :min="128"
+                  :max="8192"
+                  :step="128"
+                  @update:model-value="onMaxTokensSliderUpdate"
+                  @value-commit="onMaxTokensSliderCommit"
                 />
               </div>
             </template>
