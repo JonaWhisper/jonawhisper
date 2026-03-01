@@ -8,11 +8,11 @@
 ## Fonctionnalités
 
 - [ ] **Raccourci pour historique rapide** — Touche configurable pour afficher un popup flottant avec les dernières transcriptions. Permet de re-coller rapidement un texte récent sans ouvrir la fenêtre d'historique complète. Style popup léger (comme Spotlight/Alfred), clic ou Enter pour coller l'entrée sélectionnée.
-- [ ] **Détection de silence avant transcription** — Analyser l'audio avant de l'envoyer au modèle ASR. Si l'enregistrement ne contient que du silence (énergie RMS sous un seuil), le jeter directement sans transcrire. Évite les hallucinations sur audio vide (le modèle invente du texte quand il n'y a rien à transcrire).
+- [ ] **Pipeline prétraitement audio** — Denoising + VAD avant transcription. Voir `docs/AUDIO-PIPELINE.md` pour l'architecture complète.
+  - **Phase 1** : Intégrer nnnoiseless (Rust natif, port de RNNoise) dans `audio.rs` pour denoising temps réel + utiliser son score VAD pour détecter le silence → discard si pas de parole.
+  - **Phase 2** : Si qualité insuffisante, compléter avec DeepFilterNet (ONNX via ort) et/ou Silero VAD + trimming des silences début/fin.
+  - **Phase 3** : Presets device (gain, noise gate, normalisation par type de micro). Voir `docs/AUDIO-PIPELINE.md` Phase 3.
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue de transcription sur disque (fichiers audio en attente). En cas de crash ou kill pendant une transcription, les fichiers WAV restent dans /tmp mais la queue en mémoire est perdue. Persister la queue permettrait de reprendre automatiquement au relancement. Concerne uniquement la transcription, pas le téléchargement.
-- [ ] **Presets audio par type de device** — Gain, noise gate, normalisation selon le micro utilisé. À réfléchir :
-  - **Détection automatique** — Matcher le device par pattern dans le nom (ex: "AirPods" → preset Bluetooth, "MacBook" → preset intégré). Fournir quelques presets par défaut pour les cas courants.
-  - **Presets personnalisés** — Permettre à l'utilisateur de créer/éditer ses propres presets et de les associer à un device spécifique. Important car chaque micro a ses particularités.
 
 ## Intégrations Cloud & Modèles
 
