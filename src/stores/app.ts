@@ -2,9 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type Event } from '@tauri-apps/api/event'
-import { hasAsrSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
 import { useHistoryStore } from './history'
+import { useEnginesStore } from './engines'
 
 // Re-export all types for backward compatibility
 export type {
@@ -13,8 +13,6 @@ export type {
 } from './types'
 
 import type {
-  AudioDevice, EngineInfo, ASRModel, Language,
-  Provider, PermissionReport,
   RecordingStoppedPayload, TranscriptionStartedPayload,
   TranscriptionCompletePayload, DownloadProgressPayload,
   AppStatePayload,
@@ -23,6 +21,7 @@ import type {
 export const useAppStore = defineStore('app', () => {
   const settingsStore = useSettingsStore()
   const historyStore = useHistoryStore()
+  const enginesStore = useEnginesStore()
 
   // State
   const isRecording = ref(false)
@@ -30,12 +29,6 @@ export const useAppStore = defineStore('app', () => {
   const queueCount = ref(0)
   const activeDownloads = ref<Record<string, { progress: number; stopping: boolean; downloaded: number; totalSize: number; speed: number }>>({})
   const deletingModels = ref<Record<string, boolean>>({})
-  const engines = ref<EngineInfo[]>([])
-  const models = ref<ASRModel[]>([])
-  const languages = ref<Language[]>([])
-  const audioDevices = ref<AudioDevice[]>([])
-  const permissions = ref<PermissionReport>({ microphone: 'Undetermined', accessibility: 'Denied', input_monitoring: 'Denied' })
-  const providers = ref<Provider[]>([])
 
   // Proxy refs for backward compatibility (delegates to settings store)
   const selectedModelId = computed({ get: () => settingsStore.selectedModelId, set: v => { settingsStore.selectedModelId = v } })
@@ -58,105 +51,39 @@ export const useAppStore = defineStore('app', () => {
   // Proxy ref for history backward compat
   const history = computed({ get: () => historyStore.history, set: v => { historyStore.history = v } })
 
+  // Proxy refs for engines backward compat
+  const engines = computed(() => enginesStore.engines)
+  const models = computed(() => enginesStore.models)
+  const languages = computed(() => enginesStore.languages)
+  const audioDevices = computed(() => enginesStore.audioDevices)
+  const permissions = computed(() => enginesStore.permissions)
+  const providers = computed(() => enginesStore.providers)
+  const selectedEngine = computed(() => enginesStore.selectedEngine)
+  const downloadedModels = computed(() => enginesStore.downloadedModels)
+  const asrEngines = computed(() => enginesStore.asrEngines)
+  const llmEngines = computed(() => enginesStore.llmEngines)
+  const downloadedLlmModels = computed(() => enginesStore.downloadedLlmModels)
+  const punctuationEngines = computed(() => enginesStore.punctuationEngines)
+  const downloadedPunctuationModels = computed(() => enginesStore.downloadedPunctuationModels)
+  const bertModelReady = computed(() => enginesStore.bertModelReady)
+  const cleanupModels = computed(() => enginesStore.cleanupModels)
+  const asrModels = computed(() => enginesStore.asrModels)
+  const isCloudAsr = computed(() => enginesStore.isCloudAsr)
+  const asrCloudProviderId = computed(() => enginesStore.asrCloudProviderId)
+  const isCloudLlm = computed(() => enginesStore.isCloudLlm)
+  const isLocalLlm = computed(() => enginesStore.isLocalLlm)
+  const cleanupCloudProviderId = computed(() => enginesStore.cleanupCloudProviderId)
+
   // Computed
   const isBusy = computed(() => isRecording.value || isTranscribing.value || queueCount.value > 0 || Object.keys(activeDownloads.value).length > 0)
-  const selectedEngine = computed(() => {
-    const model = models.value.find(m => m.id === settingsStore.selectedModelId)
-    return model ? engines.value.find(e => e.id === model.engine_id) : null
-  })
-  const downloadedModels = computed(() => models.value.filter(m => {
-    if (m.download_type.type === 'RemoteAPI' || m.download_type.type === 'System') return true
-    return m.is_downloaded
-  }))
-  const asrEngines = computed(() => engines.value.filter(e => e.category === 'asr'))
-  const llmEngines = computed(() => engines.value.filter(e => e.category === 'llm'))
-  const downloadedLlmModels = computed(() => {
-    const llmEngineIds = new Set(llmEngines.value.map(e => e.id))
-    return models.value.filter(m => llmEngineIds.has(m.engine_id) && m.is_downloaded)
-  })
-  const punctuationEngines = computed(() => engines.value.filter(e => e.category === 'punctuation'))
-  const downloadedPunctuationModels = computed(() => {
-    const ids = new Set(punctuationEngines.value.map(e => e.id))
-    return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
-  })
-  const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
-  const cleanupModels = computed(() => {
-    const result: { id: string; label: string; group: string }[] = []
-    for (const m of downloadedPunctuationModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'bert' })
-    }
-    for (const m of downloadedLlmModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'llm' })
-    }
-    for (const p of providers.value) {
-      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
-    }
-    return result
-  })
-  const asrModels = computed(() => {
-    const result: { id: string; label: string; group: string }[] = []
-    const asrIds = new Set(asrEngines.value.map(e => e.id))
-    for (const m of models.value) {
-      if (!asrIds.has(m.engine_id)) continue
-      if (m.download_type.type === 'System' || m.is_downloaded) {
-        result.push({ id: m.id, label: m.label, group: 'local' })
-      }
-    }
-    for (const p of providers.value) {
-      if (hasAsrSupport(p)) {
-        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
-      }
-    }
-    return result
-  })
-  const isCloudAsr = computed(() => settingsStore.selectedModelId.startsWith('cloud:'))
-  const asrCloudProviderId = computed(() =>
-    isCloudAsr.value ? settingsStore.selectedModelId.slice('cloud:'.length) : ''
-  )
-  const isCloudLlm = computed(() => settingsStore.cleanupModelId.startsWith('cloud:'))
-  const isLocalLlm = computed(() => settingsStore.cleanupModelId.startsWith('llama:'))
-  const cleanupCloudProviderId = computed(() =>
-    isCloudLlm.value ? settingsStore.cleanupModelId.slice('cloud:'.length) : ''
-  )
 
   // Actions
-  async function fetchEngines() {
-    try { engines.value = await invoke('get_engines') }
-    catch (e) { console.error('fetchEngines failed:', e) }
-  }
-
-  async function fetchModels() {
-    try { models.value = await invoke('get_models') }
-    catch (e) { console.error('fetchModels failed:', e) }
-  }
-
-  async function fetchLanguages() {
-    try { languages.value = await invoke('get_languages') }
-    catch (e) { console.error('fetchLanguages failed:', e) }
-  }
-
-  async function fetchAudioDevices() {
-    try { audioDevices.value = await invoke('get_audio_devices') }
-    catch (e) { console.error('fetchAudioDevices failed:', e) }
-  }
-
-  async function fetchPermissions() {
-    try { permissions.value = await invoke('get_permissions') }
-    catch (e) { console.error('fetchPermissions failed:', e) }
-  }
-
-  async function fetchProviders() {
-    try { providers.value = await invoke('get_providers') }
-    catch (e) { console.error('fetchProviders failed:', e) }
-  }
-
   async function fetchState() {
     try {
       const state = await invoke<AppStatePayload>('get_app_state')
       isRecording.value = state.is_recording
       isTranscribing.value = state.is_transcribing
       queueCount.value = state.queue_count
-      // Hydrate activeDownloads from backend (preserve stopping flags for entries we already track)
       const hydrated: typeof activeDownloads.value = {}
       for (const [id, progress] of Object.entries(state.active_downloads ?? {})) {
         hydrated[id] = { progress, stopping: activeDownloads.value[id]?.stopping ?? false, downloaded: 0, totalSize: 0, speed: 0 }
@@ -168,9 +95,12 @@ export const useAppStore = defineStore('app', () => {
   // Delegated settings actions
   const { fetchSettings, setSetting, selectModel, selectLanguageAction } = settingsStore
 
+  // Delegated engines actions
+  const { fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices, fetchPermissions, fetchProviders, requestPermission, addProvider, removeProvider, updateProvider } = enginesStore
+
   async function downloadModel(id: string) {
     if (activeDownloads.value[id]) return false
-    const model = models.value.find(m => m.id === id)
+    const model = enginesStore.models.find(m => m.id === id)
     const initialProgress = model?.partial_progress ?? 0
     activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false, downloaded: 0, totalSize: model?.size ?? 0, speed: 0 } }
     try {
@@ -183,7 +113,7 @@ export const useAppStore = defineStore('app', () => {
       const entry = activeDownloads.value[id]
       if (entry) {
         const lastProgress = entry.progress
-        const m = models.value.find(m => m.id === id)
+        const m = enginesStore.models.find(m => m.id === id)
         if (m) {
           if (lastProgress >= 1) {
             m.is_downloaded = true
@@ -197,14 +127,14 @@ export const useAppStore = defineStore('app', () => {
         const { [id]: _, ...rest } = activeDownloads.value
         activeDownloads.value = rest
       }
-      fetchModels()
+      enginesStore.fetchModels()
     }
   }
 
   async function pauseDownload(id: string) {
     const entry = activeDownloads.value[id]
     if (!entry) return
-    const m = models.value.find(m => m.id === id)
+    const m = enginesStore.models.find(m => m.id === id)
     if (m && entry.progress > 0) {
       m.partial_progress = entry.progress
     }
@@ -218,12 +148,12 @@ export const useAppStore = defineStore('app', () => {
     if (activeDownloads.value[id]) {
       activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
     } else {
-      const m = models.value.find(m => m.id === id)
+      const m = enginesStore.models.find(m => m.id === id)
       if (m) m.partial_progress = null
     }
     try {
       await invoke('cancel_download', { id })
-      await fetchModels()
+      await enginesStore.fetchModels()
     } catch (e) { console.error('cancelDownload failed:', e) }
   }
 
@@ -232,7 +162,7 @@ export const useAppStore = defineStore('app', () => {
     try {
       const success = await invoke<boolean>('delete_model_cmd', { id })
       if (success) {
-        await fetchModels()
+        await enginesStore.fetchModels()
       }
       return success
     } catch (e) {
@@ -252,34 +182,10 @@ export const useAppStore = defineStore('app', () => {
   // Delegated history actions
   const { fetchHistory, clearHistoryAction, searchHistory, deleteHistoryEntry, deleteHistoryDay } = historyStore
 
-  async function requestPermission(kind: string) {
-    try { await invoke('request_permission', { kind }) }
-    catch (e) { console.error('requestPermission failed:', e) }
-  }
-
-  async function addProvider(provider: Provider) {
-    try {
-      await invoke('add_provider', { provider })
-      await fetchProviders()
-    } catch (e) { console.error('addProvider failed:', e) }
-  }
-
-  async function removeProvider(id: string) {
-    try {
-      await invoke('remove_provider', { id })
-      await fetchProviders()
-    } catch (e) { console.error('removeProvider failed:', e) }
-  }
-
-  async function updateProvider(provider: Provider) {
-    try {
-      await invoke('update_provider', { provider })
-      await fetchProviders()
-    } catch (e) { console.error('updateProvider failed:', e) }
-  }
-
   // Event listeners
   function setupListeners() {
+    enginesStore.setupListeners()
+
     listen('recording-started', () => {
       isRecording.value = true
     })
@@ -335,14 +241,6 @@ export const useAppStore = defineStore('app', () => {
         }
       }
     })
-
-    listen('permission-changed', () => {
-      fetchPermissions()
-    })
-
-    listen('models-changed', () => {
-      fetchModels()
-    })
   }
 
   // Initialize
@@ -354,12 +252,12 @@ export const useAppStore = defineStore('app', () => {
     await Promise.all([
       fetchState(),
       settingsStore.fetchSettings(),
-      fetchEngines(),
-      fetchModels(),
-      fetchLanguages(),
-      fetchPermissions(),
+      enginesStore.fetchEngines(),
+      enginesStore.fetchModels(),
+      enginesStore.fetchLanguages(),
+      enginesStore.fetchPermissions(),
       historyStore.fetchHistory(),
-      fetchProviders(),
+      enginesStore.fetchProviders(),
     ])
   }
 
