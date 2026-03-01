@@ -21,7 +21,7 @@
 
 ## Refactoring
 
-- [ ] **Splitter le store Pinia** — `app.ts` centralise tout (état, downloads, settings, history, providers, permissions). Splitter en sous-stores thématiques : `useDownloadStore`, `useSettingsStore`, `useHistoryStore`, `useProviderStore`, etc. Chaque store gère son propre état + actions. Le store principal ne garde que l'état runtime (recording, transcription, queue).
+- [x] **Splitter le store Pinia** — ~~`app.ts` centralise tout.~~ **Done.** Stores séparés : `app.ts` (runtime), `history.ts` (pagination backend + infinite scroll), `settings.ts`, `engines.ts`, `downloads.ts`.
 
 ## Documentation
 

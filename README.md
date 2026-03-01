@@ -14,7 +14,8 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
 - **Mic test** — test your microphone with live spectrum visualization in Settings
 - **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
-- **History badges** — each transcription shows processing details: ASR engine (local/cloud), language, text cleanup method (BERT/LLM/Cloud), and hallucination filter status
+- **History badges** — each transcription shows processing details: ASR engine (local/cloud), language, text cleanup method (BERT/LLM/Cloud), hallucination filter status, and VAD silence trimming — with styled tooltips (shadcn-vue)
+- **Paginated history** — backend-driven search (SQLite LIKE) and infinite scroll for fast opening even with thousands of entries
 
 ## Requirements
 
@@ -224,7 +225,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed architecture guide with da
 src/                     Vue frontend
   views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
   components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, BenchmarkBadges, …)
-  stores/app.ts          Pinia store
+  stores/                Pinia stores (app, history, settings, engines, downloads)
   config/providers.ts    Cloud provider presets and model filter helpers
   utils/                 Shared utilities (shortcut types, formatting, byte/speed formatters)
   i18n/                  Translations (en.json, fr.json)

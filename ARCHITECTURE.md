@@ -44,9 +44,9 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
-| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL with additive migrations for `cleanup_model_id` and `hallucination_filter` columns), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext. `Provider` struct includes `cached_models: Vec<String>`. `ProviderKind::base_url()` resolves canonical API URLs at runtime for known providers (Custom uses stored URL). |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL with additive migrations for `cleanup_model_id`, `hallucination_filter`, and `vad_trimmed` columns), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext. History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search — `get_history(query, limit, offset)` and `history_count(query)`. `Provider` struct includes `cached_models: Vec<String>`. `ProviderKind::base_url()` resolves canonical API URLs at runtime for known providers (Custom uses stored URL). |
 | `migrations.rs` | Versioned preference migrations. Each migration is a numbered function receiving raw JSON + typed `Preferences`. Runs on startup if `_version` < current. v1: legacy format unification (api_servers, llm_config, cleanup_mode). v2: model file relocation to `~/Library/Application Support/WhisperDictate/models/`. v3: update llm_max_tokens default from 256 to 4096 (autoscale hard cap). |
-| `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD check → transcribe → paste) and all background thread spawning. VAD pre-check discards silent recordings and trims silence before transcription. Cancel support during both recording (discard audio) and transcription (cancel flag checked before paste). LLM cleanup uses autoscale max_tokens (capped by user hard cap, default 4096) with fallback to raw text on any error. |
+| `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD check → transcribe → paste) and all background thread spawning. VAD pre-check discards silent recordings and trims silence before transcription; `vad_trimmed` bool threaded through to history and frontend event. Cancel support during both recording (discard audio) and transcription (cancel flag checked before paste). LLM cleanup uses autoscale max_tokens (capped by user hard cap, default 4096) with fallback to raw text on any error. Success pill close uses `PILL_CLOSE_GENERATION` guard (same as error path) to prevent race conditions when re-recording immediately. |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
 
@@ -128,7 +128,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `SetupWizard.vue` | `/setup` | Two-step wizard: permissions, then initial configuration |
 | `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). Refresh buttons to re-fetch models from cloud providers. Token hard cap slider (128–8192). |
 | `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
-| `History.vue` | `/history` | Transcription history timeline with search, deletion, and processing badges (ASR local/cloud, language, cleanup method, hallucination filter) |
+| `History.vue` | `/history` | Transcription history timeline with backend-driven search (SQLite LIKE) and infinite scroll pagination. Processing badges with shadcn-vue tooltips: ASR local/cloud, language, cleanup method, hallucination filter, VAD trimmed. |
 
 ### Key components
 
@@ -139,11 +139,11 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `SetupStep2.vue` | Initial configuration form (hotkey, recording mode, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
-| `ProviderForm.vue` | Reusable form for configuring cloud providers (9 presets + custom). Includes a Test button that validates the API key and fetches available models (`fetch_provider_models`). Fetched models are cached on the Provider and used in Settings dropdowns. |
+| `ProviderForm.vue` | Reusable form for configuring cloud providers (9 presets + custom). Includes a Test button that validates the API key and fetches available models (`fetch_provider_models`). Fetched models are cached on the Provider and used in Settings dropdowns. Error feedback in a styled alert box (border + icon). |
 
 ### State management
 
-`stores/app.ts` is the single Pinia store. It holds all reactive state, wraps every `invoke()` call with optimistic updates and rollback, and sets up Tauri event listeners on init. Download state uses an `activeDownloads` map (model ID → progress/speed/stopping) enabling parallel downloads. Pause transitions use optimistic updates (immediate state swap, no async gap) to avoid visual flash.
+Pinia stores are split by domain: `app.ts` (runtime state + event listeners), `history.ts` (paginated history with backend-driven search and infinite scroll), `settings.ts`, `engines.ts`, `downloads.ts`. Download state uses an `activeDownloads` map (model ID → progress/speed/stopping) enabling parallel downloads. Pause transitions use optimistic updates (immediate state swap, no async gap) to avoid visual flash.
 
 ### Utilities
 
@@ -194,9 +194,9 @@ Main thread (Tauri + Tokio runtime)
 9. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM with autoscale max_tokens), then finalize (spacing, capitalization). On any LLM error, falls back to raw transcription.
 10. **Cancel check** → `transcription_cancelled` flag verified before paste — if cancel arrived during cleanup, text is discarded
 11. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
-12. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
+12. **History** → entry saved to SQLite (with cleanup_model_id, hallucination_filter, vad_trimmed metadata) → frontend notified via event
 
-**Cancel flow:** Escape during recording → `cancel_recording()` stops audio, discards file, shows error cross. Escape during transcription → `cancel_transcription()` sets cancel flag, clears queue. Delayed pill close uses a generation counter to prevent stale closes from interfering with new recordings.
+**Cancel flow:** Escape during recording → `cancel_recording()` stops audio, discards file, shows error cross. Escape during transcription → `cancel_transcription()` sets cancel flag, clears queue. Both error and success delayed pill closes use a generation counter (`PILL_CLOSE_GENERATION`) to prevent stale closes from interfering with new recordings.
 
 ## Configuration
 
