@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useEnginesStore } from '@/stores/engines'
 import { Button } from '@/components/ui/button'
 import { Check } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
@@ -11,10 +12,11 @@ import SetupStep2 from '@/components/SetupStep2.vue'
 
 const { t } = useI18n()
 const store = useAppStore()
+const enginesStore = useEnginesStore()
 const step = ref(1)
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
-const permissions = computed(() => store.permissions)
+const permissions = computed(() => enginesStore.permissions)
 
 const canContinue = computed(() =>
   permissions.value.microphone === 'Granted' &&
@@ -44,7 +46,7 @@ const permissionItems = computed(() => [
 ])
 
 async function grant(kind: string) {
-  await store.requestPermission(kind)
+  await enginesStore.requestPermission(kind)
 }
 
 function goToStep2() {
@@ -72,7 +74,7 @@ watch(step, async (newStep) => {
   } else {
     // Resume polling
     if (!pollInterval) {
-      pollInterval = setInterval(() => store.fetchPermissions(), 1500)
+      pollInterval = setInterval(() => enginesStore.fetchPermissions(), 1500)
     }
     await win.setSize(new LogicalSize(420, 450))
   }
@@ -80,9 +82,9 @@ watch(step, async (newStep) => {
 
 onMounted(() => {
   getCurrentWindow().setTitle(t('window.setup'))
-  store.fetchPermissions()
+  enginesStore.fetchPermissions()
   pollInterval = setInterval(() => {
-    store.fetchPermissions()
+    enginesStore.fetchPermissions()
   }, 1500)
 })
 

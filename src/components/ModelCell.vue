@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, type ASRModel } from '@/stores/app'
+import { useDownloadStore } from '@/stores/downloads'
+import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Trash2, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +11,7 @@ import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 import { formatSize, formatSpeed } from '@/utils/format'
 
 const { t } = useI18n()
-const store = useAppStore()
+const downloads = useDownloadStore()
 
 const props = defineProps<{
   model: ASRModel
@@ -21,7 +22,7 @@ const emit = defineEmits<{
   delete: [model: ASRModel]
 }>()
 
-const dl = computed(() => store.activeDownloads[props.model.id])
+const dl = computed(() => downloads.activeDownloads[props.model.id])
 const isDownloading = computed(() => !!dl.value)
 const progress = computed(() => dl.value?.progress ?? 0)
 const isStopping = computed(() => dl.value?.stopping ?? false)
@@ -32,7 +33,7 @@ const isDownloaded = computed(() => {
   return props.model.is_downloaded
 })
 
-const isDeleting = computed(() => !!store.deletingModels[props.model.id])
+const isDeleting = computed(() => !!downloads.deletingModels[props.model.id])
 
 const isPaused = computed(() => {
   return !isDownloading.value && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
@@ -69,10 +70,10 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
             <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
           </template>
           <template v-else>
-            <Button variant="ghost" size="icon-sm" @click="store.pauseDownload(model.id)" :title="t('modelManager.pause')">
+            <Button variant="ghost" size="icon-sm" @click="downloads.pauseDownload(model.id)" :title="t('modelManager.pause')">
               <Pause class="w-3.5 h-3.5" />
             </Button>
-            <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+            <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
               <X class="w-3.5 h-3.5" />
             </Button>
           </template>
@@ -91,7 +92,7 @@ const speedText = computed(() => dl.value ? formatSpeed(dl.value.speed) : '')
           <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
             <Play class="w-3.5 h-3.5" />
           </Button>
-          <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+          <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
             <X class="w-3.5 h-3.5" />
           </Button>
         </div>

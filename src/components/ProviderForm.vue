@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
-import type { Provider, ProviderKind } from '@/stores/app'
+import type { Provider, ProviderKind } from '@/stores/types'
 import { PROVIDER_PRESETS, PRESET_ENTRIES } from '@/config/providers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

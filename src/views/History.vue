@@ -3,7 +3,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
-import type { HistoryEntry } from '@/stores/app'
+import { useHistoryStore } from '@/stores/history'
+import { useEnginesStore } from '@/stores/engines'
+import type { HistoryEntry } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -20,6 +22,8 @@ import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck } from
 
 const { t } = useI18n()
 const store = useAppStore()
+const historyStore = useHistoryStore()
+const enginesStore = useEnginesStore()
 
 const searchQuery = ref('')
 const copiedTimestamp = ref<number | null>(null)
@@ -34,13 +38,13 @@ const filteredHistory = ref<HistoryEntry[]>([])
 function updateFiltered() {
   const q = searchQuery.value.toLowerCase()
   if (!q) {
-    filteredHistory.value = store.history
+    filteredHistory.value = historyStore.history
   } else {
-    filteredHistory.value = store.history.filter(e => e.text.toLowerCase().includes(q))
+    filteredHistory.value = historyStore.history.filter(e => e.text.toLowerCase().includes(q))
   }
 }
 
-watch(() => store.history, updateFiltered, { deep: true })
+watch(() => historyStore.history, updateFiltered, { deep: true })
 watch(searchQuery, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(updateFiltered, 150)
@@ -115,10 +119,10 @@ async function copyEntry(entry: HistoryEntry) {
 function formatAsrLabel(modelId: string): string {
   if (modelId.startsWith('cloud:')) {
     const providerId = modelId.slice('cloud:'.length)
-    const provider = store.providers.find(p => p.id === providerId)
+    const provider = enginesStore.providers.find(p => p.id === providerId)
     return provider ? provider.name : 'Cloud'
   }
-  const model = store.models.find(m => m.id === modelId)
+  const model = enginesStore.models.find(m => m.id === modelId)
   return model ? model.label : modelId
 }
 
@@ -130,11 +134,11 @@ function formatCleanupLabel(id: string): string {
   if (id.startsWith('bert-punctuation:')) return 'BERT'
   if (id.startsWith('cloud:')) {
     const providerId = id.slice('cloud:'.length)
-    const provider = store.providers.find(p => p.id === providerId)
+    const provider = enginesStore.providers.find(p => p.id === providerId)
     return provider ? provider.name : 'Cloud LLM'
   }
   // Local LLM (llama:*)
-  const model = store.models.find(m => m.id === id)
+  const model = enginesStore.models.find(m => m.id === id)
   return model ? model.label : id
 }
 
@@ -145,7 +149,7 @@ function cleanupBadgeType(id: string): 'bert' | 'cloud' | 'local' {
 }
 
 async function deleteEntry(entry: HistoryEntry) {
-  await store.deleteHistoryEntry(entry.timestamp)
+  await historyStore.deleteHistoryEntry(entry.timestamp)
 }
 
 function confirmDeleteDay(dayTimestamp: number) {
@@ -155,12 +159,12 @@ function confirmDeleteDay(dayTimestamp: number) {
 
 async function doDeleteDay() {
   showDeleteDayConfirm.value = false
-  await store.deleteHistoryDay(deleteDayTarget.value)
+  await historyStore.deleteHistoryDay(deleteDayTarget.value)
 }
 
 async function doClearAll() {
   showClearAllConfirm.value = false
-  await store.clearHistoryAction()
+  await historyStore.clearHistoryAction()
 }
 </script>
 
@@ -170,7 +174,7 @@ async function doClearAll() {
     <div class="flex items-center justify-between px-5 pt-5 pb-2">
       <h1 class="text-lg font-semibold">{{ t('history.title') }}</h1>
       <Button
-        v-if="store.history.length > 0"
+        v-if="historyStore.history.length > 0"
         variant="ghost"
         size="sm"
         class="text-destructive hover:text-destructive"
@@ -193,7 +197,7 @@ async function doClearAll() {
     <!-- Content -->
     <div class="flex-1 overflow-y-auto px-5 pb-5">
       <!-- Empty state -->
-      <div v-if="store.history.length === 0" class="flex items-center justify-center h-full text-muted-foreground text-sm">
+      <div v-if="historyStore.history.length === 0" class="flex items-center justify-center h-full text-muted-foreground text-sm">
         {{ t('history.empty') }}
       </div>
 

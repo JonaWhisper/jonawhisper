@@ -2,7 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useAppStore, type ASRModel, type EngineInfo } from '@/stores/app'
+import { useEnginesStore } from '@/stores/engines'
+import { useDownloadStore } from '@/stores/downloads'
+import type { ASRModel, EngineInfo } from '@/stores/types'
 import ModelCell from '@/components/ModelCell.vue'
 import {
   AlertDialog,
@@ -16,19 +18,20 @@ import {
 } from '@/components/ui/alert-dialog'
 
 const { t } = useI18n()
-const store = useAppStore()
+const engines = useEnginesStore()
+const downloads = useDownloadStore()
 
 const selectedEngineId = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
 
 const filteredModels = computed(() => {
-  if (!selectedEngineId.value) return store.models
-  return store.models.filter(m => m.engine_id === selectedEngineId.value)
+  if (!selectedEngineId.value) return engines.models
+  return engines.models.filter(m => m.engine_id === selectedEngineId.value)
 })
 
 const selectedEngineInfo = computed(() => {
-  return store.engines.find(e => e.id === selectedEngineId.value)
+  return engines.engines.find(e => e.id === selectedEngineId.value)
 })
 
 function selectEngine(engine: EngineInfo) {
@@ -36,7 +39,7 @@ function selectEngine(engine: EngineInfo) {
 }
 
 async function handleDownload(model: ASRModel) {
-  await store.downloadModel(model.id)
+  await downloads.downloadModel(model.id)
 }
 
 function handleDeleteRequest(model: ASRModel) {
@@ -49,17 +52,17 @@ async function confirmDelete() {
   showDeleteConfirm.value = false
   deleteTarget.value = null
   if (target) {
-    await store.deleteModel(target.id)
+    await downloads.deleteModel(target.id)
   }
 }
 
 onMounted(async () => {
   getCurrentWindow().setTitle(t('window.modelManager'))
-  await Promise.all([store.fetchEngines(), store.fetchModels()])
-  if (store.engines.length > 0 && !selectedEngineId.value) {
+  await Promise.all([engines.fetchEngines(), engines.fetchModels()])
+  if (engines.engines.length > 0 && !selectedEngineId.value) {
     // Default to first ASR engine
-    const firstAsr = store.asrEngines[0]
-    selectedEngineId.value = firstAsr?.id ?? store.engines[0]?.id ?? null
+    const firstAsr = engines.asrEngines[0]
+    selectedEngineId.value = firstAsr?.id ?? engines.engines[0]?.id ?? null
   }
 })
 </script>
@@ -75,7 +78,7 @@ onMounted(async () => {
       </div>
       <div class="space-y-1 px-1">
         <button
-          v-for="engine in store.asrEngines"
+          v-for="engine in engines.asrEngines"
           :key="engine.id"
           @click="selectEngine(engine)"
           class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"
@@ -86,7 +89,7 @@ onMounted(async () => {
           <span class="font-medium truncate">{{ engine.name }}</span>
         </button>
       </div>
-      <template v-if="store.punctuationEngines.length > 0">
+      <template v-if="engines.punctuationEngines.length > 0">
         <div class="px-3 pt-4 pb-1">
           <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             {{ t('modelManager.punctuation') }}
@@ -94,7 +97,7 @@ onMounted(async () => {
         </div>
         <div class="space-y-1 px-1">
           <button
-            v-for="engine in store.punctuationEngines"
+            v-for="engine in engines.punctuationEngines"
             :key="engine.id"
             @click="selectEngine(engine)"
             class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"
@@ -106,7 +109,7 @@ onMounted(async () => {
           </button>
         </div>
       </template>
-      <template v-if="store.llmEngines.length > 0">
+      <template v-if="engines.llmEngines.length > 0">
         <div class="px-3 pt-4 pb-1">
           <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             {{ t('modelManager.postProcessing') }}
@@ -114,7 +117,7 @@ onMounted(async () => {
         </div>
         <div class="space-y-1 px-1">
           <button
-            v-for="engine in store.llmEngines"
+            v-for="engine in engines.llmEngines"
             :key="engine.id"
             @click="selectEngine(engine)"
             class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"

@@ -2,7 +2,9 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { useAppStore, type Provider } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useEnginesStore } from '@/stores/engines'
+import type { Provider } from '@/stores/types'
 import { getAsrModels, getLlmModels } from '@/config/providers'
 import { Settings, Cloud, Sparkles, Keyboard, Mic, AudioLines, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Pencil, Trash2, Plus, RefreshCw, Loader2 } from 'lucide-vue-next'
 import type { Component } from 'vue'
@@ -37,7 +39,8 @@ import ProviderForm from '@/components/ProviderForm.vue'
 import { serializeShortcut } from '@/utils/shortcut'
 
 const { t } = useI18n()
-const store = useAppStore()
+const settings = useSettingsStore()
+const engines = useEnginesStore()
 
 // Active section
 const activeSection = ref('general')
@@ -64,36 +67,36 @@ const localeOptions = [
 
 async function onLocaleChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('app_locale', value)
+  await settings.setSetting('app_locale', value)
   // Rust handles tray labels; resolve effective locale for frontend
   const locale = await invoke<string>('get_system_locale')
   i18n.global.locale.value = locale as 'fr' | 'en'
 }
 
 async function onHallucinationFilterChange(enabled: boolean) {
-  await store.setSetting('hallucination_filter_enabled', String(enabled))
+  await settings.setSetting('hallucination_filter_enabled', String(enabled))
 }
 
 async function onAudioDuckingChange(enabled: boolean) {
-  await store.setSetting('audio_ducking_enabled', String(enabled))
+  await settings.setSetting('audio_ducking_enabled', String(enabled))
 }
 
-const duckingSliderValue = ref(store.audioDuckingLevel * 100)
-watch(() => store.audioDuckingLevel, (v) => { duckingSliderValue.value = v * 100 })
+const duckingSliderValue = ref(settings.audioDuckingLevel * 100)
+watch(() => settings.audioDuckingLevel, (v) => { duckingSliderValue.value = v * 100 })
 function onDuckingSliderUpdate(v: number[] | undefined) {
   if (v?.[0] != null) duckingSliderValue.value = v[0]
 }
 function onDuckingSliderCommit(v: number[]) {
   const val = v[0] ?? duckingSliderValue.value
-  store.setSetting('audio_ducking_level', String(val / 100))
+  settings.setSetting('audio_ducking_level', String(val / 100))
 }
 
 async function onHotkeyChange(value: string) {
-  await store.setSetting('hotkey', value)
+  await settings.setSetting('hotkey', value)
 }
 
 async function onCancelShortcutChange(value: string) {
-  await store.setSetting('cancel_shortcut', value)
+  await settings.setSetting('cancel_shortcut', value)
 }
 
 function onDisableCancel() {
@@ -102,7 +105,7 @@ function onDisableCancel() {
 }
 
 async function onRecordingModeChange(mode: string) {
-  await store.setSetting('recording_mode', mode)
+  await settings.setSetting('recording_mode', mode)
 }
 
 const TRANSPORT_ICONS: Record<string, Component> = {
@@ -114,23 +117,22 @@ function deviceIcon(type: string): Component { return TRANSPORT_ICONS[type] ?? M
 
 // Selected device UID: use the stored preference, or the default device UID
 const selectedDeviceUid = computed(() => {
-  const settings = store.audioDevices
-  const stored = settings.find(d => d.uid === store.selectedInputDeviceUid)
+  const devices = engines.audioDevices
+  const stored = devices.find(d => d.uid === settings.selectedInputDeviceUid)
   if (stored) return stored.uid
-  const def = settings.find(d => d.is_default)
+  const def = devices.find(d => d.is_default)
   return def?.uid ?? ''
 })
 
 const selectedDevice = computed(() =>
-  store.audioDevices.find(d => d.uid === selectedDeviceUid.value)
+  engines.audioDevices.find(d => d.uid === selectedDeviceUid.value)
 )
 
 async function onDeviceChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  // If selecting the default device, store empty string (= use system default)
-  const defaultDevice = store.audioDevices.find(d => d.is_default)
+  const defaultDevice = engines.audioDevices.find(d => d.is_default)
   const uid = (defaultDevice && value === defaultDevice.uid) ? '' : value
-  await store.setSetting('selected_input_device_uid', uid)
+  await settings.setSetting('selected_input_device_uid', uid)
 }
 
 // -- Providers management --
@@ -150,7 +152,7 @@ function cancelAddProvider() {
 }
 
 async function saveNewProvider(provider: Provider) {
-  await store.addProvider(provider)
+  await engines.addProvider(provider)
   showAddForm.value = false
 }
 
@@ -163,7 +165,7 @@ function cancelEditProvider(providerId: string) {
 }
 
 async function saveEditedProvider(provider: Provider) {
-  await store.updateProvider(provider)
+  await engines.updateProvider(provider)
   editingProviderIds.value.delete(provider.id)
 }
 
@@ -174,7 +176,7 @@ function requestRemoveProvider(provider: Provider) {
 
 async function confirmRemoveProvider() {
   if (removeTarget.value) {
-    await store.removeProvider(removeTarget.value.id)
+    await engines.removeProvider(removeTarget.value.id)
   }
   showRemoveConfirm.value = false
   removeTarget.value = null
@@ -185,21 +187,21 @@ const CUSTOM_MODEL_VALUE = '_custom'
 
 async function onAsrModelChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('selected_model_id', value)
+  await settings.setSetting('selected_model_id', value)
 }
 
 async function onLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('selected_language', value)
+  await settings.setSetting('selected_language', value)
 }
 
 async function onGpuModeChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('gpu_mode', value)
+  await settings.setSetting('gpu_mode', value)
 }
 
 const asrSelectedProvider = computed(() =>
-  store.providers.find(p => p.id === store.asrCloudProviderId)
+  engines.providers.find(p => p.id === engines.asrCloudProviderId)
 )
 
 const asrModelOptions = computed(() => {
@@ -209,39 +211,39 @@ const asrModelOptions = computed(() => {
 
 const isCustomAsrModel = computed(() => {
   if (asrModelOptions.value.length === 0) return true
-  return !asrModelOptions.value.includes(store.asrCloudModel)
+  return !asrModelOptions.value.includes(settings.asrCloudModel)
 })
 
 const asrModelSelectValue = computed(() => {
   if (asrModelOptions.value.length === 0) return CUSTOM_MODEL_VALUE
-  if (asrModelOptions.value.includes(store.asrCloudModel)) return store.asrCloudModel
+  if (asrModelOptions.value.includes(settings.asrCloudModel)) return settings.asrCloudModel
   return CUSTOM_MODEL_VALUE
 })
 
 async function onAsrModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   if (value === CUSTOM_MODEL_VALUE) {
-    await store.setSetting('asr_cloud_model', '')
+    await settings.setSetting('asr_cloud_model', '')
     return
   }
-  await store.setSetting('asr_cloud_model', value)
+  await settings.setSetting('asr_cloud_model', value)
 }
 
 let asrModelDebounce: ReturnType<typeof setTimeout> | null = null
 
 function onAsrModelInput(event: Event) {
   const value = (event.target as HTMLInputElement).value
-  store.asrCloudModel = value
+  settings.asrCloudModel = value
   if (asrModelDebounce) clearTimeout(asrModelDebounce)
   asrModelDebounce = setTimeout(() => {
-    store.setSetting('asr_cloud_model', value)
+    settings.setSetting('asr_cloud_model', value)
   }, 500)
 }
 
 // -- LLM config --
 
 const llmSelectedProvider = computed(() =>
-  store.providers.find(p => p.id === store.cleanupCloudProviderId)
+  engines.providers.find(p => p.id === engines.cleanupCloudProviderId)
 )
 
 const llmModelOptions = computed(() => {
@@ -260,7 +262,7 @@ async function refreshModels(provider: Provider | undefined, loadingRef: { value
   loadingRef.value = true
   try {
     const models = await invoke<string[]>('fetch_provider_models', { provider })
-    await store.updateProvider({ ...provider, cached_models: models })
+    await engines.updateProvider({ ...provider, cached_models: models })
   } catch (e) {
     console.error('refreshModels failed:', e)
   } finally {
@@ -279,33 +281,33 @@ function refreshLlmModels() {
 let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
 
 async function onTextCleanupChange(enabled: boolean) {
-  await store.setSetting('text_cleanup_enabled', String(enabled))
+  await settings.setSetting('text_cleanup_enabled', String(enabled))
 }
 
 async function onCleanupModelChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('cleanup_model_id', value)
+  await settings.setSetting('cleanup_model_id', value)
 }
 
 function onMaxTokensSliderUpdate(v: number[] | undefined) {
-  if (v?.[0] != null) store.llmMaxTokens = v[0]
+  if (v?.[0] != null) settings.llmMaxTokens = v[0]
 }
 function onMaxTokensSliderCommit(v: number[]) {
-  const val = v[0] ?? store.llmMaxTokens
-  store.setSetting('llm_max_tokens', String(val))
+  const val = v[0] ?? settings.llmMaxTokens
+  settings.setSetting('llm_max_tokens', String(val))
 }
 
 async function onLlmModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.setSetting('llm_model', value)
+  await settings.setSetting('llm_model', value)
 }
 
 function onLlmModelInput(event: Event) {
   const value = (event.target as HTMLInputElement).value
-  store.llmModel = value
+  settings.llmModel = value
   if (llmModelDebounce) clearTimeout(llmModelDebounce)
   llmModelDebounce = setTimeout(() => {
-    store.setSetting('llm_model', value)
+    settings.setSetting('llm_model', value)
   }, 500)
 }
 
@@ -343,12 +345,12 @@ let micTestStoppedUnlisten: (() => void) | null = null
 onMounted(async () => {
   getCurrentWindow().setTitle(t('window.settings'))
   await Promise.all([
-    store.fetchSettings(),
-    store.fetchAudioDevices(),
-    store.fetchProviders(),
-    store.fetchEngines(),
-    store.fetchModels(),
-    store.fetchLanguages(),
+    settings.fetchSettings(),
+    engines.fetchAudioDevices(),
+    engines.fetchProviders(),
+    engines.fetchEngines(),
+    engines.fetchModels(),
+    engines.fetchLanguages(),
   ])
 
   // Listen for mic test being auto-cancelled (e.g. recording started while testing)
@@ -407,7 +409,7 @@ onUnmounted(() => {
         <div class="space-y-4">
           <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.locale') }}</Label>
-            <Select :model-value="store.appLocale" @update:model-value="onLocaleChange">
+            <Select :model-value="settings.appLocale" @update:model-value="onLocaleChange">
               <SelectTrigger class="w-full h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
@@ -436,11 +438,11 @@ onUnmounted(() => {
         </div>
 
         <div class="space-y-3">
-          <div v-if="store.providers.length === 0 && !showAddForm" class="text-sm text-muted-foreground">
+          <div v-if="engines.providers.length === 0 && !showAddForm" class="text-sm text-muted-foreground">
             {{ t('settings.providers.empty') }}
           </div>
 
-          <div v-for="provider in store.providers" :key="provider.id" class="rounded-md border border-border">
+          <div v-for="provider in engines.providers" :key="provider.id" class="rounded-md border border-border">
             <!-- Edit mode: inline form -->
             <div v-if="editingProviderIds.has(provider.id)" class="p-4">
               <ProviderForm
@@ -485,8 +487,8 @@ onUnmounted(() => {
           <div class="space-y-1">
             <Label class="text-sm font-medium">{{ t('settings.transcription.model') }}</Label>
             <Select
-              v-if="store.asrModels.length > 0"
-              :model-value="store.selectedModelId"
+              v-if="engines.asrModels.length > 0"
+              :model-value="settings.selectedModelId"
               @update:model-value="onAsrModelChange"
             >
               <SelectTrigger class="w-full h-9 text-sm">
@@ -494,7 +496,7 @@ onUnmounted(() => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="m in store.asrModels"
+                  v-for="m in engines.asrModels"
                   :key="m.id"
                   :value="m.id"
                 >
@@ -508,7 +510,7 @@ onUnmounted(() => {
           </div>
 
           <!-- Cloud ASR sub-settings (model name) -->
-          <template v-if="store.isCloudAsr && asrSelectedProvider">
+          <template v-if="engines.isCloudAsr && asrSelectedProvider">
             <div class="space-y-1">
               <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
               <div v-if="asrModelOptions.length > 0" class="flex items-center gap-2">
@@ -545,7 +547,7 @@ onUnmounted(() => {
               </div>
               <Input
                 v-if="isCustomAsrModel"
-                :value="store.asrCloudModel"
+                :value="settings.asrCloudModel"
                 @input="onAsrModelInput"
                 :placeholder="t('settings.cloudAsr.customPlaceholder')"
                 class="h-9 text-sm mt-1.5"
@@ -556,13 +558,13 @@ onUnmounted(() => {
           <!-- Language -->
           <div class="space-y-1">
             <Label class="text-sm font-medium">{{ t('settings.transcription.language') }}</Label>
-            <Select :model-value="store.selectedLanguage" @update:model-value="onLanguageChange">
+            <Select :model-value="settings.selectedLanguage" @update:model-value="onLanguageChange">
               <SelectTrigger class="w-full h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="lang in store.languages"
+                  v-for="lang in engines.languages"
                   :key="lang.code"
                   :value="lang.code"
                 >
@@ -573,9 +575,9 @@ onUnmounted(() => {
           </div>
 
           <!-- GPU Acceleration (local only) -->
-          <div v-if="!store.isCloudAsr" class="space-y-1">
+          <div v-if="!engines.isCloudAsr" class="space-y-1">
             <Label class="text-sm font-medium">{{ t('settings.transcription.gpuMode') }}</Label>
-            <Select :model-value="store.gpuMode" @update:model-value="onGpuModeChange">
+            <Select :model-value="settings.gpuMode" @update:model-value="onGpuModeChange">
               <SelectTrigger class="w-full h-9 text-sm">
                 <SelectValue />
               </SelectTrigger>
@@ -597,7 +599,7 @@ onUnmounted(() => {
           <div class="flex items-center justify-between gap-4">
             <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
             <Switch
-              :model-value="store.hallucinationFilterEnabled"
+              :model-value="settings.hallucinationFilterEnabled"
               @update:model-value="onHallucinationFilterChange"
             />
           </div>
@@ -606,29 +608,29 @@ onUnmounted(() => {
           <div class="flex items-center justify-between gap-4">
             <Label class="text-sm shrink-0">{{ t('settings.postProcessing.textCleanup') }}</Label>
             <Switch
-              :model-value="store.textCleanupEnabled"
+              :model-value="settings.textCleanupEnabled"
               @update:model-value="onTextCleanupChange"
             />
           </div>
 
           <!-- Cleanup model selector + sub-settings (only when cleanup enabled) -->
           <div
-            v-if="store.textCleanupEnabled"
+            v-if="settings.textCleanupEnabled"
             class="space-y-4 pl-4 border-l-2 border-border"
           >
             <!-- Model selector -->
             <div class="space-y-1">
               <Label class="text-xs text-muted-foreground">{{ t('settings.postProcessing.cleanupModel') }}</Label>
               <Select
-                v-if="store.cleanupModels.length > 0"
-                :model-value="store.cleanupModelId"
+                v-if="engines.cleanupModels.length > 0"
+                :model-value="settings.cleanupModelId"
                 @update:model-value="onCleanupModelChange"
               >
                 <SelectTrigger class="w-full h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <template v-for="m in store.cleanupModels" :key="m.id">
+                  <template v-for="m in engines.cleanupModels" :key="m.id">
                     <SelectItem :value="m.id">
                       {{ m.label }}
                     </SelectItem>
@@ -641,14 +643,14 @@ onUnmounted(() => {
             </div>
 
             <!-- Cloud LLM sub-settings (provider already selected via model dropdown) -->
-            <template v-if="store.isCloudLlm && llmSelectedProvider">
+            <template v-if="engines.isCloudLlm && llmSelectedProvider">
               <div class="space-y-1">
                 <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
                 <div class="flex items-center gap-2">
                   <Select
                     v-if="!isCustomLlmModel"
                     class="flex-1"
-                    :model-value="store.llmModel"
+                    :model-value="settings.llmModel"
                     @update:model-value="onLlmModelSelect"
                   >
                     <SelectTrigger class="w-full h-9 text-sm">
@@ -666,7 +668,7 @@ onUnmounted(() => {
                   </Select>
                   <Input
                     v-else
-                    :value="store.llmModel"
+                    :value="settings.llmModel"
                     @input="onLlmModelInput"
                     class="h-9 text-sm flex-1"
                   />
@@ -688,10 +690,10 @@ onUnmounted(() => {
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
                   <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-                  <span class="text-xs text-muted-foreground tabular-nums">{{ store.llmMaxTokens }}</span>
+                  <span class="text-xs text-muted-foreground tabular-nums">{{ settings.llmMaxTokens }}</span>
                 </div>
                 <Slider
-                  :model-value="[store.llmMaxTokens]"
+                  :model-value="[settings.llmMaxTokens]"
                   :min="128"
                   :max="8192"
                   :step="128"
@@ -702,14 +704,14 @@ onUnmounted(() => {
             </template>
 
             <!-- Local LLM sub-settings (token hard cap) -->
-            <template v-if="store.isLocalLlm">
+            <template v-if="engines.isLocalLlm">
               <div class="space-y-2">
                 <div class="flex items-center justify-between">
                   <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-                  <span class="text-xs text-muted-foreground tabular-nums">{{ store.llmMaxTokens }}</span>
+                  <span class="text-xs text-muted-foreground tabular-nums">{{ settings.llmMaxTokens }}</span>
                 </div>
                 <Slider
-                  :model-value="[store.llmMaxTokens]"
+                  :model-value="[settings.llmMaxTokens]"
                   :min="128"
                   :max="8192"
                   :step="128"
@@ -733,7 +735,7 @@ onUnmounted(() => {
             <div class="inline-flex rounded-md border border-border overflow-hidden">
               <button
                 class="px-3 py-1.5 text-sm transition-colors whitespace-nowrap"
-                :class="store.recordingMode === 'push_to_talk'
+                :class="settings.recordingMode === 'push_to_talk'
                   ? 'bg-accent text-accent-foreground'
                   : 'hover:bg-accent/50 text-muted-foreground'"
                 @click="onRecordingModeChange('push_to_talk')"
@@ -742,7 +744,7 @@ onUnmounted(() => {
               </button>
               <button
                 class="px-3 py-1.5 text-sm border-l border-border transition-colors whitespace-nowrap"
-                :class="store.recordingMode === 'toggle'
+                :class="settings.recordingMode === 'toggle'
                   ? 'bg-accent text-accent-foreground'
                   : 'hover:bg-accent/50 text-muted-foreground'"
                 @click="onRecordingModeChange('toggle')"
@@ -755,7 +757,7 @@ onUnmounted(() => {
           <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.record') }}</Label>
             <ShortcutCapture
-              :model-value="store.hotkey"
+              :model-value="settings.hotkey"
               @update:model-value="onHotkeyChange"
             />
           </div>
@@ -765,7 +767,7 @@ onUnmounted(() => {
             <div class="flex gap-2">
               <ShortcutCapture
                 class="flex-1"
-                :model-value="store.cancelShortcut"
+                :model-value="settings.cancelShortcut"
                 @update:model-value="onCancelShortcutChange"
               />
               <Button
@@ -791,7 +793,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-2">
               <Select
                 :model-value="selectedDeviceUid"
-                :disabled="store.audioDevices.length === 0"
+                :disabled="engines.audioDevices.length === 0"
                 @update:model-value="onDeviceChange"
                 class="flex-1"
               >
@@ -804,7 +806,7 @@ onUnmounted(() => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
-                    v-for="device in store.audioDevices"
+                    v-for="device in engines.audioDevices"
                     :key="device.uid"
                     :value="device.uid"
                   >
@@ -819,7 +821,7 @@ onUnmounted(() => {
                 variant="outline"
                 size="sm"
                 class="shrink-0 h-9 w-20"
-                :disabled="store.audioDevices.length === 0"
+                :disabled="engines.audioDevices.length === 0"
                 @click="isTesting ? stopMicTest() : startMicTest()"
               >
                 {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
@@ -833,13 +835,13 @@ onUnmounted(() => {
           <div class="flex items-center justify-between gap-4">
             <Label class="text-sm shrink-0">{{ t('settings.microphone.ducking') }}</Label>
             <Switch
-              :model-value="store.audioDuckingEnabled"
+              :model-value="settings.audioDuckingEnabled"
               @update:model-value="onAudioDuckingChange"
             />
           </div>
 
           <div
-            v-if="store.audioDuckingEnabled"
+            v-if="settings.audioDuckingEnabled"
             class="space-y-2 pl-4 border-l-2 border-border"
           >
             <div class="flex items-center justify-between">

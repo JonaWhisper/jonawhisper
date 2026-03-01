@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAppStore, type ASRModel } from '@/stores/app'
+import { useSettingsStore } from '@/stores/settings'
+import { useEnginesStore } from '@/stores/engines'
+import { useDownloadStore } from '@/stores/downloads'
+import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -19,29 +22,31 @@ import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 import { formatSize, formatSpeed } from '@/utils/format'
 
 const { t } = useI18n()
-const store = useAppStore()
+const settings = useSettingsStore()
+const engines = useEnginesStore()
+const downloads = useDownloadStore()
 const emit = defineEmits<{ start: []; back: [] }>()
 
 const showAllModels = ref(false)
 
 // -- Hotkey --
 async function onHotkeyChange(value: string) {
-  await store.setSetting('hotkey', value)
+  await settings.setSetting('hotkey', value)
 }
 
 // -- Recording mode --
 async function onRecordingModeChange(mode: string) {
-  await store.setSetting('recording_mode', mode)
+  await settings.setSetting('recording_mode', mode)
 }
 
 // -- Models --
-const availableEngines = computed(() => store.engines.filter(e => e.available && e.category === 'asr'))
+const availableEngines = computed(() => engines.engines.filter(e => e.available && e.category === 'asr'))
 
 const recommendedModels = computed(() => {
-  const result = store.models.filter(m => m.recommended)
+  const result = engines.models.filter(m => m.recommended)
   // Include the currently selected model if not already in the list
-  if (store.selectedModelId && !result.find(m => m.id === store.selectedModelId)) {
-    const selected = store.models.find(m => m.id === store.selectedModelId)
+  if (settings.selectedModelId && !result.find(m => m.id === settings.selectedModelId)) {
+    const selected = engines.models.find(m => m.id === settings.selectedModelId)
     if (selected) result.unshift(selected)
   }
   return result
@@ -61,7 +66,7 @@ const recommendedByEngine = computed(() => {
 const allModelsByEngine = computed(() => {
   const groups: { engine: string; engineName: string; models: ASRModel[] }[] = []
   for (const engine of availableEngines.value) {
-    const engineModels = store.models.filter(m => m.engine_id === engine.id)
+    const engineModels = engines.models.filter(m => m.engine_id === engine.id)
     if (engineModels.length > 0) {
       groups.push({ engine: engine.id, engineName: engine.name, models: engineModels })
     }
@@ -77,55 +82,55 @@ function isModelDownloaded(model: ASRModel): boolean {
 
 
 async function handleDownload(model: ASRModel) {
-  const success = await store.downloadModel(model.id)
+  const success = await downloads.downloadModel(model.id)
   if (success) {
-    await store.selectModel(model.id)
+    await settings.selectModel(model.id)
   }
 }
 
 async function handleSelectModel(model: ASRModel) {
   if (!isModelDownloaded(model)) return
   // Check language compatibility
-  const engine = store.engines.find(e => e.id === model.engine_id)
-  if (engine && store.selectedLanguage !== 'auto') {
-    if (!engine.supported_language_codes.includes(store.selectedLanguage)) {
-      await store.selectLanguageAction('auto')
+  const engine = engines.engines.find(e => e.id === model.engine_id)
+  if (engine && settings.selectedLanguage !== 'auto') {
+    if (!engine.supported_language_codes.includes(settings.selectedLanguage)) {
+      await settings.selectLanguageAction('auto')
     }
   }
-  await store.selectModel(model.id)
+  await settings.selectModel(model.id)
 }
 
 // -- Transcription language --
 const availableLanguages = computed(() => {
-  const model = store.models.find(m => m.id === store.selectedModelId)
-  if (!model) return store.languages
-  const engine = store.engines.find(e => e.id === model.engine_id)
-  if (!engine) return store.languages
-  return store.languages.filter(l => engine.supported_language_codes.includes(l.code))
+  const model = engines.models.find(m => m.id === settings.selectedModelId)
+  if (!model) return engines.languages
+  const engine = engines.engines.find(e => e.id === model.engine_id)
+  if (!engine) return engines.languages
+  return engines.languages.filter(l => engine.supported_language_codes.includes(l.code))
 })
 
 async function onLanguageChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
-  await store.selectLanguageAction(value)
+  await settings.selectLanguageAction(value)
 }
 
 // Refresh models when language changes (recommended flags depend on it)
-watch(() => store.selectedLanguage, () => {
-  store.fetchModels()
+watch(() => settings.selectedLanguage, () => {
+  engines.fetchModels()
 })
 
 // Reset language if no longer supported when model changes
-watch(() => store.selectedModelId, () => {
-  if (store.selectedLanguage === 'auto') return
+watch(() => settings.selectedModelId, () => {
+  if (settings.selectedLanguage === 'auto') return
   const langs = availableLanguages.value
-  if (!langs.find(l => l.code === store.selectedLanguage)) {
-    store.selectLanguageAction('auto')
+  if (!langs.find(l => l.code === settings.selectedLanguage)) {
+    settings.selectLanguageAction('auto')
   }
 })
 
 // -- Can start --
 const canStart = computed(() => {
-  const model = store.models.find(m => m.id === store.selectedModelId)
+  const model = engines.models.find(m => m.id === settings.selectedModelId)
   return model ? isModelDownloaded(model) : false
 })
 </script>
@@ -146,7 +151,7 @@ const canStart = computed(() => {
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.hotkey') }}</Label>
           <ShortcutCapture
-            :model-value="store.hotkey"
+            :model-value="settings.hotkey"
             @update:model-value="onHotkeyChange"
           />
         </div>
@@ -157,7 +162,7 @@ const canStart = computed(() => {
           <div class="inline-flex rounded-md border border-border overflow-hidden w-full">
             <button
               class="flex-1 px-3 py-1.5 text-sm transition-colors"
-              :class="store.recordingMode === 'push_to_talk'
+              :class="settings.recordingMode === 'push_to_talk'
                 ? 'bg-accent text-accent-foreground'
                 : 'hover:bg-accent/50 text-muted-foreground'"
               @click="onRecordingModeChange('push_to_talk')"
@@ -166,7 +171,7 @@ const canStart = computed(() => {
             </button>
             <button
               class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
-              :class="store.recordingMode === 'toggle'
+              :class="settings.recordingMode === 'toggle'
                 ? 'bg-accent text-accent-foreground'
                 : 'hover:bg-accent/50 text-muted-foreground'"
               @click="onRecordingModeChange('toggle')"
@@ -179,7 +184,7 @@ const canStart = computed(() => {
         <!-- Transcription language -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.transcriptionLanguage') }}</Label>
-          <Select :model-value="store.selectedLanguage" @update:model-value="onLanguageChange">
+          <Select :model-value="settings.selectedLanguage" @update:model-value="onLanguageChange">
             <SelectTrigger class="w-full h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
@@ -211,18 +216,18 @@ const canStart = computed(() => {
                   v-for="model in group.models"
                   :key="model.id"
                   class="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors hover:bg-accent/30"
-                  :class="model.id === store.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
+                  :class="model.id === settings.selectedModelId ? 'bg-primary/10 border-primary/30' : 'bg-card border-border'"
                   @click="handleSelectModel(model)"
                 >
                   <div
                     class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
-                    :class="model.id === store.selectedModelId
+                    :class="model.id === settings.selectedModelId
                       ? 'border-primary bg-primary'
                       : isModelDownloaded(model)
                         ? 'border-muted-foreground'
                         : 'border-muted opacity-50'"
                   >
-                    <div v-if="model.id === store.selectedModelId" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
+                    <div v-if="model.id === settings.selectedModelId" class="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1.5">
@@ -233,21 +238,21 @@ const canStart = computed(() => {
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
                     <!-- Downloading -->
-                    <template v-if="store.activeDownloads[model.id]">
+                    <template v-if="downloads.activeDownloads[model.id]">
                       <div class="w-16">
-                        <Progress :model-value="(store.activeDownloads[model.id]?.progress ?? 0) * 100" />
+                        <Progress :model-value="(downloads.activeDownloads[model.id]?.progress ?? 0) * 100" />
                         <div class="text-[9px] text-muted-foreground mt-0.5">
-                          {{ formatSpeed(store.activeDownloads[model.id]!.speed) }}
+                          {{ formatSpeed(downloads.activeDownloads[model.id]!.speed) }}
                         </div>
                       </div>
-                      <template v-if="store.activeDownloads[model.id]?.stopping">
+                      <template v-if="downloads.activeDownloads[model.id]?.stopping">
                         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
                       </template>
                       <template v-else>
-                        <Button variant="ghost" size="icon-sm" @click="store.pauseDownload(model.id)" :title="t('modelManager.pause')">
+                        <Button variant="ghost" size="icon-sm" @click="downloads.pauseDownload(model.id)" :title="t('modelManager.pause')">
                           <Pause class="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+                        <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
                           <X class="w-3.5 h-3.5" />
                         </Button>
                       </template>
@@ -263,7 +268,7 @@ const canStart = computed(() => {
                       <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
                         <Play class="w-3.5 h-3.5" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" @click="store.cancelDownload(model.id)" :title="t('modelManager.cancel')">
+                      <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
                         <X class="w-3.5 h-3.5" />
                       </Button>
                     </template>
