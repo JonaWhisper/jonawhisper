@@ -63,6 +63,16 @@ impl ASREngine for WhisperEngine {
                 ..Default::default()
             },
             ASRModel {
+                id: "whisper:large-v3-french-distil".into(), engine_id: "whisper".into(),
+                label: "Large V3 French".into(), filename: "ggml-model-q5_0.bin".into(),
+                url: "https://huggingface.co/bofenghuang/whisper-large-v3-french-distil-dec2/resolve/main/ggml-model-q5_0.bin".into(),
+                size: 538_000_000, storage_dir: storage_dir(),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                wer: Some(1.5), rtf: Some(0.20),
+                lang_codes: Some(vec!["fr".into()]),
+                ..Default::default()
+            },
+            ASRModel {
                 id: "whisper:medium".into(), engine_id: "whisper".into(),
                 label: "Medium".into(), filename: "ggml-medium.bin".into(),
                 url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin".into(),
