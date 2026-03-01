@@ -5,6 +5,7 @@ import { useDownloadStore } from '@/stores/downloads'
 import { isModelAvailable } from '@/stores/types'
 import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Trash2 } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
@@ -73,14 +74,20 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
         >
           {{ t('modelManager.downloaded') }}
         </Badge>
-        <Button
-          variant="ghost" size="icon-sm"
-          class="absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition-opacity"
-          @click="emit('delete', model)"
-          :title="t('modelManager.delete')"
-        >
-          <Trash2 class="w-4 h-4" />
-        </Button>
+        <TooltipProvider :delay-duration="300">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost" size="icon-sm"
+                class="absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition-opacity"
+                @click="emit('delete', model)"
+              >
+                <Trash2 class="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.delete') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </template>
 
       <!-- Common states: downloading, paused, not-downloaded -->

@@ -11,6 +11,7 @@ import type { Component } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { i18n } from '@/main'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -525,17 +526,23 @@ onUnmounted(() => {
                     <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  class="h-9 w-9 shrink-0"
-                  :title="t('settings.models.refresh')"
-                  :disabled="refreshingAsr"
-                  @click="refreshAsrModels"
-                >
-                  <Loader2 v-if="refreshingAsr" class="w-4 h-4 animate-spin" />
-                  <RefreshCw v-else class="w-4 h-4" />
-                </Button>
+                <TooltipProvider :delay-duration="300">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        class="h-9 w-9 shrink-0"
+                        :disabled="refreshingAsr"
+                        @click="refreshAsrModels"
+                      >
+                        <Loader2 v-if="refreshingAsr" class="w-4 h-4 animate-spin" />
+                        <RefreshCw v-else class="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <Input
                 v-if="isCustomAsrModel"
@@ -672,17 +679,23 @@ onUnmounted(() => {
                     @input="onLlmModelInput"
                     class="h-9 text-sm flex-1"
                   />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    class="h-9 w-9 shrink-0"
-                    :title="t('settings.models.refresh')"
-                    :disabled="refreshingLlm"
-                    @click="refreshLlmModels"
-                  >
-                    <Loader2 v-if="refreshingLlm" class="w-4 h-4 animate-spin" />
-                    <RefreshCw v-else class="w-4 h-4" />
-                  </Button>
+                  <TooltipProvider :delay-duration="300">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          class="h-9 w-9 shrink-0"
+                          :disabled="refreshingLlm"
+                          @click="refreshLlmModels"
+                        >
+                          <Loader2 v-if="refreshingLlm" class="w-4 h-4 animate-spin" />
+                          <RefreshCw v-else class="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 

@@ -10,6 +10,7 @@ import type { HistoryEntry } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck, Scissors } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -229,79 +230,95 @@ async function doClearAll() {
                 </span>
                 <p class="text-sm flex-1 min-w-0 break-words">{{ entry.text }}</p>
                 <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="h-6 w-6 p-0"
-                    :title="t('history.copy')"
-                    @click="copyEntry(entry)"
-                  >
-                    <Check v-if="copiedTimestamp === entry.timestamp" class="h-3.5 w-3.5 text-green-600" />
-                    <Copy v-else class="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="h-6 w-6 p-0 hover:text-destructive"
-                    :title="t('history.delete')"
-                    @click="deleteEntry(entry)"
-                  >
-                    <Trash2 class="h-3.5 w-3.5" />
-                  </Button>
+                  <TooltipProvider :delay-duration="300">
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button variant="ghost" size="sm" class="h-6 w-6 p-0" @click="copyEntry(entry)">
+                          <Check v-if="copiedTimestamp === entry.timestamp" class="h-3.5 w-3.5 text-green-600" />
+                          <Copy v-else class="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.copy') }}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button variant="ghost" size="sm" class="h-6 w-6 p-0 hover:text-destructive" @click="deleteEntry(entry)">
+                          <Trash2 class="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.delete') }}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
-              <div v-if="entry.model_id" class="ml-12 mt-1 flex flex-wrap gap-1">
-                <!-- ASR badge -->
-                <span
-                  :title="t('history.badge.asr')"
-                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                  :class="isCloudAsr(entry.model_id)
-                    ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                    : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'"
-                >
-                  <Cloud v-if="isCloudAsr(entry.model_id)" class="h-2.5 w-2.5" />
-                  <Cpu v-else class="h-2.5 w-2.5" />
-                  {{ formatAsrLabel(entry.model_id) }}
-                </span>
-                <!-- Language badge -->
-                <span v-if="entry.language" :title="t('history.badge.language')" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
-                  {{ entry.language }}
-                </span>
-                <!-- Cleanup badge -->
-                <span
-                  v-if="entry.cleanup_model_id"
-                  :title="t('history.badge.cleanup')"
-                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                  :class="{
-                    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': cleanupBadgeType(entry.cleanup_model_id) === 'bert',
-                    'bg-violet-500/10 text-violet-600 dark:text-violet-400': cleanupBadgeType(entry.cleanup_model_id) === 'local',
-                    'bg-amber-500/10 text-amber-600 dark:text-amber-400': cleanupBadgeType(entry.cleanup_model_id) === 'cloud',
-                  }"
-                >
-                  <SpellCheck v-if="cleanupBadgeType(entry.cleanup_model_id) === 'bert'" class="h-2.5 w-2.5" />
-                  <Cpu v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'local'" class="h-2.5 w-2.5" />
-                  <Cloud v-else class="h-2.5 w-2.5" />
-                  {{ formatCleanupLabel(entry.cleanup_model_id) }}
-                </span>
-                <!-- Hallucination filter badge -->
-                <span
-                  v-if="entry.hallucination_filter"
-                  :title="t('history.badge.hallucination')"
-                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                >
-                  <ShieldCheck class="h-2.5 w-2.5" />
-                  Anti-halluc.
-                </span>
-                <!-- VAD trimmed badge -->
-                <span
-                  v-if="entry.vad_trimmed"
-                  :title="t('history.badge.vad')"
-                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-                >
-                  <Scissors class="h-2.5 w-2.5" />
-                  VAD
-                </span>
-              </div>
+              <TooltipProvider v-if="entry.model_id" :delay-duration="300">
+                <div class="ml-12 mt-1 flex flex-wrap gap-1">
+                  <!-- ASR badge -->
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span
+                        class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                        :class="isCloudAsr(entry.model_id)
+                          ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                          : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'"
+                      >
+                        <Cloud v-if="isCloudAsr(entry.model_id)" class="h-2.5 w-2.5" />
+                        <Cpu v-else class="h-2.5 w-2.5" />
+                        {{ formatAsrLabel(entry.model_id) }}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.asr') }}</TooltipContent>
+                  </Tooltip>
+                  <!-- Language badge -->
+                  <Tooltip v-if="entry.language">
+                    <TooltipTrigger as-child>
+                      <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
+                        {{ entry.language }}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.language') }}</TooltipContent>
+                  </Tooltip>
+                  <!-- Cleanup badge -->
+                  <Tooltip v-if="entry.cleanup_model_id">
+                    <TooltipTrigger as-child>
+                      <span
+                        class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                        :class="{
+                          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': cleanupBadgeType(entry.cleanup_model_id) === 'bert',
+                          'bg-violet-500/10 text-violet-600 dark:text-violet-400': cleanupBadgeType(entry.cleanup_model_id) === 'local',
+                          'bg-amber-500/10 text-amber-600 dark:text-amber-400': cleanupBadgeType(entry.cleanup_model_id) === 'cloud',
+                        }"
+                      >
+                        <SpellCheck v-if="cleanupBadgeType(entry.cleanup_model_id) === 'bert'" class="h-2.5 w-2.5" />
+                        <Cpu v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'local'" class="h-2.5 w-2.5" />
+                        <Cloud v-else class="h-2.5 w-2.5" />
+                        {{ formatCleanupLabel(entry.cleanup_model_id) }}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.cleanup') }}</TooltipContent>
+                  </Tooltip>
+                  <!-- Hallucination filter badge -->
+                  <Tooltip v-if="entry.hallucination_filter">
+                    <TooltipTrigger as-child>
+                      <span class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                        <ShieldCheck class="h-2.5 w-2.5" />
+                        Anti-halluc.
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.hallucination') }}</TooltipContent>
+                  </Tooltip>
+                  <!-- VAD trimmed badge -->
+                  <Tooltip v-if="entry.vad_trimmed">
+                    <TooltipTrigger as-child>
+                      <span class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                        <Scissors class="h-2.5 w-2.5" />
+                        VAD
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.vad') }}</TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { isModelAvailable } from '@/stores/types'
 import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Progress } from '@/components/ui/progress'
 import { Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import { formatSize, formatSpeed } from '@/utils/format'
@@ -51,14 +52,24 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
       <template v-if="isStopping">
         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
       </template>
-      <template v-else>
-        <Button variant="ghost" size="icon-sm" @click="downloads.pauseDownload(model.id)" :title="t('modelManager.pause')">
-          <Pause class="w-3.5 h-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-          <X class="w-3.5 h-3.5" />
-        </Button>
-      </template>
+      <TooltipProvider v-else :delay-duration="300">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon-sm" @click="downloads.pauseDownload(model.id)">
+              <Pause class="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.pause') }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)">
+              <X class="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.cancel') }}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   </template>
 
@@ -71,12 +82,24 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
           {{ formatSize(Math.round((model.partial_progress ?? 0) * model.size)) }} / {{ formatSize(model.size) }}
         </div>
       </div>
-      <Button variant="ghost" size="icon-sm" @click="emit('download', model)" :title="t('modelManager.resume')">
-        <Play class="w-3.5 h-3.5" />
-      </Button>
-      <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-        <X class="w-3.5 h-3.5" />
-      </Button>
+      <TooltipProvider :delay-duration="300">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon-sm" @click="emit('download', model)">
+              <Play class="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.resume') }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)">
+              <X class="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.cancel') }}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   </template>
 
