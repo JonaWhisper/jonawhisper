@@ -225,6 +225,10 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
                     platform::play_sound("Basso");
                     let _ = std::fs::remove_file(&audio_path);
                     state.runtime.lock().unwrap().is_transcribing = false;
+                    // If queue still has items, continue processing them
+                    if state.queue_count() > 0 {
+                        continue;
+                    }
                     show_error_then_close(app);
                     return;
                 }
