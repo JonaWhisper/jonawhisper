@@ -9,12 +9,12 @@ pub fn paste_text(app: &AppHandle, text: &str) {
     }
 
     // Small delay to ensure clipboard is ready
-    std::thread::sleep(std::time::Duration::from_millis(15));
+    std::thread::sleep(std::time::Duration::from_millis(50));
 
     simulate_paste();
 
     // Allow paste to complete before next operation
-    std::thread::sleep(std::time::Duration::from_millis(15));
+    std::thread::sleep(std::time::Duration::from_millis(50));
 }
 
 /// Simulate Cmd+V on macOS.
