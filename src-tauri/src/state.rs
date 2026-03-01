@@ -71,6 +71,13 @@ pub enum ProviderKind {
     OpenAI,
     Anthropic,
     Custom,
+    Groq,
+    Cerebras,
+    Gemini,
+    Mistral,
+    Fireworks,
+    Together,
+    DeepSeek,
 }
 
 impl ProviderKind {
@@ -83,6 +90,13 @@ impl ProviderKind {
             Self::OpenAI => "OpenAI",
             Self::Anthropic => "Anthropic",
             Self::Custom => "Custom",
+            Self::Groq => "Groq",
+            Self::Cerebras => "Cerebras",
+            Self::Gemini => "Google Gemini",
+            Self::Mistral => "Mistral",
+            Self::Fireworks => "Fireworks AI",
+            Self::Together => "Together AI",
+            Self::DeepSeek => "DeepSeek",
         }
     }
 }

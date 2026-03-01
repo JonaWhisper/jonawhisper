@@ -21,6 +21,16 @@ pub const DOWNLOAD_PROGRESS: &str = "download-progress";
 pub const SETTINGS_CHANGED: &str = "settings-changed";
 pub const PERMISSION_CHANGED: &str = "permission-changed";
 
+// Models
+pub const MODELS_CHANGED: &str = "models-changed";
+
+// Errors
+pub const TRANSCRIPTION_ERROR: &str = "transcription-error";
+
+// Shortcut capture
+pub const SHORTCUT_CAPTURE_UPDATE: &str = "shortcut-capture-update";
+pub const SHORTCUT_CAPTURE_COMPLETE: &str = "shortcut-capture-complete";
+
 // Mic test
 pub const MIC_TEST_SPECTRUM: &str = "mic-test-spectrum";
 pub const MIC_TEST_STOPPED: &str = "mic-test-stopped";

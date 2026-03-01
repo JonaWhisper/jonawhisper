@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Provider, ProviderKind } from '@/stores/app'
+import { PROVIDER_PRESETS, PRESET_ENTRIES } from '@/config/providers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,19 +33,14 @@ const url = ref(props.provider?.url ?? '')
 const apiKey = ref(props.provider?.api_key ?? '')
 const errors = ref<Record<string, string>>({})
 
-const PRECONFIGURED_DEFAULTS: Record<string, { name: string; url: string }> = {
-  OpenAI: { name: 'OpenAI', url: 'https://api.openai.com' },
-  Anthropic: { name: 'Anthropic', url: 'https://api.anthropic.com' },
-}
-
 const showUrl = computed(() => kind.value === 'Custom')
 
 watch(kind, (newKind) => {
   if (isEditing.value) return
-  const defaults = PRECONFIGURED_DEFAULTS[newKind]
-  if (defaults) {
-    name.value = defaults.name
-    url.value = defaults.url
+  const preset = PROVIDER_PRESETS[newKind]
+  if (preset) {
+    name.value = preset.label
+    url.value = preset.url
   } else {
     name.value = ''
     url.value = ''
@@ -88,9 +84,8 @@ function save() {
         <SelectTrigger class="w-full h-9 text-sm">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="OpenAI">{{ t('provider.kind.openai') }}</SelectItem>
-          <SelectItem value="Anthropic">{{ t('provider.kind.anthropic') }}</SelectItem>
+        <SelectContent class="max-h-52">
+          <SelectItem v-for="[kind, preset] in PRESET_ENTRIES" :key="kind" :value="kind">{{ preset.label }}</SelectItem>
           <SelectItem value="Custom">{{ t('provider.kind.custom') }}</SelectItem>
         </SelectContent>
       </Select>

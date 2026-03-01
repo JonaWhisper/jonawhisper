@@ -1,4 +1,5 @@
 use crate::audio;
+use crate::events;
 use crate::platform::hotkey;
 use crate::platform::paste;
 use crate::platform;
@@ -248,7 +249,7 @@ async fn run_transcription(
             log::error!("Transcription error: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
-                "transcription-error",
+                events::TRANSCRIPTION_ERROR,
                 serde_json::json!({ "error": e.to_string() }),
             );
             true
@@ -257,7 +258,7 @@ async fn run_transcription(
             log::error!("Transcription task panicked: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
-                "transcription-error",
+                events::TRANSCRIPTION_ERROR,
                 serde_json::json!({ "error": "Internal error" }),
             );
             true
@@ -611,13 +612,13 @@ pub fn spawn_hotkey_handler(
                 }
             }
             Ok(hotkey::HotkeyEvent::CaptureUpdate { modifiers, key_code }) => {
-                let _ = app.emit("shortcut-capture-update", serde_json::json!({
+                let _ = app.emit(events::SHORTCUT_CAPTURE_UPDATE, serde_json::json!({
                     "modifiers": modifiers,
                     "key_code": key_code,
                 }));
             }
             Ok(hotkey::HotkeyEvent::CaptureComplete(shortcut)) => {
-                let _ = app.emit("shortcut-capture-complete", serde_json::json!({
+                let _ = app.emit(events::SHORTCUT_CAPTURE_COMPLETE, serde_json::json!({
                     "key_code": shortcut.key_code,
                     "modifiers": shortcut.modifiers,
                     "kind": shortcut.kind,

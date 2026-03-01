@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore, type Provider } from '@/stores/app'
+import { PROVIDER_PRESETS } from '@/config/providers'
 import { Settings, Cloud, Sparkles, Keyboard, Mic, AudioLines, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Pencil, Trash2, Plus } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
@@ -180,7 +181,6 @@ async function confirmRemoveProvider() {
 }
 
 // -- Transcription --
-const OPENAI_ASR_MODELS = ['whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe']
 const CUSTOM_MODEL_VALUE = '_custom'
 
 async function onAsrModelChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -205,8 +205,7 @@ const asrSelectedProvider = computed(() =>
 const asrModelOptions = computed(() => {
   const provider = asrSelectedProvider.value
   if (!provider) return []
-  if (provider.kind === 'OpenAI') return OPENAI_ASR_MODELS
-  return []
+  return PROVIDER_PRESETS[provider.kind]?.asrModels ?? []
 })
 
 const isCustomAsrModel = computed(() => {
@@ -241,8 +240,6 @@ function onAsrModelInput(event: Event) {
 }
 
 // -- LLM config --
-const OPENAI_MODELS = ['gpt-4o-mini', 'gpt-4o']
-const ANTHROPIC_MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-4-5-20250514', 'claude-opus-4-6-20250626']
 
 const llmSelectedProvider = computed(() =>
   store.providers.find(p => p.id === store.cleanupCloudProviderId)
@@ -251,11 +248,7 @@ const llmSelectedProvider = computed(() =>
 const llmModelOptions = computed(() => {
   const provider = llmSelectedProvider.value
   if (!provider) return []
-  switch (provider.kind) {
-    case 'OpenAI': return OPENAI_MODELS
-    case 'Anthropic': return ANTHROPIC_MODELS
-    default: return []
-  }
+  return PROVIDER_PRESETS[provider.kind]?.llmModels ?? []
 })
 
 const isCustomLlmModel = computed(() => llmModelOptions.value.length === 0)

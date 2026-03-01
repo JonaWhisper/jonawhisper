@@ -51,8 +51,6 @@
   "modelManager.cancel": "Annuler",
   "modelManager.save": "Enregistrer",
   "provider.kind": "Type",
-  "provider.kind.openai": "OpenAI",
-  "provider.kind.anthropic": "Anthropic",
   "provider.kind.custom": "Serveur personnalisé",
   "provider.name": "Nom",
   "provider.url": "URL de l'API",

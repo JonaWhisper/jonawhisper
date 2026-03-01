@@ -2,6 +2,7 @@ use crate::audio;
 use crate::engines::downloader;
 use crate::engines::{self, EngineCatalog, EngineInfo, Language};
 use crate::errors::AppError;
+use crate::events;
 use crate::platform;
 use crate::state::{AppState, HistoryEntry, Provider};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -70,7 +71,7 @@ pub async fn download_model_cmd(
         .ok_or_else(|| AppError::Other(format!("Model not found: {}", id)))?;
 
     let result = downloader::download_model(app.clone(), Arc::clone(&state), model).await;
-    let _ = app.emit("models-changed", ());
+    let _ = app.emit(events::MODELS_CHANGED, ());
     Ok(result)
 }
 
@@ -81,7 +82,7 @@ pub async fn delete_model_cmd(app: AppHandle, id: String) -> bool {
             .model_by_id(&id)
             .is_some_and(|m| downloader::delete_model(&m))
     }).await.unwrap_or(false);
-    let _ = app.emit("models-changed", ());
+    let _ = app.emit(events::MODELS_CHANGED, ());
     result
 }
 
@@ -108,7 +109,7 @@ pub fn cancel_download(app: AppHandle, id: String, state: tauri::State<'_, Arc<A
         if let Some(model) = catalog().model_by_id(&id) {
             downloader::delete_partial(&model);
         }
-        let _ = app.emit("models-changed", ());
+        let _ = app.emit(events::MODELS_CHANGED, ());
     }
 }
 

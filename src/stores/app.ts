@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type Event } from '@tauri-apps/api/event'
+import { hasAsrSupport } from '@/config/providers'
 
 export interface AudioDevice {
   id: number
@@ -54,7 +55,7 @@ export interface HistoryEntry {
   hallucination_filter: boolean
 }
 
-export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom'
+export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom' | 'Groq' | 'Cerebras' | 'Gemini' | 'Mistral' | 'Fireworks' | 'Together' | 'DeepSeek'
 
 export interface Provider {
   id: string
@@ -137,7 +138,6 @@ export const useAppStore = defineStore('app', () => {
   const hotkey = ref('right_command')
   const textCleanupEnabled = ref(false)
   const cleanupModelId = ref('')
-  const llmProviderId = ref('')
   const llmModel = ref('')
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
@@ -200,7 +200,7 @@ export const useAppStore = defineStore('app', () => {
       }
     }
     for (const p of providers.value) {
-      if (p.kind === 'OpenAI' || p.kind === 'Custom') {
+      if (hasAsrSupport(p.kind)) {
         result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
       }
     }
@@ -371,7 +371,6 @@ export const useAppStore = defineStore('app', () => {
       selectedLanguage.value = s.selected_language
       textCleanupEnabled.value = s.text_cleanup_enabled ?? false
       cleanupModelId.value = s.cleanup_model_id ?? ''
-      llmProviderId.value = s.llm_provider_id ?? ''
       llmModel.value = s.llm_model ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
@@ -393,7 +392,6 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_language': return selectedLanguage.value
       case 'text_cleanup_enabled': return String(textCleanupEnabled.value)
       case 'cleanup_model_id': return cleanupModelId.value
-      case 'llm_provider_id': return llmProviderId.value
       case 'llm_model': return llmModel.value
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
@@ -416,7 +414,6 @@ export const useAppStore = defineStore('app', () => {
       case 'selected_language': selectedLanguage.value = value; break
       case 'text_cleanup_enabled': textCleanupEnabled.value = value === 'true'; break
       case 'cleanup_model_id': cleanupModelId.value = value; break
-      case 'llm_provider_id': llmProviderId.value = value; break
       case 'llm_model': llmModel.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
@@ -601,7 +598,7 @@ export const useAppStore = defineStore('app', () => {
     selectedModelId, selectedLanguage,
     hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
-    textCleanupEnabled, cleanupModelId, llmProviderId, llmModel, llmMaxTokens, asrCloudModel, gpuMode,
+    textCleanupEnabled, cleanupModelId, llmModel, llmMaxTokens, asrCloudModel, gpuMode,
     audioDuckingEnabled, audioDuckingLevel,
     engines, models, languages, history,
     audioDevices, permissions, providers,

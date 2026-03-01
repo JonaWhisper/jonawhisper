@@ -51,8 +51,6 @@
   "modelManager.cancel": "Cancel",
   "modelManager.save": "Save",
   "provider.kind": "Type",
-  "provider.kind.openai": "OpenAI",
-  "provider.kind.anthropic": "Anthropic",
   "provider.kind.custom": "Custom Server",
   "provider.name": "Name",
   "provider.url": "API URL",
