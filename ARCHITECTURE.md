@@ -15,6 +15,8 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 │                                                      │
 │  hotkey.rs ──event──▶ recording.rs ──cmd──▶ audio.rs │
 │                           │                          │
+│                        vad.rs (silence filter)       │
+│                           │                          │
 │                     transcriber.rs                    │
 │                      ┌────┴────┐                     │
 │                 engines/*   post_processor.rs         │
@@ -44,7 +46,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
 | `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL with additive migrations for `cleanup_model_id` and `hallucination_filter` columns), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext. `Provider` struct includes `cached_models: Vec<String>`. `ProviderKind::base_url()` resolves canonical API URLs at runtime for known providers (Custom uses stored URL). |
 | `migrations.rs` | Versioned preference migrations. Each migration is a numbered function receiving raw JSON + typed `Preferences`. Runs on startup if `_version` < current. v1: legacy format unification (api_servers, llm_config, cleanup_mode). v2: model file relocation to `~/Library/Application Support/WhisperDictate/models/`. v3: update llm_max_tokens default from 256 to 4096 (autoscale hard cap). |
-| `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning. Cancel support during both recording (discard audio) and transcription (cancel flag checked before paste). LLM cleanup uses autoscale max_tokens (capped by user hard cap, default 4096) with fallback to raw text on any error. |
+| `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD check → transcribe → paste) and all background thread spawning. VAD pre-check discards silent recordings and trims silence before transcription. Cancel support during both recording (discard audio) and transcription (cancel flag checked before paste). LLM cleanup uses autoscale max_tokens (capped by user hard cap, default 4096) with fallback to raw text on any error. |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
 
@@ -77,6 +79,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 
 | File | Role |
 |------|------|
+| `vad.rs` | Voice Activity Detection using Silero VAD v6 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly (no VAD crate — ndarray version conflicts). Provides `has_speech()` (chunk-by-chunk probability check) and `trim_silence()` (find first/last speech segments with margin). Fallback: always proceeds on error (never loses dictation). |
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. |
 | `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if `selected_model_id` starts with `cloud:`, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (punctuation spacing, capitalization) |
@@ -186,11 +189,12 @@ Main thread (Tauri + Tokio runtime)
 4. **Pill opens** — native NSWindow with first frame pre-rendered (no flash), shows "recording" mode (spectrum bars)
 5. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
 6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
-7. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
-8. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM with autoscale max_tokens), then finalize (spacing, capitalization). On any LLM error, falls back to raw transcription.
-9. **Cancel check** → `transcription_cancelled` flag verified before paste — if cancel arrived during cleanup, text is discarded
-10. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
-11. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
+7. **VAD check** → if `vad_enabled`, reads the WAV and runs Silero VAD: if no speech detected → plays "Basso" sound, discards file, skips to next queue item. If speech found → trims leading/trailing silence and rewrites the WAV.
+8. **Transcription** → `transcriber::transcribe()` on a blocking thread
+9. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM with autoscale max_tokens), then finalize (spacing, capitalization). On any LLM error, falls back to raw transcription.
+10. **Cancel check** → `transcription_cancelled` flag verified before paste — if cancel arrived during cleanup, text is discarded
+11. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
+12. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
 
 **Cancel flow:** Escape during recording → `cancel_recording()` stops audio, discards file, shows error cross. Escape during transcription → `cancel_transcription()` sets cancel flag, clears queue. Delayed pill close uses a generation counter to prevent stale closes from interfering with new recordings.
 

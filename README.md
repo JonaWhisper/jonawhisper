@@ -8,7 +8,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
 - **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible cloud API — unified model selector
 - **9 cloud providers** — preconfigured presets (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) with API key testing and dynamic model discovery
-- **Post-processing** — hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
+- **Post-processing** — VAD silence detection (Silero VAD v6, discards silent recordings + trims silence), hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual feedback (recording → transcribing), real-time spectrum bars, cancel support during recording or transcription
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
@@ -84,7 +84,7 @@ Open Settings from the tray menu to configure:
 
 - Interface language (Auto / Français / English)
 - Transcription model (local Whisper models + cloud providers in a single selector, GPU mode for local)
-- Post-processing (hallucination filter, text cleanup with unified BERT/LLM model selector)
+- Post-processing (VAD silence filter, hallucination filter, text cleanup with unified BERT/LLM model selector)
 - Recording mode (push-to-talk / toggle)
 - Hotkey and cancel shortcut
 - Input microphone and audio ducking (reduce system volume while recording)
@@ -136,7 +136,8 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT pour spectre audio (visualisation) |
 | [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Transcription native Whisper (GGML, Metal GPU sur macOS) |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Inférence LLM locale (GGUF, Metal GPU, text cleanup) |
-| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (modèles BERT ponctuation) |
+| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT ponctuation) |
+| [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors pour VAD (état LSTM, entrées/sorties ONNX) |
 | [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Décodage UTF-8 incrémental (sortie LLM token par token) |
 
 **Réseau / IO**
@@ -234,6 +235,7 @@ src-tauri/               Rust backend
     state.rs             App state & persistent preferences
     migrations.rs        Versioned preference migrations & model relocation
     recording.rs         Recording state machine & audio thread
+    vad.rs               Voice Activity Detection (Silero VAD v6 via ONNX Runtime)
     audio.rs             cpal recording & FFT
     transcriber.rs       Transcription dispatcher (native whisper / cloud API)
     post_processor.rs    Text post-processing
