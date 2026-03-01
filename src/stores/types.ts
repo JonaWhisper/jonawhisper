@@ -77,6 +77,8 @@ export interface AsrModelOption {
   group: 'local' | 'cloud'
   params: number | null
   ram: number | null
+  wer: number | null
+  rtf: number | null
   lang_codes: string[] | null
   recommended: boolean
 }

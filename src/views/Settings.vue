@@ -318,6 +318,20 @@ function formatParams(params: number): string {
   return params % 1 === 0 ? params.toFixed(0) + 'B' : params.toFixed(1) + 'B'
 }
 
+function werBadge(wer: number) {
+  if (wer < 3) return { label: t('benchmark.wer.excellent'), cls: 'bg-emerald-500/10 text-emerald-600' }
+  if (wer < 5) return { label: t('benchmark.wer.good'), cls: 'bg-blue-500/10 text-blue-600' }
+  if (wer < 8) return { label: t('benchmark.wer.fair'), cls: 'bg-amber-500/10 text-amber-600' }
+  return { label: t('benchmark.wer.basic'), cls: 'bg-orange-500/10 text-orange-600' }
+}
+
+function rtfBadge(rtf: number) {
+  if (rtf < 0.05) return { label: t('benchmark.rtf.lightning'), cls: 'bg-violet-500/10 text-violet-600' }
+  if (rtf < 0.15) return { label: t('benchmark.rtf.fast'), cls: 'bg-emerald-500/10 text-emerald-600' }
+  if (rtf < 0.35) return { label: t('benchmark.rtf.normal'), cls: 'bg-blue-500/10 text-blue-600' }
+  return { label: t('benchmark.rtf.slow'), cls: 'bg-amber-500/10 text-amber-600' }
+}
+
 async function onCleanupModelChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   await settings.setSetting('cleanup_model_id', value)
@@ -544,10 +558,20 @@ onUnmounted(() => {
                       >{{ t('settings.cleanup.recommended') }}</Badge>
                       <Badge
                         variant="secondary"
-                        :class="['text-[9px] px-1 py-0 border-transparent font-medium ml-auto', asrGroupClass(m.group)]"
+                        :class="['text-[9px] px-1 py-0 border-transparent font-medium', asrGroupClass(m.group)]"
                       >{{ asrGroupLabel(m.group) }}</Badge>
                     </span>
-                    <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+                    <span v-if="m.wer != null || m.rtf != null || m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+                      <Badge
+                        v-if="m.wer != null"
+                        variant="secondary"
+                        :class="['text-[9px] px-1 py-0 border-transparent font-medium', werBadge(m.wer).cls]"
+                      >{{ werBadge(m.wer).label }} <span class="opacity-50 font-normal">{{ +m.wer.toFixed(1) }}%</span></Badge>
+                      <Badge
+                        v-if="m.rtf != null"
+                        variant="secondary"
+                        :class="['text-[9px] px-1 py-0 border-transparent font-medium', rtfBadge(m.rtf).cls]"
+                      >{{ rtfBadge(m.rtf).label }} <span class="opacity-50 font-normal">{{ +m.rtf.toFixed(2) }}x</span></Badge>
                       <Badge
                         v-if="m.params != null"
                         variant="secondary"
@@ -719,7 +743,7 @@ onUnmounted(() => {
                         >{{ t('settings.cleanup.recommended') }}</Badge>
                         <Badge
                           variant="secondary"
-                          :class="['text-[9px] px-1 py-0 border-transparent font-medium ml-auto', cleanupGroupClass(m.group)]"
+                          :class="['text-[9px] px-1 py-0 border-transparent font-medium', cleanupGroupClass(m.group)]"
                         >{{ cleanupGroupLabel(m.group) }}</Badge>
                       </span>
                       <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
