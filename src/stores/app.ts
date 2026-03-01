@@ -146,7 +146,7 @@ export const useAppStore = defineStore('app', () => {
   const audioDuckingEnabled = ref(false)
   const audioDuckingLevel = ref(0.8)
   const spectrumData = ref<number[]>(new Array(12).fill(0))
-  const pillMode = ref<'preparing' | 'recording' | 'transcribing' | 'error' | 'idle'>('recording')
+  const pillMode = ref<'recording' | 'transcribing' | 'error' | 'idle'>('recording')
 
   const engines = ref<EngineInfo[]>([])
   const models = ref<ASRModel[]>([])

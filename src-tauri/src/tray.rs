@@ -3,17 +3,12 @@ use crate::platform::audio_devices;
 use crate::state::AppState;
 use rust_i18n::t;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{
     image::Image,
     menu::{IconMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
-
-/// Generation counter for pill window — incremented on each open, used to
-/// prevent stale delayed closes from killing a freshly opened pill.
-static PILL_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// Holds references to menu items for incremental updates.
 pub struct TrayMenuState {
@@ -122,32 +117,12 @@ fn activate_app() {
 fn activate_app() {}
 
 pub fn open_pill_window(app: &AppHandle) {
-    PILL_GENERATION.fetch_add(1, Ordering::SeqCst);
-
-    // If pill already exists (hidden), just show it — no recreate, no flash
     if app.get_webview_window("pill").is_some() {
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            if let Some(w) = handle.get_webview_window("pill") {
-                #[cfg(target_os = "macos")]
-                ensure_pill_transparent(&w);
-                let _ = w.show();
-            }
-        });
         return;
     }
 
-    // Create new pill window
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        // Double-check on main thread
-        if let Some(w) = handle.get_webview_window("pill") {
-            #[cfg(target_os = "macos")]
-            ensure_pill_transparent(&w);
-            let _ = w.show();
-            return;
-        }
-
         match WebviewWindowBuilder::new(&handle, "pill", WebviewUrl::App("/pill".into()))
             .decorations(false)
             .transparent(true)
@@ -174,59 +149,12 @@ pub fn open_pill_window(app: &AppHandle) {
     });
 }
 
-/// Idle timeout: destroy the pill webview after this long without use (saves memory).
-const PILL_IDLE_DESTROY_MS: u64 = 60_000;
-
 pub fn close_pill_window(app: &AppHandle) {
     set_tray_state(app, "idle");
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(win) = handle.get_webview_window("pill") {
-            let _ = win.hide();
-        }
-    });
-    // Schedule destroy after idle timeout
-    schedule_pill_destroy(app);
-}
-
-/// Close the pill window after a delay, but only if no new pill was opened since.
-pub fn close_pill_window_delayed(app: &AppHandle, delay_ms: u64) {
-    set_tray_state(app, "idle");
-    let gen = PILL_GENERATION.load(Ordering::SeqCst);
-    let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-        if PILL_GENERATION.load(Ordering::SeqCst) == gen {
-            let handle = app_clone.clone();
-            let _ = app_clone.run_on_main_thread(move || {
-                if let Some(win) = handle.get_webview_window("pill") {
-                    let _ = win.hide();
-                }
-            });
-            // Schedule destroy after idle timeout
-            schedule_pill_destroy_with_gen(&app_clone, gen);
-        }
-    });
-}
-
-/// Destroy the pill webview after an idle period (no new open since `gen`).
-fn schedule_pill_destroy(app: &AppHandle) {
-    let gen = PILL_GENERATION.load(Ordering::SeqCst);
-    schedule_pill_destroy_with_gen(app, gen);
-}
-
-fn schedule_pill_destroy_with_gen(app: &AppHandle, gen: u64) {
-    let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(PILL_IDLE_DESTROY_MS)).await;
-        if PILL_GENERATION.load(Ordering::SeqCst) == gen {
-            let handle = app_clone.clone();
-            let _ = app_clone.run_on_main_thread(move || {
-                if let Some(win) = handle.get_webview_window("pill") {
-                    log::debug!("Destroying idle pill webview");
-                    let _ = win.destroy();
-                }
-            });
+            let _ = win.destroy();
         }
     });
 }
@@ -264,21 +192,6 @@ fn configure_pill_nswindow(win: &tauri::WebviewWindow) {
         }
 
         // Make the webview background transparent
-        let content_view: *mut AnyObject = msg_send![ns_win, contentView];
-        if !content_view.is_null() {
-            set_subviews_transparent(content_view);
-        }
-    }
-}
-
-/// Re-apply transparency settings before showing a hidden pill (WKWebView may reset).
-#[cfg(target_os = "macos")]
-fn ensure_pill_transparent(win: &tauri::WebviewWindow) {
-    use objc2::msg_send;
-    use objc2::runtime::AnyObject;
-
-    let ns_win: *mut AnyObject = win.ns_window().unwrap() as *mut AnyObject;
-    unsafe {
         let content_view: *mut AnyObject = msg_send![ns_win, contentView];
         if !content_view.is_null() {
             set_subviews_transparent(content_view);

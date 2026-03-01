@@ -6,10 +6,14 @@ use crate::platform;
 use crate::post_processor;
 use crate::state::AppState;
 use crate::transcriber;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+
+/// Generation counter — incremented on each recording start, used to prevent
+/// stale delayed pill closes (from error display) from killing a freshly opened pill.
+static PILL_CLOSE_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 // -- Timing constants --
 
@@ -61,10 +65,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         rt.transcription_cancelled = false;
     }
     rec.key_down_time = Some(Instant::now());
-
-    // Show pill immediately in "preparing" state for instant feedback
-    crate::tray::open_pill_window(app);
-    let _ = app.emit(crate::events::PILL_MODE, "preparing");
+    PILL_CLOSE_GENERATION.fetch_add(1, Ordering::SeqCst);
 
     let (device_uid, ducking_enabled, ducking_level) = {
         let s = state.settings.lock().unwrap();
@@ -77,6 +78,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     let _ = rec.audio_rx.recv();
 
     platform::play_sound("Tink");
+    crate::tray::open_pill_window(app);
     crate::tray::set_tray_state(app, "recording");
     let _ = app.emit(crate::events::PILL_MODE, "recording");
     let _ = app.emit(crate::events::RECORDING_STARTED, ());
@@ -495,7 +497,15 @@ fn run_local_llm_cleanup(
 
 fn show_error_then_close(app: &AppHandle) {
     let _ = app.emit(crate::events::PILL_MODE, "error");
-    crate::tray::close_pill_window_delayed(app, ERROR_DISPLAY_MS);
+    let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(ERROR_DISPLAY_MS)).await;
+        // Only close if no new recording started since the error
+        if PILL_CLOSE_GENERATION.load(Ordering::SeqCst) == gen {
+            crate::tray::close_pill_window(&app_clone);
+        }
+    });
 }
 
 fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {

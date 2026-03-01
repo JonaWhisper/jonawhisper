@@ -89,7 +89,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 
 | File | Role |
 |------|------|
-| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), floating pill window lifecycle. Uses hide/show (not destroy/recreate) for fast pill transitions, with a `PILL_GENERATION` atomic counter to prevent stale delayed closes from killing a freshly opened pill. Idle pill webview is auto-destroyed after 60s. Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
+| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), floating pill window lifecycle. Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
 | `menu_icons.rs` | SDF (Signed Distance Field) icon rendering — shared primitives (`sdf_aa`, `sdf_rrect`, `sdf_circle`, `sdf_segment`, `point_in_triangle`) and 8 transport type icons (laptop, USB, bluetooth, waves, hard drive, zap, monitor, mic). Icons are rendered at 16×16, cached in a `LazyLock`, and composited onto 36×36 colored bubbles (blue=selected, gray=other) for menu items. Inspired by [Lucide](https://lucide.dev/) icon paths, hand-crafted as SDF shapes — zero image dependencies. |
 
 ### SDF icon rendering — how it works
@@ -122,7 +122,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | View | Route | Description |
 |------|-------|-------------|
 | `SetupWizard.vue` | `/setup` | Two-step wizard: permissions, then initial configuration |
-| `FloatingPill.vue` | `/pill` | Overlay showing recording state with spectrum animation. Five modes: **preparing** (pulsing dot, shown instantly on key press), **recording** (spectrum bars), **transcribing** (bouncing dots), **error** (red cross), **idle**. |
+| `FloatingPill.vue` | `/pill` | Overlay showing recording state with spectrum animation. Four modes: **recording** (spectrum bars), **transcribing** (bouncing dots), **error** (red cross), **idle**. |
 | `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). Refresh buttons to re-fetch models from cloud providers. Token hard cap slider (128–8192). |
 | `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
 | `History.vue` | `/history` | Transcription history timeline with search, deletion, and processing badges (ASR local/cloud, language, cleanup method, hallucination filter) |
@@ -178,8 +178,8 @@ Main thread (Tauri + Tokio runtime)
 
 1. **Hotkey press** → CGEvent callback detects the configured shortcut → sends `HotkeyEvent::KeyDown`
 2. **Hotkey handler** receives the event → calls `start_recording()`
-3. **Pill opens immediately** in "preparing" mode (pulsing dot) for instant visual feedback
-4. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing → pill switches to "recording" mode (spectrum bars)
+3. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing
+4. **Pill opens** in "recording" mode (spectrum bars) once audio is ready
 5. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
 6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
 7. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
@@ -188,7 +188,7 @@ Main thread (Tauri + Tokio runtime)
 10. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
 11. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
 
-**Cancel flow:** Escape during recording → `cancel_recording()` stops audio, discards file, shows error cross. Escape during transcription → `cancel_transcription()` sets cancel flag, clears queue. Pill close uses `PILL_GENERATION` counter to prevent stale delayed closes from interfering with new recordings.
+**Cancel flow:** Escape during recording → `cancel_recording()` stops audio, discards file, shows error cross. Escape during transcription → `cancel_transcription()` sets cancel flag, clears queue. Delayed pill close uses a generation counter to prevent stale closes from interfering with new recordings.
 
 ## Configuration
 

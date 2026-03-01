@@ -8,7 +8,7 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 let animFrame = 0
 let dotPhase = 0
 
-type PillMode = 'preparing' | 'recording' | 'transcribing' | 'error' | 'idle'
+type PillMode = 'recording' | 'transcribing' | 'error' | 'idle'
 
 const mode = computed<PillMode>(() => store.pillMode)
 
@@ -53,9 +53,7 @@ function draw() {
   // Draw content based on mode
   const m = mode.value
 
-  if (m === 'preparing') {
-    drawPreparing(ctx, cw, ch)
-  } else if (m === 'recording') {
+  if (m === 'recording') {
     drawSpectrum(ctx, cw, ch)
   } else if (m === 'transcribing') {
     drawDots(ctx, cw, ch)
@@ -82,17 +80,6 @@ function draw() {
   }
 
   animFrame = requestAnimationFrame(draw)
-}
-
-function drawPreparing(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  dotPhase += 0.08
-  const pulse = Math.sin(dotPhase) * 0.3 + 0.7
-  const circleSize = Math.max(3, Math.round(h * 0.15))
-
-  ctx.beginPath()
-  ctx.arc(w / 2, h / 2, circleSize * pulse, 0, Math.PI * 2)
-  ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + pulse * 0.5})`
-  ctx.fill()
 }
 
 function drawSpectrum(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -158,24 +145,13 @@ function drawError(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.stroke()
 }
 
-function ensureDrawing() {
-  cancelAnimationFrame(animFrame)
-  animFrame = requestAnimationFrame(draw)
-}
-
 onMounted(async () => {
   // Ensure transparent background for pill window
   document.documentElement.style.background = 'transparent'
   document.body.style.background = 'transparent'
   document.body.style.margin = '0'
   document.body.style.overflow = 'hidden'
-  ensureDrawing()
-
-  // Restart drawing when window becomes visible again (after hide/show)
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) ensureDrawing()
-  })
-
+  animFrame = requestAnimationFrame(draw)
   // Signal to Rust that the webview is ready to be shown
   await emit('pill-ready')
 })

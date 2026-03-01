@@ -10,7 +10,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **9 cloud providers** — preconfigured presets (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) with API key testing and dynamic model discovery
 - **Post-processing** — hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
 - **Bilingual UI** — French and English, auto-detected or manual override
-- **Floating pill** — instant visual feedback (preparing → recording → transcribing), real-time spectrum bars, cancel support during recording or transcription
+- **Floating pill** — visual feedback (recording → transcribing), real-time spectrum bars, cancel support during recording or transcription
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
 - **Mic test** — test your microphone with live spectrum visualization in Settings
 - **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
