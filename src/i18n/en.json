@@ -80,7 +80,7 @@
   "settings.postProcessing.cleanupModel": "Cleanup model",
   "settings.postProcessing.cleanupModel.none": "No models downloaded",
   "settings.cleanupGroup.bert": "Punctuation",
-  "settings.cleanupGroup.llm": "Local LLM",
+  "settings.cleanupGroup.llm": "Local",
   "settings.cleanupGroup.cloud": "Cloud",
   "settings.cleanup.recommended": "Recommended",
   "settings.asrGroup.local": "Local",

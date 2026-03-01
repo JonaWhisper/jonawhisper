@@ -80,7 +80,7 @@
   "settings.postProcessing.cleanupModel": "Mod\u00e8le de nettoyage",
   "settings.postProcessing.cleanupModel.none": "Aucun mod\u00e8le t\u00e9l\u00e9charg\u00e9",
   "settings.cleanupGroup.bert": "Ponctuation",
-  "settings.cleanupGroup.llm": "LLM local",
+  "settings.cleanupGroup.llm": "Local",
   "settings.cleanupGroup.cloud": "Cloud",
   "settings.cleanup.recommended": "Recommandé",
   "settings.asrGroup.local": "Local",
