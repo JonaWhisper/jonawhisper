@@ -426,6 +426,7 @@ fn run_event_tap(
             KEY_DOWN => {
                 if !is_modifier_key_code(key_code) {
                     cap.key.store(key_code, Ordering::SeqCst);
+                    cap.modifiers.store(mod_flags, Ordering::SeqCst);
                     cap.had_key.store(true, Ordering::SeqCst);
                     cap.active.store(true, Ordering::SeqCst);
 
