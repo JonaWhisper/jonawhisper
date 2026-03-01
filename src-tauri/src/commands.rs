@@ -422,8 +422,8 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
         log::info!("Simulation round {}/{}", round + 1, rounds);
 
         crate::tray::open_pill_window(&app);
-        tokio::time::sleep(Duration::from_millis(200)).await;
-        let _ = app.emit(crate::events::PILL_MODE, "recording");
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        crate::pill::set_mode(crate::pill::PillMode::Recording);
         let _ = app.emit(crate::events::RECORDING_STARTED, ());
 
         // Fake spectrum data for 2 seconds (30fps)
@@ -434,12 +434,12 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
                     (phase.sin() * 0.5 + 0.5) * 0.8
                 })
                 .collect();
-            let _ = app.emit(crate::events::SPECTRUM_DATA, &spectrum);
+            crate::pill::set_spectrum(&spectrum);
             tokio::time::sleep(Duration::from_millis(33)).await;
         }
 
         let _ = app.emit(crate::events::RECORDING_STOPPED, serde_json::json!({ "queue_count": rounds - round }));
-        let _ = app.emit(crate::events::PILL_MODE, "transcribing");
+        crate::pill::set_mode(crate::pill::PillMode::Transcribing);
         let _ = app.emit(crate::events::TRANSCRIPTION_STARTED, serde_json::json!({ "queue_count": rounds - round - 1 }));
 
         tokio::time::sleep(Duration::from_millis(2000)).await;
@@ -451,7 +451,7 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
         }
     }
 
-    let _ = app.emit(crate::events::PILL_MODE, "error");
+    crate::pill::set_mode(crate::pill::PillMode::Error);
     tokio::time::sleep(Duration::from_millis(800)).await;
 
     crate::tray::close_pill_window(&app);

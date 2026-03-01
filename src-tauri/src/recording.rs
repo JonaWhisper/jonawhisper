@@ -80,7 +80,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     platform::play_sound("Tink");
     crate::tray::open_pill_window(app);
     crate::tray::set_tray_state(app, "recording");
-    let _ = app.emit(crate::events::PILL_MODE, "recording");
+    crate::pill::set_mode(crate::pill::PillMode::Recording);
     let _ = app.emit(crate::events::RECORDING_STARTED, ());
 }
 
@@ -134,7 +134,7 @@ pub fn stop_recording_and_enqueue(
         crate::events::RECORDING_STOPPED,
         serde_json::json!({ "queue_count": count }),
     );
-    let _ = app.emit(crate::events::PILL_MODE, "transcribing");
+    crate::pill::set_mode(crate::pill::PillMode::Transcribing);
     crate::tray::set_tray_state(app, "transcribing");
 
     let app_clone = app.clone();
@@ -172,7 +172,7 @@ fn handle_short_tap(
     if !is_transcribing && queue_empty {
         crate::tray::close_pill_window(app);
     } else {
-        let _ = app.emit(crate::events::PILL_MODE, "transcribing");
+        crate::pill::set_mode(crate::pill::PillMode::Transcribing);
         crate::tray::set_tray_state(app, "transcribing");
     }
     let _ = app.emit(crate::events::RECORDING_STOPPED, ());
@@ -496,7 +496,7 @@ fn run_local_llm_cleanup(
 // -- Cleanup helpers --
 
 fn show_error_then_close(app: &AppHandle) {
-    let _ = app.emit(crate::events::PILL_MODE, "error");
+    crate::pill::set_mode(crate::pill::PillMode::Error);
     let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -710,8 +710,12 @@ pub fn spawn_spectrum_emitter(
 
         let spectrum = spectrum_data.lock().unwrap().clone();
         let _ = cmd_tx.send(AudioCmd::GetSpectrum);
-        let event_name = if is_mic_testing { crate::events::MIC_TEST_SPECTRUM } else { crate::events::SPECTRUM_DATA };
-        let _ = app.emit(event_name, spectrum);
+        if is_mic_testing {
+            let _ = app.emit(crate::events::MIC_TEST_SPECTRUM, &spectrum);
+        } else {
+            // Feed spectrum directly to native pill (no Tauri event needed)
+            crate::pill::set_spectrum(&spectrum);
+        }
     });
 }
 

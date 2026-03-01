@@ -9,6 +9,7 @@ mod llm_local;
 mod migrations;
 mod llm_prompt;
 mod menu_icons;
+mod pill;
 mod platform;
 mod post_processor;
 mod recording;

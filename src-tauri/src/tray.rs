@@ -7,7 +7,7 @@ use tauri::{
     image::Image,
     menu::{IconMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
-    AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
 /// Holds references to menu items for incremental updates.
@@ -20,10 +20,6 @@ pub struct TrayMenuState {
     pub setup_item: MenuItem<tauri::Wry>,
     pub quit_item: MenuItem<tauri::Wry>,
 }
-
-const PILL_WIDTH: f64 = 80.0;
-const PILL_HEIGHT: f64 = 32.0;
-const PILL_TOP_OFFSET: f64 = 40.0;
 
 // Tray icon size (44px for @2x Retina)
 const TRAY_ICON_SIZE: u32 = 44;
@@ -117,103 +113,12 @@ fn activate_app() {
 fn activate_app() {}
 
 pub fn open_pill_window(app: &AppHandle) {
-    if app.get_webview_window("pill").is_some() {
-        return;
-    }
-
-    let handle = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        match WebviewWindowBuilder::new(&handle, "pill", WebviewUrl::App("/pill".into()))
-            .decorations(false)
-            .transparent(true)
-            .always_on_top(true)
-            .inner_size(PILL_WIDTH, PILL_HEIGHT)
-            .resizable(false)
-            .visible(false)
-            .build()
-        {
-            Ok(win) => {
-                #[cfg(target_os = "macos")]
-                configure_pill_nswindow(&win);
-
-                // Show when the webview signals it's ready (avoids white flash)
-                let handle_for_show = handle.clone();
-                handle.once("pill-ready", move |_| {
-                    if let Some(w) = handle_for_show.get_webview_window("pill") {
-                        let _ = w.show();
-                    }
-                });
-            }
-            Err(e) => log::error!("Failed to create pill window: {}", e),
-        }
-    });
+    crate::pill::open(app);
 }
 
 pub fn close_pill_window(app: &AppHandle) {
     set_tray_state(app, "idle");
-    let handle = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        if let Some(win) = handle.get_webview_window("pill") {
-            let _ = win.destroy();
-        }
-    });
-}
-
-// -- Pill NSWindow configuration (macOS) --
-
-#[cfg(target_os = "macos")]
-fn configure_pill_nswindow(win: &tauri::WebviewWindow) {
-    use objc2::msg_send;
-    use objc2::runtime::AnyObject;
-    use objc2_foundation::NSPoint;
-
-    let ns_win: *mut AnyObject = win.ns_window().unwrap() as *mut AnyObject;
-
-    // SAFETY: ns_win is a valid NSWindow pointer from Tauri's ns_window().
-    // All msg_send! calls use standard NSWindow/NSColor selectors.
-    // setLevel:3 = NSFloatingWindowLevel, collectionBehavior:17 = canJoinAllSpaces|stationary.
-    unsafe {
-        let _: () = msg_send![ns_win, setOpaque: false];
-        let clear_color: *mut AnyObject =
-            msg_send![objc2::runtime::AnyClass::get(c"NSColor").unwrap(), clearColor];
-        let _: () = msg_send![ns_win, setBackgroundColor: clear_color];
-        let _: () = msg_send![ns_win, setHasShadow: true];
-        let _: () = msg_send![ns_win, setIgnoresMouseEvents: true];
-        let _: () = msg_send![ns_win, setLevel: 3i64];
-        let _: () = msg_send![ns_win, setCollectionBehavior: 17u64];
-
-        // Position near top-center of screen (like Swift: 40px from top)
-        let screen: *mut AnyObject = msg_send![ns_win, screen];
-        if !screen.is_null() {
-            let screen_frame: objc2_foundation::NSRect = msg_send![screen, frame];
-            let x = (screen_frame.size.width - PILL_WIDTH) / 2.0;
-            let y = screen_frame.origin.y + screen_frame.size.height - PILL_HEIGHT - PILL_TOP_OFFSET;
-            let _: () = msg_send![ns_win, setFrameOrigin: NSPoint::new(x, y)];
-        }
-
-        // Make the webview background transparent
-        let content_view: *mut AnyObject = msg_send![ns_win, contentView];
-        if !content_view.is_null() {
-            set_subviews_transparent(content_view);
-        }
-    }
-}
-
-#[cfg(target_os = "macos")]
-unsafe fn set_subviews_transparent(content_view: *mut objc2::runtime::AnyObject) {
-    use objc2::msg_send;
-    use objc2::runtime::{AnyObject, Bool};
-
-    let sel = objc2::sel!(setDrawsBackground:);
-    let subviews: *mut AnyObject = msg_send![content_view, subviews];
-    let count: usize = msg_send![subviews, count];
-    for i in 0..count {
-        let subview: *mut AnyObject = msg_send![subviews, objectAtIndex: i];
-        let responds: Bool = msg_send![subview, respondsToSelector: sel];
-        if responds.as_bool() {
-            let _: () = msg_send![subview, setDrawsBackground: false];
-        }
-    }
+    crate::pill::close(app);
 }
 
 // -- Tray menu --

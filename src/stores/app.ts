@@ -145,9 +145,6 @@ export const useAppStore = defineStore('app', () => {
   const llmMaxTokens = ref(4096)
   const audioDuckingEnabled = ref(false)
   const audioDuckingLevel = ref(0.8)
-  const spectrumData = ref<number[]>(new Array(12).fill(0))
-  const pillMode = ref<'recording' | 'transcribing' | 'error' | 'idle'>('recording')
-
   const engines = ref<EngineInfo[]>([])
   const models = ref<ASRModel[]>([])
   const languages = ref<Language[]>([])
@@ -511,10 +508,6 @@ export const useAppStore = defineStore('app', () => {
       }
     })
 
-    listen<number[]>('spectrum-data', (event: Event<number[]>) => {
-      spectrumData.value = event.payload
-    })
-
     listen<TranscriptionStartedPayload>('transcription-started', (event: Event<TranscriptionStartedPayload>) => {
       isTranscribing.value = true
       if (event.payload?.queue_count !== undefined) {
@@ -545,10 +538,6 @@ export const useAppStore = defineStore('app', () => {
     listen('transcription-cancelled', () => {
       isTranscribing.value = false
       queueCount.value = 0
-    })
-
-    listen<string>('pill-mode', (event: Event<string>) => {
-      pillMode.value = event.payload as typeof pillMode.value
     })
 
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
@@ -598,7 +587,7 @@ export const useAppStore = defineStore('app', () => {
     activeDownloads, deletingModels,
     selectedModelId, selectedLanguage,
     hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
-    cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
+    cancelShortcut, recordingMode, hotkey,
     textCleanupEnabled, cleanupModelId, llmModel, llmMaxTokens, asrCloudModel, gpuMode,
     audioDuckingEnabled, audioDuckingLevel,
     engines, models, languages, history,
