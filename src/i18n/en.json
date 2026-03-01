@@ -79,7 +79,7 @@
   "settings.postProcessing.cleanupModel.none": "No models downloaded",
   "settings.models.refresh": "Refresh models",
   "settings.llm.model": "Model",
-  "settings.llm.maxTokens": "Max tokens",
+  "settings.llm.maxTokens": "Token hard cap",
   "settings.providers.add": "Add Provider",
   "settings.providers.empty": "No providers configured.",
   "settings.providers.removeConfirm": "Remove this provider?",

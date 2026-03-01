@@ -79,7 +79,7 @@
   "settings.postProcessing.cleanupModel.none": "Aucun mod\u00e8le t\u00e9l\u00e9charg\u00e9",
   "settings.models.refresh": "Actualiser les modèles",
   "settings.llm.model": "Modèle",
-  "settings.llm.maxTokens": "Tokens max",
+  "settings.llm.maxTokens": "Limite max tokens",
   "settings.providers.add": "Ajouter un fournisseur",
   "settings.providers.empty": "Aucun fournisseur configuré.",
   "settings.providers.removeConfirm": "Supprimer ce fournisseur ?",

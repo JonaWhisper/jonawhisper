@@ -288,7 +288,7 @@ async function onCleanupModelChange(value: string | number | bigint | Record<str
 }
 
 async function onLlmMaxTokensChange(value: string | number) {
-  const parsed = Math.max(64, Math.min(4096, parseInt(String(value), 10) || 256))
+  const parsed = Math.max(128, Math.min(8192, parseInt(String(value), 10) || 4096))
   await store.setSetting('llm_max_tokens', String(parsed))
 }
 
@@ -681,22 +681,22 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- Max tokens (cloud) -->
+              <!-- Token hard cap (cloud) -->
               <div class="space-y-1">
                 <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
                 <Input
                   type="number"
                   :model-value="String(store.llmMaxTokens)"
                   @update:model-value="onLlmMaxTokensChange"
-                  min="64"
-                  max="4096"
-                  step="64"
+                  min="128"
+                  max="8192"
+                  step="128"
                   class="h-9 text-sm w-28"
                 />
               </div>
             </template>
 
-            <!-- Local LLM sub-settings (max tokens only) -->
+            <!-- Local LLM sub-settings (token hard cap) -->
             <template v-if="store.isLocalLlm">
               <div class="space-y-1">
                 <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
@@ -704,9 +704,9 @@ onUnmounted(() => {
                   type="number"
                   :model-value="String(store.llmMaxTokens)"
                   @update:model-value="onLlmMaxTokensChange"
-                  min="64"
-                  max="4096"
-                  step="64"
+                  min="128"
+                  max="8192"
+                  step="128"
                   class="h-9 text-sm w-28"
                 />
               </div>

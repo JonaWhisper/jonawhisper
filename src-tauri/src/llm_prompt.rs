@@ -40,15 +40,21 @@ pub fn sanitize_output(raw: &str, input_len: usize) -> Result<String, LlmError> 
 
     // LLM detected hallucinated input
     if result == "HALLUCINATION" {
-        log::info!("LLM flagged input as hallucination, discarding");
+        log::info!("LLM flagged input as hallucination");
         return Err(LlmError::Hallucination);
     }
 
-    let max_len = std::cmp::max(input_len * 3, 100);
-    if result.is_empty() || result.len() > max_len {
-        log::warn!("LLM output suspicious (len={} vs input={}, max={}), discarding", result.len(), input_len, max_len);
+    if result.is_empty() {
+        log::warn!("LLM returned empty output (input_len={})", input_len);
+        return Err(LlmError::InvalidResponse("Empty output".into()));
+    }
+
+    // Only reject if output is unreasonably LONG (expansion beyond 3x is suspicious)
+    let max_len = std::cmp::max(input_len * 3, 200);
+    if result.len() > max_len {
+        log::warn!("LLM output too long (len={} vs input={}, max={}), rejecting", result.len(), input_len, max_len);
         return Err(LlmError::InvalidResponse(format!(
-            "Output failed sanity check (len={} vs input={})", result.len(), input_len
+            "Output too long (len={} vs input={})", result.len(), input_len
         )));
     }
     Ok(result)

@@ -331,9 +331,16 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             // LLM cleanup (cloud or local) — finalize before
             processed = post_processor::finalize(&processed);
 
+            // Auto-scale max_tokens based on input length (1 token ≈ 3 chars),
+            // capped by user's hard cap setting (default 4096)
+            let effective_max_tokens = std::cmp::min(
+                llm_max_tokens,
+                std::cmp::max((processed.len() as u32) / 3 + 64, 128),
+            );
+
             let llm_result = if let Some(cloud_provider_id) = cleanup_model_id.strip_prefix("cloud:") {
                 if let Some(provider) = providers.iter().find(|p| p.id == cloud_provider_id) {
-                    crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await
+                    crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
                 } else {
                     log::warn!("Cloud LLM provider '{}' not found", cloud_provider_id);
                     Err(crate::llm_prompt::LlmError::NotConfigured)
@@ -345,7 +352,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 let lang_for_llm = lang.clone();
                 let model_id = cleanup_model_id.clone();
                 match tokio::task::spawn_blocking(move || {
-                    run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, llm_max_tokens)
+                    run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, effective_max_tokens)
                 }).await {
                     Ok(result) => result,
                     Err(e) => Err(crate::llm_prompt::LlmError::Inference(format!("LLM task panicked: {}", e))),
@@ -358,14 +365,9 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     processed = cleaned;
                     effective_cleanup_model_id = cleanup_model_id.clone();
                 }
-                Err(crate::llm_prompt::LlmError::Hallucination) => {
-                    log::info!("LLM detected hallucination, discarding");
-                    platform::play_sound("Basso");
-                    let _ = app.emit(crate::events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": "" }));
-                    return;
-                }
                 Err(e) => {
-                    log::warn!("LLM cleanup failed, using finalized result: {}", e);
+                    // Always fall back to finalized text — never lose the user's dictation
+                    log::warn!("LLM cleanup failed (fallback to raw): {}", e);
                 }
             }
         }

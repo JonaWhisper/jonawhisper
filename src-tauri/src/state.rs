@@ -189,7 +189,7 @@ fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
-fn default_llm_max_tokens() -> u32 { 256 }
+fn default_llm_max_tokens() -> u32 { 4096 }
 fn default_ducking_level() -> f32 { 0.8 }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)

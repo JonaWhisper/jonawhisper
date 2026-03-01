@@ -142,7 +142,7 @@ export const useAppStore = defineStore('app', () => {
   const llmModel = ref('')
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
-  const llmMaxTokens = ref(256)
+  const llmMaxTokens = ref(4096)
   const audioDuckingEnabled = ref(false)
   const audioDuckingLevel = ref(0.8)
   const spectrumData = ref<number[]>(new Array(12).fill(0))
@@ -375,7 +375,7 @@ export const useAppStore = defineStore('app', () => {
       llmModel.value = s.llm_model ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
-      llmMaxTokens.value = s.llm_max_tokens ?? 256
+      llmMaxTokens.value = s.llm_max_tokens ?? 4096
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
     } catch (e) { console.error('fetchSettings failed:', e) }
@@ -418,7 +418,7 @@ export const useAppStore = defineStore('app', () => {
       case 'llm_model': llmModel.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
-      case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 256; break
+      case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 4096; break
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
     }
