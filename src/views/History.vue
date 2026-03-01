@@ -9,16 +9,7 @@ import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -306,34 +297,20 @@ async function doClearAll() {
     </div>
 
     <!-- Clear All confirmation -->
-    <AlertDialog :open="showClearAllConfirm" @update:open="showClearAllConfirm = $event">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('history.clearAllConfirm') }}</AlertDialogTitle>
-          <AlertDialogDescription>{{ t('history.clearAllDesc') }}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showClearAllConfirm = false">{{ t('history.cancel') }}</AlertDialogCancel>
-          <AlertDialogAction @click="doClearAll" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            {{ t('history.clearAll') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      v-model:open="showClearAllConfirm"
+      :title="t('history.clearAllConfirm')"
+      :description="t('history.clearAllDesc')"
+      :confirm-label="t('history.clearAll')"
+      @confirm="doClearAll"
+    />
 
     <!-- Delete Day confirmation -->
-    <AlertDialog :open="showDeleteDayConfirm" @update:open="showDeleteDayConfirm = $event">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('history.deleteDayConfirm') }}</AlertDialogTitle>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showDeleteDayConfirm = false">{{ t('history.cancel') }}</AlertDialogCancel>
-          <AlertDialogAction @click="doDeleteDay" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            {{ t('history.deleteDay') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      v-model:open="showDeleteDayConfirm"
+      :title="t('history.deleteDayConfirm')"
+      :confirm-label="t('history.deleteDay')"
+      @confirm="doDeleteDay"
+    />
   </div>
 </template>

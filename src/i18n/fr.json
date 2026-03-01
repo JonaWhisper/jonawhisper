@@ -1,5 +1,6 @@
 {
   "_version": 1,
+  "common.cancel": "Annuler",
   "app.name": "WhisperDictate",
   "menu.microphone": "Microphone",
   "menu.manageModels": "Gérer les modèles\u2026",

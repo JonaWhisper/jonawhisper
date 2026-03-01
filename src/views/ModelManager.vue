@@ -6,16 +6,7 @@ import { useEnginesStore } from '@/stores/engines'
 import { useDownloadStore } from '@/stores/downloads'
 import type { ASRModel, EngineInfo } from '@/stores/types'
 import ModelCell from '@/components/ModelCell.vue'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 const engines = useEnginesStore()
@@ -162,21 +153,12 @@ onMounted(async () => {
     </div>
 
     <!-- Delete confirmation dialog -->
-    <AlertDialog :open="showDeleteConfirm" @update:open="showDeleteConfirm = $event">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('modelManager.deleteConfirm') }}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {{ t('modelManager.deleteConfirmDesc', [deleteTarget?.label || '']) }}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showDeleteConfirm = false">{{ t('modelManager.cancel') }}</AlertDialogCancel>
-          <AlertDialogAction @click="confirmDelete" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            {{ t('modelManager.delete') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      v-model:open="showDeleteConfirm"
+      :title="t('modelManager.deleteConfirm')"
+      :description="t('modelManager.deleteConfirmDesc', [deleteTarget?.label || ''])"
+      :confirm-label="t('modelManager.delete')"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>

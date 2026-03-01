@@ -23,16 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import SpectrumBars from '@/components/SpectrumBars.vue'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import ProviderForm from '@/components/ProviderForm.vue'
@@ -864,21 +855,12 @@ onUnmounted(() => {
     </div>
 
     <!-- Remove provider confirmation dialog -->
-    <AlertDialog :open="showRemoveConfirm" @update:open="showRemoveConfirm = $event">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('settings.providers.removeConfirm') }}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {{ t('settings.providers.removeConfirmDesc') }}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="showRemoveConfirm = false">{{ t('modelManager.cancel') }}</AlertDialogCancel>
-          <AlertDialogAction @click="confirmRemoveProvider" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            {{ t('modelManager.delete') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      v-model:open="showRemoveConfirm"
+      :title="t('settings.providers.removeConfirm')"
+      :description="t('settings.providers.removeConfirmDesc')"
+      :confirm-label="t('modelManager.delete')"
+      @confirm="confirmRemoveProvider"
+    />
   </div>
 </template>
