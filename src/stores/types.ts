@@ -130,4 +130,5 @@ export interface SettingsPayload {
   llm_max_tokens: number
   audio_ducking_enabled: boolean
   audio_ducking_level: number
+  vad_enabled: boolean
 }

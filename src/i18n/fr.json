@@ -74,6 +74,7 @@
   "settings.locale.auto": "Défaut du système",
   "settings.locale.fr": "Français",
   "settings.locale.en": "English",
+  "settings.postProcessing.vad": "Filtrer le silence (VAD)",
   "settings.postProcessing.hallucinations": "Filtrage des hallucinations",
   "settings.postProcessing.textCleanup": "Nettoyage du texte",
   "settings.postProcessing.cleanupModel": "Mod\u00e8le de nettoyage",

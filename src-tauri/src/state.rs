@@ -178,6 +178,8 @@ pub struct Preferences {
     pub audio_ducking_enabled: bool,
     #[serde(default = "default_ducking_level")]
     pub audio_ducking_level: f32,
+    #[serde(default = "default_true")]
+    pub vad_enabled: bool,
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }

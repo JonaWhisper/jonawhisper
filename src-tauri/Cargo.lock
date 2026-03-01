@@ -6061,6 +6061,7 @@ dependencies = [
  "hound",
  "llama-cpp-2",
  "log",
+ "ndarray",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

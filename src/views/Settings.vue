@@ -589,6 +589,14 @@ onUnmounted(() => {
 
         <div class="space-y-4">
           <div class="flex items-center justify-between gap-4">
+            <Label class="text-sm shrink-0">{{ t('settings.postProcessing.vad') }}</Label>
+            <Switch
+              :model-value="settings.vadEnabled"
+              @update:model-value="(v: boolean) => settings.setSetting('vad_enabled', String(v))"
+            />
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
             <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
             <Switch
               :model-value="settings.hallucinationFilterEnabled"

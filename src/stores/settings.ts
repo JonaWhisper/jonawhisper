@@ -19,6 +19,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const hotkey = ref('right_command')
   const cancelShortcut = ref('escape')
   const recordingMode = ref('push_to_talk')
+  const vadEnabled = ref(true)
   const appLocale = ref('auto')
 
   async function fetchSettings() {
@@ -40,6 +41,7 @@ export const useSettingsStore = defineStore('settings', () => {
       llmMaxTokens.value = s.llm_max_tokens ?? 4096
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
+      vadEnabled.value = s.vad_enabled ?? true
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -61,6 +63,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'llm_max_tokens': return String(llmMaxTokens.value)
       case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
       case 'audio_ducking_level': return String(audioDuckingLevel.value)
+      case 'vad_enabled': return String(vadEnabled.value)
       default: return ''
     }
   }
@@ -83,6 +86,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 4096; break
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
+      case 'vad_enabled': vadEnabled.value = value === 'true'; break
     }
   }
 
@@ -108,7 +112,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     selectedModelId, selectedLanguage, asrCloudModel,
     textCleanupEnabled, cleanupModelId, llmModel, llmMaxTokens,
-    hallucinationFilterEnabled, selectedInputDeviceUid,
+    hallucinationFilterEnabled, vadEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
     hotkey, cancelShortcut, recordingMode, appLocale,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,

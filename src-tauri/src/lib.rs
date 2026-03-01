@@ -16,6 +16,7 @@ mod recording;
 mod state;
 mod transcriber;
 mod tray;
+mod vad;
 
 rust_i18n::i18n!("../src/i18n");
 

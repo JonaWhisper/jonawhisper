@@ -38,6 +38,7 @@ rust-i18n = "3"
 sys-locale = "0.3"
 encoding_rs = "0.8"
 ort = "2.0.0-rc.11"
+ndarray = "0.17"
 tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]

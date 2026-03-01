@@ -163,6 +163,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "llm_max_tokens": s.llm_max_tokens,
         "audio_ducking_enabled": s.audio_ducking_enabled,
         "audio_ducking_level": s.audio_ducking_level,
+        "vad_enabled": s.vad_enabled,
     })
 }
 
@@ -203,6 +204,7 @@ pub fn set_setting(
             "llm_max_tokens" => s.llm_max_tokens = value.parse::<u32>().unwrap_or(256),
             "audio_ducking_enabled" => s.audio_ducking_enabled = value == "true",
             "audio_ducking_level" => s.audio_ducking_level = value.parse().unwrap_or(0.8),
+            "vad_enabled" => s.vad_enabled = value == "true",
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;

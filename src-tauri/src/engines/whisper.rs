@@ -218,7 +218,7 @@ pub fn transcribe_native(
 }
 
 /// Read a WAV file and convert to f32 mono samples.
-fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
+pub(crate) fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
     let reader = hound::WavReader::open(path)
         .map_err(|e| EngineError::LaunchFailed(format!("Failed to open WAV: {}", e)))?;
 

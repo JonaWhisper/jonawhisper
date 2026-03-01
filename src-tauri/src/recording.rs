@@ -211,6 +211,33 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         // pending = items still in queue + the one we're about to process
         crate::pill::set_pending(qc as u32 + 1);
 
+        // VAD pre-check: discard silence, trim edges
+        let vad_enabled = state.settings.lock().unwrap().vad_enabled;
+        if vad_enabled {
+            let path_clone = audio_path.clone();
+            let vad_result = tokio::task::spawn_blocking(move || {
+                vad_preprocess(&path_clone)
+            }).await;
+
+            match vad_result {
+                Ok(VadResult::NoSpeech) => {
+                    log::info!("VAD: no speech detected, discarding");
+                    platform::play_sound("Basso");
+                    let _ = std::fs::remove_file(&audio_path);
+                    state.runtime.lock().unwrap().is_transcribing = false;
+                    show_error_then_close(app);
+                    return;
+                }
+                Ok(VadResult::Trimmed) => {
+                    log::info!("VAD: trimmed silence from audio");
+                }
+                Ok(VadResult::Unchanged) => {}
+                Err(e) => {
+                    log::warn!("VAD task error, proceeding with original audio: {}", e);
+                }
+            }
+        }
+
         let had_error = run_transcription(app, state, &audio_path).await;
         let _ = std::fs::remove_file(&audio_path);
         state.runtime.lock().unwrap().is_transcribing = false;
@@ -509,6 +536,57 @@ fn run_local_llm_cleanup(
 
     let ctx = ctx_guard.as_ref().unwrap();
     crate::llm_local::cleanup_text(ctx, text, language, max_tokens as usize)
+}
+
+// -- VAD helpers --
+
+enum VadResult {
+    NoSpeech,
+    Trimmed,
+    Unchanged,
+}
+
+fn vad_preprocess(audio_path: &std::path::Path) -> VadResult {
+    let audio = match crate::engines::whisper::read_wav_f32(audio_path) {
+        Ok(a) => a,
+        Err(e) => {
+            log::warn!("VAD: failed to read WAV, skipping: {}", e);
+            return VadResult::Unchanged;
+        }
+    };
+
+    if !crate::vad::has_speech(&audio) {
+        return VadResult::NoSpeech;
+    }
+
+    let (start, end) = crate::vad::trim_silence(&audio);
+    if start == 0 && end == audio.len() {
+        return VadResult::Unchanged;
+    }
+
+    let trimmed = &audio[start..end];
+    if let Err(e) = write_wav_f32(audio_path, trimmed) {
+        log::warn!("VAD: failed to write trimmed WAV, using original: {}", e);
+        return VadResult::Unchanged;
+    }
+
+    VadResult::Trimmed
+}
+
+fn write_wav_f32(path: &std::path::Path, samples: &[f32]) -> Result<(), String> {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: 16_000,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let mut writer = hound::WavWriter::create(path, spec)
+        .map_err(|e| format!("Failed to create WAV: {e}"))?;
+    for &s in samples {
+        writer.write_sample(s).map_err(|e| format!("WAV write error: {e}"))?;
+    }
+    writer.finalize().map_err(|e| format!("WAV finalize error: {e}"))?;
+    Ok(())
 }
 
 // -- Cleanup helpers --
