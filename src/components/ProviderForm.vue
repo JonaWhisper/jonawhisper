@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, CheckCircle2 } from 'lucide-vue-next'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-vue-next'
 
 const props = defineProps<{
   provider?: Provider
@@ -166,7 +166,10 @@ function save() {
         <CheckCircle2 class="w-3.5 h-3.5" />
         <span>{{ testMessage }}</span>
       </div>
-      <p v-if="testStatus === 'error'" class="text-xs text-destructive">{{ testMessage }}</p>
+      <div v-if="testStatus === 'error'" class="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
+        <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
+        <span>{{ testMessage }}</span>
+      </div>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">
