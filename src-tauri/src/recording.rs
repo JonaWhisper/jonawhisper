@@ -134,6 +134,9 @@ pub fn stop_recording_and_enqueue(
         crate::events::RECORDING_STOPPED,
         serde_json::json!({ "queue_count": count }),
     );
+    // count = queue len after enqueue; +1 if already transcribing = total pending
+    let is_transcribing = state.runtime.lock().unwrap().is_transcribing;
+    crate::pill::set_pending(count as u32 + if is_transcribing { 1 } else { 0 });
     crate::pill::set_mode(crate::pill::PillMode::Transcribing);
     crate::tray::set_tray_state(app, "transcribing");
 
@@ -200,10 +203,13 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
             }
         };
 
+        let qc = state.queue_count();
         let _ = app.emit(
             crate::events::TRANSCRIPTION_STARTED,
-            serde_json::json!({ "queue_count": state.queue_count() }),
+            serde_json::json!({ "queue_count": qc }),
         );
+        // pending = items still in queue + the one we're about to process
+        crate::pill::set_pending(qc as u32 + 1);
 
         let had_error = run_transcription(app, state, &audio_path).await;
         let _ = std::fs::remove_file(&audio_path);
@@ -539,6 +545,7 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
         rt.transcription_cancelled = true;
         rt.last_paste_had_content = false;
     }
+    crate::pill::set_pending(0);
     platform::play_sound("Funk");
     let _ = app.emit(crate::events::TRANSCRIPTION_CANCELLED, ());
     show_error_then_close(app);

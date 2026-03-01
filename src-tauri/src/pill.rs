@@ -118,7 +118,6 @@ pub fn set_spectrum(data: &[f32]) {
     let _ = data;
 }
 
-#[allow(dead_code)]
 pub fn set_pending(count: u32) {
     #[cfg(target_os = "macos")]
     if let Some(ref mut p) = *PILL.lock().unwrap() {
