@@ -5,6 +5,7 @@ use crate::errors::AppError;
 use crate::events;
 use crate::platform;
 use crate::state::{AppState, HistoryEntry, Provider};
+use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 use tauri::{AppHandle, Emitter, Manager};
@@ -257,17 +258,22 @@ pub fn stop_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::Stat
 
 // -- History --
 
-#[tauri::command]
-pub fn get_history(state: tauri::State<'_, Arc<AppState>>) -> Vec<HistoryEntry> {
-    state.get_history()
+#[derive(Serialize)]
+pub struct HistoryPage {
+    entries: Vec<HistoryEntry>,
+    total: u32,
 }
 
 #[tauri::command]
-pub fn search_history(query: String, state: tauri::State<'_, Arc<AppState>>) -> Vec<HistoryEntry> {
-    if query.is_empty() {
-        return state.get_history();
-    }
-    state.search_history(&query)
+pub fn get_history(query: String, limit: u32, offset: u32, state: tauri::State<'_, Arc<AppState>>) -> HistoryPage {
+    let entries = state.get_history(&query, limit, offset);
+    let total = state.history_count(&query);
+    HistoryPage { entries, total }
+}
+
+#[tauri::command]
+pub fn search_history(query: String, limit: u32, offset: u32, state: tauri::State<'_, Arc<AppState>>) -> HistoryPage {
+    get_history(query, limit, offset, state)
 }
 
 #[tauri::command]

@@ -358,12 +358,23 @@ impl AppState {
         }
     }
 
-    pub fn get_history(&self) -> Vec<HistoryEntry> {
+    pub fn get_history(&self, query: &str, limit: u32, offset: u32) -> Vec<HistoryEntry> {
         let db = self.history_db.lock().unwrap();
-        let mut stmt = db.prepare(
-            "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history ORDER BY timestamp DESC"
-        ).unwrap();
-        stmt.query_map([], |row| {
+        let (sql, params): (&str, Vec<Box<dyn rusqlite::types::ToSql>>) = if query.is_empty() {
+            (
+                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history ORDER BY timestamp DESC LIMIT ?1 OFFSET ?2",
+                vec![Box::new(limit), Box::new(offset)],
+            )
+        } else {
+            let pattern = format!("%{}%", query);
+            (
+                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2 OFFSET ?3",
+                vec![Box::new(pattern), Box::new(limit), Box::new(offset)],
+            )
+        };
+        let mut stmt = db.prepare(sql).unwrap();
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
+        stmt.query_map(params_refs.as_slice(), |row| {
             Ok(HistoryEntry {
                 timestamp: row.get(0)?,
                 text: row.get(1)?,
@@ -376,23 +387,14 @@ impl AppState {
         }).unwrap().filter_map(|r| r.ok()).collect()
     }
 
-    pub fn search_history(&self, query: &str) -> Vec<HistoryEntry> {
+    pub fn history_count(&self, query: &str) -> u32 {
         let db = self.history_db.lock().unwrap();
-        let pattern = format!("%{}%", query);
-        let mut stmt = db.prepare(
-            "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC"
-        ).unwrap();
-        stmt.query_map([&pattern], |row| {
-            Ok(HistoryEntry {
-                timestamp: row.get(0)?,
-                text: row.get(1)?,
-                model_id: row.get(2)?,
-                language: row.get(3)?,
-                cleanup_model_id: row.get(4)?,
-                hallucination_filter: row.get(5)?,
-                vad_trimmed: row.get(6)?,
-            })
-        }).unwrap().filter_map(|r| r.ok()).collect()
+        if query.is_empty() {
+            db.query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0)).unwrap_or(0)
+        } else {
+            let pattern = format!("%{}%", query);
+            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1", [&pattern], |row| row.get(0)).unwrap_or(0)
+        }
     }
 
     pub fn delete_history_entry(&self, timestamp: u64) {

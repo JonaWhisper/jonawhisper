@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
@@ -24,46 +24,29 @@ const showClearAllConfirm = ref(false)
 const showDeleteDayConfirm = ref(false)
 const deleteDayTarget = ref<number>(0)
 
-// Debounced search
+// Debounced search — calls backend
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
-const filteredHistory = ref<HistoryEntry[]>([])
-
-function updateFiltered() {
-  const q = searchQuery.value.toLowerCase()
-  if (!q) {
-    filteredHistory.value = historyStore.history
-  } else {
-    filteredHistory.value = historyStore.history.filter(e => e.text.toLowerCase().includes(q))
-  }
-  displayLimit.value = PAGE_SIZE
-}
-
-watch(() => historyStore.history, updateFiltered, { deep: true })
 watch(searchQuery, () => {
   if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(updateFiltered, 150)
+  searchTimeout = setTimeout(() => {
+    historyStore.fetchHistory(searchQuery.value)
+  }, 250)
 })
 
 // Infinite scroll
-const PAGE_SIZE = 50
-const displayLimit = ref(PAGE_SIZE)
 const scrollContainer = ref<HTMLElement | null>(null)
-
-const visibleEntries = computed(() => filteredHistory.value.slice(0, displayLimit.value))
-const hasMore = computed(() => displayLimit.value < filteredHistory.value.length)
 
 function onScroll() {
   const el = scrollContainer.value
-  if (!el || !hasMore.value) return
+  if (!el || !historyStore.hasMore) return
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
-    displayLimit.value += PAGE_SIZE
+    historyStore.loadMore()
   }
 }
 
 onMounted(async () => {
   getCurrentWindow().setTitle(t('window.history'))
   await store.init()
-  updateFiltered()
 })
 
 // Group entries by day
@@ -81,7 +64,7 @@ const groupedHistory = computed<DayGroup[]>(() => {
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayKey = dateKey(yesterday)
 
-  for (const entry of visibleEntries.value) {
+  for (const entry of historyStore.history) {
     const date = new Date(entry.timestamp * 1000)
     const key = dateKey(date)
 
@@ -207,12 +190,12 @@ async function doClearAll() {
     <!-- Content -->
     <div ref="scrollContainer" class="flex-1 overflow-y-auto px-5 pb-5" @scroll="onScroll">
       <!-- Empty state -->
-      <div v-if="historyStore.history.length === 0" class="flex items-center justify-center h-full text-muted-foreground text-sm">
+      <div v-if="historyStore.total === 0 && !searchQuery" class="flex items-center justify-center h-full text-muted-foreground text-sm">
         {{ t('history.empty') }}
       </div>
 
       <!-- Empty search -->
-      <div v-else-if="filteredHistory.length === 0 && searchQuery" class="flex items-center justify-center h-full text-muted-foreground text-sm">
+      <div v-else-if="historyStore.history.length === 0 && searchQuery" class="flex items-center justify-center h-full text-muted-foreground text-sm">
         {{ t('history.emptySearch', [searchQuery]) }}
       </div>
 
