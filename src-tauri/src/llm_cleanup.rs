@@ -70,37 +70,7 @@ struct AnthropicContent {
     text: String,
 }
 
-use crate::llm_prompt::system_prompt;
-
-/// Strip `<think>...</think>` blocks emitted by reasoning models (e.g. Qwen3, DeepSeek).
-fn strip_think_blocks(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find("<think>") {
-        result.push_str(&rest[..start]);
-        if let Some(end) = rest[start..].find("</think>") {
-            rest = &rest[start + end + "</think>".len()..];
-        } else {
-            return result;
-        }
-    }
-    result.push_str(rest);
-    result
-}
-
-/// Sanity-check LLM output: strip think blocks, reject empty or unreasonably long results.
-fn sanitize_output(raw: &str, input_len: usize) -> Result<String, LlmError> {
-    let cleaned = strip_think_blocks(raw);
-    let result = cleaned.trim().to_string();
-    let max_len = std::cmp::max(input_len * 3, 100);
-    if result.is_empty() || result.len() > max_len {
-        log::warn!("Cloud LLM output suspicious (len={} vs input={}, max={}), discarding", result.len(), input_len, max_len);
-        return Err(LlmError::InvalidResponse(format!(
-            "Output failed sanity check (len={} vs input={})", result.len(), input_len
-        )));
-    }
-    Ok(result)
-}
+use crate::llm_prompt::{sanitize_output, system_prompt};
 
 /// Clean up transcribed text using an LLM.
 /// Returns the cleaned text, or an error.
@@ -115,7 +85,7 @@ pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model
         call_openai_compatible(text, language, provider, model, max_tokens).await?
     };
 
-    sanitize_output(&raw, text.len())
+    sanitize_output(&raw, text.len()).map_err(LlmError::InvalidResponse)
 }
 
 async fn call_openai_compatible(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {

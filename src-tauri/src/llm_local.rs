@@ -45,23 +45,6 @@ impl LlmContext {
     }
 }
 
-/// Strip `<think>...</think>` blocks emitted by reasoning models (e.g. Qwen3).
-fn strip_think_blocks(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(start) = rest.find("<think>") {
-        result.push_str(&rest[..start]);
-        if let Some(end) = rest[start..].find("</think>") {
-            rest = &rest[start + end + "</think>".len()..];
-        } else {
-            // Unclosed <think> — discard the rest
-            return result;
-        }
-    }
-    result.push_str(rest);
-    result
-}
-
 /// Clean up transcribed text using a local LLM.
 pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: usize) -> Result<String, String> {
     let messages = vec![
@@ -148,17 +131,5 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
         n_cur += 1;
     }
 
-    // Strip <think>...</think> blocks (Qwen3 and similar reasoning models)
-    let cleaned = strip_think_blocks(&output);
-    let result = cleaned.trim().to_string();
-
-    // Sanity check: discard if empty or unreasonably long
-    // Use max(3x, 100) to avoid false rejections on very short inputs
-    let max_len = std::cmp::max(text.len() * 3, 100);
-    if result.is_empty() || result.len() > max_len {
-        log::warn!("LLM cleanup output suspicious (len={} vs input={}, max={}), discarding", result.len(), text.len(), max_len);
-        return Err("LLM output failed sanity check".into());
-    }
-
-    Ok(result)
+    crate::llm_prompt::sanitize_output(&output, text.len())
 }

@@ -1,3 +1,33 @@
+/// Strip `<think>...</think>` blocks emitted by reasoning models (e.g. Qwen3, DeepSeek).
+pub fn strip_think_blocks(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find("<think>") {
+        result.push_str(&rest[..start]);
+        if let Some(end) = rest[start..].find("</think>") {
+            rest = &rest[start + end + "</think>".len()..];
+        } else {
+            // Unclosed <think> — discard the rest
+            return result;
+        }
+    }
+    result.push_str(rest);
+    result
+}
+
+/// Sanity-check LLM output: strip think blocks, reject empty or unreasonably long results.
+/// Returns cleaned text or an error message.
+pub fn sanitize_output(raw: &str, input_len: usize) -> Result<String, String> {
+    let cleaned = strip_think_blocks(raw);
+    let result = cleaned.trim().to_string();
+    let max_len = std::cmp::max(input_len * 3, 100);
+    if result.is_empty() || result.len() > max_len {
+        log::warn!("LLM output suspicious (len={} vs input={}, max={}), discarding", result.len(), input_len, max_len);
+        return Err(format!("Output failed sanity check (len={} vs input={})", result.len(), input_len));
+    }
+    Ok(result)
+}
+
 /// Shared system prompt for LLM text cleanup (used by both local and cloud paths).
 pub fn system_prompt(language: &str) -> String {
     let lang_name = match language {
