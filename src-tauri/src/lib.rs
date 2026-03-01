@@ -6,6 +6,7 @@ mod errors;
 mod events;
 mod llm_cleanup;
 mod llm_local;
+mod migrations;
 mod llm_prompt;
 mod menu_icons;
 mod platform;

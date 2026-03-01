@@ -95,6 +95,8 @@ pub struct Provider {
 /// Persistent preferences (subset of AppState that survives restarts).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Preferences {
+    #[serde(default, rename = "_version")]
+    pub schema_version: u32,
     #[serde(default = "default_model_id")]
     pub selected_model_id: String,
     #[serde(default = "default_language")]
@@ -134,7 +136,7 @@ pub struct Preferences {
     pub audio_ducking_level: f32,
 }
 
-fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
+pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
 fn default_language() -> String { "auto".to_string() }
 fn default_true() -> bool { true }
 fn default_hotkey() -> String { "right_command".to_string() }
@@ -154,6 +156,11 @@ pub fn config_dir() -> PathBuf {
         .join(APP_DIR_NAME)
 }
 
+/// Model storage: ~/Library/Application Support/WhisperDictate/models/
+pub fn models_dir() -> PathBuf {
+    config_dir().join("models")
+}
+
 fn prefs_path() -> PathBuf {
     config_dir().join(PREFS_FILE)
 }
@@ -166,175 +173,10 @@ impl Preferences {
             Err(_) => return Self::default(),
         };
 
-        // Try parsing as new format first
-        let mut prefs: Preferences = serde_json::from_str(&data).unwrap_or_default();
-        let mut needs_save = false;
+        let mut raw: serde_json::Value = serde_json::from_str(&data).unwrap_or_default();
+        let mut prefs: Preferences = serde_json::from_value(raw.clone()).unwrap_or_default();
 
-        // Detect old format and migrate
-        if let Ok(raw) = serde_json::from_str::<serde_json::Value>(&data) {
-            let has_old_api_servers = raw.get("api_servers").is_some();
-            let has_old_llm_config = raw.get("llm_config").is_some();
-
-            if has_old_api_servers || has_old_llm_config {
-                log::info!("Migrating preferences from old format to unified providers");
-                needs_save = true;
-
-                // 1. Convert api_servers → providers
-                if let Some(servers) = raw.get("api_servers").and_then(|v| v.as_array()) {
-                    for server in servers {
-                        if let (Some(id), Some(name), Some(url), Some(model)) = (
-                            server.get("id").and_then(|v| v.as_str()),
-                            server.get("name").and_then(|v| v.as_str()),
-                            server.get("url").and_then(|v| v.as_str()),
-                            server.get("model").and_then(|v| v.as_str()),
-                        ) {
-                            let api_key = server.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
-                            prefs.providers.push(Provider {
-                                id: id.to_string(),
-                                name: name.to_string(),
-                                kind: ProviderKind::Custom,
-                                url: url.to_string(),
-                                api_key: api_key.to_string(),
-                            });
-                            // Migrate ASR model to settings
-                            if !model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
-                                prefs.selected_model_id = format!("cloud:{}", id);
-                                prefs.asr_cloud_model = model.to_string();
-                            }
-                        }
-                    }
-                }
-
-                // 2. Convert llm_config → provider + settings
-                if let Some(llm) = raw.get("llm_config") {
-                    let provider_str = llm.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
-                    let api_url = llm.get("api_url").and_then(|v| v.as_str()).unwrap_or("");
-                    let api_key = llm.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
-                    let model = llm.get("model").and_then(|v| v.as_str()).unwrap_or("");
-
-                    // Mark cleanup enabled; cleanup_model_id will be finalized
-                    // after llm_provider_id is set below
-                    if llm.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
-                        prefs.text_cleanup_enabled = true;
-                    }
-                    prefs.llm_model = model.to_string();
-
-                    if !api_url.is_empty() {
-                        // Check if an existing provider has the same url+key
-                        let existing = prefs.providers.iter().find(|p|
-                            p.url == api_url && p.api_key == api_key
-                        );
-                        if let Some(p) = existing {
-                            prefs.llm_provider_id = p.id.clone();
-                        } else {
-                            let kind = if provider_str == "anthropic" {
-                                ProviderKind::Anthropic
-                            } else {
-                                ProviderKind::OpenAI
-                            };
-                            let id = format!("provider-{}", provider_str);
-                            prefs.providers.push(Provider {
-                                id: id.clone(),
-                                name: kind.display_name().to_string(),
-                                kind,
-                                url: api_url.to_string(),
-                                api_key: api_key.to_string(),
-                            });
-                            prefs.llm_provider_id = id;
-                        }
-                    }
-                }
-            }
-
-            // Migrate providers that still have asr_model in JSON (old unified format)
-            if let Some(providers_json) = raw.get("providers").and_then(|v| v.as_array()) {
-                for pj in providers_json {
-                    if let Some(asr_model) = pj.get("asr_model").and_then(|v| v.as_str()) {
-                        if !asr_model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
-                            if let Some(pid) = pj.get("id").and_then(|v| v.as_str()) {
-                                log::info!("Migrating asr_model from provider {} to settings", pid);
-                                prefs.selected_model_id = format!("cloud:{}", pid);
-                                prefs.asr_cloud_model = asr_model.to_string();
-                                needs_save = true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Reset selected_model_id if it was pointing to old openai-api: pseudo-model
-            if prefs.selected_model_id.starts_with("openai-api:") {
-                log::info!("Resetting selected_model_id from old openai-api: format");
-                prefs.selected_model_id = default_model_id();
-                needs_save = true;
-            }
-
-            // Migrate asr_provider_id → selected_model_id = "cloud:<provider_id>"
-            if let Some(asr_pid) = raw.get("asr_provider_id").and_then(|v| v.as_str()) {
-                if !asr_pid.is_empty() {
-                    let cloud_id = format!("cloud:{}", asr_pid);
-                    log::info!("Migrating asr_provider_id={} → selected_model_id={}", asr_pid, cloud_id);
-                    prefs.selected_model_id = cloud_id;
-                    needs_save = true;
-                }
-            }
-
-            // Migrate old cleanup_mode/punctuation_model_id/llm_source/llm_local_model_id → unified text_cleanup_enabled + cleanup_model_id
-            if let Some(cleanup_mode) = raw.get("cleanup_mode").and_then(|v| v.as_str()) {
-                let old_llm_source = raw.get("llm_source").and_then(|v| v.as_str()).unwrap_or("cloud");
-                let old_punctuation_model_id = raw.get("punctuation_model_id").and_then(|v| v.as_str()).unwrap_or("");
-                let old_llm_local_model_id = raw.get("llm_local_model_id").and_then(|v| v.as_str()).unwrap_or("");
-                let old_llm_provider_id = raw.get("llm_provider_id").and_then(|v| v.as_str()).unwrap_or("");
-
-                match cleanup_mode {
-                    "punctuation" => {
-                        log::info!("Migrating cleanup_mode=punctuation → text_cleanup_enabled=true, cleanup_model_id={}", old_punctuation_model_id);
-                        prefs.text_cleanup_enabled = true;
-                        prefs.cleanup_model_id = old_punctuation_model_id.to_string();
-                    }
-                    "full" => {
-                        prefs.text_cleanup_enabled = true;
-                        if old_llm_source == "local" {
-                            let mut model_id = old_llm_local_model_id.to_string();
-                            // Also migrate llm-local: prefix
-                            if model_id.starts_with("llm-local:") {
-                                model_id = model_id.replacen("llm-local:", "llama:", 1);
-                            }
-                            log::info!("Migrating cleanup_mode=full, llm_source=local → cleanup_model_id={}", model_id);
-                            prefs.cleanup_model_id = model_id;
-                        } else {
-                            let cloud_id = format!("cloud:{}", old_llm_provider_id);
-                            log::info!("Migrating cleanup_mode=full, llm_source=cloud → cleanup_model_id={}", cloud_id);
-                            prefs.cleanup_model_id = cloud_id;
-                        }
-                    }
-                    _ => {
-                        // "none" or unknown
-                        prefs.text_cleanup_enabled = false;
-                    }
-                }
-                needs_save = true;
-            }
-
-            // Migrate llm_enabled (even older format) → text_cleanup_enabled
-            if let Some(llm_enabled) = raw.get("llm_enabled").and_then(|v| v.as_bool()) {
-                if llm_enabled && !prefs.text_cleanup_enabled {
-                    log::info!("Migrating llm_enabled=true → text_cleanup_enabled=true");
-                    prefs.text_cleanup_enabled = true;
-                    needs_save = true;
-                }
-            }
-
-            // Finalize cloud cleanup_model_id: ensure "cloud:" prefix with provider ID
-            if prefs.text_cleanup_enabled && (prefs.cleanup_model_id.is_empty() || prefs.cleanup_model_id == "cloud") {
-                if !prefs.llm_provider_id.is_empty() {
-                    prefs.cleanup_model_id = format!("cloud:{}", prefs.llm_provider_id);
-                    needs_save = true;
-                }
-            }
-        }
-
-        if needs_save {
+        if crate::migrations::run(&mut raw, &mut prefs) {
             prefs.save();
             log::info!("Migration complete: {} providers", prefs.providers.len());
         }

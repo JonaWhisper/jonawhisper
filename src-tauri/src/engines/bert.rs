@@ -2,7 +2,9 @@ use super::*;
 
 pub struct BertPunctuationEngine;
 
-const BERT_STORAGE_DIR: &str = "~/.local/share/whisper-dictate/bert";
+fn storage_dir() -> String {
+    crate::state::models_dir().join("bert").to_string_lossy().to_string()
+}
 
 impl ASREngine for BertPunctuationEngine {
     fn engine_id(&self) -> &str { "bert-punctuation" }
@@ -18,7 +20,7 @@ impl ASREngine for BertPunctuationEngine {
                 filename: "model_quantized.onnx".into(),
                 url: "https://huggingface.co/ldenoue/fullstop-punctuation-multilang-large/resolve/main/onnx/model_quantized.onnx".into(),
                 size: 562_000_000,
-                storage_dir: BERT_STORAGE_DIR.into(),
+                storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile,
                 download_marker: None,
                 recommended: true,
