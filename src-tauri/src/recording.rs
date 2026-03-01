@@ -227,10 +227,22 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         }
     }
 
-    let mut rt = state.runtime.lock().unwrap();
-    if !rt.is_recording {
-        rt.last_paste_had_content = false;
-        drop(rt);
+    let (should_close, had_content) = {
+        let mut rt = state.runtime.lock().unwrap();
+        if !rt.is_recording {
+            let hc = rt.last_paste_had_content;
+            rt.last_paste_had_content = false;
+            (true, hc)
+        } else {
+            (false, false)
+        }
+    };
+    if should_close {
+        if had_content {
+            // Show success checkmark briefly before closing
+            crate::pill::set_mode(crate::pill::PillMode::Success);
+            tokio::time::sleep(Duration::from_millis(600)).await;
+        }
         crate::tray::close_pill_window(app);
     }
 }

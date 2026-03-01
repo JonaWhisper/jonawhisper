@@ -1,7 +1,7 @@
 use super::*;
 use crate::state::AppState;
 use std::path::Path;
-use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperVadParams};
 
 pub struct WhisperEngine;
 
@@ -169,6 +169,8 @@ pub fn transcribe_native(
 
     // Read WAV audio as f32 mono 16kHz
     let audio = read_wav_f32(audio_path)?;
+    let duration_secs = audio.len() as f32 / 16000.0;
+    log::info!("Audio: {} samples, {:.2}s, path={}", audio.len(), duration_secs, audio_path.display());
 
     // Configure transcription parameters
     let n_threads = std::thread::available_parallelism()
@@ -189,6 +191,21 @@ pub fn transcribe_native(
         params.set_detect_language(true);
     }
 
+    // Enable VAD (Voice Activity Detection) to filter out noise
+    if let Some(vad_path) = ensure_vad_model() {
+        params.set_vad_model_path(Some(&vad_path));
+        let mut vad_params = WhisperVadParams::new();
+        vad_params.set_threshold(0.5);
+        vad_params.set_min_speech_duration(250);
+        vad_params.set_min_silence_duration(100);
+        params.set_vad_params(vad_params);
+        params.enable_vad(true);
+        log::info!("VAD enabled");
+    }
+
+    // Suppress non-speech tokens (breathing, background noise tokens)
+    params.set_suppress_nst(true);
+
     // Run transcription
     wstate.full(params, &audio)
         .map_err(|e| EngineError::LaunchFailed(format!("Whisper transcription failed: {}", e)))?;
@@ -196,6 +213,7 @@ pub fn transcribe_native(
     // Extract text from segments
     let mut text = String::new();
     let n_segments = wstate.full_n_segments();
+    log::info!("Whisper: {} segments, {:.2}s audio", n_segments, duration_secs);
     for i in 0..n_segments {
         if let Some(segment) = wstate.get_segment(i) {
             if let Ok(s) = segment.to_str() {
@@ -203,7 +221,6 @@ pub fn transcribe_native(
             }
         }
     }
-
     Ok(text.trim().to_string())
 }
 
@@ -240,4 +257,25 @@ fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
     } else {
         Ok(samples_f32)
     }
+}
+
+const VAD_MODEL_URL: &str = "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin";
+const VAD_MODEL_FILE: &str = "ggml-silero-vad.bin";
+
+/// Return the path to the VAD model, downloading it if needed.
+fn ensure_vad_model() -> Option<String> {
+    let dir = crate::state::models_dir().join("vad");
+    let path = dir.join(VAD_MODEL_FILE);
+    if path.exists() {
+        return Some(path.to_string_lossy().to_string());
+    }
+
+    log::info!("Downloading VAD model from {}", VAD_MODEL_URL);
+    let _ = std::fs::create_dir_all(&dir);
+
+    let bytes = reqwest::blocking::get(VAD_MODEL_URL).ok()?.bytes().ok()?;
+    std::fs::write(&path, &bytes).ok()?;
+
+    log::info!("VAD model downloaded to {}", path.display());
+    Some(path.to_string_lossy().to_string())
 }
