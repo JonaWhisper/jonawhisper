@@ -129,6 +129,8 @@ pub fn open_pill_window(app: &AppHandle) {
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
             if let Some(w) = handle.get_webview_window("pill") {
+                #[cfg(target_os = "macos")]
+                ensure_pill_transparent(&w);
                 let _ = w.show();
             }
         });
@@ -140,6 +142,8 @@ pub fn open_pill_window(app: &AppHandle) {
     let _ = app.run_on_main_thread(move || {
         // Double-check on main thread
         if let Some(w) = handle.get_webview_window("pill") {
+            #[cfg(target_os = "macos")]
+            ensure_pill_transparent(&w);
             let _ = w.show();
             return;
         }
@@ -260,6 +264,21 @@ fn configure_pill_nswindow(win: &tauri::WebviewWindow) {
         }
 
         // Make the webview background transparent
+        let content_view: *mut AnyObject = msg_send![ns_win, contentView];
+        if !content_view.is_null() {
+            set_subviews_transparent(content_view);
+        }
+    }
+}
+
+/// Re-apply transparency settings before showing a hidden pill (WKWebView may reset).
+#[cfg(target_os = "macos")]
+fn ensure_pill_transparent(win: &tauri::WebviewWindow) {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let ns_win: *mut AnyObject = win.ns_window().unwrap() as *mut AnyObject;
+    unsafe {
         let content_view: *mut AnyObject = msg_send![ns_win, contentView];
         if !content_view.is_null() {
             set_subviews_transparent(content_view);

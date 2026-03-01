@@ -158,13 +158,24 @@ function drawError(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.stroke()
 }
 
+function ensureDrawing() {
+  cancelAnimationFrame(animFrame)
+  animFrame = requestAnimationFrame(draw)
+}
+
 onMounted(async () => {
   // Ensure transparent background for pill window
   document.documentElement.style.background = 'transparent'
   document.body.style.background = 'transparent'
   document.body.style.margin = '0'
   document.body.style.overflow = 'hidden'
-  animFrame = requestAnimationFrame(draw)
+  ensureDrawing()
+
+  // Restart drawing when window becomes visible again (after hide/show)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) ensureDrawing()
+  })
+
   // Signal to Rust that the webview is ready to be shown
   await emit('pill-ready')
 })
