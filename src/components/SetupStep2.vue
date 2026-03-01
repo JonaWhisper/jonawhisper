@@ -7,9 +7,7 @@ import { useDownloadStore } from '@/stores/downloads'
 import { isModelAvailable } from '@/stores/types'
 import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
 import {
   Select,
   SelectContent,
@@ -17,11 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronRight, Pause, Play, X, Loader2 } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
-import { formatSize, formatSpeed } from '@/utils/format'
+import DownloadActions from '@/components/DownloadActions.vue'
+import { formatSize } from '@/utils/format'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -224,47 +223,7 @@ const canStart = computed(() => {
                     <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null || model.ram != null || (model.lang_codes && model.lang_codes.length > 0)" :wer="model.wer" :rtf="model.rtf" :params="model.params" :ram="model.ram" :lang-codes="model.lang_codes" compact class="mt-0.5" />
                   </div>
                   <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
-                    <!-- Downloading -->
-                    <template v-if="downloads.activeDownloads[model.id]">
-                      <div class="w-16">
-                        <Progress :model-value="(downloads.activeDownloads[model.id]?.progress ?? 0) * 100" />
-                        <div class="text-[9px] text-muted-foreground mt-0.5">
-                          {{ formatSpeed(downloads.activeDownloads[model.id]!.speed) }}
-                        </div>
-                      </div>
-                      <template v-if="downloads.activeDownloads[model.id]?.stopping">
-                        <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                      </template>
-                      <template v-else>
-                        <Button variant="ghost" size="icon-sm" @click="downloads.pauseDownload(model.id)" :title="t('modelManager.pause')">
-                          <Pause class="w-3.5 h-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-                          <X class="w-3.5 h-3.5" />
-                        </Button>
-                      </template>
-                    </template>
-                    <!-- Paused (partial exists) -->
-                    <template v-else-if="model.partial_progress != null && model.partial_progress > 0">
-                      <div class="w-16">
-                        <Progress :model-value="(model.partial_progress ?? 0) * 100" />
-                        <div v-if="model.size > 0" class="text-[9px] text-muted-foreground mt-0.5">
-                          {{ formatSize(Math.round((model.partial_progress ?? 0) * model.size)) }} / {{ formatSize(model.size) }}
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon-sm" @click="handleDownload(model)" :title="t('modelManager.resume')">
-                        <Play class="w-3.5 h-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)" :title="t('modelManager.cancel')">
-                        <X class="w-3.5 h-3.5" />
-                      </Button>
-                    </template>
-                    <Badge v-else-if="isModelDownloaded(model)" variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-xs">
-                      {{ t('modelManager.downloaded') }}
-                    </Badge>
-                    <Button v-else size="sm" @click="handleDownload(model)">
-                      {{ t('modelManager.download') }}
-                    </Button>
+                    <DownloadActions :model="model" compact @download="handleDownload" />
                   </div>
                 </div>
               </div>
