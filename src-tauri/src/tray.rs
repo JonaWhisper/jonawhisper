@@ -124,8 +124,8 @@ fn activate_app() {}
 pub fn open_pill_window(app: &AppHandle) {
     PILL_GENERATION.fetch_add(1, Ordering::SeqCst);
 
+    // If pill already exists (hidden), just show it — no recreate, no flash
     if app.get_webview_window("pill").is_some() {
-        // Pill already exists — just make sure it's visible
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
             if let Some(w) = handle.get_webview_window("pill") {
@@ -135,13 +135,12 @@ pub fn open_pill_window(app: &AppHandle) {
         return;
     }
 
+    // Create new pill window
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
-        // Double-check after switching to main thread (destroy may have completed)
-        if handle.get_webview_window("pill").is_some() {
-            if let Some(w) = handle.get_webview_window("pill") {
-                let _ = w.show();
-            }
+        // Double-check on main thread
+        if let Some(w) = handle.get_webview_window("pill") {
+            let _ = w.show();
             return;
         }
 
@@ -176,7 +175,7 @@ pub fn close_pill_window(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(win) = handle.get_webview_window("pill") {
-            let _ = win.destroy();
+            let _ = win.hide();
         }
     });
 }
@@ -193,7 +192,7 @@ pub fn close_pill_window_delayed(app: &AppHandle, delay_ms: u64) {
             let handle = app_clone.clone();
             let _ = app_clone.run_on_main_thread(move || {
                 if let Some(win) = handle.get_webview_window("pill") {
-                    let _ = win.destroy();
+                    let _ = win.hide();
                 }
             });
         }

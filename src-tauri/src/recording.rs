@@ -379,6 +379,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         processed = post_processor::finalize(&processed);
     }
 
+    // Check cancel flag before pasting (cancel may arrive during LLM cleanup)
+    if state.runtime.lock().unwrap().transcription_cancelled {
+        log::info!("Transcription cancelled before paste, discarding");
+        return;
+    }
+
     // Add a leading space when pasting consecutive results (queued recordings)
     let needs_separator = state.runtime.lock().unwrap().last_paste_had_content;
     let paste_text = if needs_separator {
