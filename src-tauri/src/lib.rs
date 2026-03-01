@@ -116,8 +116,10 @@ pub fn run() {
             };
             let initial_record = platform::hotkey::Shortcut::parse(&hotkey_str);
             let initial_cancel = platform::hotkey::Shortcut::parse(&cancel_str);
+            let capture_control = Arc::new(platform::hotkey::CaptureControl::new());
             let (hotkey_rx, hotkey_update_tx) =
-                platform::hotkey::start_monitor(initial_record, initial_cancel, monitor_enabled.clone());
+                platform::hotkey::start_monitor(initial_record, initial_cancel, monitor_enabled.clone(), capture_control.clone());
+            app.manage(capture_control);
             app.manage(HotkeyUpdateSender(hotkey_update_tx));
 
             // Hotkey event processing thread

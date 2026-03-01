@@ -351,13 +351,13 @@ pub fn get_app_state(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Valu
 // -- Shortcut capture --
 
 #[tauri::command]
-pub fn start_shortcut_capture(hotkey_sender: tauri::State<'_, crate::HotkeyUpdateSender>) {
-    let _ = hotkey_sender.0.send(crate::platform::hotkey::HotkeyUpdate::EnterCaptureMode);
+pub fn start_shortcut_capture(capture: tauri::State<'_, Arc<crate::platform::hotkey::CaptureControl>>) {
+    capture.enter();
 }
 
 #[tauri::command]
-pub fn stop_shortcut_capture(hotkey_sender: tauri::State<'_, crate::HotkeyUpdateSender>) {
-    let _ = hotkey_sender.0.send(crate::platform::hotkey::HotkeyUpdate::ExitCaptureMode);
+pub fn stop_shortcut_capture(capture: tauri::State<'_, Arc<crate::platform::hotkey::CaptureControl>>) {
+    capture.exit();
 }
 
 // -- Debug --
