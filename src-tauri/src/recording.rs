@@ -493,6 +493,28 @@ fn show_error_then_close(app: &AppHandle) {
     });
 }
 
+fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
+    {
+        let mut rt = state.runtime.lock().unwrap();
+        if !rt.is_recording {
+            return;
+        }
+        rt.is_recording = false;
+    }
+
+    let _ = rec.audio_tx.send(AudioCmd::StopRecording);
+    platform::audio_ducking::restore_volume();
+    if let Ok(AudioReply::Stopped { path: Some(path) }) = rec.audio_rx.recv() {
+        let _ = std::fs::remove_file(&path);
+    }
+    rec.key_down_time = None;
+    rec.last_short_tap_time = None;
+
+    platform::play_sound("Funk");
+    let _ = app.emit(crate::events::RECORDING_STOPPED, ());
+    show_error_then_close(app);
+}
+
 fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
     while let Some(path) = state.dequeue() {
         let _ = std::fs::remove_file(&path);
@@ -607,8 +629,16 @@ pub fn spawn_hotkey_handler(
             }
             Ok(hotkey::HotkeyEvent::CancelPressed) => {
                 let rt = state.runtime.lock().unwrap();
-                if rt.is_transcribing || !rt.queue.is_empty() {
-                    drop(rt);
+                let is_recording = rt.is_recording;
+                let is_transcribing = rt.is_transcribing;
+                let has_queue = !rt.queue.is_empty();
+                drop(rt);
+
+                if is_recording {
+                    log::info!("Cancel shortcut pressed during recording, discarding");
+                    let mut rec = rec_state.lock().unwrap();
+                    cancel_recording(&app, &state, &mut rec);
+                } else if is_transcribing || has_queue {
                     log::info!("Cancel shortcut pressed, cancelling transcription");
                     cancel_transcription(&app, &state);
                 }
