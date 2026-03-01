@@ -18,6 +18,14 @@
 
 - [ ] **Splitter le store Pinia** — `app.ts` centralise tout (état, downloads, settings, history, providers, permissions). Splitter en sous-stores thématiques : `useDownloadStore`, `useSettingsStore`, `useHistoryStore`, `useProviderStore`, etc. Chaque store gère son propre état + actions. Le store principal ne garde que l'état runtime (recording, transcription, queue).
 
+## Documentation
+
+- [ ] **Guide de setup LLM/ASR local pour les utilisateurs** — Expliquer simplement comment configurer un serveur LLM local (Ollama, llama.cpp server, LM Studio, etc.) et le connecter à WhisperDictate. Inclure des recommandations de modèles adaptés :
+  - **ASR** — quels modèles Whisper choisir selon le hardware (tiny/base pour machines modestes, large-v3-turbo pour Apple Silicon avec assez de RAM)
+  - **LLM cleanup** — quels modèles GGUF recommander pour la correction de texte (petits modèles rapides type Qwen3 0.6B/1.7B, vs plus gros pour meilleure qualité)
+  - **Cloud providers** — comment configurer OpenAI, Anthropic, ou un endpoint compatible
+  - Format : section dans le README ou page wiki/guide séparée
+
 ## Technique / Infra
 
 - [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
