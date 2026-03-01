@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { ChevronRight, Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
+import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 import { formatSize, formatSpeed } from '@/utils/format'
 
@@ -156,26 +157,15 @@ const canStart = computed(() => {
         <!-- Recording mode -->
         <div class="space-y-1">
           <Label class="text-sm font-medium">{{ t('setup.step2.recordingMode') }}</Label>
-          <div class="inline-flex rounded-md border border-border overflow-hidden w-full">
-            <button
-              class="flex-1 px-3 py-1.5 text-sm transition-colors"
-              :class="settings.recordingMode === 'push_to_talk'
-                ? 'bg-accent text-accent-foreground'
-                : 'hover:bg-accent/50 text-muted-foreground'"
-              @click="onRecordingModeChange('push_to_talk')"
-            >
-              {{ t('setup.step2.pushToTalk') }}
-            </button>
-            <button
-              class="flex-1 px-3 py-1.5 text-sm border-l border-border transition-colors"
-              :class="settings.recordingMode === 'toggle'
-                ? 'bg-accent text-accent-foreground'
-                : 'hover:bg-accent/50 text-muted-foreground'"
-              @click="onRecordingModeChange('toggle')"
-            >
-              {{ t('setup.step2.toggle') }}
-            </button>
-          </div>
+          <SegmentedToggle
+            :model-value="settings.recordingMode"
+            :options="[
+              { value: 'push_to_talk', label: t('setup.step2.pushToTalk') },
+              { value: 'toggle', label: t('setup.step2.toggle') },
+            ]"
+            block
+            @update:model-value="onRecordingModeChange"
+          />
         </div>
 
         <!-- Transcription language -->

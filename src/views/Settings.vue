@@ -26,6 +26,7 @@ import {
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import SpectrumBars from '@/components/SpectrumBars.vue'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
+import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import ProviderForm from '@/components/ProviderForm.vue'
 import { serializeShortcut } from '@/utils/shortcut'
 
@@ -723,26 +724,14 @@ onUnmounted(() => {
           <!-- Recording mode toggle -->
           <div class="flex items-center justify-between">
             <Label class="text-sm font-medium">{{ t('settings.shortcut.mode') }}</Label>
-            <div class="inline-flex rounded-md border border-border overflow-hidden">
-              <button
-                class="px-3 py-1.5 text-sm transition-colors whitespace-nowrap"
-                :class="settings.recordingMode === 'push_to_talk'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-accent/50 text-muted-foreground'"
-                @click="onRecordingModeChange('push_to_talk')"
-              >
-                {{ t('settings.shortcut.mode.pushToTalk') }}
-              </button>
-              <button
-                class="px-3 py-1.5 text-sm border-l border-border transition-colors whitespace-nowrap"
-                :class="settings.recordingMode === 'toggle'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-accent/50 text-muted-foreground'"
-                @click="onRecordingModeChange('toggle')"
-              >
-                {{ t('settings.shortcut.mode.toggle') }}
-              </button>
-            </div>
+            <SegmentedToggle
+              :model-value="settings.recordingMode"
+              :options="[
+                { value: 'push_to_talk', label: t('settings.shortcut.mode.pushToTalk') },
+                { value: 'toggle', label: t('settings.shortcut.mode.toggle') },
+              ]"
+              @update:model-value="onRecordingModeChange"
+            />
           </div>
 
           <div class="space-y-2">
