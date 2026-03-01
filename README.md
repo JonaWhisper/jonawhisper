@@ -108,7 +108,7 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum), CoreAudio FFI (audio ducking) |
 | Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) (native, Metal GPU) |
-| Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted en Rust, rendues en bitmap RGBA — zéro dépendance image, inspirées [Lucide](https://lucide.dev/) |
+| Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted in Rust, rendered as RGBA bitmaps — zero image dependencies, inspired by [Lucide](https://lucide.dev/) |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
 | Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
 | i18n | [vue-i18n](https://vue-i18n.intlify.dev/) (frontend), [rust-i18n](https://github.com/longbridge/rust-i18n) (backend/tray menu) |
@@ -119,103 +119,103 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 
 **Core / Framework**
 
-| Crate | Rôle |
+| Crate | Role |
 |-------|------|
-| [`tauri`](https://github.com/tauri-apps/tauri) | Framework app (webview, tray, IPC, windows) |
-| [`tauri-plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Accès clipboard (paste simulation) |
-| [`serde`](https://github.com/serde-rs/serde) / [`serde_json`](https://github.com/serde-rs/json) | Sérialisation JSON (settings, IPC) |
-| [`tokio`](https://github.com/tokio-rs/tokio) | Runtime async (transcription, téléchargements) |
+| [`tauri`](https://github.com/tauri-apps/tauri) | App framework (webview, tray, IPC, windows) |
+| [`tauri-plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Clipboard access (paste simulation) |
+| [`serde`](https://github.com/serde-rs/serde) / [`serde_json`](https://github.com/serde-rs/json) | JSON serialization (settings, IPC) |
+| [`tokio`](https://github.com/tokio-rs/tokio) | Async runtime (transcription, downloads) |
 | [`log`](https://github.com/rust-lang/log) / [`env_logger`](https://github.com/rust-cli/env_logger) | Logging |
-| [`thiserror`](https://github.com/dtolnay/thiserror) | Dérivation d'erreurs typées |
+| [`thiserror`](https://github.com/dtolnay/thiserror) | Typed error derivation |
 
 **Audio / Transcription**
 
-| Crate | Rôle |
+| Crate | Role |
 |-------|------|
-| [`cpal`](https://github.com/RustAudio/cpal) | Capture audio cross-platform (enregistrement micro) |
-| [`hound`](https://github.com/ruuda/hound) | Écriture fichiers WAV |
-| [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT pour spectre audio (visualisation) |
-| [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Transcription native Whisper (GGML, Metal GPU sur macOS) |
-| [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Inférence LLM locale (GGUF, Metal GPU, text cleanup) |
-| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT ponctuation) |
-| [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors pour VAD (état LSTM, entrées/sorties ONNX) |
-| [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Décodage UTF-8 incrémental (sortie LLM token par token) |
+| [`cpal`](https://github.com/RustAudio/cpal) | Cross-platform audio capture (microphone recording) |
+| [`hound`](https://github.com/ruuda/hound) | WAV file writing |
+| [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT for audio spectrum (visualization) |
+| [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Native Whisper transcription (GGML, Metal GPU on macOS) |
+| [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF, Metal GPU, text cleanup) |
+| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT punctuation) |
+| [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD (LSTM state, ONNX inputs/outputs) |
+| [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Incremental UTF-8 decoding (LLM token-by-token output) |
 
-**Réseau / IO**
+**Network / IO**
 
-| Crate | Rôle |
+| Crate | Role |
 |-------|------|
-| [`reqwest`](https://github.com/seanmonstar/reqwest) | HTTP client (téléchargement modèles, API ASR/LLM) |
-| [`futures-util`](https://github.com/rust-lang/futures-rs) | Utilitaires async (streams de téléchargement) |
-| [`dirs`](https://github.com/dirs-dev/dirs-rs) | Chemins système (`~/Library/Application Support/`, etc.) |
-| [`shellexpand`](https://github.com/netvl/shellexpand) | Expansion de chemins (`~`, variables d'env) |
-| [`rusqlite`](https://github.com/rusqlite/rusqlite) | SQLite embarqué (historique des transcriptions, WAL) |
+| [`reqwest`](https://github.com/seanmonstar/reqwest) | HTTP client (model downloads, ASR/LLM APIs) |
+| [`futures-util`](https://github.com/rust-lang/futures-rs) | Async utilities (download streams) |
+| [`dirs`](https://github.com/dirs-dev/dirs-rs) | System paths (`~/Library/Application Support/`, etc.) |
+| [`shellexpand`](https://github.com/netvl/shellexpand) | Path expansion (`~`, env variables) |
+| [`rusqlite`](https://github.com/rusqlite/rusqlite) | Embedded SQLite (transcription history, WAL) |
 
-**Concurrence**
+**Concurrency**
 
-| Crate | Rôle |
+| Crate | Role |
 |-------|------|
-| [`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam) | Canaux multi-producteur (thread audio, hotkey) |
+| [`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam) | Multi-producer channels (audio thread, hotkey) |
 
-**Traitement texte / i18n**
+**Text processing / i18n**
 
-| Crate | Rôle |
+| Crate | Role |
 |-------|------|
-| [`regex`](https://github.com/rust-lang/regex) | Post-traitement transcriptions (filtrage hallucinations) |
-| [`rust-i18n`](https://github.com/longbridge/rust-i18n) | Internationalisation backend (menus tray, messages) |
-| [`sys-locale`](https://github.com/1Password/sys-locale) | Détection locale système |
+| [`regex`](https://github.com/rust-lang/regex) | Transcription post-processing (hallucination filtering) |
+| [`rust-i18n`](https://github.com/longbridge/rust-i18n) | Backend internationalization (tray menus, messages) |
+| [`sys-locale`](https://github.com/1Password/sys-locale) | System locale detection |
 
-**macOS uniquement**
+**macOS only**
 
-| Crate | Rôle |
+| Crate | Role |
 |-------|------|
 | [`core-graphics`](https://github.com/nickel-org/core-foundation-rs) / [`core-foundation`](https://github.com/nickel-org/core-foundation-rs) | CGEvent tap (hotkey), CGEvent paste (Cmd+V) |
-| [`objc2`](https://github.com/madsmtm/objc2) / [`objc2-foundation`](https://github.com/madsmtm/objc2) / [`objc2-app-kit`](https://github.com/madsmtm/objc2) | FFI Objective-C (permissions micro, NSPasteboard, NSSound, activation app) |
-| [`block2`](https://github.com/madsmtm/objc2) | Blocks Objective-C (callback `requestAccessForMediaType`) |
+| [`objc2`](https://github.com/madsmtm/objc2) / [`objc2-foundation`](https://github.com/madsmtm/objc2) / [`objc2-app-kit`](https://github.com/madsmtm/objc2) | Objective-C FFI (mic permissions, NSPasteboard, NSSound, app activation) |
+| [`block2`](https://github.com/madsmtm/objc2) | Objective-C blocks (`requestAccessForMediaType` callback) |
 
 ### Frontend (npm)
 
 **App**
 
-| Package | Rôle |
+| Package | Role |
 |---------|------|
-| [`vue`](https://github.com/vuejs/core) | Framework UI |
-| [`vue-router`](https://github.com/vuejs/router) | Routing (pill, settings, model-manager, history, setup) |
+| [`vue`](https://github.com/vuejs/core) | UI framework |
+| [`vue-router`](https://github.com/vuejs/router) | Routing (settings, model-manager, history, setup) |
 | [`pinia`](https://github.com/vuejs/pinia) | State management |
-| [`vue-i18n`](https://github.com/intlify/vue-i18n) | Internationalisation (FR/EN) |
-| [`@tauri-apps/api`](https://github.com/tauri-apps/tauri) | Bridge IPC vers le backend Rust |
+| [`vue-i18n`](https://github.com/intlify/vue-i18n) | Internationalization (FR/EN) |
+| [`@tauri-apps/api`](https://github.com/tauri-apps/tauri) | IPC bridge to the Rust backend |
 
 **UI**
 
-| Package | Rôle |
+| Package | Role |
 |---------|------|
-| [`lucide-vue-next`](https://github.com/lucide-icons/lucide) | Icones (tree-shakeable, ~1500 icones) |
-| [`reka-ui`](https://github.com/unovue/reka-ui) | Primitives UI headless (base de shadcn-vue) |
-| [`class-variance-authority`](https://github.com/joe-bell/cva) | Variants CSS pour composants (shadcn-vue) |
-| [`clsx`](https://github.com/lukeed/clsx) / [`tailwind-merge`](https://github.com/dcastil/tailwind-merge) | Utilitaires classes CSS |
-| [`@vueuse/core`](https://github.com/vueuse/vueuse) | Composables Vue (utilisé par shadcn-vue) |
+| [`lucide-vue-next`](https://github.com/lucide-icons/lucide) | Icons (tree-shakeable, ~1500 icons) |
+| [`reka-ui`](https://github.com/unovue/reka-ui) | Headless UI primitives (shadcn-vue foundation) |
+| [`class-variance-authority`](https://github.com/joe-bell/cva) | CSS variants for components (shadcn-vue) |
+| [`clsx`](https://github.com/lukeed/clsx) / [`tailwind-merge`](https://github.com/dcastil/tailwind-merge) | CSS class utilities |
+| [`@vueuse/core`](https://github.com/vueuse/vueuse) | Vue composables (used by shadcn-vue) |
 
 **Styling**
 
-| Package | Rôle |
+| Package | Role |
 |---------|------|
-| [`tailwindcss`](https://github.com/tailwindlabs/tailwindcss) / [`tailwindcss-animate`](https://github.com/jamiebuilds/tailwindcss-animate) | CSS utility-first + animations |
-| [`autoprefixer`](https://github.com/postcss/autoprefixer) / [`postcss`](https://github.com/postcss/postcss) | Post-traitement CSS |
+| [`tailwindcss`](https://github.com/tailwindlabs/tailwindcss) / [`tailwindcss-animate`](https://github.com/jamiebuilds/tailwindcss-animate) | Utility-first CSS + animations |
+| [`autoprefixer`](https://github.com/postcss/autoprefixer) / [`postcss`](https://github.com/postcss/postcss) | CSS post-processing |
 
-**Plugins Tauri (JS bindings)**
+**Tauri plugins (JS bindings)**
 
-| Package | Rôle |
+| Package | Role |
 |---------|------|
-| [`@tauri-apps/plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Écriture clipboard avant paste |
+| [`@tauri-apps/plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Clipboard write before paste |
 
 **Dev**
 
-| Package | Rôle |
+| Package | Role |
 |---------|------|
-| [`@tauri-apps/cli`](https://github.com/tauri-apps/tauri) | CLI Tauri (build, dev) |
-| [`vite`](https://github.com/vitejs/vite) / [`@vitejs/plugin-vue`](https://github.com/vitejs/vite-plugin-vue) | Bundler + plugin Vue SFC |
+| [`@tauri-apps/cli`](https://github.com/tauri-apps/tauri) | Tauri CLI (build, dev) |
+| [`vite`](https://github.com/vitejs/vite) / [`@vitejs/plugin-vue`](https://github.com/vitejs/vite-plugin-vue) | Bundler + Vue SFC plugin |
 | [`typescript`](https://github.com/microsoft/TypeScript) / [`vue-tsc`](https://github.com/vuejs/language-tools) | Type checking |
-| [`@vue/tsconfig`](https://github.com/vuejs/tsconfig) / [`@types/node`](https://github.com/DefinitelyTyped/DefinitelyTyped) | Config TypeScript |
+| [`@vue/tsconfig`](https://github.com/vuejs/tsconfig) / [`@types/node`](https://github.com/DefinitelyTyped/DefinitelyTyped) | TypeScript config |
 
 ## Project structure
 
@@ -223,7 +223,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed architecture guide with da
 
 ```
 src/                     Vue frontend
-  views/                 Pages (Settings, ModelManager, History, FloatingPill, SetupWizard)
+  views/                 Pages (Settings, ModelManager, History, SetupWizard)
   components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, BenchmarkBadges, …)
   stores/                Pinia stores (app, history, settings, engines, downloads)
   config/providers.ts    Cloud provider presets and model filter helpers
@@ -245,6 +245,7 @@ src-tauri/               Rust backend
     llm_prompt.rs        Shared LLM module (error types, output sanitization, prompt)
     bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
     tray.rs              Menu bar menu & tray icon states
+    pill.rs              Native pill overlay (AppKit NSWindow, SDF rendering)
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
     events.rs            Centralised event name constants
     errors.rs            App error types
