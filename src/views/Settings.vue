@@ -732,43 +732,43 @@ onUnmounted(() => {
         <div class="space-y-4">
           <div class="space-y-2">
             <Label class="text-sm font-medium">{{ t('settings.microphone') }}</Label>
-            <Select
-              :model-value="selectedDeviceUid"
-              :disabled="store.audioDevices.length === 0"
-              @update:model-value="onDeviceChange"
-            >
-              <SelectTrigger class="w-full h-9 text-sm">
-                <span v-if="selectedDevice" class="inline-flex items-center gap-1.5 truncate">
-                  <component :is="deviceIcon(selectedDevice.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                  <span class="truncate">{{ selectedDevice.name }}{{ selectedDevice.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
-                </span>
-                <span v-else class="text-muted-foreground">{{ t('menu.noDevices') }}</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="device in store.audioDevices"
-                  :key="device.uid"
-                  :value="device.uid"
-                >
-                  <span class="inline-flex items-center gap-1.5">
-                    <component :is="deviceIcon(device.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                    <span>{{ device.name }}{{ device.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
+            <div class="flex items-center gap-2">
+              <Select
+                :model-value="selectedDeviceUid"
+                :disabled="store.audioDevices.length === 0"
+                @update:model-value="onDeviceChange"
+                class="flex-1"
+              >
+                <SelectTrigger class="w-full h-9 text-sm">
+                  <span v-if="selectedDevice" class="inline-flex items-center gap-1.5 truncate">
+                    <component :is="deviceIcon(selectedDevice.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                    <span class="truncate">{{ selectedDevice.name }}{{ selectedDevice.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
                   </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div class="space-y-3">
-            <Button
-              variant="outline"
-              size="sm"
-              class="w-20"
-              :disabled="store.audioDevices.length === 0"
-              @click="isTesting ? stopMicTest() : startMicTest()"
-            >
-              {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
-            </Button>
+                  <span v-else class="text-muted-foreground">{{ t('menu.noDevices') }}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="device in store.audioDevices"
+                    :key="device.uid"
+                    :value="device.uid"
+                  >
+                    <span class="inline-flex items-center gap-1.5">
+                      <component :is="deviceIcon(device.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                      <span>{{ device.name }}{{ device.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                class="shrink-0 h-9 w-20"
+                :disabled="store.audioDevices.length === 0"
+                @click="isTesting ? stopMicTest() : startMicTest()"
+              >
+                {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
+              </Button>
+            </div>
             <div v-if="isTesting" class="rounded-md border border-border bg-muted/30 px-3 py-2">
               <SpectrumBars :spectrum="testSpectrum" size="md" />
             </div>
