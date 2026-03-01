@@ -138,7 +138,7 @@ pub fn run() {
             if report.all_granted() {
                 monitor_enabled.store(true, Ordering::SeqCst);
             } else {
-                tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 420.0);
+                tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
             }
 
             // Spectrum emission (30fps) + stream error detection
