@@ -383,13 +383,14 @@ pub fn start_monitoring(
             .is_some_and(|m| m.is_downloaded());
 
     if !model_ready {
-        crate::tray::open_window(
+        crate::tray::open_window_with_min(
             &app,
             "model-manager",
             "Model Manager",
             "/model-manager",
             700.0,
             500.0,
+            Some((650.0, 400.0)),
         );
     }
 }

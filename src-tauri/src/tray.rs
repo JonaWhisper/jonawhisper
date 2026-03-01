@@ -30,10 +30,6 @@ fn get_state(app: &AppHandle) -> Arc<AppState> {
 
 // -- Window management --
 
-pub fn open_window(app: &AppHandle, label: &str, title: &str, url: &str, width: f64, height: f64) {
-    open_window_with_min(app, label, title, url, width, height, None);
-}
-
 pub fn open_fixed_window(app: &AppHandle, label: &str, title: &str, url: &str, width: f64, height: f64) {
     if let Some(window) = app.get_webview_window(label) {
         activate_app();
@@ -418,10 +414,10 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 600.0, 440.0, Some((580.0, 380.0)));
                 }
                 "model_manager" => {
-                    open_window(app, "model-manager", &t!("window.modelManager"), "/model-manager", 700.0, 500.0);
+                    open_window_with_min(app, "model-manager", &t!("window.modelManager"), "/model-manager", 700.0, 500.0, Some((650.0, 400.0)));
                 }
                 "history" => {
-                    open_window(app, "history", &t!("window.history"), "/history", 500.0, 500.0);
+                    open_window_with_min(app, "history", &t!("window.history"), "/history", 500.0, 500.0, Some((350.0, 300.0)));
                 }
                 "setup" => {
                     open_fixed_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 450.0);
