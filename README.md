@@ -61,7 +61,7 @@ On first launch, a setup wizard asks for three macOS permissions:
 - **Whisper** is the default and recommended engine — runs locally with Metal GPU acceleration on Apple Silicon (M1/M2/M3/M4). Multiple model sizes available (tiny to large-v3-turbo).
 - **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server.
 
-Models are downloaded and managed from within the app (Model Manager).
+Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `llm/`, `bert/`).
 
 ## Usage
 
@@ -227,6 +227,7 @@ src-tauri/               Rust backend
     lib.rs               Tauri setup & app lifecycle
     commands.rs          Tauri IPC commands
     state.rs             App state & persistent preferences
+    migrations.rs        Versioned preference migrations & model relocation
     recording.rs         Recording state machine & audio thread
     audio.rs             cpal recording & FFT
     transcriber.rs       Transcription dispatcher (native whisper / cloud API)

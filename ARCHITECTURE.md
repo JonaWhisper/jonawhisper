@@ -43,6 +43,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules |
 | `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext |
+| `migrations.rs` | Versioned preference migrations. Each migration is a numbered function receiving raw JSON + typed `Preferences`. Runs on startup if `_version` < current. v1: legacy format unification (api_servers, llm_config, cleanup_mode). v2: model file relocation to `~/Library/Application Support/WhisperDictate/models/`. |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
@@ -187,6 +188,8 @@ Main thread (Tauri + Tokio runtime)
 
 ## Configuration
 
-Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/preferences.json`. History lives in `history.db` (SQLite, WAL mode) in the same directory.
+Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/preferences.json` with a `_version` field tracking the schema version. History lives in `history.db` (SQLite, WAL mode) in the same directory. All model files are stored under `~/Library/Application Support/WhisperDictate/models/` with subdirectories per engine (`whisper/`, `llm/`, `bert/`).
+
+On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON (to access removed fields) and the typed `Preferences` struct. Migrations can also perform filesystem operations (e.g. relocating model files). To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`.
 
 Shortcut values are stored as JSON objects (`{"key_code":54,"modifiers":1048576,"kind":"ModifierOnly"}`). Legacy string values (`"right_command"`, `"escape"`) are automatically parsed for backward compatibility.
