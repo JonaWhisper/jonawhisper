@@ -280,9 +280,8 @@ async function onTextCleanupChange(enabled: boolean) {
   await settings.setSetting('text_cleanup_enabled', String(enabled))
 }
 
-const selectedCleanupLabel = computed(() => {
-  const m = engines.cleanupModels.find(m => m.id === settings.cleanupModelId)
-  return m?.label ?? ''
+const selectedCleanupModel = computed(() => {
+  return engines.cleanupModels.find(m => m.id === settings.cleanupModelId) ?? null
 })
 
 const cleanupGroupLabel = (group: CleanupModel['group']) => {
@@ -309,9 +308,8 @@ const asrGroupClass = (group: AsrModelOption['group']) => {
   }
 }
 
-const selectedAsrLabel = computed(() => {
-  const m = engines.asrModels.find(m => m.id === settings.selectedModelId)
-  return m?.label ?? ''
+const selectedAsrModel = computed(() => {
+  return engines.asrModels.find(m => m.id === settings.selectedModelId) ?? null
 })
 
 function formatParams(params: number): string {
@@ -540,7 +538,13 @@ onUnmounted(() => {
               @update:model-value="onAsrModelChange"
             >
               <SelectTrigger class="w-full h-9 text-sm">
-                <span class="truncate">{{ selectedAsrLabel }}</span>
+                <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
+                  <span class="truncate">{{ selectedAsrModel.label }}</span>
+                  <Badge
+                    variant="secondary"
+                    :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', asrGroupClass(selectedAsrModel.group)]"
+                  >{{ asrGroupLabel(selectedAsrModel.group) }}</Badge>
+                </span>
               </SelectTrigger>
               <SelectContent class="max-h-60">
                 <SelectItem
@@ -729,7 +733,13 @@ onUnmounted(() => {
                 @update:model-value="onCleanupModelChange"
               >
                 <SelectTrigger class="w-full h-9 text-sm">
-                  <span class="truncate">{{ selectedCleanupLabel }}</span>
+                  <span v-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
+                    <span class="truncate">{{ selectedCleanupModel.label }}</span>
+                    <Badge
+                      variant="secondary"
+                      :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', cleanupGroupClass(selectedCleanupModel.group)]"
+                    >{{ cleanupGroupLabel(selectedCleanupModel.group) }}</Badge>
+                  </span>
                 </SelectTrigger>
                 <SelectContent class="max-h-60">
                   <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
