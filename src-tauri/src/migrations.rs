@@ -55,6 +55,7 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         kind: ProviderKind::Custom,
                         url: url.to_string(),
                         api_key: api_key.to_string(),
+                        cached_models: Vec::new(),
                     });
                     // Migrate ASR model to settings
                     if !model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
@@ -96,6 +97,7 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         kind,
                         url: api_url.to_string(),
                         api_key: api_key.to_string(),
+                        cached_models: Vec::new(),
                     });
                     prefs.llm_provider_id = id;
                 }

@@ -6,8 +6,10 @@ use crate::events;
 use crate::platform;
 use crate::state::{AppState, HistoryEntry, Provider};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tauri::{AppHandle, Emitter, Manager};
+
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 /// Build the local-only engine catalog.
 fn catalog() -> EngineCatalog {
@@ -311,6 +313,50 @@ pub fn update_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>
 #[tauri::command]
 pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
     state.settings.lock().unwrap().providers.clone()
+}
+
+#[tauri::command]
+pub async fn fetch_provider_models(provider: Provider) -> Result<Vec<String>, String> {
+    let url = format!("{}/models", provider.base_url());
+
+    let mut req = HTTP_CLIENT.get(&url);
+    if !provider.api_key.is_empty() {
+        if provider.kind.is_anthropic_format() {
+            req = req
+                .header("x-api-key", &provider.api_key)
+                .header("anthropic-version", "2023-06-01");
+        } else {
+            req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+        }
+    }
+
+    let response = req.send().await.map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("HTTP {}: {}", status, body));
+    }
+
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+
+    // Parse model IDs: handle {data:[...]} (OpenAI-compatible) and bare [...] (some providers)
+    let models_array = json.get("data").and_then(|d| d.as_array())
+        .or_else(|| json.as_array());
+
+    let ids: Vec<String> = models_array
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if ids.is_empty() {
+        return Err("No models found in response".to_string());
+    }
+
+    Ok(ids)
 }
 
 // -- App lifecycle --

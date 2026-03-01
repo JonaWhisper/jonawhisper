@@ -75,6 +75,7 @@ pub fn run() {
             commands::remove_provider,
             commands::update_provider,
             commands::get_providers,
+            commands::fetch_provider_models,
             commands::get_settings,
             commands::set_setting,
             commands::get_app_state,

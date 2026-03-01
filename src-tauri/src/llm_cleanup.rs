@@ -86,7 +86,7 @@ pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model
 }
 
 async fn call_openai_compatible(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
-    let url = format!("{}/v1/chat/completions", provider.url.trim_end_matches('/'));
+    let url = format!("{}/chat/completions", provider.base_url());
 
     let request = ChatRequest {
         model: model.to_string(),
@@ -119,7 +119,7 @@ async fn call_openai_compatible(text: &str, language: &str, provider: &Provider,
 }
 
 async fn call_anthropic(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
-    let url = format!("{}/v1/messages", provider.url.trim_end_matches('/'));
+    let url = format!("{}/messages", provider.base_url());
 
     let request = AnthropicRequest {
         model: model.to_string(),

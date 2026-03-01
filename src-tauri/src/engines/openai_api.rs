@@ -36,7 +36,7 @@ pub fn transcribe(
         form = form.text("language", language.to_string());
     }
 
-    let url = format!("{}/v1/audio/transcriptions", provider.url.trim_end_matches('/'));
+    let url = format!("{}/audio/transcriptions", provider.base_url());
 
     let mut req = client.post(&url).multipart(form);
     if !provider.api_key.is_empty() {

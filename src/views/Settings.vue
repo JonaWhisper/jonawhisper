@@ -3,8 +3,8 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore, type Provider } from '@/stores/app'
-import { PROVIDER_PRESETS } from '@/config/providers'
-import { Settings, Cloud, Sparkles, Keyboard, Mic, AudioLines, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Pencil, Trash2, Plus } from 'lucide-vue-next'
+import { getAsrModels, getLlmModels } from '@/config/providers'
+import { Settings, Cloud, Sparkles, Keyboard, Mic, AudioLines, Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Pencil, Trash2, Plus, RefreshCw, Loader2 } from 'lucide-vue-next'
 import type { Component } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -204,8 +204,7 @@ const asrSelectedProvider = computed(() =>
 
 const asrModelOptions = computed(() => {
   const provider = asrSelectedProvider.value
-  if (!provider) return []
-  return PROVIDER_PRESETS[provider.kind]?.asrModels ?? []
+  return provider ? getAsrModels(provider) : []
 })
 
 const isCustomAsrModel = computed(() => {
@@ -247,11 +246,35 @@ const llmSelectedProvider = computed(() =>
 
 const llmModelOptions = computed(() => {
   const provider = llmSelectedProvider.value
-  if (!provider) return []
-  return PROVIDER_PRESETS[provider.kind]?.llmModels ?? []
+  return provider ? getLlmModels(provider) : []
 })
 
 const isCustomLlmModel = computed(() => llmModelOptions.value.length === 0)
+
+// Refresh models from provider API
+const refreshingAsr = ref(false)
+const refreshingLlm = ref(false)
+
+async function refreshModels(provider: Provider | undefined, loadingRef: { value: boolean }) {
+  if (!provider || loadingRef.value) return
+  loadingRef.value = true
+  try {
+    const models = await invoke<string[]>('fetch_provider_models', { provider })
+    await store.updateProvider({ ...provider, cached_models: models })
+  } catch (e) {
+    console.error('refreshModels failed:', e)
+  } finally {
+    loadingRef.value = false
+  }
+}
+
+function refreshAsrModels() {
+  refreshModels(asrSelectedProvider.value, refreshingAsr)
+}
+
+function refreshLlmModels() {
+  refreshModels(llmSelectedProvider.value, refreshingLlm)
+}
 
 let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
 
@@ -484,7 +507,18 @@ onUnmounted(() => {
           <!-- Cloud ASR sub-settings (model name) -->
           <template v-if="store.isCloudAsr && asrSelectedProvider">
             <div class="space-y-1">
-              <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
+              <div class="flex items-center gap-2">
+                <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
+                <button
+                  :title="t('settings.models.refresh')"
+                  :disabled="refreshingAsr"
+                  class="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  @click="refreshAsrModels"
+                >
+                  <Loader2 v-if="refreshingAsr" class="w-3.5 h-3.5 animate-spin" />
+                  <RefreshCw v-else class="w-3.5 h-3.5" />
+                </button>
+              </div>
               <Select
                 v-if="asrModelOptions.length > 0"
                 :model-value="asrModelSelectValue"
@@ -604,7 +638,18 @@ onUnmounted(() => {
             <!-- Cloud LLM sub-settings (provider already selected via model dropdown) -->
             <template v-if="store.isCloudLlm && llmSelectedProvider">
               <div class="space-y-1">
-                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+                <div class="flex items-center gap-2">
+                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+                  <button
+                    :title="t('settings.models.refresh')"
+                    :disabled="refreshingLlm"
+                    class="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                    @click="refreshLlmModels"
+                  >
+                    <Loader2 v-if="refreshingLlm" class="w-3.5 h-3.5 animate-spin" />
+                    <RefreshCw v-else class="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <Select
                   v-if="!isCustomLlmModel"
                   :model-value="store.llmModel"

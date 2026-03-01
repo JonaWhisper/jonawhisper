@@ -99,6 +99,30 @@ impl ProviderKind {
             Self::DeepSeek => "DeepSeek",
         }
     }
+
+    /// Canonical base URL for known providers (includes version path).
+    /// Returns None for Custom — use provider.url instead.
+    pub fn base_url(&self) -> Option<&'static str> {
+        match self {
+            Self::OpenAI => Some("https://api.openai.com/v1"),
+            Self::Anthropic => Some("https://api.anthropic.com/v1"),
+            Self::Groq => Some("https://api.groq.com/openai/v1"),
+            Self::Cerebras => Some("https://api.cerebras.ai/v1"),
+            Self::Gemini => Some("https://generativelanguage.googleapis.com/v1beta/openai"),
+            Self::Mistral => Some("https://api.mistral.ai/v1"),
+            Self::Fireworks => Some("https://api.fireworks.ai/inference/v1"),
+            Self::Together => Some("https://api.together.xyz/v1"),
+            Self::DeepSeek => Some("https://api.deepseek.com/v1"),
+            Self::Custom => None,
+        }
+    }
+}
+
+impl Provider {
+    /// Resolved base URL: preset URL for known providers, stored URL for Custom.
+    pub fn base_url(&self) -> &str {
+        self.kind.base_url().unwrap_or_else(|| self.url.trim_end_matches('/'))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,6 +132,8 @@ pub struct Provider {
     pub kind: ProviderKind,
     pub url: String,
     pub api_key: String,
+    #[serde(default)]
+    pub cached_models: Vec<String>,
 }
 
 /// Persistent preferences (subset of AppState that survives restarts).

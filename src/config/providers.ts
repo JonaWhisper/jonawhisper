@@ -1,4 +1,4 @@
-import type { ProviderKind } from '@/stores/app'
+import type { Provider, ProviderKind } from '@/stores/app'
 
 export interface ProviderPreset {
   label: string
@@ -61,8 +61,40 @@ export const PROVIDER_PRESETS: Partial<Record<ProviderKind, ProviderPreset>> = {
 /** Ordered list of preset entries for UI dropdowns (Custom excluded — handled separately) */
 export const PRESET_ENTRIES = Object.entries(PROVIDER_PRESETS) as [ProviderKind, ProviderPreset][]
 
-/** Check if a provider kind has ASR models available */
-export function hasAsrSupport(kind: ProviderKind): boolean {
-  if (kind === 'Custom') return true
-  return (PROVIDER_PRESETS[kind]?.asrModels?.length ?? 0) > 0
+/** Check if a provider has ASR models available (from cache or preset) */
+export function hasAsrSupport(provider: Provider): boolean {
+  if (provider.kind === 'Custom') return true
+  if (provider.cached_models.length > 0) {
+    return provider.cached_models.some(isAsrModel)
+  }
+  return (PROVIDER_PRESETS[provider.kind]?.asrModels?.length ?? 0) > 0
+}
+
+/** Heuristic: model ID looks like an ASR/transcription model */
+function isAsrModel(id: string): boolean {
+  const lower = id.toLowerCase()
+  return lower.includes('whisper') || lower.includes('transcrib')
+}
+
+/** Heuristic: model ID looks like a utility model (not ASR, not LLM) */
+function isUtilityModel(id: string): boolean {
+  const lower = id.toLowerCase()
+  return lower.includes('embed') || lower.includes('tts') || lower.includes('dall-e')
+    || lower.includes('moderation') || lower.includes('text-embedding')
+}
+
+/** Get ASR models for a provider (cached > preset fallback) */
+export function getAsrModels(provider: Provider): string[] {
+  if (provider.cached_models.length > 0) {
+    return provider.cached_models.filter(isAsrModel)
+  }
+  return PROVIDER_PRESETS[provider.kind]?.asrModels ?? []
+}
+
+/** Get LLM models for a provider (cached > preset fallback) */
+export function getLlmModels(provider: Provider): string[] {
+  if (provider.cached_models.length > 0) {
+    return provider.cached_models.filter(id => !isAsrModel(id) && !isUtilityModel(id))
+  }
+  return PROVIDER_PRESETS[provider.kind]?.llmModels ?? []
 }

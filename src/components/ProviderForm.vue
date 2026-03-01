@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { invoke } from '@tauri-apps/api/core'
 import type { Provider, ProviderKind } from '@/stores/app'
 import { PROVIDER_PRESETS, PRESET_ENTRIES } from '@/config/providers'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Loader2, CheckCircle2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   provider?: Provider
@@ -33,7 +35,13 @@ const url = ref(props.provider?.url ?? '')
 const apiKey = ref(props.provider?.api_key ?? '')
 const errors = ref<Record<string, string>>({})
 
+// Test state
+const testStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
+const testMessage = ref('')
+const fetchedModels = ref<string[]>(props.provider?.cached_models ?? [])
+
 const showUrl = computed(() => kind.value === 'Custom')
+const canTest = computed(() => apiKey.value.trim().length > 0)
 
 watch(kind, (newKind) => {
   if (isEditing.value) return
@@ -45,6 +53,10 @@ watch(kind, (newKind) => {
     name.value = ''
     url.value = ''
   }
+  // Reset test state on kind change
+  testStatus.value = 'idle'
+  testMessage.value = ''
+  fetchedModels.value = []
 })
 
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -60,6 +72,33 @@ function validate(): boolean {
   return Object.keys(errors.value).length === 0
 }
 
+async function testConnection() {
+  testStatus.value = 'loading'
+  testMessage.value = ''
+
+  const tempProvider: Provider = {
+    id: props.provider?.id ?? 'temp',
+    name: name.value.trim(),
+    kind: kind.value,
+    url: url.value.trim(),
+    api_key: apiKey.value.trim(),
+    cached_models: [],
+  }
+
+  try {
+    const models = await invoke<string[]>('fetch_provider_models', { provider: tempProvider })
+    fetchedModels.value = models
+    testStatus.value = 'success'
+    testMessage.value = t('provider.testSuccess', [models.length])
+  } catch (e) {
+    testStatus.value = 'error'
+    const msg = String(e)
+    // Truncate long error messages
+    testMessage.value = msg.length > 120 ? msg.slice(0, 120) + '…' : msg
+    fetchedModels.value = []
+  }
+}
+
 function save() {
   if (!validate()) return
 
@@ -69,6 +108,7 @@ function save() {
     kind: kind.value,
     url: url.value.trim(),
     api_key: apiKey.value.trim(),
+    cached_models: fetchedModels.value,
   }
 
   emit('save', provider)
@@ -108,7 +148,25 @@ function save() {
 
     <div class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.apiKey') }}</Label>
-      <Input v-model="apiKey" type="password" placeholder="sk-..." class="h-9 text-sm" />
+      <div class="flex gap-2">
+        <Input v-model="apiKey" type="password" placeholder="sk-..." class="h-9 text-sm flex-1" />
+        <Button
+          variant="outline"
+          size="sm"
+          class="shrink-0 h-9 w-20"
+          :disabled="!canTest || testStatus === 'loading'"
+          @click="testConnection"
+        >
+          <Loader2 v-if="testStatus === 'loading'" class="w-3.5 h-3.5 animate-spin" />
+          <template v-else>{{ t('provider.test') }}</template>
+        </Button>
+      </div>
+      <!-- Test result -->
+      <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 text-xs text-green-600">
+        <CheckCircle2 class="w-3.5 h-3.5" />
+        <span>{{ testMessage }}</span>
+      </div>
+      <p v-if="testStatus === 'error'" class="text-xs text-destructive">{{ testMessage }}</p>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">

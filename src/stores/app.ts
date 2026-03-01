@@ -63,6 +63,7 @@ export interface Provider {
   kind: ProviderKind
   url: string
   api_key: string
+  cached_models: string[]
 }
 
 export interface PermissionReport {
@@ -200,7 +201,7 @@ export const useAppStore = defineStore('app', () => {
       }
     }
     for (const p of providers.value) {
-      if (hasAsrSupport(p.kind)) {
+      if (hasAsrSupport(p)) {
         result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
       }
     }
