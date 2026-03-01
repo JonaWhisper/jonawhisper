@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore, type Provider } from '@/stores/app'
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
@@ -76,9 +77,14 @@ async function onAudioDuckingChange(enabled: boolean) {
   await store.setSetting('audio_ducking_enabled', String(enabled))
 }
 
-async function onAudioDuckingLevelChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
-  await store.setSetting('audio_ducking_level', value)
+const duckingSliderValue = ref(store.audioDuckingLevel * 100)
+watch(() => store.audioDuckingLevel, (v) => { duckingSliderValue.value = v * 100 })
+function onDuckingSliderUpdate(v: number[] | undefined) {
+  if (v?.[0] != null) duckingSliderValue.value = v[0]
+}
+function onDuckingSliderCommit(v: number[]) {
+  const val = v[0] ?? duckingSliderValue.value
+  store.setSetting('audio_ducking_level', String(val / 100))
 }
 
 async function onHotkeyChange(value: string) {
@@ -784,21 +790,22 @@ onUnmounted(() => {
 
           <div
             v-if="store.audioDuckingEnabled"
-            class="space-y-1 pl-4 border-l-2 border-border"
+            class="space-y-2 pl-4 border-l-2 border-border"
           >
-            <Label class="text-xs text-muted-foreground">{{ t('settings.microphone.duckingLevel') }}</Label>
-            <Select :model-value="String(store.audioDuckingLevel)" @update:model-value="onAudioDuckingLevelChange">
-              <SelectTrigger class="w-full h-9 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0.25">25%</SelectItem>
-                <SelectItem value="0.5">50%</SelectItem>
-                <SelectItem value="0.75">75%</SelectItem>
-                <SelectItem value="0.8">80%</SelectItem>
-                <SelectItem value="1">100% ({{ t('settings.microphone.duckingMute') }})</SelectItem>
-              </SelectContent>
-            </Select>
+            <div class="flex items-center justify-between">
+              <Label class="text-xs text-muted-foreground">{{ t('settings.microphone.duckingLevel') }}</Label>
+              <span class="text-xs text-muted-foreground tabular-nums">
+                {{ duckingSliderValue >= 100 ? t('settings.microphone.duckingMute') : `${Math.round(duckingSliderValue)}%` }}
+              </span>
+            </div>
+            <Slider
+              :model-value="[duckingSliderValue]"
+              :min="5"
+              :max="100"
+              :step="5"
+              @update:model-value="onDuckingSliderUpdate"
+              @value-commit="onDuckingSliderCommit"
+            />
           </div>
         </div>
       </div>
