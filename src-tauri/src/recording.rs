@@ -274,7 +274,12 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         if had_content {
             // Show success checkmark briefly before closing
             crate::pill::set_mode(crate::pill::PillMode::Success);
+            let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
             tokio::time::sleep(Duration::from_millis(600)).await;
+            // Abort if a new recording started during the sleep
+            if PILL_CLOSE_GENERATION.load(Ordering::SeqCst) != gen {
+                return;
+            }
         }
         crate::tray::close_pill_window(app);
     }
