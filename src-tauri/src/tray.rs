@@ -170,6 +170,9 @@ pub fn open_pill_window(app: &AppHandle) {
     });
 }
 
+/// Idle timeout: destroy the pill webview after this long without use (saves memory).
+const PILL_IDLE_DESTROY_MS: u64 = 60_000;
+
 pub fn close_pill_window(app: &AppHandle) {
     set_tray_state(app, "idle");
     let handle = app.clone();
@@ -178,6 +181,8 @@ pub fn close_pill_window(app: &AppHandle) {
             let _ = win.hide();
         }
     });
+    // Schedule destroy after idle timeout
+    schedule_pill_destroy(app);
 }
 
 /// Close the pill window after a delay, but only if no new pill was opened since.
@@ -187,12 +192,35 @@ pub fn close_pill_window_delayed(app: &AppHandle, delay_ms: u64) {
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-        // Only close if no new pill was opened during the delay
         if PILL_GENERATION.load(Ordering::SeqCst) == gen {
             let handle = app_clone.clone();
             let _ = app_clone.run_on_main_thread(move || {
                 if let Some(win) = handle.get_webview_window("pill") {
                     let _ = win.hide();
+                }
+            });
+            // Schedule destroy after idle timeout
+            schedule_pill_destroy_with_gen(&app_clone, gen);
+        }
+    });
+}
+
+/// Destroy the pill webview after an idle period (no new open since `gen`).
+fn schedule_pill_destroy(app: &AppHandle) {
+    let gen = PILL_GENERATION.load(Ordering::SeqCst);
+    schedule_pill_destroy_with_gen(app, gen);
+}
+
+fn schedule_pill_destroy_with_gen(app: &AppHandle, gen: u64) {
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(PILL_IDLE_DESTROY_MS)).await;
+        if PILL_GENERATION.load(Ordering::SeqCst) == gen {
+            let handle = app_clone.clone();
+            let _ = app_clone.run_on_main_thread(move || {
+                if let Some(win) = handle.get_webview_window("pill") {
+                    log::debug!("Destroying idle pill webview");
+                    let _ = win.destroy();
                 }
             });
         }
