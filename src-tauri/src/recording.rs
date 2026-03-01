@@ -447,18 +447,20 @@ fn run_local_llm_cleanup(
     language: &str,
     llm_local_model_id: &str,
     max_tokens: u32,
-) -> Result<String, String> {
+) -> Result<String, crate::llm_prompt::LlmError> {
+    use crate::llm_prompt::LlmError;
+
     if llm_local_model_id.is_empty() {
-        return Err("No local LLM model selected".into());
+        return Err(LlmError::NotConfigured);
     }
 
     // Resolve model path from catalog
     let catalog = crate::engines::EngineCatalog::new();
     let model = catalog.model_by_id(llm_local_model_id)
-        .ok_or_else(|| format!("LLM model not found: {}", llm_local_model_id))?;
+        .ok_or_else(|| LlmError::Inference(format!("LLM model not found: {}", llm_local_model_id)))?;
 
     if !model.is_downloaded() {
-        return Err(format!("LLM model not downloaded: {}", llm_local_model_id));
+        return Err(LlmError::Inference(format!("LLM model not downloaded: {}", llm_local_model_id)));
     }
 
     let model_path = model.local_path();

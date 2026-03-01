@@ -1,20 +1,9 @@
+use crate::llm_prompt::{sanitize_output, system_prompt, LlmError};
 use crate::state::Provider;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
 static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
-
-#[derive(Debug, thiserror::Error)]
-pub enum LlmError {
-    #[error("LLM not configured")]
-    NotConfigured,
-    #[error("HTTP error: {0}")]
-    Http(String),
-    #[error("API error: {status} {body}")]
-    Api { status: u16, body: String },
-    #[error("Invalid response: {0}")]
-    InvalidResponse(String),
-}
 
 #[derive(Serialize)]
 struct ChatMessage {
@@ -70,10 +59,18 @@ struct AnthropicContent {
     text: String,
 }
 
-use crate::llm_prompt::{sanitize_output, system_prompt};
+/// Send an HTTP request and check for errors. Returns the successful response.
+async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Response, LlmError> {
+    let response = req.send().await.map_err(|e| LlmError::Http(e.to_string()))?;
+    if !response.status().is_success() {
+        let status = response.status().as_u16();
+        let body = response.text().await.unwrap_or_default();
+        return Err(LlmError::Api { status, body });
+    }
+    Ok(response)
+}
 
-/// Clean up transcribed text using an LLM.
-/// Returns the cleaned text, or an error.
+/// Clean up transcribed text using a cloud LLM.
 pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
     if provider.url.is_empty() || model.is_empty() {
         return Err(LlmError::NotConfigured);
@@ -85,7 +82,7 @@ pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model
         call_openai_compatible(text, language, provider, model, max_tokens).await?
     };
 
-    sanitize_output(&raw, text.len()).map_err(LlmError::InvalidResponse)
+    sanitize_output(&raw, text.len())
 }
 
 async fn call_openai_compatible(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {
@@ -106,13 +103,7 @@ async fn call_openai_compatible(text: &str, language: &str, provider: &Provider,
         req = req.header("Authorization", format!("Bearer {}", provider.api_key));
     }
 
-    let response = req.send().await.map_err(|e| LlmError::Http(e.to_string()))?;
-
-    if !response.status().is_success() {
-        let status = response.status().as_u16();
-        let body = response.text().await.unwrap_or_default();
-        return Err(LlmError::Api { status, body });
-    }
+    let response = send_and_check(req).await?;
 
     let chat_response: ChatResponse = response
         .json()
@@ -148,13 +139,7 @@ async fn call_anthropic(text: &str, language: &str, provider: &Provider, model: 
         req = req.header("x-api-key", &provider.api_key);
     }
 
-    let response = req.send().await.map_err(|e| LlmError::Http(e.to_string()))?;
-
-    if !response.status().is_success() {
-        let status = response.status().as_u16();
-        let body = response.text().await.unwrap_or_default();
-        return Err(LlmError::Api { status, body });
-    }
+    let response = send_and_check(req).await?;
 
     let anthropic_response: AnthropicResponse = response
         .json()

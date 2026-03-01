@@ -8,6 +8,8 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 
+use crate::llm_prompt::LlmError;
+
 /// Cached LLM context: backend + model, reused across calls.
 pub struct LlmContext {
     backend: LlamaBackend,
@@ -21,15 +23,15 @@ unsafe impl Sync for LlmContext {}
 
 impl LlmContext {
     /// Load a GGUF model from disk. GPU offloads all layers on macOS Metal.
-    pub fn load(path: &Path, model_id: &str) -> Result<Self, String> {
+    pub fn load(path: &Path, model_id: &str) -> Result<Self, LlmError> {
         let backend = LlamaBackend::init()
-            .map_err(|e| format!("Failed to init llama backend: {}", e))?;
+            .map_err(|e| LlmError::Inference(format!("Failed to init llama backend: {}", e)))?;
 
         let model_params = LlamaModelParams::default()
             .with_n_gpu_layers(999);
 
         let model = LlamaModel::load_from_file(&backend, path, &model_params)
-            .map_err(|e| format!("Failed to load LLM model: {}", e))?;
+            .map_err(|e| LlmError::Inference(format!("Failed to load LLM model: {}", e)))?;
 
         log::info!("LLM model loaded: {} ({})", model_id, path.display());
 
@@ -46,23 +48,23 @@ impl LlmContext {
 }
 
 /// Clean up transcribed text using a local LLM.
-pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: usize) -> Result<String, String> {
+pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: usize) -> Result<String, LlmError> {
     let messages = vec![
         LlamaChatMessage::new("system".to_string(), crate::llm_prompt::system_prompt(language))
-            .map_err(|e| format!("Failed to create system message: {}", e))?,
+            .map_err(|e| LlmError::Inference(format!("Failed to create system message: {}", e)))?,
         LlamaChatMessage::new("user".to_string(), text.to_string())
-            .map_err(|e| format!("Failed to create user message: {}", e))?,
+            .map_err(|e| LlmError::Inference(format!("Failed to create user message: {}", e)))?,
     ];
 
     // Apply the model's built-in chat template
     let template = ctx.model.chat_template(None)
-        .map_err(|e| format!("Failed to get chat template: {}", e))?;
+        .map_err(|e| LlmError::Inference(format!("Failed to get chat template: {}", e)))?;
     let prompt = ctx.model.apply_chat_template(&template, &messages, true)
-        .map_err(|e| format!("Failed to apply chat template: {}", e))?;
+        .map_err(|e| LlmError::Inference(format!("Failed to apply chat template: {}", e)))?;
 
     // Tokenize
     let tokens = ctx.model.str_to_token(&prompt, AddBos::Always)
-        .map_err(|e| format!("Tokenization failed: {}", e))?;
+        .map_err(|e| LlmError::Inference(format!("Tokenization failed: {}", e)))?;
 
     let n_prompt_tokens = tokens.len();
     let max_gen_tokens = max_tokens;
@@ -81,19 +83,19 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
         .with_flash_attention_policy(1); // LLAMA_FLASH_ATTN_TYPE_ENABLED
 
     let mut llama_ctx = ctx.model.new_context(&ctx.backend, ctx_params)
-        .map_err(|e| format!("Failed to create LLM context: {}", e))?;
+        .map_err(|e| LlmError::Inference(format!("Failed to create LLM context: {}", e)))?;
 
     // Create batch and fill with prompt tokens
     let mut batch = LlamaBatch::new(512, 1);
     let last_index = tokens.len() as i32 - 1;
     for (i, token) in (0_i32..).zip(tokens.into_iter()) {
         batch.add(token, i, &[0], i == last_index)
-            .map_err(|e| format!("Batch add failed: {}", e))?;
+            .map_err(|e| LlmError::Inference(format!("Batch add failed: {}", e)))?;
     }
 
     // Decode prompt (prefill)
     llama_ctx.decode(&mut batch)
-        .map_err(|e| format!("Prompt decode failed: {}", e))?;
+        .map_err(|e| LlmError::Inference(format!("Prompt decode failed: {}", e)))?;
 
     // Set up sampler: low temperature for deterministic cleanup
     let mut sampler = LlamaSampler::chain_simple([
@@ -118,15 +120,15 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
         }
 
         let piece = ctx.model.token_to_piece(token, &mut decoder, false, None)
-            .map_err(|e| format!("Token decode failed: {}", e))?;
+            .map_err(|e| LlmError::Inference(format!("Token decode failed: {}", e)))?;
         output.push_str(&piece);
 
         batch.clear();
         batch.add(token, n_cur, &[0], true)
-            .map_err(|e| format!("Batch add failed: {}", e))?;
+            .map_err(|e| LlmError::Inference(format!("Batch add failed: {}", e)))?;
 
         llama_ctx.decode(&mut batch)
-            .map_err(|e| format!("Decode failed: {}", e))?;
+            .map_err(|e| LlmError::Inference(format!("Decode failed: {}", e)))?;
 
         n_cur += 1;
     }

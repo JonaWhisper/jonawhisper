@@ -1,3 +1,18 @@
+/// Shared error type for all LLM operations (local and cloud).
+#[derive(Debug, thiserror::Error)]
+pub enum LlmError {
+    #[error("LLM not configured")]
+    NotConfigured,
+    #[error("HTTP error: {0}")]
+    Http(String),
+    #[error("API error: {status} {body}")]
+    Api { status: u16, body: String },
+    #[error("Invalid response: {0}")]
+    InvalidResponse(String),
+    #[error("Inference error: {0}")]
+    Inference(String),
+}
+
 /// Strip `<think>...</think>` blocks emitted by reasoning models (e.g. Qwen3, DeepSeek).
 fn strip_think_blocks(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
@@ -16,14 +31,15 @@ fn strip_think_blocks(text: &str) -> String {
 }
 
 /// Sanity-check LLM output: strip think blocks, reject empty or unreasonably long results.
-/// Returns cleaned text or an error message.
-pub fn sanitize_output(raw: &str, input_len: usize) -> Result<String, String> {
+pub fn sanitize_output(raw: &str, input_len: usize) -> Result<String, LlmError> {
     let cleaned = strip_think_blocks(raw);
     let result = cleaned.trim().to_string();
     let max_len = std::cmp::max(input_len * 3, 100);
     if result.is_empty() || result.len() > max_len {
         log::warn!("LLM output suspicious (len={} vs input={}, max={}), discarding", result.len(), input_len, max_len);
-        return Err(format!("Output failed sanity check (len={} vs input={})", result.len(), input_len));
+        return Err(LlmError::InvalidResponse(format!(
+            "Output failed sanity check (len={} vs input={})", result.len(), input_len
+        )));
     }
     Ok(result)
 }
