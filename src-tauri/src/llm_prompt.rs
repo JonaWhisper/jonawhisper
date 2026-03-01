@@ -1,5 +1,5 @@
 /// Strip `<think>...</think>` blocks emitted by reasoning models (e.g. Qwen3, DeepSeek).
-pub fn strip_think_blocks(text: &str) -> String {
+fn strip_think_blocks(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(start) = rest.find("<think>") {
