@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { hasAsrSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
 import { isModelAvailable, parseCloudId } from './types'
-import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport, CleanupModel } from './types'
+import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport, CleanupModel, AsrModelOption } from './types'
 
 export const useEnginesStore = defineStore('engines', () => {
   const settingsStore = useSettingsStore()
@@ -49,18 +49,18 @@ export const useEnginesStore = defineStore('engines', () => {
     }
     return result
   })
-  const asrModels = computed(() => {
-    const result: { id: string; label: string; group: string }[] = []
+  const asrModels = computed<AsrModelOption[]>(() => {
+    const result: AsrModelOption[] = []
     const asrIds = new Set(asrEngines.value.map(e => e.id))
     for (const m of models.value) {
       if (!asrIds.has(m.engine_id)) continue
       if (isModelAvailable(m)) {
-        result.push({ id: m.id, label: m.label, group: 'local' })
+        result.push({ id: m.id, label: m.label, group: 'local', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
       }
     }
     for (const p of providers.value) {
       if (hasAsrSupport(p)) {
-        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
+        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, recommended: false })
       }
     }
     return result

@@ -71,6 +71,16 @@ export interface CleanupModel {
   recommended: boolean
 }
 
+export interface AsrModelOption {
+  id: string
+  label: string
+  group: 'local' | 'cloud'
+  params: number | null
+  ram: number | null
+  lang_codes: string[] | null
+  recommended: boolean
+}
+
 export interface PermissionReport {
   microphone: string
   accessibility: string

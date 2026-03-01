@@ -20,9 +20,7 @@ import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -32,8 +30,9 @@ import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import ProviderForm from '@/components/ProviderForm.vue'
 import { serializeShortcut } from '@/utils/shortcut'
+import { Badge } from '@/components/ui/badge'
 import { formatRam } from '@/utils/format'
-import type { CleanupModel } from '@/stores/types'
+import type { CleanupModel, AsrModelOption } from '@/stores/types'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -286,17 +285,33 @@ const selectedCleanupLabel = computed(() => {
   return m?.label ?? ''
 })
 
-const cleanupModelGroups = computed(() => {
-  const groups: { key: CleanupModel['group']; labelKey: string; models: CleanupModel[] }[] = [
-    { key: 'bert', labelKey: 'settings.cleanupGroup.bert', models: [] },
-    { key: 'llm', labelKey: 'settings.cleanupGroup.llm', models: [] },
-    { key: 'cloud', labelKey: 'settings.cleanupGroup.cloud', models: [] },
-  ]
-  for (const m of engines.cleanupModels) {
-    const g = groups.find(g => g.key === m.group)
-    if (g) g.models.push(m)
+const cleanupGroupLabel = (group: CleanupModel['group']) => {
+  const key = `settings.cleanupGroup.${group}`
+  return t(key)
+}
+
+const cleanupGroupClass = (group: CleanupModel['group']) => {
+  switch (group) {
+    case 'bert': return 'bg-violet-500/10 text-violet-600'
+    case 'llm': return 'bg-blue-500/10 text-blue-600'
+    case 'cloud': return 'bg-sky-500/10 text-sky-600'
   }
-  return groups.filter(g => g.models.length > 0)
+}
+
+const asrGroupLabel = (group: AsrModelOption['group']) => {
+  return t(`settings.asrGroup.${group}`)
+}
+
+const asrGroupClass = (group: AsrModelOption['group']) => {
+  switch (group) {
+    case 'local': return 'bg-blue-500/10 text-blue-600'
+    case 'cloud': return 'bg-sky-500/10 text-sky-600'
+  }
+}
+
+const selectedAsrLabel = computed(() => {
+  const m = engines.asrModels.find(m => m.id === settings.selectedModelId)
+  return m?.label ?? ''
 })
 
 function formatParams(params: number): string {
@@ -511,15 +526,45 @@ onUnmounted(() => {
               @update:model-value="onAsrModelChange"
             >
               <SelectTrigger class="w-full h-9 text-sm">
-                <SelectValue />
+                <span class="truncate">{{ selectedAsrLabel }}</span>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent class="max-h-60">
                 <SelectItem
                   v-for="m in engines.asrModels"
                   :key="m.id"
                   :value="m.id"
                 >
-                  {{ m.label }}
+                  <div class="flex flex-col gap-0.5">
+                    <span class="flex items-center gap-1.5">
+                      {{ m.label }}
+                      <Badge
+                        v-if="m.recommended"
+                        variant="secondary"
+                        class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium"
+                      >{{ t('settings.cleanup.recommended') }}</Badge>
+                      <Badge
+                        variant="secondary"
+                        :class="['text-[9px] px-1 py-0 border-transparent font-medium ml-auto', asrGroupClass(m.group)]"
+                      >{{ asrGroupLabel(m.group) }}</Badge>
+                    </span>
+                    <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+                      <Badge
+                        v-if="m.params != null"
+                        variant="secondary"
+                        class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium"
+                      >{{ formatParams(m.params) }}</Badge>
+                      <Badge
+                        v-if="m.ram != null"
+                        variant="secondary"
+                        class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium"
+                      >RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
+                      <Badge
+                        v-if="m.lang_codes && m.lang_codes.length > 0"
+                        variant="secondary"
+                        class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium"
+                      >{{ m.lang_codes.map(c => c.toUpperCase()).join(' ') }}</Badge>
+                    </span>
+                  </div>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -662,28 +707,40 @@ onUnmounted(() => {
                 <SelectTrigger class="w-full h-9 text-sm">
                   <span class="truncate">{{ selectedCleanupLabel }}</span>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup v-for="group in cleanupModelGroups" :key="group.key">
-                    <SelectLabel>{{ t(group.labelKey) }}</SelectLabel>
-                    <SelectItem v-for="m in group.models" :key="m.id" :value="m.id">
-                      <div class="flex flex-col gap-0.5">
-                        <span class="flex items-center gap-1.5">
-                          {{ m.label }}
-                          <span
-                            v-if="m.recommended"
-                            class="text-[9px] px-1 py-0 rounded bg-emerald-500/10 text-emerald-600 font-medium"
-                          >{{ t('settings.cleanup.recommended') }}</span>
-                        </span>
-                        <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="text-[10px] text-muted-foreground">
-                          {{ [
-                            m.params != null ? formatParams(m.params) : null,
-                            m.ram != null ? '~' + formatRam(m.ram) : null,
-                            m.lang_codes && m.lang_codes.length > 0 ? m.lang_codes.map(c => c.toUpperCase()).join(' ') : null,
-                          ].filter(Boolean).join(' · ') }}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  </SelectGroup>
+                <SelectContent class="max-h-60">
+                  <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="flex items-center gap-1.5">
+                        {{ m.label }}
+                        <Badge
+                          v-if="m.recommended"
+                          variant="secondary"
+                          class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium"
+                        >{{ t('settings.cleanup.recommended') }}</Badge>
+                        <Badge
+                          variant="secondary"
+                          :class="['text-[9px] px-1 py-0 border-transparent font-medium ml-auto', cleanupGroupClass(m.group)]"
+                        >{{ cleanupGroupLabel(m.group) }}</Badge>
+                      </span>
+                      <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+                        <Badge
+                          v-if="m.params != null"
+                          variant="secondary"
+                          class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium"
+                        >{{ formatParams(m.params) }}</Badge>
+                        <Badge
+                          v-if="m.ram != null"
+                          variant="secondary"
+                          class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium"
+                        >RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
+                        <Badge
+                          v-if="m.lang_codes && m.lang_codes.length > 0"
+                          variant="secondary"
+                          class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium"
+                        >{{ m.lang_codes.map(c => c.toUpperCase()).join(' ') }}</Badge>
+                      </span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <p v-else class="text-sm text-muted-foreground">

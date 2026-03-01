@@ -83,6 +83,8 @@
   "settings.cleanupGroup.llm": "LLM local",
   "settings.cleanupGroup.cloud": "Cloud",
   "settings.cleanup.recommended": "Recommandé",
+  "settings.asrGroup.local": "Local",
+  "settings.asrGroup.cloud": "Cloud",
   "settings.models.refresh": "Actualiser les modèles",
   "settings.llm.model": "Modèle",
   "settings.llm.maxTokens": "Limite max tokens",
