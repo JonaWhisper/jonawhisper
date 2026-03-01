@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type Event } from '@tauri-apps/api/event'
 import { hasAsrSupport } from '@/config/providers'
+import { useSettingsStore } from './settings'
+import { useHistoryStore } from './history'
 
 // Re-export all types for backward compatibility
 export type {
@@ -11,48 +13,55 @@ export type {
 } from './types'
 
 import type {
-  AudioDevice, EngineInfo, ASRModel, Language, HistoryEntry,
+  AudioDevice, EngineInfo, ASRModel, Language,
   Provider, PermissionReport,
   RecordingStoppedPayload, TranscriptionStartedPayload,
   TranscriptionCompletePayload, DownloadProgressPayload,
-  AppStatePayload, SettingsPayload,
+  AppStatePayload,
 } from './types'
 
 export const useAppStore = defineStore('app', () => {
+  const settingsStore = useSettingsStore()
+  const historyStore = useHistoryStore()
+
   // State
   const isRecording = ref(false)
   const isTranscribing = ref(false)
   const queueCount = ref(0)
   const activeDownloads = ref<Record<string, { progress: number; stopping: boolean; downloaded: number; totalSize: number; speed: number }>>({})
   const deletingModels = ref<Record<string, boolean>>({})
-  const selectedModelId = ref('whisper:large-v3-turbo-q8')
-  const selectedLanguage = ref('auto')
-  const hallucinationFilterEnabled = ref(true)
-  const appLocale = ref('auto')
-  const cancelShortcut = ref('escape')
-  const recordingMode = ref('push_to_talk')
-  const selectedInputDeviceUid = ref<string | null>(null)
-  const hotkey = ref('right_command')
-  const textCleanupEnabled = ref(false)
-  const cleanupModelId = ref('')
-  const llmModel = ref('')
-  const asrCloudModel = ref('whisper-1')
-  const gpuMode = ref('auto')
-  const llmMaxTokens = ref(4096)
-  const audioDuckingEnabled = ref(false)
-  const audioDuckingLevel = ref(0.8)
   const engines = ref<EngineInfo[]>([])
   const models = ref<ASRModel[]>([])
   const languages = ref<Language[]>([])
-  const history = ref<HistoryEntry[]>([])
   const audioDevices = ref<AudioDevice[]>([])
   const permissions = ref<PermissionReport>({ microphone: 'Undetermined', accessibility: 'Denied', input_monitoring: 'Denied' })
   const providers = ref<Provider[]>([])
 
+  // Proxy refs for backward compatibility (delegates to settings store)
+  const selectedModelId = computed({ get: () => settingsStore.selectedModelId, set: v => { settingsStore.selectedModelId = v } })
+  const selectedLanguage = computed({ get: () => settingsStore.selectedLanguage, set: v => { settingsStore.selectedLanguage = v } })
+  const asrCloudModel = computed({ get: () => settingsStore.asrCloudModel, set: v => { settingsStore.asrCloudModel = v } })
+  const textCleanupEnabled = computed({ get: () => settingsStore.textCleanupEnabled, set: v => { settingsStore.textCleanupEnabled = v } })
+  const cleanupModelId = computed({ get: () => settingsStore.cleanupModelId, set: v => { settingsStore.cleanupModelId = v } })
+  const llmModel = computed({ get: () => settingsStore.llmModel, set: v => { settingsStore.llmModel = v } })
+  const llmMaxTokens = computed({ get: () => settingsStore.llmMaxTokens, set: v => { settingsStore.llmMaxTokens = v } })
+  const hallucinationFilterEnabled = computed({ get: () => settingsStore.hallucinationFilterEnabled, set: v => { settingsStore.hallucinationFilterEnabled = v } })
+  const selectedInputDeviceUid = computed({ get: () => settingsStore.selectedInputDeviceUid, set: v => { settingsStore.selectedInputDeviceUid = v } })
+  const audioDuckingEnabled = computed({ get: () => settingsStore.audioDuckingEnabled, set: v => { settingsStore.audioDuckingEnabled = v } })
+  const audioDuckingLevel = computed({ get: () => settingsStore.audioDuckingLevel, set: v => { settingsStore.audioDuckingLevel = v } })
+  const gpuMode = computed({ get: () => settingsStore.gpuMode, set: v => { settingsStore.gpuMode = v } })
+  const hotkey = computed({ get: () => settingsStore.hotkey, set: v => { settingsStore.hotkey = v } })
+  const cancelShortcut = computed({ get: () => settingsStore.cancelShortcut, set: v => { settingsStore.cancelShortcut = v } })
+  const recordingMode = computed({ get: () => settingsStore.recordingMode, set: v => { settingsStore.recordingMode = v } })
+  const appLocale = computed({ get: () => settingsStore.appLocale, set: v => { settingsStore.appLocale = v } })
+
+  // Proxy ref for history backward compat
+  const history = computed({ get: () => historyStore.history, set: v => { historyStore.history = v } })
+
   // Computed
   const isBusy = computed(() => isRecording.value || isTranscribing.value || queueCount.value > 0 || Object.keys(activeDownloads.value).length > 0)
   const selectedEngine = computed(() => {
-    const model = models.value.find(m => m.id === selectedModelId.value)
+    const model = models.value.find(m => m.id === settingsStore.selectedModelId)
     return model ? engines.value.find(e => e.id === model.engine_id) : null
   })
   const downloadedModels = computed(() => models.value.filter(m => {
@@ -100,14 +109,14 @@ export const useAppStore = defineStore('app', () => {
     }
     return result
   })
-  const isCloudAsr = computed(() => selectedModelId.value.startsWith('cloud:'))
+  const isCloudAsr = computed(() => settingsStore.selectedModelId.startsWith('cloud:'))
   const asrCloudProviderId = computed(() =>
-    isCloudAsr.value ? selectedModelId.value.slice('cloud:'.length) : ''
+    isCloudAsr.value ? settingsStore.selectedModelId.slice('cloud:'.length) : ''
   )
-  const isCloudLlm = computed(() => cleanupModelId.value.startsWith('cloud:'))
-  const isLocalLlm = computed(() => cleanupModelId.value.startsWith('llama:'))
+  const isCloudLlm = computed(() => settingsStore.cleanupModelId.startsWith('cloud:'))
+  const isLocalLlm = computed(() => settingsStore.cleanupModelId.startsWith('llama:'))
   const cleanupCloudProviderId = computed(() =>
-    isCloudLlm.value ? cleanupModelId.value.slice('cloud:'.length) : ''
+    isCloudLlm.value ? settingsStore.cleanupModelId.slice('cloud:'.length) : ''
   )
 
   // Actions
@@ -136,11 +145,6 @@ export const useAppStore = defineStore('app', () => {
     catch (e) { console.error('fetchPermissions failed:', e) }
   }
 
-  async function fetchHistory() {
-    try { history.value = await invoke('get_history') }
-    catch (e) { console.error('fetchHistory failed:', e) }
-  }
-
   async function fetchProviders() {
     try { providers.value = await invoke('get_providers') }
     catch (e) { console.error('fetchProviders failed:', e) }
@@ -161,17 +165,11 @@ export const useAppStore = defineStore('app', () => {
     } catch (e) { console.error('fetchState failed:', e) }
   }
 
-  async function selectModel(id: string) {
-    await setSetting('selected_model_id', id)
-  }
-
-  async function selectLanguageAction(code: string) {
-    await setSetting('selected_language', code)
-  }
+  // Delegated settings actions
+  const { fetchSettings, setSetting, selectModel, selectLanguageAction } = settingsStore
 
   async function downloadModel(id: string) {
     if (activeDownloads.value[id]) return false
-    // Pre-fill progress from partial file (avoids 0% flash on resume)
     const model = models.value.find(m => m.id === id)
     const initialProgress = model?.partial_progress ?? 0
     activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false, downloaded: 0, totalSize: model?.size ?? 0, speed: 0 } }
@@ -182,7 +180,6 @@ export const useAppStore = defineStore('app', () => {
       console.error('downloadModel failed:', e)
       return false
     } finally {
-      // If pauseDownload already cleaned up, skip
       const entry = activeDownloads.value[id]
       if (entry) {
         const lastProgress = entry.progress
@@ -207,14 +204,12 @@ export const useAppStore = defineStore('app', () => {
   async function pauseDownload(id: string) {
     const entry = activeDownloads.value[id]
     if (!entry) return
-    // Optimistic: immediately show paused state (no intermediate spinner)
     const m = models.value.find(m => m.id === id)
     if (m && entry.progress > 0) {
       m.partial_progress = entry.progress
     }
     const { [id]: _, ...rest } = activeDownloads.value
     activeDownloads.value = rest
-    // Tell backend to stop (fire-and-forget)
     try { await invoke('pause_download', { id }) }
     catch (e) { console.error('pauseDownload failed:', e) }
   }
@@ -223,7 +218,6 @@ export const useAppStore = defineStore('app', () => {
     if (activeDownloads.value[id]) {
       activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
     } else {
-      // Cancelling from paused state — clear partial_progress immediately
       const m = models.value.find(m => m.id === id)
       if (m) m.partial_progress = null
     }
@@ -250,120 +244,13 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-
-
-  async function fetchSettings() {
-    try {
-      const s = await invoke<SettingsPayload>('get_settings')
-      appLocale.value = s.app_locale
-      hallucinationFilterEnabled.value = s.hallucination_filter_enabled
-      hotkey.value = s.hotkey
-      selectedInputDeviceUid.value = s.selected_input_device_uid
-      cancelShortcut.value = s.cancel_shortcut
-      recordingMode.value = s.recording_mode
-      selectedModelId.value = s.selected_model_id
-      selectedLanguage.value = s.selected_language
-      textCleanupEnabled.value = s.text_cleanup_enabled ?? false
-      cleanupModelId.value = s.cleanup_model_id ?? ''
-      llmModel.value = s.llm_model ?? ''
-      asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
-      gpuMode.value = s.gpu_mode ?? 'auto'
-      llmMaxTokens.value = s.llm_max_tokens ?? 4096
-      audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
-      audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
-    } catch (e) { console.error('fetchSettings failed:', e) }
-  }
-
-  function getSettingValue(key: string): string {
-    switch (key) {
-      case 'app_locale': return appLocale.value
-      case 'hallucination_filter_enabled': return String(hallucinationFilterEnabled.value)
-      case 'hotkey': return hotkey.value
-      case 'cancel_shortcut': return cancelShortcut.value
-      case 'recording_mode': return recordingMode.value
-      case 'selected_input_device_uid': return selectedInputDeviceUid.value ?? ''
-      case 'selected_model_id': return selectedModelId.value
-      case 'selected_language': return selectedLanguage.value
-      case 'text_cleanup_enabled': return String(textCleanupEnabled.value)
-      case 'cleanup_model_id': return cleanupModelId.value
-      case 'llm_model': return llmModel.value
-      case 'asr_cloud_model': return asrCloudModel.value
-      case 'gpu_mode': return gpuMode.value
-      case 'llm_max_tokens': return String(llmMaxTokens.value)
-      case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
-      case 'audio_ducking_level': return String(audioDuckingLevel.value)
-      default: return ''
-    }
-  }
-
-  function applySettingLocally(key: string, value: string) {
-    switch (key) {
-      case 'app_locale': appLocale.value = value; break
-      case 'hallucination_filter_enabled': hallucinationFilterEnabled.value = value === 'true'; break
-      case 'hotkey': hotkey.value = value; break
-      case 'cancel_shortcut': cancelShortcut.value = value; break
-      case 'recording_mode': recordingMode.value = value; break
-      case 'selected_input_device_uid': selectedInputDeviceUid.value = value || null; break
-      case 'selected_model_id': selectedModelId.value = value; break
-      case 'selected_language': selectedLanguage.value = value; break
-      case 'text_cleanup_enabled': textCleanupEnabled.value = value === 'true'; break
-      case 'cleanup_model_id': cleanupModelId.value = value; break
-      case 'llm_model': llmModel.value = value; break
-      case 'asr_cloud_model': asrCloudModel.value = value; break
-      case 'gpu_mode': gpuMode.value = value; break
-      case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 4096; break
-      case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
-      case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
-    }
-  }
-
-  async function setSetting(key: string, value: string) {
-    const prev = getSettingValue(key)
-    applySettingLocally(key, value)
-    try {
-      await invoke('set_setting', { key, value })
-    } catch (e) {
-      console.error('setSetting failed, rolling back:', e)
-      applySettingLocally(key, prev)
-    }
-  }
-
   async function startMonitoring() {
     try { await invoke('start_monitoring') }
     catch (e) { console.error('startMonitoring failed:', e) }
   }
 
-
-  async function clearHistoryAction() {
-    try {
-      await invoke('clear_history')
-      history.value = []
-    } catch (e) { console.error('clearHistory failed:', e) }
-  }
-
-  async function searchHistory(query: string): Promise<HistoryEntry[]> {
-    try {
-      return await invoke<HistoryEntry[]>('search_history', { query })
-    } catch (e) {
-      console.error('searchHistory failed:', e)
-      return []
-    }
-  }
-
-  async function deleteHistoryEntry(timestamp: number) {
-    try {
-      await invoke('delete_history_entry', { timestamp: Math.floor(timestamp) })
-      history.value = history.value.filter(e => e.timestamp !== timestamp)
-    } catch (e) { console.error('deleteHistoryEntry failed:', e) }
-  }
-
-  async function deleteHistoryDay(dayTimestamp: number) {
-    try {
-      await invoke('delete_history_day', { dayTimestamp: Math.floor(dayTimestamp) })
-      const dayEnd = dayTimestamp + 86400
-      history.value = history.value.filter(e => e.timestamp < dayTimestamp || e.timestamp >= dayEnd)
-    } catch (e) { console.error('deleteHistoryDay failed:', e) }
-  }
+  // Delegated history actions
+  const { fetchHistory, clearHistoryAction, searchHistory, deleteHistoryEntry, deleteHistoryDay } = historyStore
 
   async function requestPermission(kind: string) {
     try { await invoke('request_permission', { kind }) }
@@ -391,7 +278,7 @@ export const useAppStore = defineStore('app', () => {
     } catch (e) { console.error('updateProvider failed:', e) }
   }
 
-  // Event listeners (store is a singleton — listeners live for the app's lifetime)
+  // Event listeners
   function setupListeners() {
     listen('recording-started', () => {
       isRecording.value = true
@@ -415,11 +302,11 @@ export const useAppStore = defineStore('app', () => {
       isTranscribing.value = false
       queueCount.value = Math.max(0, queueCount.value - 1)
       if (event.payload?.text) {
-        history.value.unshift({
+        historyStore.addEntry({
           text: event.payload.text,
           timestamp: Date.now() / 1000,
-          model_id: selectedModelId.value,
-          language: selectedLanguage.value,
+          model_id: settingsStore.selectedModelId,
+          language: settingsStore.selectedLanguage,
           cleanup_model_id: event.payload.cleanup_model_id ?? '',
           hallucination_filter: event.payload.hallucination_filter ?? false,
         })
@@ -440,7 +327,6 @@ export const useAppStore = defineStore('app', () => {
       const { model_id, progress, downloaded, total_size, speed } = event.payload ?? {}
       if (model_id && progress !== undefined && activeDownloads.value[model_id]) {
         const entry = activeDownloads.value[model_id]
-        // Only accept forward progress (avoid jitter from out-of-order events)
         if (progress >= entry.progress) {
           entry.progress = progress
           if (downloaded !== undefined) entry.downloaded = downloaded
@@ -459,7 +345,7 @@ export const useAppStore = defineStore('app', () => {
     })
   }
 
-  // Initialize (don't fetch audio devices here — that triggers mic permission dialog on macOS 14+)
+  // Initialize
   let initialized = false
   async function init() {
     if (initialized) return
@@ -467,12 +353,12 @@ export const useAppStore = defineStore('app', () => {
     setupListeners()
     await Promise.all([
       fetchState(),
-      fetchSettings(),
+      settingsStore.fetchSettings(),
       fetchEngines(),
       fetchModels(),
       fetchLanguages(),
       fetchPermissions(),
-      fetchHistory(),
+      historyStore.fetchHistory(),
       fetchProviders(),
     ])
   }
