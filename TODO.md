@@ -8,9 +8,9 @@
 ## Fonctionnalités
 
 - [ ] **Raccourci pour historique rapide** — Touche configurable pour afficher un popup flottant avec les dernières transcriptions. Permet de re-coller rapidement un texte récent sans ouvrir la fenêtre d'historique complète. Style popup léger (comme Spotlight/Alfred), clic ou Enter pour coller l'entrée sélectionnée.
-- [ ] **Pipeline prétraitement audio** — Denoising + VAD avant transcription. Voir `docs/AUDIO-PIPELINE.md` pour l'architecture complète.
-  - **Phase 1** : Intégrer nnnoiseless (Rust natif, port de RNNoise) dans `audio.rs` pour denoising temps réel + utiliser son score VAD pour détecter le silence → discard si pas de parole.
-  - **Phase 2** : Si qualité insuffisante, compléter avec DeepFilterNet (ONNX via ort) et/ou Silero VAD + trimming des silences début/fin.
+- [ ] **Pipeline prétraitement audio** — VAD + denoising optionnel avant transcription. Voir `docs/AUDIO-PIPELINE.md` pour l'architecture complète. **Important** : le denoising dégrade Whisper (paper "When De-noising Hurts", arXiv:2512.17562) → VAD prioritaire, denoising optionnel et désactivé par défaut.
+  - **Phase 1** : Intégrer Silero VAD v6 (crate `voice_activity_detector`, 2 MB ONNX, `ort` déjà dispo) pour détecter le silence → discard si pas de parole + trimming silences début/fin.
+  - **Phase 2** : Denoising optionnel via nnnoiseless (pure Rust, 85 KB). Toggle dans préférences, désactivé par défaut. Si qualité insuffisante → DeepFilterNet3 (crate `deep_filter`, Rust natif via tract).
   - **Phase 3** : Presets device (gain, noise gate, normalisation par type de micro). Voir `docs/AUDIO-PIPELINE.md` Phase 3.
 - [ ] **Restauration après crash** — Sauvegarder l'état de la queue de transcription sur disque (fichiers audio en attente). En cas de crash ou kill pendant une transcription, les fichiers WAV restent dans /tmp mais la queue en mémoire est perdue. Persister la queue permettrait de reprendre automatiquement au relancement. Concerne uniquement la transcription, pas le téléchargement.
 
@@ -23,7 +23,9 @@
   - SmolLM3 3B (~1.8 GB, bat Llama 3.2 3B)
   - Llama 3.2 1B/3B (~700 MB / 1.8 GB, Meta)
   - Ministral 3B (~1.8 GB, Mistral, bon en FR)
+- [ ] **Ajouter whisper-large-v3-french au catalogue ASR** — `bofenghuang/whisper-large-v3-french` fine-tuné sur données françaises, export GGML disponible → compatible whisper-rs existant sans code. Meilleur WER français open-source.
 - [ ] **Intégration Deepgram Nova-3** — API propriétaire mais simple (REST, audio brut en body, ~80 lignes Rust). Meilleure qualité sur audio bruité. Voir `docs/CLOUD-INTEGRATION.md`.
+- [ ] **Évaluer modèles de correction spécialisés** — Alternative au LLM pour le text cleanup : pipeline léger (regex filler words → ponctuation ONNX → grammar). Modèles candidats : `1-800-BAD-CODE/punct_cap_seg_47_language` (47 langues, F1=97%), `fdemelo/t5-base-spell-correction-fr` (correction FR), `FlanEC` (post-ASR error correction). Voir `docs/BENCHMARK.md` section "Modèles de correction spécialisés".
 
 ## Refactoring
 
