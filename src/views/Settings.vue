@@ -507,37 +507,39 @@ onUnmounted(() => {
           <!-- Cloud ASR sub-settings (model name) -->
           <template v-if="store.isCloudAsr && asrSelectedProvider">
             <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
-                <button
+              <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
+              <div v-if="asrModelOptions.length > 0" class="flex items-center gap-2">
+                <Select
+                  class="flex-1"
+                  :model-value="asrModelSelectValue"
+                  @update:model-value="onAsrModelSelect"
+                >
+                  <SelectTrigger class="w-full h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem
+                      v-for="m in asrModelOptions"
+                      :key="m"
+                      :value="m"
+                    >
+                      {{ m }}
+                    </SelectItem>
+                    <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  class="h-9 w-9 shrink-0"
                   :title="t('settings.models.refresh')"
                   :disabled="refreshingAsr"
-                  class="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                   @click="refreshAsrModels"
                 >
-                  <Loader2 v-if="refreshingAsr" class="w-3.5 h-3.5 animate-spin" />
-                  <RefreshCw v-else class="w-3.5 h-3.5" />
-                </button>
+                  <Loader2 v-if="refreshingAsr" class="w-4 h-4 animate-spin" />
+                  <RefreshCw v-else class="w-4 h-4" />
+                </Button>
               </div>
-              <Select
-                v-if="asrModelOptions.length > 0"
-                :model-value="asrModelSelectValue"
-                @update:model-value="onAsrModelSelect"
-              >
-                <SelectTrigger class="w-full h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="m in asrModelOptions"
-                    :key="m"
-                    :value="m"
-                  >
-                    {{ m }}
-                  </SelectItem>
-                  <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
-                </SelectContent>
-              </Select>
               <Input
                 v-if="isCustomAsrModel"
                 :value="store.asrCloudModel"
@@ -638,42 +640,45 @@ onUnmounted(() => {
             <!-- Cloud LLM sub-settings (provider already selected via model dropdown) -->
             <template v-if="store.isCloudLlm && llmSelectedProvider">
               <div class="space-y-1">
+                <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
                 <div class="flex items-center gap-2">
-                  <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
-                  <button
+                  <Select
+                    v-if="!isCustomLlmModel"
+                    class="flex-1"
+                    :model-value="store.llmModel"
+                    @update:model-value="onLlmModelSelect"
+                  >
+                    <SelectTrigger class="w-full h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        v-for="m in llmModelOptions"
+                        :key="m"
+                        :value="m"
+                      >
+                        {{ m }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    v-else
+                    :value="store.llmModel"
+                    @input="onLlmModelInput"
+                    class="h-9 text-sm flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    class="h-9 w-9 shrink-0"
                     :title="t('settings.models.refresh')"
                     :disabled="refreshingLlm"
-                    class="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                     @click="refreshLlmModels"
                   >
-                    <Loader2 v-if="refreshingLlm" class="w-3.5 h-3.5 animate-spin" />
-                    <RefreshCw v-else class="w-3.5 h-3.5" />
-                  </button>
+                    <Loader2 v-if="refreshingLlm" class="w-4 h-4 animate-spin" />
+                    <RefreshCw v-else class="w-4 h-4" />
+                  </Button>
                 </div>
-                <Select
-                  v-if="!isCustomLlmModel"
-                  :model-value="store.llmModel"
-                  @update:model-value="onLlmModelSelect"
-                >
-                  <SelectTrigger class="w-full h-9 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      v-for="m in llmModelOptions"
-                      :key="m"
-                      :value="m"
-                    >
-                      {{ m }}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  v-else
-                  :value="store.llmModel"
-                  @input="onLlmModelInput"
-                  class="h-9 text-sm"
-                />
               </div>
 
               <!-- Max tokens (cloud) -->
