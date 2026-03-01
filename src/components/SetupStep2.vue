@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { useDownloadStore } from '@/stores/downloads'
+import { isModelAvailable } from '@/stores/types'
 import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -74,11 +75,7 @@ const allModelsByEngine = computed(() => {
   return groups
 })
 
-function isModelDownloaded(model: ASRModel): boolean {
-  const dt = model.download_type.type
-  if (dt === 'RemoteAPI' || dt === 'System') return true
-  return !!model.is_downloaded
-}
+const isModelDownloaded = isModelAvailable
 
 
 async function handleDownload(model: ASRModel) {

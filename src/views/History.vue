@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
 import { useHistoryStore } from '@/stores/history'
 import { useEnginesStore } from '@/stores/engines'
+import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -117,9 +118,9 @@ async function copyEntry(entry: HistoryEntry) {
 }
 
 function formatAsrLabel(modelId: string): string {
-  if (modelId.startsWith('cloud:')) {
-    const providerId = modelId.slice('cloud:'.length)
-    const provider = enginesStore.providers.find(p => p.id === providerId)
+  const cloudId = parseCloudId(modelId)
+  if (cloudId) {
+    const provider = enginesStore.providers.find(p => p.id === cloudId)
     return provider ? provider.name : 'Cloud'
   }
   const model = enginesStore.models.find(m => m.id === modelId)
@@ -127,14 +128,14 @@ function formatAsrLabel(modelId: string): string {
 }
 
 function isCloudAsr(modelId: string): boolean {
-  return modelId.startsWith('cloud:')
+  return !!parseCloudId(modelId)
 }
 
 function formatCleanupLabel(id: string): string {
   if (id.startsWith('bert-punctuation:')) return 'BERT'
-  if (id.startsWith('cloud:')) {
-    const providerId = id.slice('cloud:'.length)
-    const provider = enginesStore.providers.find(p => p.id === providerId)
+  const cloudId = parseCloudId(id)
+  if (cloudId) {
+    const provider = enginesStore.providers.find(p => p.id === cloudId)
     return provider ? provider.name : 'Cloud LLM'
   }
   // Local LLM (llama:*)
@@ -144,7 +145,7 @@ function formatCleanupLabel(id: string): string {
 
 function cleanupBadgeType(id: string): 'bert' | 'cloud' | 'local' {
   if (id.startsWith('bert-punctuation:')) return 'bert'
-  if (id.startsWith('cloud:')) return 'cloud'
+  if (parseCloudId(id)) return 'cloud'
   return 'local'
 }
 

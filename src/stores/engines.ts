@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { hasAsrSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
+import { isModelAvailable, parseCloudId } from './types'
 import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport } from './types'
 
 export const useEnginesStore = defineStore('engines', () => {
@@ -22,10 +23,7 @@ export const useEnginesStore = defineStore('engines', () => {
     const model = models.value.find(m => m.id === settingsStore.selectedModelId)
     return model ? engines.value.find(e => e.id === model.engine_id) : null
   })
-  const downloadedModels = computed(() => models.value.filter(m => {
-    if (m.download_type.type === 'RemoteAPI' || m.download_type.type === 'System') return true
-    return m.is_downloaded
-  }))
+  const downloadedModels = computed(() => models.value.filter(isModelAvailable))
   const asrEngines = computed(() => engines.value.filter(e => e.category === 'asr'))
   const llmEngines = computed(() => engines.value.filter(e => e.category === 'llm'))
   const downloadedLlmModels = computed(() => {
@@ -56,7 +54,7 @@ export const useEnginesStore = defineStore('engines', () => {
     const asrIds = new Set(asrEngines.value.map(e => e.id))
     for (const m of models.value) {
       if (!asrIds.has(m.engine_id)) continue
-      if (m.download_type.type === 'System' || m.is_downloaded) {
+      if (isModelAvailable(m)) {
         result.push({ id: m.id, label: m.label, group: 'local' })
       }
     }
@@ -67,15 +65,11 @@ export const useEnginesStore = defineStore('engines', () => {
     }
     return result
   })
-  const isCloudAsr = computed(() => settingsStore.selectedModelId.startsWith('cloud:'))
-  const asrCloudProviderId = computed(() =>
-    isCloudAsr.value ? settingsStore.selectedModelId.slice('cloud:'.length) : ''
-  )
-  const isCloudLlm = computed(() => settingsStore.cleanupModelId.startsWith('cloud:'))
+  const isCloudAsr = computed(() => !!parseCloudId(settingsStore.selectedModelId))
+  const asrCloudProviderId = computed(() => parseCloudId(settingsStore.selectedModelId) ?? '')
+  const isCloudLlm = computed(() => !!parseCloudId(settingsStore.cleanupModelId))
   const isLocalLlm = computed(() => settingsStore.cleanupModelId.startsWith('llama:'))
-  const cleanupCloudProviderId = computed(() =>
-    isCloudLlm.value ? settingsStore.cleanupModelId.slice('cloud:'.length) : ''
-  )
+  const cleanupCloudProviderId = computed(() => parseCloudId(settingsStore.cleanupModelId) ?? '')
 
   // Actions
   async function fetchEngines() {

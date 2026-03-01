@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloadStore } from '@/stores/downloads'
+import { isModelAvailable } from '@/stores/types'
 import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Trash2, Pause, Play, X, Loader2 } from 'lucide-vue-next'
@@ -27,11 +28,7 @@ const isDownloading = computed(() => !!dl.value)
 const progress = computed(() => dl.value?.progress ?? 0)
 const isStopping = computed(() => dl.value?.stopping ?? false)
 
-const isDownloaded = computed(() => {
-  const dt = props.model.download_type.type
-  if (dt === 'System') return true
-  return props.model.is_downloaded
-})
+const isDownloaded = computed(() => isModelAvailable(props.model))
 
 const isDeleting = computed(() => !!downloads.deletingModels[props.model.id])
 

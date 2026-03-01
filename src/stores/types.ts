@@ -96,6 +96,22 @@ export interface AppStatePayload {
   active_downloads: Record<string, number>
 }
 
+// --- Helpers ---
+
+/** True if the model is usable (downloaded, system-provided, or remote API) */
+export function isModelAvailable(model: ASRModel): boolean {
+  const dt = model.download_type.type
+  if (dt === 'RemoteAPI' || dt === 'System') return true
+  return !!model.is_downloaded
+}
+
+/** Parse a "cloud:<providerId>" composite ID. Returns the provider ID or null. */
+export function parseCloudId(id: string): string | null {
+  return id.startsWith('cloud:') ? id.slice('cloud:'.length) : null
+}
+
+// --- Tauri payloads ---
+
 export interface SettingsPayload {
   app_locale: string
   hallucination_filter_enabled: boolean

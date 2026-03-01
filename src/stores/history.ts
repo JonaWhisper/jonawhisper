@@ -18,15 +18,6 @@ export const useHistoryStore = defineStore('history', () => {
     } catch (e) { console.error('clearHistory failed:', e) }
   }
 
-  async function searchHistory(query: string): Promise<HistoryEntry[]> {
-    try {
-      return await invoke<HistoryEntry[]>('search_history', { query })
-    } catch (e) {
-      console.error('searchHistory failed:', e)
-      return []
-    }
-  }
-
   async function deleteHistoryEntry(timestamp: number) {
     try {
       await invoke('delete_history_entry', { timestamp: Math.floor(timestamp) })
@@ -48,7 +39,7 @@ export const useHistoryStore = defineStore('history', () => {
 
   return {
     history,
-    fetchHistory, clearHistoryAction, searchHistory,
+    fetchHistory, clearHistoryAction,
     deleteHistoryEntry, deleteHistoryDay, addEntry,
   }
 })
