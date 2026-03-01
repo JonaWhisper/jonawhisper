@@ -128,6 +128,10 @@ pub struct Preferences {
     pub gpu_mode: String,
     #[serde(default = "default_llm_max_tokens")]
     pub llm_max_tokens: u32,
+    #[serde(default)]
+    pub audio_ducking_enabled: bool,
+    #[serde(default = "default_ducking_level")]
+    pub audio_ducking_level: f32,
 }
 
 fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
@@ -140,6 +144,7 @@ fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
 fn default_llm_max_tokens() -> u32 { 256 }
+fn default_ducking_level() -> f32 { 0.8 }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
 /// or %APPDATA%/WhisperDictate/ (Windows).

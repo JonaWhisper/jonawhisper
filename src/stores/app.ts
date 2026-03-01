@@ -112,6 +112,8 @@ export interface SettingsPayload {
   asr_cloud_model: string
   gpu_mode: string
   llm_max_tokens: number
+  audio_ducking_enabled: boolean
+  audio_ducking_level: number
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -136,6 +138,8 @@ export const useAppStore = defineStore('app', () => {
   const asrCloudModel = ref('whisper-1')
   const gpuMode = ref('auto')
   const llmMaxTokens = ref(256)
+  const audioDuckingEnabled = ref(false)
+  const audioDuckingLevel = ref(0.8)
   const spectrumData = ref<number[]>(new Array(12).fill(0))
   const pillMode = ref<'recording' | 'transcribing' | 'error' | 'idle'>('recording')
 
@@ -368,6 +372,8 @@ export const useAppStore = defineStore('app', () => {
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
       llmMaxTokens.value = s.llm_max_tokens ?? 256
+      audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
+      audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -388,6 +394,8 @@ export const useAppStore = defineStore('app', () => {
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
       case 'llm_max_tokens': return String(llmMaxTokens.value)
+      case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
+      case 'audio_ducking_level': return String(audioDuckingLevel.value)
       default: return ''
     }
   }
@@ -409,6 +417,8 @@ export const useAppStore = defineStore('app', () => {
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
       case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 256; break
+      case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
+      case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
     }
   }
 
@@ -586,6 +596,7 @@ export const useAppStore = defineStore('app', () => {
     hallucinationFilterEnabled, appLocale, selectedInputDeviceUid,
     cancelShortcut, recordingMode, hotkey, spectrumData, pillMode,
     textCleanupEnabled, cleanupModelId, llmProviderId, llmModel, llmMaxTokens, asrCloudModel, gpuMode,
+    audioDuckingEnabled, audioDuckingLevel,
     engines, models, languages, history,
     audioDevices, permissions, providers,
     // Computed

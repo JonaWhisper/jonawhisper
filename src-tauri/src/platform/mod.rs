@@ -31,6 +31,9 @@ pub mod macos;
 #[cfg(target_os = "macos")]
 pub mod audio_devices;
 
+#[cfg(target_os = "macos")]
+pub mod audio_ducking;
+
 pub mod hotkey;
 pub mod paste;
 
@@ -55,6 +58,12 @@ pub mod audio_devices {
 
     pub fn list_input_devices() -> Vec<AudioDevice> { vec![] }
     pub fn start_device_change_listener(_callback: impl Fn() + Send + 'static) {}
+}
+
+#[cfg(not(target_os = "macos"))]
+pub mod audio_ducking {
+    pub fn duck_volume(_ratio: f32) {}
+    pub fn restore_volume() {}
 }
 
 #[cfg(not(target_os = "macos"))]

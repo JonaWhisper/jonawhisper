@@ -72,6 +72,15 @@ async function onHallucinationFilterChange(enabled: boolean) {
   await store.setSetting('hallucination_filter_enabled', String(enabled))
 }
 
+async function onAudioDuckingChange(enabled: boolean) {
+  await store.setSetting('audio_ducking_enabled', String(enabled))
+}
+
+async function onAudioDuckingLevelChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await store.setSetting('audio_ducking_level', value)
+}
+
 async function onHotkeyChange(value: string) {
   await store.setSetting('hotkey', value)
 }
@@ -763,6 +772,33 @@ onUnmounted(() => {
             <div v-if="isTesting" class="rounded-md border border-border bg-muted/30 px-3 py-2">
               <SpectrumBars :spectrum="testSpectrum" size="md" />
             </div>
+          </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <Label class="text-sm shrink-0">{{ t('settings.microphone.ducking') }}</Label>
+            <Switch
+              :model-value="store.audioDuckingEnabled"
+              @update:model-value="onAudioDuckingChange"
+            />
+          </div>
+
+          <div
+            v-if="store.audioDuckingEnabled"
+            class="space-y-1 pl-4 border-l-2 border-border"
+          >
+            <Label class="text-xs text-muted-foreground">{{ t('settings.microphone.duckingLevel') }}</Label>
+            <Select :model-value="String(store.audioDuckingLevel)" @update:model-value="onAudioDuckingLevelChange">
+              <SelectTrigger class="w-full h-9 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0.25">25%</SelectItem>
+                <SelectItem value="0.5">50%</SelectItem>
+                <SelectItem value="0.75">75%</SelectItem>
+                <SelectItem value="0.8">80%</SelectItem>
+                <SelectItem value="1">100% ({{ t('settings.microphone.duckingMute') }})</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>

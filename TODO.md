@@ -2,6 +2,7 @@
 
 ## Bugs
 
+- [ ] **LLM cleanup renvoie le system prompt** — Le nettoyage LLM renvoie parfois le prompt système dans la sortie au lieu du texte nettoyé uniquement. Bug dans le parsing de la réponse LLM (local ou cloud). À investiguer dans `llm_cleanup.rs` / `llm_local.rs`.
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement
 - [ ] **Tray menu se ferme au premier clic après lancement** — Bug upstream `tray-icon` (manque `acceptsFirstMouse:` sur TrayTarget NSView). Issue ouverte : tray-icon#251. Workaround actuel (menu attaché après build) est le meilleur disponible. Fix = PR upstream ou fork.
 
