@@ -16,9 +16,6 @@
 
 ## Intégrations Cloud & Modèles
 
-- [x] **Presets provider préconfigurés** — 9 providers préconfigurés (OpenAI, Anthropic, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek). URLs résolues dynamiquement via `ProviderKind::base_url()` (pas de migration si les URLs changent). Bouton Test pour valider la clé API + récupérer les modèles disponibles. Cache des modèles sur le Provider (persiste entre restarts). Boutons Refresh dans Settings pour actualiser les listes.
-- [x] **Enrichir le catalogue LLM natif** — Ajouté 6 modèles GGUF : Qwen3 0.6B, Llama 3.2 1B/3B, SmolLM3 3B, Ministral 3 3B, Gemma 3 4B (11 modèles total)
-- [x] **Ajouter whisper-large-v3-french au catalogue ASR** — `bofenghuang/whisper-large-v3-french-distil-dec2` (GGML q5_0, 538 MB, spécialisé FR)
 - [ ] **Intégration Deepgram Nova-3** — API propriétaire mais simple (REST, audio brut en body, ~80 lignes Rust). Meilleure qualité sur audio bruité. Voir `docs/CLOUD-INTEGRATION.md`.
 - [ ] **Évaluer modèles de correction spécialisés** — Alternative au LLM pour le text cleanup : pipeline léger (regex filler words → ponctuation ONNX → grammar). Modèles candidats : `1-800-BAD-CODE/punct_cap_seg_47_language` (47 langues, F1=97%), `fdemelo/t5-base-spell-correction-fr` (correction FR), `FlanEC` (post-ASR error correction). Voir `docs/BENCHMARK.md` section "Modèles de correction spécialisés".
 
