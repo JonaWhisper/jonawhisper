@@ -1,4 +1,4 @@
-import type { Provider, ProviderKind } from '@/stores/app'
+import type { Provider, ProviderKind } from '@/stores/types'
 
 export interface ProviderPreset {
   label: string
