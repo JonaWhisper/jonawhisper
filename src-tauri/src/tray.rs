@@ -318,7 +318,7 @@ pub fn update_mic_submenu(app: &AppHandle) {
         None => d.is_default,
     });
     if let Some(d) = active_device {
-        let _ = m.mic_submenu.set_icon(Some(menu_icons::transport_icon(&d.transport_type, false)));
+        let _ = m.mic_submenu.set_icon(Some(menu_icons::transport_icon_plain(&d.transport_type)));
         let _ = m.mic_submenu.set_text(&d.name);
     } else {
         let _ = m.mic_submenu.set_icon(None::<Image<'_>>);

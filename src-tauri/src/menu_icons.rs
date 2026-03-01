@@ -90,10 +90,8 @@ fn sample_shape(shape: &[u8], fx: f32, fy: f32) -> f32 {
 const BLUE: (u8, u8, u8) = (0, 122, 255);  // NSColor.systemBlue (light mode)
 const GRAY: (u8, u8, u8) = (99, 99, 102);  // NSColor.systemGray2 (dark mode) — 3.9:1 contrast with white
 
-/// Get a 36×36 icon with colored bubble for an audio transport type.
-/// `selected`: blue bubble (active device), otherwise gray bubble.
-pub fn transport_icon(t: &AudioTransportType, selected: bool) -> Image<'static> {
-    let idx = match t {
+fn shape_index(t: &AudioTransportType) -> usize {
+    match t {
         AudioTransportType::BuiltIn => 0,
         AudioTransportType::USB => 1,
         AudioTransportType::Bluetooth => 2,
@@ -102,8 +100,47 @@ pub fn transport_icon(t: &AudioTransportType, selected: bool) -> Image<'static> 
         AudioTransportType::Thunderbolt => 5,
         AudioTransportType::HDMI => 6,
         AudioTransportType::Unknown => 7,
-    };
-    let shape = &ICON_SHAPES[idx];
+    }
+}
+
+/// Get a 36×36 plain icon (no bubble) for use in menu headers.
+/// Rendered as gray shape on transparent background.
+pub fn transport_icon_plain(t: &AudioTransportType) -> Image<'static> {
+    let shape = &ICON_SHAPES[shape_index(t)];
+    let (fg_r, fg_g, fg_b) = (255u8, 255, 255);
+
+    let s = MENU_ICON_SIZE as usize;
+    let mut rgba = vec![0u8; s * s * 4];
+
+    let icon_margin = 7.0;
+    let icon_span = s as f32 - 2.0 * icon_margin;
+
+    for y in 0..s {
+        for x in 0..s {
+            let px = x as f32 + 0.5;
+            let py = y as f32 + 0.5;
+
+            let ix = (px - icon_margin) * SHAPE_SIZE as f32 / icon_span;
+            let iy = (py - icon_margin) * SHAPE_SIZE as f32 / icon_span;
+            let icon_a = sample_shape(shape, ix, iy);
+
+            if icon_a > 0.0 {
+                let i = (y * s + x) * 4;
+                rgba[i] = fg_r;
+                rgba[i + 1] = fg_g;
+                rgba[i + 2] = fg_b;
+                rgba[i + 3] = (icon_a * 255.0) as u8;
+            }
+        }
+    }
+
+    Image::new_owned(rgba, MENU_ICON_SIZE, MENU_ICON_SIZE)
+}
+
+/// Get a 36×36 icon with colored bubble for an audio transport type.
+/// `selected`: blue bubble (active device), otherwise gray bubble.
+pub fn transport_icon(t: &AudioTransportType, selected: bool) -> Image<'static> {
+    let shape = &ICON_SHAPES[shape_index(t)];
     let (bg_r, bg_g, bg_b) = if selected { BLUE } else { GRAY };
 
     let s = MENU_ICON_SIZE as usize;
