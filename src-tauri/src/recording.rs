@@ -213,6 +213,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
 
         // VAD pre-check: discard silence, trim edges
         let vad_enabled = state.settings.lock().unwrap().vad_enabled;
+        let mut vad_trimmed = false;
         if vad_enabled {
             let path_clone = audio_path.clone();
             let vad_result = tokio::task::spawn_blocking(move || {
@@ -234,6 +235,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
                 }
                 Ok(VadResult::Trimmed) => {
                     log::info!("VAD: trimmed silence from audio");
+                    vad_trimmed = true;
                 }
                 Ok(VadResult::Unchanged) => {}
                 Err(e) => {
@@ -242,7 +244,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
             }
         }
 
-        let had_error = run_transcription(app, state, &audio_path).await;
+        let had_error = run_transcription(app, state, &audio_path, vad_trimmed).await;
         let _ = std::fs::remove_file(&audio_path);
         state.runtime.lock().unwrap().is_transcribing = false;
 
@@ -282,6 +284,7 @@ async fn run_transcription(
     app: &AppHandle,
     state: &Arc<AppState>,
     audio_path: &std::path::Path,
+    vad_trimmed: bool,
 ) -> bool {
     let state_clone = Arc::clone(state);
     let path = audio_path.to_path_buf();
@@ -296,7 +299,7 @@ async fn run_transcription(
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
             }
-            handle_transcription_result(app, state, &text).await;
+            handle_transcription_result(app, state, &text, vad_trimmed).await;
             false
         }
         Ok(Err(e)) => {
@@ -320,7 +323,7 @@ async fn run_transcription(
     }
 }
 
-async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str) {
+async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str, vad_trimmed: bool) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         platform::play_sound("Basso");
@@ -454,7 +457,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         let s = state.settings.lock().unwrap();
         (s.selected_model_id.clone(), s.selected_language.clone())
     };
-    state.add_history(processed.clone(), model_id, language, effective_cleanup_model_id.clone(), hall_filter);
+    state.add_history(processed.clone(), model_id, language, effective_cleanup_model_id.clone(), hall_filter, vad_trimmed);
     platform::play_sound("Glass");
 
     let _ = app.emit(
@@ -463,6 +466,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             "text": processed,
             "cleanup_model_id": effective_cleanup_model_id,
             "hallucination_filter": hall_filter,
+            "vad_trimmed": vad_trimmed,
         }),
     );
 }

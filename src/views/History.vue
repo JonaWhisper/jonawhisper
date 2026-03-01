@@ -10,7 +10,7 @@ import type { HistoryEntry } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck } from 'lucide-vue-next'
+import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck, Scissors } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -253,6 +253,7 @@ async function doClearAll() {
               <div v-if="entry.model_id" class="ml-12 mt-1 flex flex-wrap gap-1">
                 <!-- ASR badge -->
                 <span
+                  :title="t('history.badge.asr')"
                   class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                   :class="isCloudAsr(entry.model_id)
                     ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
@@ -263,12 +264,13 @@ async function doClearAll() {
                   {{ formatAsrLabel(entry.model_id) }}
                 </span>
                 <!-- Language badge -->
-                <span v-if="entry.language" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
+                <span v-if="entry.language" :title="t('history.badge.language')" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
                   {{ entry.language }}
                 </span>
                 <!-- Cleanup badge -->
                 <span
                   v-if="entry.cleanup_model_id"
+                  :title="t('history.badge.cleanup')"
                   class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
                   :class="{
                     'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': cleanupBadgeType(entry.cleanup_model_id) === 'bert',
@@ -284,10 +286,20 @@ async function doClearAll() {
                 <!-- Hallucination filter badge -->
                 <span
                   v-if="entry.hallucination_filter"
+                  :title="t('history.badge.hallucination')"
                   class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400"
                 >
                   <ShieldCheck class="h-2.5 w-2.5" />
                   Anti-halluc.
+                </span>
+                <!-- VAD trimmed badge -->
+                <span
+                  v-if="entry.vad_trimmed"
+                  :title="t('history.badge.vad')"
+                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+                >
+                  <Scissors class="h-2.5 w-2.5" />
+                  VAD
                 </span>
               </div>
             </div>

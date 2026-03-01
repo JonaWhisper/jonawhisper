@@ -79,6 +79,7 @@ export const useAppStore = defineStore('app', () => {
           language: settingsStore.selectedLanguage,
           cleanup_model_id: event.payload.cleanup_model_id ?? '',
           hallucination_filter: event.payload.hallucination_filter ?? false,
+          vad_trimmed: event.payload.vad_trimmed ?? false,
         })
       }
     })

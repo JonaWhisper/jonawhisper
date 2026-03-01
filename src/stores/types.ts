@@ -47,6 +47,7 @@ export interface HistoryEntry {
   language: string
   cleanup_model_id: string
   hallucination_filter: boolean
+  vad_trimmed: boolean
 }
 
 export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom' | 'Groq' | 'Cerebras' | 'Gemini' | 'Mistral' | 'Fireworks' | 'Together' | 'DeepSeek'
@@ -79,6 +80,7 @@ export interface TranscriptionCompletePayload {
   text?: string
   cleanup_model_id?: string
   hallucination_filter?: boolean
+  vad_trimmed?: boolean
 }
 
 export interface DownloadProgressPayload {
