@@ -235,7 +235,7 @@ src-tauri/               Rust backend
     post_processor.rs    Text post-processing
     llm_cleanup.rs       Cloud LLM text cleanup (OpenAI/Anthropic)
     llm_local.rs         Local LLM text cleanup (llama.cpp)
-    llm_prompt.rs        Shared system prompt for LLM cleanup
+    llm_prompt.rs        Shared LLM module (error types, output sanitization, prompt)
     bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
     tray.rs              Menu bar menu & tray icon states
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)

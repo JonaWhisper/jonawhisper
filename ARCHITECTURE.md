@@ -81,9 +81,9 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `transcriber.rs` | Thin dispatcher: routes to cloud ASR API (`openai_api::transcribe`) if `selected_model_id` starts with `cloud:`, otherwise calls native `whisper::transcribe_native`. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (punctuation spacing, capitalization) |
 | `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime (`ort`). Cached `BertContext` in `AppState`. Sentence-level batching with tokenizer. |
-| `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (configurable `max_tokens`) |
-| `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. Strips `<think>` blocks from reasoning models (Qwen3). |
-| `llm_prompt.rs` | Shared system prompt template for LLM text cleanup (used by both cloud and local) |
+| `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (configurable `max_tokens`). Uses shared `LlmError` and `sanitize_output` from `llm_prompt`. |
+| `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. Uses shared `LlmError` and `sanitize_output` from `llm_prompt`. |
+| `llm_prompt.rs` | Shared LLM module: `LlmError` enum (unified error type for local and cloud), `sanitize_output` (think-block stripping + sanity check), and system prompt template. |
 
 ### Tray & icons
 
