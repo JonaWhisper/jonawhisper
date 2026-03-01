@@ -42,7 +42,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules |
-| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state (`HashMap<String, ActiveDownload>` for parallel per-model downloads), preferences, history DB (SQLite WAL with additive migrations for `cleanup_model_id` and `hallucination_filter` columns), tray menu state, cached WhisperContext, cached BertContext, cached LlmContext |
 | `migrations.rs` | Versioned preference migrations. Each migration is a numbered function receiving raw JSON + typed `Preferences`. Runs on startup if `_version` < current. v1: legacy format unification (api_servers, llm_config, cleanup_mode). v2: model file relocation to `~/Library/Application Support/WhisperDictate/models/`. |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → transcribe → paste) and all background thread spawning |
 | `events.rs` | Centralised event name constants to avoid string typos |
@@ -82,7 +82,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (punctuation spacing, capitalization) |
 | `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime (`ort`). Cached `BertContext` in `AppState`. Sentence-level batching with tokenizer. |
 | `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (configurable `max_tokens`) |
-| `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. |
+| `llm_local.rs` | Local LLM text cleanup via llama.cpp (`llama-cpp-2`). Cached `LlmContext` (backend + model), Metal GPU offload, configurable `max_tokens`. Strips `<think>` blocks from reasoning models (Qwen3). |
 | `llm_prompt.rs` | Shared system prompt template for LLM text cleanup (used by both cloud and local) |
 
 ### Tray & icons
@@ -125,7 +125,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | `FloatingPill.vue` | `/pill` | Overlay showing recording/transcribing state with spectrum animation |
 | `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). |
 | `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
-| `History.vue` | `/history` | Transcription history timeline with search and deletion |
+| `History.vue` | `/history` | Transcription history timeline with search, deletion, and processing badges (ASR local/cloud, language, cleanup method, hallucination filter) |
 
 ### Key components
 
@@ -184,7 +184,7 @@ Main thread (Tauri + Tokio runtime)
 6. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
 7. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM), then finalize (spacing, capitalization)
 8. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
-9. **History** → entry saved to SQLite → frontend notified via event
+9. **History** → entry saved to SQLite (with cleanup_model_id + hallucination_filter metadata) → frontend notified via event
 
 ## Configuration
 

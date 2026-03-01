@@ -13,6 +13,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
 - **Mic test** — test your microphone with live spectrum visualization in Settings
 - **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
+- **History badges** — each transcription shows processing details: ASR engine (local/cloud), language, text cleanup method (BERT/LLM/Cloud), and hallucination filter status
 
 ## Requirements
 
