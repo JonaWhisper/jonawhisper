@@ -68,7 +68,7 @@ onMounted(async () => {
   <div class="flex h-full">
     <!-- Engine sidebar -->
     <div class="w-48 border-r border-border bg-muted/30 overflow-y-auto flex-shrink-0">
-      <div class="p-3">
+      <div class="px-3 pt-3 pb-1">
         <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           {{ t('modelManager.engines') }}
         </h2>

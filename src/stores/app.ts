@@ -50,6 +50,8 @@ export interface HistoryEntry {
   timestamp: number
   model_id: string
   language: string
+  cleanup_model_id: string
+  hallucination_filter: boolean
 }
 
 export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom'
@@ -79,6 +81,8 @@ interface TranscriptionStartedPayload {
 
 interface TranscriptionCompletePayload {
   text?: string
+  cleanup_model_id?: string
+  hallucination_filter?: boolean
 }
 
 interface DownloadProgressPayload {
@@ -529,6 +533,8 @@ export const useAppStore = defineStore('app', () => {
           timestamp: Date.now() / 1000,
           model_id: selectedModelId.value,
           language: selectedLanguage.value,
+          cleanup_model_id: event.payload.cleanup_model_id ?? '',
+          hallucination_filter: event.payload.hallucination_filter ?? false,
         })
       }
     })

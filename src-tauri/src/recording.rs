@@ -303,6 +303,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Step 2: cleanup based on selected model
+    let mut effective_cleanup_model_id = String::new();
     if text_cleanup_enabled && !cleanup_model_id.is_empty() {
         if cleanup_model_id.starts_with("bert-punctuation:") {
             // BERT punctuation restoration (finalize after)
@@ -315,6 +316,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 Ok(Ok(punctuated)) => {
                     log::info!("BERT punctuation: {} → {}", processed.len(), punctuated.len());
                     processed = punctuated;
+                    effective_cleanup_model_id = cleanup_model_id.clone();
                 }
                 Ok(Err(e)) => {
                     log::warn!("BERT punctuation failed, using preprocessed result: {}", e);
@@ -332,6 +334,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     Ok(cleaned) => {
                         log::info!("Cloud LLM cleanup: {} → {}", processed.len(), cleaned.len());
                         processed = cleaned;
+                        effective_cleanup_model_id = cleanup_model_id.clone();
                     }
                     Err(e) => {
                         log::warn!("Cloud LLM cleanup failed, using finalized result: {}", e);
@@ -353,6 +356,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 Ok(Ok(cleaned)) => {
                     log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
                     processed = cleaned;
+                    effective_cleanup_model_id = cleanup_model_id.clone();
                 }
                 Ok(Err(e)) => {
                     log::warn!("Local LLM cleanup failed, using finalized result: {}", e);
@@ -385,12 +389,16 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         let s = state.settings.lock().unwrap();
         (s.selected_model_id.clone(), s.selected_language.clone())
     };
-    state.add_history(processed.clone(), model_id, language);
+    state.add_history(processed.clone(), model_id, language, effective_cleanup_model_id.clone(), hall_filter);
     platform::play_sound("Glass");
 
     let _ = app.emit(
         crate::events::TRANSCRIPTION_COMPLETE,
-        serde_json::json!({ "text": processed }),
+        serde_json::json!({
+            "text": processed,
+            "cleanup_model_id": effective_cleanup_model_id,
+            "hallucination_filter": hall_filter,
+        }),
     );
 }
 

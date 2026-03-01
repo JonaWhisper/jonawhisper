@@ -18,6 +18,10 @@ pub struct HistoryEntry {
     pub model_id: String,
     #[serde(default)]
     pub language: String,
+    #[serde(default)]
+    pub cleanup_model_id: String,
+    #[serde(default)]
+    pub hallucination_filter: bool,
 }
 
 // -- Grouped state --
@@ -216,6 +220,10 @@ fn open_history_db() -> Connection {
          CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);"
     ).expect("Failed to initialize history schema");
 
+    // Additive migrations
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN cleanup_model_id TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN hallucination_filter INTEGER NOT NULL DEFAULT 0", []);
+
     // Migrate legacy history.json if it exists
     let json_path = dir.join(HISTORY_JSON_LEGACY);
     if json_path.exists() {
@@ -291,15 +299,15 @@ impl AppState {
         })
     }
 
-    pub fn add_history(&self, text: String, model_id: String, language: String) {
+    pub fn add_history(&self, text: String, model_id: String, language: String, cleanup_model_id: String, hallucination_filter: bool) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
         let db = self.history_db.lock().unwrap();
         if let Err(e) = db.execute(
-            "INSERT INTO history (timestamp, text, model_id, language) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![timestamp, text, model_id, language],
+            "INSERT INTO history (timestamp, text, model_id, language, cleanup_model_id, hallucination_filter) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![timestamp, text, model_id, language, cleanup_model_id, hallucination_filter],
         ) {
             log::error!("Failed to insert history entry: {}", e);
         }
@@ -308,7 +316,7 @@ impl AppState {
     pub fn get_history(&self) -> Vec<HistoryEntry> {
         let db = self.history_db.lock().unwrap();
         let mut stmt = db.prepare(
-            "SELECT timestamp, text, model_id, language FROM history ORDER BY timestamp DESC"
+            "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter FROM history ORDER BY timestamp DESC"
         ).unwrap();
         stmt.query_map([], |row| {
             Ok(HistoryEntry {
@@ -316,6 +324,8 @@ impl AppState {
                 text: row.get(1)?,
                 model_id: row.get(2)?,
                 language: row.get(3)?,
+                cleanup_model_id: row.get(4)?,
+                hallucination_filter: row.get(5)?,
             })
         }).unwrap().filter_map(|r| r.ok()).collect()
     }
@@ -324,7 +334,7 @@ impl AppState {
         let db = self.history_db.lock().unwrap();
         let pattern = format!("%{}%", query);
         let mut stmt = db.prepare(
-            "SELECT timestamp, text, model_id, language FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC"
+            "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC"
         ).unwrap();
         stmt.query_map([&pattern], |row| {
             Ok(HistoryEntry {
@@ -332,6 +342,8 @@ impl AppState {
                 text: row.get(1)?,
                 model_id: row.get(2)?,
                 language: row.get(3)?,
+                cleanup_model_id: row.get(4)?,
+                hallucination_filter: row.get(5)?,
             })
         }).unwrap().filter_map(|r| r.ok()).collect()
     }

@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Search, Copy, Check, Trash2 } from 'lucide-vue-next'
+import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -110,6 +110,38 @@ async function copyEntry(entry: HistoryEntry) {
       copiedTimestamp.value = null
     }
   }, 1500)
+}
+
+function formatAsrLabel(modelId: string): string {
+  if (modelId.startsWith('cloud:')) {
+    const providerId = modelId.slice('cloud:'.length)
+    const provider = store.providers.find(p => p.id === providerId)
+    return provider ? provider.name : 'Cloud'
+  }
+  const model = store.models.find(m => m.id === modelId)
+  return model ? model.label : modelId
+}
+
+function isCloudAsr(modelId: string): boolean {
+  return modelId.startsWith('cloud:')
+}
+
+function formatCleanupLabel(id: string): string {
+  if (id.startsWith('bert-punctuation:')) return 'BERT'
+  if (id.startsWith('cloud:')) {
+    const providerId = id.slice('cloud:'.length)
+    const provider = store.providers.find(p => p.id === providerId)
+    return provider ? provider.name : 'Cloud LLM'
+  }
+  // Local LLM (llama:*)
+  const model = store.models.find(m => m.id === id)
+  return model ? model.label : id
+}
+
+function cleanupBadgeType(id: string): 'bert' | 'cloud' | 'local' {
+  if (id.startsWith('bert-punctuation:')) return 'bert'
+  if (id.startsWith('cloud:')) return 'cloud'
+  return 'local'
 }
 
 async function deleteEntry(entry: HistoryEntry) {
@@ -222,8 +254,45 @@ async function doClearAll() {
                   </Button>
                 </div>
               </div>
-              <div v-if="entry.model_id" class="ml-12 mt-0.5 text-xs text-muted-foreground">
-                {{ entry.model_id }}<span v-if="entry.language"> &middot; {{ entry.language }}</span>
+              <div v-if="entry.model_id" class="ml-12 mt-1 flex flex-wrap gap-1">
+                <!-- ASR badge -->
+                <span
+                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                  :class="isCloudAsr(entry.model_id)
+                    ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                    : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400'"
+                >
+                  <Cloud v-if="isCloudAsr(entry.model_id)" class="h-2.5 w-2.5" />
+                  <Cpu v-else class="h-2.5 w-2.5" />
+                  {{ formatAsrLabel(entry.model_id) }}
+                </span>
+                <!-- Language badge -->
+                <span v-if="entry.language" class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
+                  {{ entry.language }}
+                </span>
+                <!-- Cleanup badge -->
+                <span
+                  v-if="entry.cleanup_model_id"
+                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium"
+                  :class="{
+                    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': cleanupBadgeType(entry.cleanup_model_id) === 'bert',
+                    'bg-violet-500/10 text-violet-600 dark:text-violet-400': cleanupBadgeType(entry.cleanup_model_id) === 'local',
+                    'bg-amber-500/10 text-amber-600 dark:text-amber-400': cleanupBadgeType(entry.cleanup_model_id) === 'cloud',
+                  }"
+                >
+                  <SpellCheck v-if="cleanupBadgeType(entry.cleanup_model_id) === 'bert'" class="h-2.5 w-2.5" />
+                  <Cpu v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'local'" class="h-2.5 w-2.5" />
+                  <Cloud v-else class="h-2.5 w-2.5" />
+                  {{ formatCleanupLabel(entry.cleanup_model_id) }}
+                </span>
+                <!-- Hallucination filter badge -->
+                <span
+                  v-if="entry.hallucination_filter"
+                  class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                >
+                  <ShieldCheck class="h-2.5 w-2.5" />
+                  Anti-halluc.
+                </span>
               </div>
             </div>
           </div>
