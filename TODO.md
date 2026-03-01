@@ -14,17 +14,30 @@
   - **Détection automatique** — Matcher le device par pattern dans le nom (ex: "AirPods" → preset Bluetooth, "MacBook" → preset intégré). Fournir quelques presets par défaut pour les cas courants.
   - **Presets personnalisés** — Permettre à l'utilisateur de créer/éditer ses propres presets et de les associer à un device spécifique. Important car chaque micro a ses particularités.
 
+## Intégrations Cloud & Modèles
+
+- [ ] **Presets provider préconfigurés** — Ajouter des presets dans l'UI pour les principaux providers cloud OpenAI-compatible. L'utilisateur choisit "Groq", "OpenAI", "Cerebras", etc. et l'URL/modèle sont pré-remplis. Reste à entrer la clé API. Zéro changement backend, frontend seul. Voir `docs/CLOUD-INTEGRATION.md` pour les URLs/modèles.
+- [ ] **Enrichir le catalogue LLM natif** — Ajouter les modèles GGUF manquants au catalogue `engines/llama.rs` (juste des entrées, pas de code) :
+  - Qwen3 0.6B (~400 MB, ultra rapide)
+  - Gemma 3 4B (~2.5 GB, alternative à Qwen3 4B)
+  - SmolLM3 3B (~1.8 GB, bat Llama 3.2 3B)
+  - Llama 3.2 1B/3B (~700 MB / 1.8 GB, Meta)
+  - Ministral 3B (~1.8 GB, Mistral, bon en FR)
+- [ ] **Intégration Deepgram Nova-3** — API propriétaire mais simple (REST, audio brut en body, ~80 lignes Rust). Meilleure qualité sur audio bruité. Voir `docs/CLOUD-INTEGRATION.md`.
+
 ## Refactoring
 
 - [ ] **Splitter le store Pinia** — `app.ts` centralise tout (état, downloads, settings, history, providers, permissions). Splitter en sous-stores thématiques : `useDownloadStore`, `useSettingsStore`, `useHistoryStore`, `useProviderStore`, etc. Chaque store gère son propre état + actions. Le store principal ne garde que l'état runtime (recording, transcription, queue).
 
 ## Documentation
 
-- [ ] **Guide de setup LLM/ASR local pour les utilisateurs** — Expliquer simplement comment configurer un serveur LLM local (Ollama, llama.cpp server, LM Studio, etc.) et le connecter à WhisperDictate. Inclure des recommandations de modèles adaptés :
-  - **ASR** — quels modèles Whisper choisir selon le hardware (tiny/base pour machines modestes, large-v3-turbo pour Apple Silicon avec assez de RAM)
-  - **LLM cleanup** — quels modèles GGUF recommander pour la correction de texte (petits modèles rapides type Qwen3 0.6B/1.7B, vs plus gros pour meilleure qualité)
-  - **Cloud providers** — comment configurer OpenAI, Anthropic, ou un endpoint compatible
-  - Format : section dans le README ou page wiki/guide séparée
+- [ ] **Guide de setup pour les utilisateurs** — Page `docs/SETUP-GUIDE.md` ou section README expliquant :
+  - **Modèles natifs** — quels Whisper/LLM télécharger selon le hardware (RAM, Apple Silicon vs Intel)
+  - **Cloud providers** — comment configurer Groq, OpenAI, Cerebras, Gemini (avec les presets)
+  - **Serveurs locaux** — pour ceux qui veulent héberger un serveur séparé :
+    - **LLM** : Ollama (`brew install ollama && ollama pull qwen3:4b`, URL `http://localhost:11434`) ou LM Studio (GUI, port 1234)
+    - **ASR** : whisper.cpp server (`brew install whisper-cpp`, port 8080) ou MLX-Audio (`pip install mlx-audio`, port 8000)
+  - Voir `docs/BENCHMARK.md` pour les comparatifs détaillés
 
 ## Technique / Infra
 
