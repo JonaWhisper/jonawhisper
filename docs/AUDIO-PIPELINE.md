@@ -51,12 +51,10 @@ Micro (cpal) → [1. VAD] → [2. Denoising optionnel] → [3. Calibration devic
 | Énergie RMS | 0 | ~1ms | Limité (pas voix vs bruit) | Natif | Aucune |
 | NVIDIA MarbleNet v2 | ~400 KB | <1ms / 20ms | Bon | ONNX via `ort` | `ort` |
 
-**Recommandation** : **Silero VAD v6** via crate `voice_activity_detector` ou `silero-vad-rust`.
+**Recommandation** : **Silero VAD v6** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/vad.rs`.
 - 4x moins d'erreurs que WebRTC VAD
 - <1ms par chunk, 2 MB de modèle
-- API simple : `forward_chunk(audio)` → probabilité 0.0-1.0
-- `get_speech_timestamps()` pour le trimming
-- Core ML disponible (`FluidInference/silero-vad-coreml`) si on veut Apple Neural Engine
+- Inférence directe : `forward_chunk` → probabilité 0.0-1.0, état LSTM [2,1,128] + contexte 64 samples
 - L'app utilise déjà `ort` pour BERT punctuation → pas de nouvelle dépendance
 
 **Fonctionnalités VAD** :
@@ -151,11 +149,11 @@ Ces modèles nécessitent ONNX export + `ort` crate + gestion STFT/ISTFT manuell
 ## Ordre d'implémentation (révisé)
 
 ```
-Phase 1 — VAD seul (haute valeur, effort faible)
-├── Intégrer Silero VAD v6 via crate voice_activity_detector
+Phase 1 — VAD seul (haute valeur, effort faible) ✅ DONE
+├── Silero VAD v6 ONNX embarqué, inférence via ort (pas de crate VAD — conflits ndarray)
 ├── Discard si pas de parole (son Basso + pas de transcription)
 ├── Trimming silences début/fin avant Whisper
-└── Aucun impact négatif sur la qualité Whisper
+└── Toggle vad_enabled dans Settings > Post-traitement (activé par défaut)
 
 Phase 2 — Denoising optionnel (valeur conditionnelle, effort modéré)
 ├── Intégrer nnnoiseless (pure Rust, ~85 KB)
@@ -197,8 +195,8 @@ Phase 3 — Presets device (polish UX)
 
 | Crate | Version | Usage | Taille |
 |---|---|---|---|
-| `voice_activity_detector` ou `silero-vad-rust` | Latest | Silero VAD v6 | ~2 MB modèle |
-| `ort` | 2.x | ONNX Runtime (déjà utilisé pour BERT) | Partagé |
+| `ort` | 2.0.0-rc.11 | ONNX Runtime — Silero VAD + BERT punctuation | Partagé |
+| `ndarray` | 0.17 | Tensors pour VAD (état LSTM) | Partagé |
 | `nnnoiseless` | 0.5.2 | Denoising optionnel | ~85 KB embarqué |
 | `deep_filter` | Git | Denoising haute qualité (Phase 2+) | ~8 MB modèle |
 
