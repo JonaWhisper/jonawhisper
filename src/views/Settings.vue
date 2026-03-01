@@ -20,7 +20,9 @@ import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -30,6 +32,8 @@ import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import ProviderForm from '@/components/ProviderForm.vue'
 import { serializeShortcut } from '@/utils/shortcut'
+import { formatRam } from '@/utils/format'
+import type { CleanupModel } from '@/stores/types'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -275,6 +279,28 @@ let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
 
 async function onTextCleanupChange(enabled: boolean) {
   await settings.setSetting('text_cleanup_enabled', String(enabled))
+}
+
+const selectedCleanupLabel = computed(() => {
+  const m = engines.cleanupModels.find(m => m.id === settings.cleanupModelId)
+  return m?.label ?? ''
+})
+
+const cleanupModelGroups = computed(() => {
+  const groups: { key: CleanupModel['group']; labelKey: string; models: CleanupModel[] }[] = [
+    { key: 'bert', labelKey: 'settings.cleanupGroup.bert', models: [] },
+    { key: 'llm', labelKey: 'settings.cleanupGroup.llm', models: [] },
+    { key: 'cloud', labelKey: 'settings.cleanupGroup.cloud', models: [] },
+  ]
+  for (const m of engines.cleanupModels) {
+    const g = groups.find(g => g.key === m.group)
+    if (g) g.models.push(m)
+  }
+  return groups.filter(g => g.models.length > 0)
+})
+
+function formatParams(params: number): string {
+  return params % 1 === 0 ? params.toFixed(0) + 'B' : params.toFixed(1) + 'B'
 }
 
 async function onCleanupModelChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -634,14 +660,30 @@ onUnmounted(() => {
                 @update:model-value="onCleanupModelChange"
               >
                 <SelectTrigger class="w-full h-9 text-sm">
-                  <SelectValue />
+                  <span class="truncate">{{ selectedCleanupLabel }}</span>
                 </SelectTrigger>
                 <SelectContent>
-                  <template v-for="m in engines.cleanupModels" :key="m.id">
-                    <SelectItem :value="m.id">
-                      {{ m.label }}
+                  <SelectGroup v-for="group in cleanupModelGroups" :key="group.key">
+                    <SelectLabel>{{ t(group.labelKey) }}</SelectLabel>
+                    <SelectItem v-for="m in group.models" :key="m.id" :value="m.id">
+                      <div class="flex flex-col gap-0.5">
+                        <span class="flex items-center gap-1.5">
+                          {{ m.label }}
+                          <span
+                            v-if="m.recommended"
+                            class="text-[9px] px-1 py-0 rounded bg-emerald-500/10 text-emerald-600 font-medium"
+                          >{{ t('settings.cleanup.recommended') }}</span>
+                        </span>
+                        <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="text-[10px] text-muted-foreground">
+                          {{ [
+                            m.params != null ? formatParams(m.params) : null,
+                            m.ram != null ? '~' + formatRam(m.ram) : null,
+                            m.lang_codes && m.lang_codes.length > 0 ? m.lang_codes.map(c => c.toUpperCase()).join(' ') : null,
+                          ].filter(Boolean).join(' · ') }}
+                        </span>
+                      </div>
                     </SelectItem>
-                  </template>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <p v-else class="text-sm text-muted-foreground">

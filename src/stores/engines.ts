@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { hasAsrSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
 import { isModelAvailable, parseCloudId } from './types'
-import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport } from './types'
+import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport, CleanupModel } from './types'
 
 export const useEnginesStore = defineStore('engines', () => {
   const settingsStore = useSettingsStore()
@@ -36,16 +36,16 @@ export const useEnginesStore = defineStore('engines', () => {
     return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
   })
   const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
-  const cleanupModels = computed(() => {
-    const result: { id: string; label: string; group: string }[] = []
+  const cleanupModels = computed<CleanupModel[]>(() => {
+    const result: CleanupModel[] = []
     for (const m of downloadedPunctuationModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'bert' })
+      result.push({ id: m.id, label: m.label, group: 'bert', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
     }
     for (const m of downloadedLlmModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'llm' })
+      result.push({ id: m.id, label: m.label, group: 'llm', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
     }
     for (const p of providers.value) {
-      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud' })
+      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, recommended: false })
     }
     return result
   })

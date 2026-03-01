@@ -61,6 +61,16 @@ export interface Provider {
   cached_models: string[]
 }
 
+export interface CleanupModel {
+  id: string
+  label: string
+  group: 'bert' | 'llm' | 'cloud'
+  params: number | null
+  ram: number | null
+  lang_codes: string[] | null
+  recommended: boolean
+}
+
 export interface PermissionReport {
   microphone: string
   accessibility: string

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
+import { formatRam } from '@/utils/format'
 
 const { t } = useI18n()
 
@@ -13,13 +14,6 @@ const props = defineProps<{
   langCodes?: string[] | null
   compact?: boolean
 }>()
-
-function formatRam(bytes: number): string {
-  const gb = bytes / 1_000_000_000
-  if (gb >= 1) return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} GB`
-  const mb = bytes / 1_000_000
-  return `${Math.round(mb)} MB`
-}
 
 const werInfo = computed(() => {
   if (props.wer == null) return null

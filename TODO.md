@@ -17,7 +17,7 @@
 ## Intégrations Cloud & Modèles
 
 - [ ] **Intégration Deepgram Nova-3** — API propriétaire mais simple (REST, audio brut en body, ~80 lignes Rust). Meilleure qualité sur audio bruité. Voir `docs/CLOUD-INTEGRATION.md`.
-- [ ] **Évaluer modèles de correction spécialisés** — Alternative au LLM pour le text cleanup : pipeline léger (regex filler words → ponctuation ONNX → grammar). Modèles candidats : `1-800-BAD-CODE/punct_cap_seg_47_language` (47 langues, F1=97%), `fdemelo/t5-base-spell-correction-fr` (correction FR), `FlanEC` (post-ASR error correction). Voir `docs/BENCHMARK.md` section "Modèles de correction spécialisés".
+- [x] **Évaluer modèles de correction spécialisés** — **Done.** Évaluation complète dans `docs/BENCHMARK.md`. Métadonnées (params, RAM, langues, recommended) intégrées dans le sélecteur cleanup de Settings.
 
 ## Refactoring
 
