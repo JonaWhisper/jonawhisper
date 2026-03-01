@@ -62,6 +62,10 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     }
     rec.key_down_time = Some(Instant::now());
 
+    // Show pill immediately in "preparing" state for instant feedback
+    crate::tray::open_pill_window(app);
+    let _ = app.emit(crate::events::PILL_MODE, "preparing");
+
     let (device_uid, ducking_enabled, ducking_level) = {
         let s = state.settings.lock().unwrap();
         (s.selected_input_device_uid.clone(), s.audio_ducking_enabled, s.audio_ducking_level)
@@ -73,7 +77,6 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     let _ = rec.audio_rx.recv();
 
     platform::play_sound("Tink");
-    crate::tray::open_pill_window(app);
     crate::tray::set_tray_state(app, "recording");
     let _ = app.emit(crate::events::PILL_MODE, "recording");
     let _ = app.emit(crate::events::RECORDING_STARTED, ());
@@ -485,23 +488,8 @@ fn run_local_llm_cleanup(
 // -- Cleanup helpers --
 
 fn show_error_then_close(app: &AppHandle) {
-    show_error_then_close_guarded(app, None);
-}
-
-fn show_error_then_close_guarded(app: &AppHandle, state: Option<&Arc<AppState>>) {
     let _ = app.emit(crate::events::PILL_MODE, "error");
-    let app_clone = app.clone();
-    let state_clone = state.map(Arc::clone);
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(ERROR_DISPLAY_MS)).await;
-        // Don't close if a new recording started during the delay
-        if let Some(st) = &state_clone {
-            if st.runtime.lock().unwrap().is_recording {
-                return;
-            }
-        }
-        crate::tray::close_pill_window(&app_clone);
-    });
+    crate::tray::close_pill_window_delayed(app, ERROR_DISPLAY_MS);
 }
 
 fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
@@ -523,7 +511,7 @@ fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingS
 
     platform::play_sound("Funk");
     let _ = app.emit(crate::events::RECORDING_STOPPED, ());
-    show_error_then_close_guarded(app, Some(state));
+    show_error_then_close(app);
 }
 
 fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
@@ -537,7 +525,7 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
     }
     platform::play_sound("Funk");
     let _ = app.emit(crate::events::TRANSCRIPTION_CANCELLED, ());
-    show_error_then_close_guarded(app, Some(state));
+    show_error_then_close(app);
 }
 
 pub fn cleanup_orphan_audio_files() {

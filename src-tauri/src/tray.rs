@@ -3,12 +3,17 @@ use crate::platform::audio_devices;
 use crate::state::AppState;
 use rust_i18n::t;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{
     image::Image,
     menu::{IconMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Listener, Manager, WebviewUrl, WebviewWindowBuilder,
 };
+
+/// Generation counter for pill window — incremented on each open, used to
+/// prevent stale delayed closes from killing a freshly opened pill.
+static PILL_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// Holds references to menu items for incremental updates.
 pub struct TrayMenuState {
@@ -117,12 +122,29 @@ fn activate_app() {
 fn activate_app() {}
 
 pub fn open_pill_window(app: &AppHandle) {
+    PILL_GENERATION.fetch_add(1, Ordering::SeqCst);
+
     if app.get_webview_window("pill").is_some() {
+        // Pill already exists — just make sure it's visible
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(w) = handle.get_webview_window("pill") {
+                let _ = w.show();
+            }
+        });
         return;
     }
 
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
+        // Double-check after switching to main thread (destroy may have completed)
+        if handle.get_webview_window("pill").is_some() {
+            if let Some(w) = handle.get_webview_window("pill") {
+                let _ = w.show();
+            }
+            return;
+        }
+
         match WebviewWindowBuilder::new(&handle, "pill", WebviewUrl::App("/pill".into()))
             .decorations(false)
             .transparent(true)
@@ -155,6 +177,25 @@ pub fn close_pill_window(app: &AppHandle) {
     let _ = app.run_on_main_thread(move || {
         if let Some(win) = handle.get_webview_window("pill") {
             let _ = win.destroy();
+        }
+    });
+}
+
+/// Close the pill window after a delay, but only if no new pill was opened since.
+pub fn close_pill_window_delayed(app: &AppHandle, delay_ms: u64) {
+    set_tray_state(app, "idle");
+    let gen = PILL_GENERATION.load(Ordering::SeqCst);
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+        // Only close if no new pill was opened during the delay
+        if PILL_GENERATION.load(Ordering::SeqCst) == gen {
+            let handle = app_clone.clone();
+            let _ = app_clone.run_on_main_thread(move || {
+                if let Some(win) = handle.get_webview_window("pill") {
+                    let _ = win.destroy();
+                }
+            });
         }
     });
 }
