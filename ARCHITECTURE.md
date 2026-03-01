@@ -58,6 +58,7 @@ macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future 
 | `ffi.rs` | Raw C declarations for CoreGraphics and CoreFoundation |
 | `paste.rs` | Writes to the clipboard (via tauri-plugin-clipboard-manager) then simulates Cmd+V with CGEvent |
 | `audio_devices.rs` | CoreAudio device enumeration and transport type detection |
+| `audio_ducking.rs` | CoreAudio volume ducking — saves output volume, reduces it during recording (`duck_volume`), restores on stop (`restore_volume`). Uses `kAudioDevicePropertyVolumeScalar` on the default output device. |
 
 ### Engines (`engines/`)
 
@@ -176,9 +177,9 @@ Main thread (Tauri + Tokio runtime)
 
 1. **Hotkey press** → CGEvent callback detects the configured shortcut → sends `HotkeyEvent::KeyDown`
 2. **Hotkey handler** receives the event → calls `start_recording()`
-3. **Recording starts** → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing → pill window opens
+3. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing → pill window opens
 4. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
-5. **Audio stops** → WAV file path returned → enqueued in `RuntimeState.queue`
+5. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
 6. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
 7. **Post-processing** → preprocess (hallucination filter, dictation commands), then optional text cleanup (BERT punctuation / local LLM / cloud LLM), then finalize (spacing, capitalization)
 8. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent

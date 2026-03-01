@@ -10,6 +10,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Post-processing** — hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) — unified model selector
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual recording indicator with real-time spectrum bars
+- **Audio ducking** — automatically lowers system volume during recording and restores it when done
 - **Mic test** — test your microphone with live spectrum visualization in Settings
 - **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
 
@@ -82,7 +83,7 @@ Open Settings from the tray menu to configure:
 - Post-processing (hallucination filter, text cleanup with unified BERT/LLM model selector)
 - Recording mode (push-to-talk / toggle)
 - Hotkey and cancel shortcut
-- Input microphone
+- Input microphone and audio ducking (reduce system volume while recording)
 
 ### Text cleanup
 
@@ -100,7 +101,7 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | Framework | [Tauri 2](https://v2.tauri.app/) |
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
-| Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum) |
+| Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum), CoreAudio FFI (audio ducking) |
 | Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) (native, Metal GPU) |
 | Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted en Rust, rendues en bitmap RGBA — zéro dépendance image, inspirées [Lucide](https://lucide.dev/) |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
@@ -239,7 +240,7 @@ src-tauri/               Rust backend
     events.rs            Centralised event name constants
     errors.rs            App error types
     engines/             Speech recognition engine adapters
-    platform/            OS-specific code (permissions, hotkey, paste, audio devices)
+    platform/            OS-specific code (permissions, hotkey, paste, audio devices, audio ducking)
 build.sh                 Build + codesign + package script
 ```
 
