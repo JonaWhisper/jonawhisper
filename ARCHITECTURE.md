@@ -29,7 +29,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 │                  Vue 3 Frontend                       │
 │                                                      │
 │  stores/app.ts  (Pinia — single source of truth)     │
-│  views/  Settings · SetupWizard · FloatingPill · … │
+│  views/  Settings · SetupWizard · History · …      │
 │  components/  ShortcutCapture · SpectrumBars · …    │
 └──────────────────────────────────────────────────────┘
 ```
@@ -89,8 +89,9 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 
 | File | Role |
 |------|------|
-| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), floating pill window lifecycle. Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
-| `menu_icons.rs` | SDF (Signed Distance Field) icon rendering — shared primitives (`sdf_aa`, `sdf_rrect`, `sdf_circle`, `sdf_segment`, `point_in_triangle`) and 8 transport type icons (laptop, USB, bluetooth, waves, hard drive, zap, monitor, mic). Icons are rendered at 16×16, cached in a `LazyLock`, and composited onto 36×36 colored bubbles (blue=selected, gray=other) for menu items. Inspired by [Lucide](https://lucide.dev/) icon paths, hand-crafted as SDF shapes — zero image dependencies. |
+| `tray.rs` | System tray icon, context menu (localized with `rust-i18n`), pill window lifecycle (delegates to `pill.rs`). Tray bar icons (idle/recording/transcribing) are rendered as 44×44 SDF bitmaps using primitives from `menu_icons`. |
+| `pill.rs` | **Native pill overlay** — pure AppKit NSWindow with NSImageView, no WebView. Renders the pill as an RGBA bitmap using SDF primitives (spectrum bars, bouncing dots, error X, queue badge with 3×5 bitmap font). Animation at ~30fps via background thread + main thread rendering. First frame rendered before window is shown — zero flash. |
+| `menu_icons.rs` | SDF (Signed Distance Field) icon rendering — shared primitives (`sdf_aa`, `sdf_rrect`, `sdf_circle`, `sdf_segment`, `point_in_triangle`) used by both tray icons and the native pill. Also provides 8 transport type icons (laptop, USB, bluetooth, waves, hard drive, zap, monitor, mic). Icons are rendered at 16×16, cached in a `LazyLock`, and composited onto 36×36 colored bubbles (blue=selected, gray=other) for menu items. Inspired by [Lucide](https://lucide.dev/) icon paths, hand-crafted as SDF shapes — zero image dependencies. |
 
 ### SDF icon rendering — how it works
 
@@ -122,7 +123,6 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | View | Route | Description |
 |------|-------|-------------|
 | `SetupWizard.vue` | `/setup` | Two-step wizard: permissions, then initial configuration |
-| `FloatingPill.vue` | `/pill` | Overlay showing recording state with spectrum animation. Four modes: **recording** (spectrum bars), **transcribing** (bouncing dots), **error** (red cross), **idle**. |
 | `Settings.vue` | `/settings` | Settings panel with sidebar navigation (general, providers, transcription, post-processing, shortcuts, microphone). Unified model selectors for ASR (local + cloud) and text cleanup (BERT + LLM). Refresh buttons to re-fetch models from cloud providers. Token hard cap slider (128–8192). |
 | `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
 | `History.vue` | `/history` | Transcription history timeline with search, deletion, and processing badges (ASR local/cloud, language, cleanup method, hallucination filter) |
@@ -132,7 +132,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 | Component | Description |
 |-----------|-------------|
 | `ShortcutCapture.vue` | Press-to-record shortcut input. Invokes `start_shortcut_capture` on the backend, listens for `shortcut-capture-update` and `shortcut-capture-complete` events. |
-| `SpectrumBars.vue` | Reusable audio spectrum visualization (used in pill and mic test) |
+| `SpectrumBars.vue` | Reusable audio spectrum visualization (used in mic test) |
 | `SetupStep2.vue` | Initial configuration form (hotkey, recording mode, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — reads download/delete state directly from store, shows progress bar with speed, pause/resume/cancel actions, and delete indicator (greyed trash with indeterminate bar) |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges (shadcn Badge) with quality/speed tiers |
@@ -150,7 +150,7 @@ All tray bar and menu icons are rendered at runtime in pure Rust using **Signed 
 
 ## Threading model
 
-The app uses five long-lived threads:
+The app uses six long-lived threads:
 
 ```
 Main thread (Tauri + Tokio runtime)
@@ -168,7 +168,11 @@ Main thread (Tauri + Tokio runtime)
   │
   ├── Spectrum emitter thread (recording.rs)
   │     30fps loop. Polls spectrum data from the audio thread,
-  │     emits to frontend. Also detects audio stream errors.
+  │     feeds pill directly. Also detects audio stream errors.
+  │
+  ├── Pill animation thread (pill.rs)
+  │     ~30fps loop while pill is open. Smooths spectrum, advances dot phase,
+  │     dispatches rendering to main thread via run_on_main_thread.
   │
   └── Tokio async tasks
         Transcription (spawn_blocking), model downloads, LLM cleanup.
@@ -179,7 +183,7 @@ Main thread (Tauri + Tokio runtime)
 1. **Hotkey press** → CGEvent callback detects the configured shortcut → sends `HotkeyEvent::KeyDown`
 2. **Hotkey handler** receives the event → calls `start_recording()`
 3. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing
-4. **Pill opens** in "recording" mode (spectrum bars) once audio is ready
+4. **Pill opens** — native NSWindow with first frame pre-rendered (no flash), shows "recording" mode (spectrum bars)
 5. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
 6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
 7. **Transcription** → `process_next_in_queue()` picks the file → `transcriber::transcribe()` on a blocking thread
