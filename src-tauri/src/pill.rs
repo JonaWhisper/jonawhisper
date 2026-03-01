@@ -21,6 +21,7 @@ const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
 pub enum PillMode {
     Recording,
     Transcribing,
+    Success,
     Error,
     #[allow(dead_code)]
     Idle,
@@ -278,6 +279,15 @@ fn render_frame(p: &PillInner) -> Vec<u8> {
                         over(&mut r, &mut g, &mut b, &mut a, dr, dg, db, da);
                     }
                 }
+                PillMode::Success => {
+                    let sa = success_alpha(px, py, cw, ch);
+                    if sa > 0.0 {
+                        let sr = 0x4a as f32 / 255.0 * sa;
+                        let sg = 0xde as f32 / 255.0 * sa;
+                        let sb = 0x80 as f32 / 255.0 * sa;
+                        over(&mut r, &mut g, &mut b, &mut a, sr, sg, sb, sa);
+                    }
+                }
                 PillMode::Error => {
                     let ea = error_alpha(px, py, cw, ch);
                     if ea > 0.0 {
@@ -359,6 +369,25 @@ fn dots_pixel(px: f32, py: f32, phase: f32, cw: f32, ch: f32) -> (f32, f32, f32,
         }
     }
     (r, g, b, a)
+}
+
+fn success_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
+    let size = (ch * 0.45).round();
+    let cx = cw / 2.0;
+    let cy = ch / 2.0;
+    let lw = (ch * 0.07).max(1.5 * DPR);
+
+    // Checkmark: short stroke down-right, then long stroke up-right
+    let x0 = cx - size * 0.4;
+    let y0 = cy;
+    let x1 = cx - size * 0.1;
+    let y1 = cy + size * 0.35;
+    let x2 = cx + size * 0.45;
+    let y2 = cy - size * 0.35;
+
+    let d1 = sdf_segment(px, py, x0, y0, x1, y1) - lw / 2.0;
+    let d2 = sdf_segment(px, py, x1, y1, x2, y2) - lw / 2.0;
+    sdf_aa(d1).max(sdf_aa(d2))
 }
 
 fn error_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
