@@ -326,43 +326,45 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 }
             }
             processed = post_processor::finalize(&processed);
-        } else if let Some(cloud_provider_id) = cleanup_model_id.strip_prefix("cloud:") {
-            // Cloud LLM (finalize before)
+        } else {
+            // LLM cleanup (cloud or local) — finalize before
             processed = post_processor::finalize(&processed);
-            if let Some(provider) = providers.iter().find(|p| p.id == cloud_provider_id) {
-                match crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await {
-                    Ok(cleaned) => {
-                        log::info!("Cloud LLM cleanup: {} → {}", processed.len(), cleaned.len());
-                        processed = cleaned;
-                        effective_cleanup_model_id = cleanup_model_id.clone();
-                    }
-                    Err(e) => {
-                        log::warn!("Cloud LLM cleanup failed, using finalized result: {}", e);
-                    }
+
+            let llm_result = if let Some(cloud_provider_id) = cleanup_model_id.strip_prefix("cloud:") {
+                if let Some(provider) = providers.iter().find(|p| p.id == cloud_provider_id) {
+                    crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, llm_max_tokens).await
+                } else {
+                    log::warn!("Cloud LLM provider '{}' not found", cloud_provider_id);
+                    Err(crate::llm_prompt::LlmError::NotConfigured)
                 }
             } else {
-                log::warn!("Cloud LLM cleanup enabled but provider '{}' not found", cloud_provider_id);
-            }
-        } else {
-            // Local LLM (llama:*) — finalize before
-            processed = post_processor::finalize(&processed);
-            let state_clone = Arc::clone(state);
-            let text_for_llm = processed.clone();
-            let lang_for_llm = lang.clone();
-            let model_id = cleanup_model_id.clone();
-            match tokio::task::spawn_blocking(move || {
-                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, llm_max_tokens)
-            }).await {
-                Ok(Ok(cleaned)) => {
-                    log::info!("Local LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                // Local LLM (llama:*)
+                let state_clone = Arc::clone(state);
+                let text_for_llm = processed.clone();
+                let lang_for_llm = lang.clone();
+                let model_id = cleanup_model_id.clone();
+                match tokio::task::spawn_blocking(move || {
+                    run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, llm_max_tokens)
+                }).await {
+                    Ok(result) => result,
+                    Err(e) => Err(crate::llm_prompt::LlmError::Inference(format!("LLM task panicked: {}", e))),
+                }
+            };
+
+            match llm_result {
+                Ok(cleaned) => {
+                    log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
                     processed = cleaned;
                     effective_cleanup_model_id = cleanup_model_id.clone();
                 }
-                Ok(Err(e)) => {
-                    log::warn!("Local LLM cleanup failed, using finalized result: {}", e);
+                Err(crate::llm_prompt::LlmError::Hallucination) => {
+                    log::info!("LLM detected hallucination, discarding");
+                    platform::play_sound("Basso");
+                    let _ = app.emit(crate::events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": "" }));
+                    return;
                 }
                 Err(e) => {
-                    log::warn!("Local LLM cleanup task panicked: {}", e);
+                    log::warn!("LLM cleanup failed, using finalized result: {}", e);
                 }
             }
         }

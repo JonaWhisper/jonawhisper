@@ -11,6 +11,8 @@ pub enum LlmError {
     InvalidResponse(String),
     #[error("Inference error: {0}")]
     Inference(String),
+    #[error("Hallucination detected")]
+    Hallucination,
 }
 
 /// Strip `<think>...</think>` blocks emitted by reasoning models (e.g. Qwen3, DeepSeek).
@@ -30,10 +32,18 @@ fn strip_think_blocks(text: &str) -> String {
     result
 }
 
-/// Sanity-check LLM output: strip think blocks, reject empty or unreasonably long results.
+/// Sanity-check LLM output: strip think blocks, detect hallucination rejection,
+/// reject empty or unreasonably long results.
 pub fn sanitize_output(raw: &str, input_len: usize) -> Result<String, LlmError> {
     let cleaned = strip_think_blocks(raw);
     let result = cleaned.trim().to_string();
+
+    // LLM detected hallucinated input
+    if result == "HALLUCINATION" {
+        log::info!("LLM flagged input as hallucination, discarding");
+        return Err(LlmError::Hallucination);
+    }
+
     let max_len = std::cmp::max(input_len * 3, 100);
     if result.is_empty() || result.len() > max_len {
         log::warn!("LLM output suspicious (len={} vs input={}, max={}), discarding", result.len(), input_len, max_len);
@@ -60,6 +70,7 @@ pub fn system_prompt(language: &str) -> String {
          Rules:\n\
          - Fix punctuation, capitalization, and spacing\n\
          - Remove filler words and speech artifacts (um, uh, etc.)\n\
+         - If the input looks like hallucinated speech-to-text (repetitive phrases, generic subtitles like \"Thanks for watching\", \"Subscribe\", or text clearly not from real dictation), reply with ONLY the word HALLUCINATION\n\
          - Do NOT change the meaning or rephrase\n\
          - Do NOT add information that wasn't in the original\n\
          - Output language: {lang_name}\n\
