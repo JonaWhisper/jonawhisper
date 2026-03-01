@@ -101,7 +101,7 @@
   "settings.microphone.defaultTag": "Défaut",
   "settings.microphone.test": "Tester",
   "settings.microphone.stop": "Arrêter",
-  "settings.microphone.ducking": "Audio ducking",
+  "settings.microphone.ducking": "Atténuation automatique (audio ducking)",
   "settings.microphone.duckingLevel": "Réduction",
   "settings.microphone.duckingMute": "Silence",
   "history.title": "Historique",
