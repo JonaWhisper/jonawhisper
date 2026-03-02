@@ -42,7 +42,6 @@ onMounted(() => {
   }, { threshold: 0 })
 })
 
-// Watch sentinel ref to observe/unobserve
 watch(sentinel, (el, oldEl) => {
   if (oldEl && observer) observer.unobserve(oldEl)
   if (el && observer) observer.observe(el)
@@ -52,7 +51,6 @@ onUnmounted(() => {
   observer?.disconnect()
 })
 
-// Group entries by day
 interface DayGroup {
   label: string
   dayTimestamp: number
@@ -159,25 +157,28 @@ async function doClearAll() {
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- Sticky header: title area + search + clear all -->
-    <div class="flex items-center gap-2 mb-3">
-      <div class="relative flex-1">
-        <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-        <Input
-          v-model="searchQuery"
-          :placeholder="t('history.search')"
-          class="h-8 pl-8 text-xs"
-        />
-      </div>
+    <!-- Header: title + clear all -->
+    <div class="flex items-center justify-between mb-0">
+      <div class="section-title" style="margin-bottom: 0;">{{ t('panel.recents') }}</div>
       <Button
         v-if="historyStore.history.length > 0"
         variant="destructive"
         size="sm"
-        class="shrink-0 h-8 text-[11px]"
+        class="shrink-0 h-7 text-[11px]"
         @click="showClearAllConfirm = true"
       >
         {{ t('history.clearAll') }}
       </Button>
+    </div>
+
+    <!-- Search bar -->
+    <div class="relative mt-2.5 mb-3.5">
+      <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+      <Input
+        v-model="searchQuery"
+        :placeholder="t('history.search')"
+        class="h-8 pl-9 text-[13px]"
+      />
     </div>
 
     <!-- Content -->
@@ -200,7 +201,7 @@ async function doClearAll() {
               {{ group.label }}
             </span>
             <button
-              class="wf-day-delete text-[11px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded"
+              class="wf-day-delete text-[11px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded cursor-pointer"
               @click="confirmDeleteDay(group.dayTimestamp)"
             >
               {{ t('history.deleteDay') }}

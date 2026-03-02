@@ -7,11 +7,12 @@ const props = withDefaults(defineProps<{
   size?: 'sm' | 'md'
 }>(), {
   size: 'sm',
+  barColor: 'bg-blue-500/50',
 })
 
 const config = computed(() =>
   props.size === 'md'
-    ? { height: 48, barMax: 44, barWidth: 'w-1.5', gap: 'gap-1' }
+    ? { height: 40, barMax: 36, barWidth: 'w-1', gap: 'gap-0.5' }
     : { height: 32, barMax: 28, barWidth: 'w-1', gap: 'gap-[3px]' }
 )
 

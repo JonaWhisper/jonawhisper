@@ -134,6 +134,8 @@ function rtfBadge(rtf: number) {
 
 <template>
   <div>
+    <div class="section-title">{{ t('panel.transcription') }}</div>
+
     <!-- Speech recognition card -->
     <div class="wf-card">
       <div class="wf-card-title">{{ t('settings.transcription.model') }}</div>
@@ -188,7 +190,7 @@ function rtfBadge(rtf: number) {
             <div class="wf-form-label">{{ t('settings.cloudAsr.model') }}</div>
           </div>
           <div class="flex items-center gap-2">
-            <Select v-if="asrModelOptions.length > 0 && !isCustomAsrModel" :model-value="asrModelSelectValue" @update:model-value="onAsrModelSelect">
+            <Select v-if="asrModelOptions.length > 0" :model-value="asrModelSelectValue" @update:model-value="onAsrModelSelect">
               <SelectTrigger class="w-auto min-w-[140px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -198,7 +200,7 @@ function rtfBadge(rtf: number) {
               </SelectContent>
             </Select>
             <Input
-              v-if="isCustomAsrModel"
+              v-else
               :value="settings.asrCloudModel"
               @input="onAsrModelInput"
               :placeholder="t('settings.cloudAsr.customPlaceholder')"
@@ -216,6 +218,18 @@ function rtfBadge(rtf: number) {
               </Tooltip>
             </TooltipProvider>
           </div>
+        </div>
+        <!-- Custom model input (shown below when "Custom" selected from dropdown) -->
+        <div v-if="asrModelOptions.length > 0 && isCustomAsrModel" class="wf-form-row">
+          <div>
+            <div class="wf-form-label">{{ t('settings.cloudAsr.customPlaceholder') }}</div>
+          </div>
+          <Input
+            :value="settings.asrCloudModel"
+            @input="onAsrModelInput"
+            :placeholder="t('settings.cloudAsr.customPlaceholder')"
+            class="h-8 text-xs min-w-[140px] max-w-[200px]"
+          />
         </div>
       </template>
 

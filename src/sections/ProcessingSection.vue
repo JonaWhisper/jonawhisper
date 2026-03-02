@@ -118,6 +118,8 @@ function onMaxTokensSliderCommit(v: number[]) {
 
 <template>
   <div>
+    <div class="section-title">{{ t('panel.processing') }}</div>
+
     <!-- Pre-processing card -->
     <div class="wf-card">
       <div class="wf-card-title">{{ t('settings.postProcessing.vad') }}</div>

@@ -84,11 +84,6 @@ onMounted(async () => {
       <div class="h-9 shrink-0" data-tauri-drag-region />
 
       <div class="panel-content-body flex-1 overflow-y-auto px-5 pb-5">
-        <!-- Section title -->
-        <div class="section-title">
-          {{ t(sections.find(s => s.id === activeSection)?.label ?? '') }}
-        </div>
-
         <Transition name="fade" mode="out-in">
           <RecentsSection v-if="activeSection === 'recents'" key="recents" />
           <ModelsSection v-else-if="activeSection === 'models'" key="models" />

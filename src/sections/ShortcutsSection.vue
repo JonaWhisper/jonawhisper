@@ -29,6 +29,8 @@ function onDisableCancel() {
 
 <template>
   <div>
+    <div class="section-title">{{ t('panel.shortcuts') }}</div>
+
     <!-- Recording mode card -->
     <div class="wf-card">
       <div class="wf-card-title">{{ t('settings.shortcut.mode') }}</div>

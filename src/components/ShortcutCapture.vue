@@ -3,7 +3,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { parseShortcut, formatShortcut, formatCaptureState, serializeShortcut, isDisabled, type ShortcutDef } from '@/utils/shortcut'
+import { parseShortcut, formatShortcutParts, formatCaptureState, serializeShortcut, isDisabled, type ShortcutDef } from '@/utils/shortcut'
 
 const props = defineProps<{
   modelValue: string
@@ -20,12 +20,17 @@ const capturing = ref(false)
 const captureDisplay = ref('')
 
 const parsed = computed(() => parseShortcut(props.modelValue))
-const displayText = computed(() => {
+const keyCaps = computed(() => {
   if (parsed.value && !isDisabled(parsed.value)) {
-    return formatShortcut(parsed.value)
+    return formatShortcutParts(parsed.value)
   }
-  return t('settings.shortcut.cancel.none')
+  return []
 })
+
+const sideLabels: Record<string, string> = {
+  Right: 'Droit',
+  Left: 'Gauche',
+}
 
 let unlistenUpdate: (() => void) | null = null
 let unlistenComplete: (() => void) | null = null
@@ -74,28 +79,129 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="flex items-center justify-between w-full h-9 rounded-md border px-3 py-2 text-sm transition-colors"
-    :class="[
-      capturing
-        ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
-        : 'border-border bg-background hover:bg-accent/50',
-      disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-    ]"
+    class="shortcut-capture"
+    :class="{ capturing, disabled }"
     @click="!capturing && !disabled && startCapture()"
   >
-    <span v-if="capturing" class="text-primary font-medium">
-      {{ captureDisplay || t('shortcutCapture.waiting') }}
-    </span>
-    <span v-else class="text-foreground font-mono">
-      {{ displayText }}
-    </span>
+    <!-- Capture mode: pulsing hint -->
+    <template v-if="capturing">
+      <span v-if="captureDisplay" class="shortcut-capture-keys">{{ captureDisplay }}</span>
+      <span v-else class="shortcut-capture-hint">{{ t('shortcutCapture.waiting') }}</span>
+    </template>
+
+    <!-- Display mode: key caps -->
+    <template v-else-if="keyCaps.length > 0">
+      <template v-for="(part, i) in keyCaps" :key="i">
+        <span class="key-cap">{{ part.symbol }}</span>
+        <span v-if="part.side" class="shortcut-capture-side">{{ sideLabels[part.side] ?? part.side }}</span>
+      </template>
+    </template>
+
+    <!-- Disabled state -->
+    <span v-else class="shortcut-capture-none">{{ t('settings.shortcut.cancel.none') }}</span>
+
+    <!-- Clear/Cancel button -->
     <button
       v-if="capturing"
       type="button"
-      class="text-xs text-muted-foreground hover:text-foreground ml-2 shrink-0 transition-colors"
+      class="shortcut-clear"
       @click.stop="stopCapture"
-    >
-      {{ t('shortcutCapture.cancel') }}
-    </button>
+    >&times;</button>
   </div>
 </template>
+
+<style scoped>
+.shortcut-capture {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: hsl(var(--muted));
+  border: 1.5px solid hsl(var(--border));
+  border-radius: 6px;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  min-width: 100px;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.shortcut-capture:hover {
+  background: hsl(var(--accent));
+}
+
+.shortcut-capture.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shortcut-capture.capturing {
+  border-color: var(--panel-accent, #007AFF);
+  background: rgba(0, 122, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.key-cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  background: hsl(var(--card));
+  border: 0.5px solid hsl(var(--border));
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 22px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+}
+
+.shortcut-capture-side {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.shortcut-capture-hint {
+  font-size: 11px;
+  color: var(--panel-accent, #007AFF);
+  animation: captureFlash 1s ease-in-out infinite;
+}
+
+.shortcut-capture-keys {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--panel-accent, #007AFF);
+}
+
+.shortcut-capture-none {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.shortcut-clear {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: hsl(var(--muted-foreground));
+  color: hsl(var(--card));
+  cursor: pointer;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.shortcut-clear:hover {
+  background: hsl(var(--destructive));
+}
+
+@keyframes captureFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+</style>

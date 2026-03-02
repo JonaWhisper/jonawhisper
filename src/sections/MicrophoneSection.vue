@@ -21,7 +21,7 @@ const engines = useEnginesStore()
 
 // Mic test
 const isTesting = ref(false)
-const testSpectrum = ref<number[]>(new Array(12).fill(0))
+const testSpectrum = ref<number[]>(new Array(20).fill(0))
 let spectrumUnlisten: (() => void) | null = null
 let micTestStoppedUnlisten: (() => void) | null = null
 
@@ -68,7 +68,7 @@ function onDuckingSliderCommit(v: number[]) {
 async function startMicTest() {
   if (isTesting.value) return
   isTesting.value = true
-  testSpectrum.value = new Array(12).fill(0)
+  testSpectrum.value = new Array(20).fill(0)
   await invoke('start_mic_test')
   spectrumUnlisten = await listen<number[]>('mic-test-spectrum', (event) => {
     if (!isTesting.value) return
@@ -84,7 +84,7 @@ async function startMicTest() {
 
 async function stopMicTest() {
   isTesting.value = false
-  testSpectrum.value = new Array(12).fill(0)
+  testSpectrum.value = new Array(20).fill(0)
   if (spectrumUnlisten) {
     spectrumUnlisten()
     spectrumUnlisten = null
@@ -95,7 +95,7 @@ async function stopMicTest() {
 onMounted(async () => {
   micTestStoppedUnlisten = await listen('mic-test-stopped', () => {
     isTesting.value = false
-    testSpectrum.value = new Array(12).fill(0)
+    testSpectrum.value = new Array(20).fill(0)
     if (spectrumUnlisten) {
       spectrumUnlisten()
       spectrumUnlisten = null
@@ -114,6 +114,8 @@ onUnmounted(() => {
 
 <template>
   <div>
+    <div class="section-title">{{ t('panel.microphone') }}</div>
+
     <!-- Input device card -->
     <div class="wf-card">
       <div class="wf-card-title">{{ t('settings.microphone') }}</div>

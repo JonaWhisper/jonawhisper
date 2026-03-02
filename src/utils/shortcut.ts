@@ -108,3 +108,42 @@ export function serializeShortcut(s: ShortcutDef): string {
 export function isDisabled(s: ShortcutDef): boolean {
   return s.key_code === 0 && s.modifiers === 0
 }
+
+// Structured key cap parts for visual rendering
+export interface KeyCapPart {
+  symbol: string    // e.g. "⌘", "⎋", "A"
+  side?: string     // e.g. "Right", "Left" (for ModifierOnly)
+}
+
+const SYMBOL_MAP: Record<number, string> = {
+  0x35: '⎋', // Escape
+}
+
+export function formatShortcutParts(s: ShortcutDef): KeyCapPart[] {
+  if (isDisabled(s)) return []
+  switch (s.kind) {
+    case 'ModifierOnly': {
+      const full = KEY_CODE_LABELS[s.key_code] ?? '⌘'
+      const spaceIdx = full.lastIndexOf(' ')
+      if (spaceIdx > 0) {
+        const side = full.slice(0, spaceIdx)
+        const symbol = full.slice(spaceIdx + 1)
+        return [{ symbol, side }]
+      }
+      return [{ symbol: full }]
+    }
+    case 'Combo': {
+      const mods = modifierSymbols(s.modifiers)
+      const key = KEY_CODE_LABELS[s.key_code] ?? '?'
+      const parts: KeyCapPart[] = []
+      for (const ch of mods) parts.push({ symbol: ch })
+      parts.push({ symbol: SYMBOL_MAP[s.key_code] ?? key })
+      return parts
+    }
+    case 'Key': {
+      const sym = SYMBOL_MAP[s.key_code] ?? KEY_CODE_LABELS[s.key_code] ?? '?'
+      const label = KEY_CODE_LABELS[s.key_code]
+      return [{ symbol: sym, side: label !== sym ? label : undefined }]
+    }
+  }
+}

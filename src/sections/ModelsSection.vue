@@ -63,6 +63,8 @@ async function confirmDelete() {
 
 <template>
   <div>
+    <div class="section-title">{{ t('panel.models') }}</div>
+
     <!-- Filter chips -->
     <div class="flex flex-wrap gap-1 mb-3.5">
       <button

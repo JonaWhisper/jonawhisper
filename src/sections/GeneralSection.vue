@@ -31,6 +31,8 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
 
 <template>
   <div>
+    <div class="section-title">{{ t('panel.general') }}</div>
+
     <!-- Appearance card -->
     <div class="wf-card">
       <div class="wf-card-title">{{ t('general.appearance') }}</div>

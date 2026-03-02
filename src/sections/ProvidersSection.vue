@@ -11,20 +11,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus } from 'lucide-vue-next'
+import { Plus, Pencil, X } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const engines = useEnginesStore()
 
-// Add dialog
 const showAddDialog = ref(false)
 const addFormKey = ref(0)
-
-// Edit dialog
 const showEditDialog = ref(false)
 const editingProvider = ref<Provider | null>(null)
-
-// Delete confirm
 const showRemoveConfirm = ref(false)
 const removeTarget = ref<Provider | null>(null)
 
@@ -82,21 +77,30 @@ const kindGradients: Record<string, string> = {
 
 <template>
   <div>
+    <!-- Header: title + add button -->
+    <div class="flex items-center justify-between mb-4">
+      <div class="section-title" style="margin-bottom: 0;">{{ t('panel.providers') }}</div>
+      <TooltipProvider :delay-duration="300">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              class="w-7 h-7 flex items-center justify-center rounded-md border-none cursor-pointer transition-colors"
+              style="background: var(--sidebar-hover-bg); color: hsl(var(--muted-foreground));"
+              @mouseenter="($event.currentTarget as HTMLElement).style.color = 'hsl(var(--foreground))'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))'"
+              @click="openAddDialog"
+            >
+              <Plus class="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('settings.providers.add') }}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+
     <!-- Provider card -->
     <div class="wf-card">
-      <div class="flex items-center justify-between mb-2.5">
-        <div class="wf-card-title" style="margin-bottom: 0;">{{ t('settings.providers.add') }}</div>
-        <TooltipProvider :delay-duration="300">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="outline" size="icon" class="h-7 w-7" @click="openAddDialog">
-                <Plus class="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('settings.providers.add') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      <div class="wf-card-title">{{ t('settings.providers.add') }}</div>
 
       <!-- Empty state -->
       <div v-if="engines.providers.length === 0" class="text-xs text-muted-foreground py-2">
@@ -106,7 +110,7 @@ const kindGradients: Record<string, string> = {
       <!-- Provider rows -->
       <div v-for="provider in engines.providers" :key="provider.id" class="wf-provider-row">
         <div
-          class="flex items-center justify-center w-8 h-8 rounded-lg text-white text-sm font-bold shrink-0"
+          class="flex items-center justify-center w-8 h-8 rounded-lg text-white text-base font-bold shrink-0"
           :style="{ background: kindGradients[provider.kind] ?? kindGradients.Custom }"
         >
           {{ providerInitial(provider) }}
@@ -122,10 +126,11 @@ const kindGradients: Record<string, string> = {
         </div>
         <div class="flex gap-1 shrink-0">
           <Button variant="outline" size="sm" class="h-7 text-[11px] px-2" @click="openEditDialog(provider)">
+            <Pencil class="w-3 h-3 mr-1" />
             Modifier
           </Button>
-          <Button variant="destructive" size="sm" class="h-7 text-[11px] px-2" @click="requestRemoveProvider(provider)">
-            &times;
+          <Button variant="destructive" size="icon" class="h-7 w-7" @click="requestRemoveProvider(provider)">
+            <X class="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
