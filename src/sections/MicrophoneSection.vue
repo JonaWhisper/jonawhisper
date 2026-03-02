@@ -22,7 +22,7 @@ const engines = useEnginesStore()
 
 // Mic test
 const isTesting = ref(false)
-const testSpectrum = ref<number[]>(new Array(20).fill(0))
+const testSpectrum = ref<number[]>(new Array(12).fill(0))
 let spectrumUnlisten: (() => void) | null = null
 let micTestStoppedUnlisten: (() => void) | null = null
 
@@ -70,18 +70,19 @@ const micLevelBadge = computed(() => {
   if (!isTesting.value) return null
   const spectrum = testSpectrum.value
   const avg = spectrum.reduce((a, b) => a + b, 0) / spectrum.length
-  // Values are 0..1 (clamped in Rust), smoothed in frontend
-  // Silence: no badge. Weak: very faint signal. Good: normal speech. Saturated: near clipping.
-  if (avg < 0.005) return null
-  if (avg < 0.03) return { label: t('settings.microphone.level.weak'), cls: 'bg-orange-500/12 text-orange-600 dark:bg-orange-500/18 dark:text-orange-400' }
-  if (avg < 0.6) return { label: t('settings.microphone.level.good'), cls: 'bg-emerald-500/12 text-emerald-600 dark:bg-emerald-500/18 dark:text-emerald-400' }
+  // 12 logarithmic FFT bands, 0..1 range, double-smoothed (Rust 55% + frontend 55%).
+  // Thresholds calibrated for typical condenser/MEMS mics at 16kHz:
+  //   Noise floor ≈ 0.01–0.02, normal speech ≈ 0.08–0.35, loud ≈ 0.4+
+  if (avg < 0.02) return { label: t('settings.microphone.level.silent'), cls: 'bg-zinc-500/12 text-zinc-500 dark:bg-zinc-500/18 dark:text-zinc-400' }
+  if (avg < 0.06) return { label: t('settings.microphone.level.weak'), cls: 'bg-orange-500/12 text-orange-600 dark:bg-orange-500/18 dark:text-orange-400' }
+  if (avg < 0.45) return { label: t('settings.microphone.level.good'), cls: 'bg-emerald-500/12 text-emerald-600 dark:bg-emerald-500/18 dark:text-emerald-400' }
   return { label: t('settings.microphone.level.saturated'), cls: 'bg-red-500/10 text-red-600 dark:bg-red-500/18 dark:text-red-400' }
 })
 
 async function startMicTest() {
   if (isTesting.value) return
   isTesting.value = true
-  testSpectrum.value = new Array(20).fill(0)
+  testSpectrum.value = new Array(12).fill(0)
   await invoke('start_mic_test')
   spectrumUnlisten = await listen<number[]>('mic-test-spectrum', (event) => {
     if (!isTesting.value) return
@@ -97,7 +98,7 @@ async function startMicTest() {
 
 async function stopMicTest() {
   isTesting.value = false
-  testSpectrum.value = new Array(20).fill(0)
+  testSpectrum.value = new Array(12).fill(0)
   if (spectrumUnlisten) {
     spectrumUnlisten()
     spectrumUnlisten = null
@@ -108,7 +109,7 @@ async function stopMicTest() {
 onMounted(async () => {
   micTestStoppedUnlisten = await listen('mic-test-stopped', () => {
     isTesting.value = false
-    testSpectrum.value = new Array(20).fill(0)
+    testSpectrum.value = new Array(12).fill(0)
     if (spectrumUnlisten) {
       spectrumUnlisten()
       spectrumUnlisten = null
