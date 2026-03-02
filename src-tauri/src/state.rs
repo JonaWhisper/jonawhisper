@@ -74,6 +74,8 @@ pub struct AppState {
     pub canary_context: Mutex<Option<crate::canary_asr::CanaryContext>>,
     /// Cached Parakeet TDT ASR context (encoder + decoder ONNX sessions). Invalidated when ASR model changes.
     pub parakeet_context: Mutex<Option<crate::parakeet_asr::ParakeetContext>>,
+    /// Cached Qwen3-ASR context (safetensors model). Invalidated when ASR model changes.
+    pub qwen_context: Mutex<Option<crate::qwen_asr::QwenContext>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -315,6 +317,7 @@ impl Default for AppState {
             candle_punct_context: Mutex::new(None),
             canary_context: Mutex::new(None),
             parakeet_context: Mutex::new(None),
+            qwen_context: Mutex::new(None),
         }
     }
 }

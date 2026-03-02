@@ -13,6 +13,7 @@ mod llm_local;
 mod mel_features;
 mod ort_session;
 mod parakeet_asr;
+mod qwen_asr;
 mod migrations;
 mod llm_prompt;
 mod menu_icons;

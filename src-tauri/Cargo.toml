@@ -44,6 +44,7 @@ prost = "0.13"
 candle-core = { version = "0.9", features = ["metal", "accelerate"] }
 candle-nn = { version = "0.9", features = ["metal", "accelerate"] }
 candle-transformers = { version = "0.9", features = ["metal", "accelerate"] }
+qwen-asr = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.15", features = ["metal"] }
