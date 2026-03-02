@@ -29,10 +29,10 @@ const keyCaps = computed(() => {
   return []
 })
 
-const sideLabels: Record<string, string> = {
-  Right: 'R',
-  Left: 'L',
-}
+const sideLabels = computed<Record<string, string>>(() => ({
+  Right: t('shortcutCapture.side.right'),
+  Left: t('shortcutCapture.side.left'),
+}))
 
 let unlistenUpdate: (() => void) | null = null
 let unlistenComplete: (() => void) | null = null
@@ -97,10 +97,9 @@ onUnmounted(() => {
 
     <!-- Display mode: key caps -->
     <template v-else-if="keyCaps.length > 0">
-      <template v-for="(part, i) in keyCaps" :key="i">
-        <span class="key-cap">{{ part.symbol }}</span>
-        <span v-if="part.side" class="shortcut-capture-side">{{ sideLabels[part.side] ?? part.side }}</span>
-      </template>
+      <span v-for="(part, i) in keyCaps" :key="i" class="key-cap">
+        <span v-if="part.side" class="key-cap-side">{{ sideLabels[part.side] ?? part.side }}</span>{{ part.symbol }}
+      </span>
     </template>
 
     <!-- Disabled state -->
@@ -169,9 +168,11 @@ onUnmounted(() => {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
 }
 
-.shortcut-capture-side {
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
+.key-cap-side {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: 0.55;
+  margin-right: 1px;
 }
 
 .shortcut-capture-hint {
