@@ -5,13 +5,12 @@ import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getAsrModels } from '@/config/providers'
-import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
-import TypeBadge from '@/components/TypeBadge.vue'
+import ModelOption from '@/components/ModelOption.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -86,18 +85,20 @@ const selectedAsrModel = computed(() =>
           @update:model-value="onAsrModelChange"
         >
           <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs">
-            <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
-              <span class="truncate">{{ selectedAsrModel.label }}</span>
-              <TypeBadge :type="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'" />
-            </span>
+            <ModelOption
+              v-if="selectedAsrModel"
+              :label="selectedAsrModel.label"
+              :location="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'"
+              compact
+            />
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
-              <span class="flex items-center gap-1.5">
-                {{ m.label }}
-                <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                <TypeBadge :type="m.group === 'cloud' ? 'cloud' : 'local'" class="ml-auto" />
-              </span>
+              <ModelOption
+                :label="m.label"
+                :location="m.group === 'cloud' ? 'cloud' : 'local'"
+                :recommended="m.recommended"
+              />
             </SelectItem>
           </SelectContent>
         </Select>

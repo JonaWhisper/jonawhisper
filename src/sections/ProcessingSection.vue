@@ -6,13 +6,12 @@ import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getLlmModels } from '@/config/providers'
 import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
-import TypeBadge from '@/components/TypeBadge.vue'
+import ModelOption from '@/components/ModelOption.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -127,21 +126,23 @@ function onMaxTokensSliderCommit(v: number[]) {
             <span v-if="unifiedCleanupValue === DISABLED_VALUE" class="text-muted-foreground">
               {{ t('settings.shortcut.cancel.none') }}
             </span>
-            <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
-              <span class="truncate">{{ selectedCleanupModel.label }}</span>
-              <TypeBadge :type="selectedCleanupModel.group === 'cloud' ? 'llm' : selectedCleanupModel.group" />
-              <TypeBadge :type="selectedCleanupModel.group === 'cloud' ? 'cloud' : 'local'" />
-            </span>
+            <ModelOption
+              v-else-if="selectedCleanupModel"
+              :label="selectedCleanupModel.label"
+              :type="selectedCleanupModel.group === 'cloud' ? 'llm' : selectedCleanupModel.group as any"
+              :location="selectedCleanupModel.group === 'cloud' ? 'cloud' : 'local'"
+              compact
+            />
           </SelectTrigger>
           <SelectContent>
             <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
             <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
-              <span class="flex items-center gap-1.5">
-                {{ m.label }}
-                <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                <TypeBadge :type="m.group === 'cloud' ? 'llm' : m.group" class="ml-auto" />
-                <TypeBadge :type="m.group === 'cloud' ? 'cloud' : 'local'" />
-              </span>
+              <ModelOption
+                :label="m.label"
+                :type="m.group === 'cloud' ? 'llm' : m.group as any"
+                :location="m.group === 'cloud' ? 'cloud' : 'local'"
+                :recommended="m.recommended"
+              />
             </SelectItem>
           </SelectContent>
         </Select>
