@@ -58,10 +58,10 @@ macro_rules! context_group {
 }
 
 context_group!(AsrContexts {
-    whisper: crate::engines::whisper::WhisperCtx,
-    canary: crate::canary_asr::CanaryContext,
-    parakeet: crate::parakeet_asr::ParakeetContext,
-    qwen: crate::qwen_asr::QwenContext,
+    whisper: crate::asr::WhisperCtx,
+    canary: crate::asr::CanaryContext,
+    parakeet: crate::asr::ParakeetContext,
+    qwen: crate::asr::QwenContext,
 });
 
 context_group!(CleanupContexts {

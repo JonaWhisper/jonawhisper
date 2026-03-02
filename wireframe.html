@@ -1229,16 +1229,17 @@ svg.icon-lg { width: 20px; height: 20px; }
 
         <div class="filter-bar">
           <button class="filter-chip active" data-filter="all">Tous</button>
-          <button class="filter-chip" data-filter="asr">ASR</button>
+          <button class="filter-chip" data-filter="asr">Reconnaissance vocale</button>
           <button class="filter-chip" data-filter="punct">Ponctuation</button>
           <button class="filter-chip" data-filter="correction">Correction</button>
-          <button class="filter-chip" data-filter="llm">LLM</button>
+          <button class="filter-chip" data-filter="llm">Reformulation</button>
         </div>
 
-        <!-- ASR Models -->
+        <!-- Reconnaissance vocale -->
+        <!-- Reconnaissance vocale -->
         <div class="model-card" data-cat="asr">
           <div class="model-info">
-            <div class="model-name">Canary-1B <span class="badge green">Actif</span></div>
+            <div class="model-name">Canary-1B</div>
             <div class="model-engine">NVIDIA NeMo — ONNX + CoreML</div>
             <div class="model-badges">
               <span class="badge blue">WER 8.2%</span>
@@ -1248,7 +1249,7 @@ svg.icon-lg { width: 20px; height: 20px; }
             </div>
           </div>
           <div class="model-action">
-            <button class="btn btn-secondary btn-sm" disabled style="opacity:0.5">Actif</button>
+            <button class="icon-btn" title="Supprimer" style="color:var(--red);"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
           </div>
         </div>
 
@@ -1264,7 +1265,7 @@ svg.icon-lg { width: 20px; height: 20px; }
             </div>
           </div>
           <div class="model-action">
-            <button class="btn btn-primary btn-sm">Activer</button>
+            <button class="icon-btn" title="Supprimer" style="color:var(--red);"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
           </div>
         </div>
 
@@ -1280,29 +1281,14 @@ svg.icon-lg { width: 20px; height: 20px; }
             </div>
           </div>
           <div class="model-action">
-            <button class="btn btn-primary btn-sm">Activer</button>
+            <button class="btn btn-primary btn-sm">Télécharger</button>
           </div>
         </div>
 
-        <div class="model-card" data-cat="asr">
-          <div class="model-info">
-            <div class="model-name">Whisper Large v3 <span class="badge">Cloud</span></div>
-            <div class="model-engine">OpenAI API</div>
-            <div class="model-badges">
-              <span class="badge blue">WER 5.2%</span>
-              <span class="badge">1.55B params</span>
-              <span class="badge">99 langues</span>
-            </div>
-          </div>
-          <div class="model-action">
-            <button class="btn btn-primary btn-sm">Activer</button>
-          </div>
-        </div>
-
-        <!-- Punctuation Models -->
+        <!-- Ponctuation -->
         <div class="model-card" data-cat="punct">
           <div class="model-info">
-            <div class="model-name">PCS Multilingual <span class="badge green">Actif</span></div>
+            <div class="model-name">PCS Multilingual</div>
             <div class="model-engine">ONNX — 4 têtes, SentencePiece</div>
             <div class="model-badges">
               <span class="badge purple">Ponctuation</span>
@@ -1311,7 +1297,7 @@ svg.icon-lg { width: 20px; height: 20px; }
             </div>
           </div>
           <div class="model-action">
-            <button class="btn btn-secondary btn-sm" disabled style="opacity:0.5">Actif</button>
+            <button class="icon-btn" title="Supprimer" style="color:var(--red);"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
           </div>
         </div>
 
@@ -1326,14 +1312,14 @@ svg.icon-lg { width: 20px; height: 20px; }
             </div>
           </div>
           <div class="model-action">
-            <button class="btn btn-primary btn-sm">Activer</button>
+            <button class="btn btn-primary btn-sm">Télécharger</button>
           </div>
         </div>
 
-        <!-- Correction Models -->
+        <!-- Correction -->
         <div class="model-card" data-cat="correction">
           <div class="model-info">
-            <div class="model-name">GEC T5 Small <span class="badge amber">Correction</span></div>
+            <div class="model-name">GEC T5 Small</div>
             <div class="model-engine">Candle — T5, 60M params</div>
             <div class="model-badges">
               <span class="badge amber">Correction</span>
@@ -1341,17 +1327,25 @@ svg.icon-lg { width: 20px; height: 20px; }
               <span class="badge">Multilingue</span>
             </div>
           </div>
-          <div class="model-action">
-            <div class="model-progress-wrap">
-              <div class="progress" style="width:80px"><div class="progress-fill" style="width:67%"></div></div>
-              <span class="model-progress-text">67% — 4.2 Mo/s</span>
+          <div class="model-action" style="display:flex; align-items:center; gap:8px; min-width:160px;">
+            <div style="flex:1; display:flex; flex-direction:column; gap:3px;">
+              <div class="progress" style="height:6px; width:100%;"><div class="progress-fill" style="width:67%"></div></div>
+              <div class="model-progress-text">4.2 Mo/s</div>
+            </div>
+            <div style="display:flex; gap:4px; flex-shrink:0;">
+              <button class="icon-btn" title="Pause" id="dlPauseBtn" style="width:22px;height:22px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 4h4v16H6z"/><path d="M14 4h4v16h-4z"/></svg>
+              </button>
+              <button class="icon-btn" title="Annuler" style="width:22px;height:22px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
             </div>
           </div>
         </div>
 
         <div class="model-card" data-cat="correction">
           <div class="model-info">
-            <div class="model-name">FlanEC Large <span class="badge amber">Correction</span></div>
+            <div class="model-name">FlanEC Large</div>
             <div class="model-engine">Candle — T5, 250M params</div>
             <div class="model-badges">
               <span class="badge amber">Correction</span>
@@ -1363,21 +1357,6 @@ svg.icon-lg { width: 20px; height: 20px; }
             <button class="btn btn-primary btn-sm">Télécharger</button>
           </div>
         </div>
-
-        <!-- LLM -->
-        <div class="model-card" data-cat="llm">
-          <div class="model-info">
-            <div class="model-name">GPT-4o Mini <span class="badge">Cloud</span></div>
-            <div class="model-engine">OpenAI API — Nettoyage LLM</div>
-            <div class="model-badges">
-              <span class="badge purple">LLM</span>
-              <span class="badge">Cloud</span>
-            </div>
-          </div>
-          <div class="model-action">
-            <button class="btn btn-primary btn-sm">Configurer</button>
-          </div>
-        </div>
       </div>
 
       <!-- ═══ TRANSCRIPTION ═══ -->
@@ -1385,7 +1364,7 @@ svg.icon-lg { width: 20px; height: 20px; }
         <div class="section-title">Transcription</div>
 
         <div class="card">
-          <div class="card-title">Modèle ASR</div>
+          <div class="card-title">Reconnaissance vocale</div>
           <div class="form-row">
             <div>
               <div class="form-label">Modèle actif</div>
@@ -1426,17 +1405,6 @@ svg.icon-lg { width: 20px; height: 20px; }
               <button class="seg-btn">GPU</button>
               <button class="seg-btn">CPU</button>
             </div>
-          </div>
-        </div>
-
-        <div class="card" style="opacity: 0.5;">
-          <div class="card-title">Cloud (OpenAI)</div>
-          <div class="form-row">
-            <div>
-              <div class="form-label">Endpoint</div>
-              <div class="form-desc">Disponible quand un modèle cloud est sélectionné</div>
-            </div>
-            <span class="text-xs text-tert">Non configuré</span>
           </div>
         </div>
       </div>
@@ -1481,7 +1449,7 @@ svg.icon-lg { width: 20px; height: 20px; }
                 <option>FlanEC Large (EN)</option>
                 <option>Flan-T5 Grammar</option>
               </optgroup>
-              <optgroup label="LLM">
+              <optgroup label="Reformulation">
                 <option>GPT-4o Mini — OpenAI</option>
                 <option>Llama 3 — LM Studio</option>
               </optgroup>
@@ -1917,21 +1885,26 @@ document.querySelectorAll('.provider-type-select').forEach(sel => {
 
 // ─── Shortcut Capture ───
 document.querySelectorAll('.shortcut-capture').forEach(cap => {
-  cap.addEventListener('click', () => {
-    // Désactiver tous les autres captures
+  cap.addEventListener('click', (e) => {
+    // Clic sur × en mode capture → annuler la capture
+    if (e.target.classList.contains('shortcut-clear') && cap.classList.contains('capturing')) {
+      e.stopPropagation();
+      cap.classList.remove('capturing');
+      return;
+    }
+    // Clic sur × en mode normal → effacer le raccourci
+    if (e.target.classList.contains('shortcut-clear')) {
+      e.stopPropagation();
+      cap.querySelectorAll('.key-cap, .text-xs:not(.capture-hint)').forEach(el => el.style.display = 'none');
+      return;
+    }
+    // Clic sur le champ → entrer en mode capture
     document.querySelectorAll('.shortcut-capture').forEach(c => c.classList.remove('capturing'));
     cap.classList.add('capturing');
   });
 });
 
-// Escape ou clic ailleurs = annuler la capture
-document.addEventListener('keydown', (e) => {
-  const active = document.querySelector('.shortcut-capture.capturing');
-  if (!active) return;
-  e.preventDefault();
-  active.classList.remove('capturing');
-});
-
+// Clic ailleurs = annuler la capture
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.shortcut-capture')) {
     document.querySelectorAll('.shortcut-capture').forEach(c => c.classList.remove('capturing'));
@@ -2002,16 +1975,36 @@ document.querySelectorAll('.slider').forEach(slider => {
 
 // ─── Animated Progress Bar (Models) ───
 const progressFill = document.querySelector('.progress-fill');
-if (progressFill) {
+const dlPauseBtn = document.getElementById('dlPauseBtn');
+let dlPaused = false;
+
+if (progressFill && dlPauseBtn) {
   let prog = 67;
-  let dir = 1;
+  const totalSize = 240; // Mo
+
   setInterval(() => {
-    prog += dir * 0.3;
-    if (prog >= 100) { prog = 100; dir = 0; }
+    if (dlPaused) return;
+    prog += 0.3;
+    if (prog > 100) prog = 100;
     progressFill.style.width = prog + '%';
     const txt = progressFill.closest('.model-card').querySelector('.model-progress-text');
-    if (txt) txt.textContent = Math.round(prog) + '% — 4.2 Mo/s';
+    if (txt) txt.textContent = '4.2 Mo/s';
   }, 200);
+
+  dlPauseBtn.addEventListener('click', () => {
+    dlPaused = !dlPaused;
+    const txt = progressFill.closest('.model-card').querySelector('.model-progress-text');
+    if (dlPaused) {
+      const downloaded = Math.round(totalSize * parseFloat(progressFill.style.width) / 100);
+      if (txt) txt.textContent = downloaded + ' / ' + totalSize + ' Mo';
+      dlPauseBtn.innerHTML = '<svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>';
+      dlPauseBtn.title = 'Reprendre';
+    } else {
+      if (txt) txt.textContent = '4.2 Mo/s';
+      dlPauseBtn.innerHTML = '<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6 4h4v16H6z"/><path d="M14 4h4v16h-4z"/></svg>';
+      dlPauseBtn.title = 'Pause';
+    }
+  });
 }
 </script>
 

@@ -1,6 +1,6 @@
+mod asr;
 mod audio;
 mod bert_punctuation;
-mod canary_asr;
 mod candle_punctuation;
 mod commands;
 mod pcs_punctuation;
@@ -10,10 +10,7 @@ mod errors;
 mod events;
 mod llm_cleanup;
 mod llm_local;
-mod mel_features;
 mod ort_session;
-mod parakeet_asr;
-mod qwen_asr;
 mod migrations;
 mod llm_prompt;
 mod platform;
@@ -21,7 +18,6 @@ mod post_processor;
 mod recording;
 mod state;
 mod t5_correction;
-mod transcriber;
 mod ui;
 mod vad;
 

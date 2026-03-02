@@ -1,3 +1,14 @@
+pub mod canary;
+pub mod mel;
+pub mod parakeet;
+pub mod qwen;
+pub mod whisper;
+
+pub use canary::CanaryContext;
+pub use parakeet::ParakeetContext;
+pub use qwen::QwenContext;
+pub use whisper::WhisperCtx;
+
 use crate::engines::{openai_api, EngineCatalog, EngineError};
 use crate::state::AppState;
 use std::path::Path;
@@ -37,10 +48,10 @@ pub fn transcribe(
 
     // Dispatch to the appropriate native engine
     match model.engine_id.as_str() {
-        "whisper" => crate::engines::whisper::transcribe_native(state, &model, audio_path, &language),
-        "canary" => crate::canary_asr::transcribe(state, &model, audio_path, &language),
-        "parakeet" => crate::parakeet_asr::transcribe(state, &model, audio_path, &language),
-        "qwen-asr" => crate::qwen_asr::transcribe(state, &model, audio_path, &language),
+        "whisper" => whisper::transcribe_native(state, &model, audio_path, &language),
+        "canary" => canary::transcribe(state, &model, audio_path, &language),
+        "parakeet" => parakeet::transcribe(state, &model, audio_path, &language),
+        "qwen-asr" => qwen::transcribe(state, &model, audio_path, &language),
         _ => Err(EngineError::LaunchFailed(format!("Unknown engine: {}", model.engine_id))),
     }
 }

@@ -3,9 +3,9 @@ use crate::events;
 use crate::platform::hotkey;
 use crate::platform::paste;
 use crate::platform;
+use crate::asr;
 use crate::post_processor;
 use crate::state::AppState;
-use crate::transcriber;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -302,7 +302,7 @@ async fn run_transcription(
     let state_clone = Arc::clone(state);
     let path = audio_path.to_path_buf();
     let result = tokio::task::spawn_blocking(move || {
-        transcriber::transcribe(&state_clone, &path)
+        asr::transcribe(&state_clone, &path)
     })
     .await;
 

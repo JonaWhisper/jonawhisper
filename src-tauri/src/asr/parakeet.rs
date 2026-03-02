@@ -116,9 +116,9 @@ pub fn transcribe(
     let audio = crate::audio::read_wav_f32(audio_path)?;
 
     // Compute mel spectrogram with Slaney scale + pre-emphasis
-    let (features, n_frames) = crate::mel_features::extract_features_with_config(
+    let (features, n_frames) = super::mel::extract_features_with_config(
         &audio,
-        &crate::mel_features::PARAKEET_CONFIG,
+        &super::mel::PARAKEET_CONFIG,
     );
 
     // Run encoder
