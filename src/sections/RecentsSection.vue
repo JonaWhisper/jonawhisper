@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck, Scissors } from 'lucide-vue-next'
+import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck, Scissors, Type, MessageSquare } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const historyStore = useHistoryStore()
@@ -129,10 +129,11 @@ function formatCleanupLabel(id: string): string {
   return model ? model.label : id
 }
 
-function cleanupBadgeType(id: string): 'bert' | 'cloud' | 'local' {
-  if (id.startsWith('bert-punctuation:')) return 'bert'
+function cleanupBadgeType(id: string): 'bert' | 'correction' | 'llm' | 'cloud' {
+  if (id.startsWith('bert-punctuation:') || id.startsWith('pcs-punctuation:')) return 'bert'
+  if (id.startsWith('correction:')) return 'correction'
   if (parseCloudId(id)) return 'cloud'
-  return 'local'
+  return 'llm'
 }
 
 async function deleteEntry(entry: HistoryEntry) {
@@ -260,12 +261,14 @@ async function doClearAll() {
                           class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
                           :class="{
                             'bg-violet-500/10 text-violet-600 dark:text-violet-400': cleanupBadgeType(entry.cleanup_model_id) === 'bert',
-                            'bg-amber-500/10 text-amber-600 dark:text-amber-400': cleanupBadgeType(entry.cleanup_model_id) === 'local',
+                            'bg-amber-500/10 text-amber-600 dark:text-amber-400': cleanupBadgeType(entry.cleanup_model_id) === 'correction',
+                            'bg-blue-500/10 text-blue-600 dark:text-blue-400': cleanupBadgeType(entry.cleanup_model_id) === 'llm',
                             'bg-sky-500/10 text-sky-600 dark:text-sky-400': cleanupBadgeType(entry.cleanup_model_id) === 'cloud',
                           }"
                         >
-                          <SpellCheck v-if="cleanupBadgeType(entry.cleanup_model_id) === 'bert'" class="h-2.5 w-2.5" />
-                          <Cpu v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'local'" class="h-2.5 w-2.5" />
+                          <Type v-if="cleanupBadgeType(entry.cleanup_model_id) === 'bert'" class="h-2.5 w-2.5" />
+                          <SpellCheck v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'correction'" class="h-2.5 w-2.5" />
+                          <MessageSquare v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'llm'" class="h-2.5 w-2.5" />
                           <Cloud v-else class="h-2.5 w-2.5" />
                           {{ formatCleanupLabel(entry.cleanup_model_id) }}
                         </span>

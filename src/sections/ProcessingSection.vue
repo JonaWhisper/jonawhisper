@@ -8,15 +8,13 @@ import { getLlmModels } from '@/config/providers'
 import type { CleanupModel } from '@/stores/types'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { formatRam } from '@/utils/format'
-import { RefreshCw, Loader2 } from 'lucide-vue-next'
+import CloudModelPicker from '@/components/CloudModelPicker.vue'
+import { Cpu, Cloud, Type, SpellCheck, MessageSquare } from 'lucide-vue-next'
+import type { Component } from 'vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -44,23 +42,28 @@ const selectedCleanupModel = computed(() =>
   engines.cleanupModels.find(m => m.id === settings.cleanupModelId) ?? null
 )
 
-const cleanupGroupLabel = (group: CleanupModel['group']) => t(`settings.cleanupGroup.${group}`)
-const cleanupGroupClass = (group: CleanupModel['group']) => {
-  switch (group) {
-    case 'bert': return 'bg-violet-500/10 text-violet-600'
-    case 'correction': return 'bg-amber-500/10 text-amber-600'
-    case 'llm': return 'bg-blue-500/10 text-blue-600'
-    case 'cloud': return 'bg-sky-500/10 text-sky-600'
-  }
+// Icon + color maps
+const CLEANUP_TYPE_ICON: Record<CleanupModel['group'], Component> = {
+  bert: Type,
+  correction: SpellCheck,
+  llm: MessageSquare,
+  cloud: MessageSquare,
+}
+const CLEANUP_TYPE_COLOR: Record<CleanupModel['group'], string> = {
+  bert: 'text-violet-500',
+  correction: 'text-amber-500',
+  llm: 'text-blue-500',
+  cloud: 'text-sky-500',
 }
 
-function formatParams(params: number): string {
-  return params % 1 === 0 ? params.toFixed(0) + 'B' : params.toFixed(1) + 'B'
+function cleanupTypeIcon(group: CleanupModel['group']): Component {
+  return CLEANUP_TYPE_ICON[group]
 }
-
-function formatLangs(codes: string[]): string {
-  if (codes.length <= 6) return codes.map(c => c.toUpperCase()).join(' ')
-  return `${codes.length} ${t('settings.langs')}`
+function cleanupTypeColor(group: CleanupModel['group']): string {
+  return CLEANUP_TYPE_COLOR[group]
+}
+function isCloudCleanup(group: CleanupModel['group']): boolean {
+  return group === 'cloud'
 }
 
 // LLM config (shown when cloud cleanup selected)
@@ -72,8 +75,6 @@ const llmModelOptions = computed(() => {
   const provider = llmSelectedProvider.value
   return provider ? getLlmModels(provider) : []
 })
-
-const isCustomLlmModel = computed(() => llmModelOptions.value.length === 0)
 
 const refreshingLlm = ref(false)
 
@@ -91,20 +92,14 @@ async function refreshLlmModels() {
   }
 }
 
-let llmModelDebounce: ReturnType<typeof setTimeout> | null = null
-
-async function onLlmModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
+async function onLlmModelChange(value: string) {
+  settings.llmModel = value
   await settings.setSetting('llm_model', value)
 }
 
-function onLlmModelInput(event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  settings.llmModel = value
-  if (llmModelDebounce) clearTimeout(llmModelDebounce)
-  llmModelDebounce = setTimeout(() => {
-    settings.setSetting('llm_model', value)
-  }, 500)
+function formatParams(p: number): string {
+  if (p < 0.1) return Math.round(p * 1000) + 'M'
+  return (p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)) + 'B'
 }
 
 function onMaxTokensSliderUpdate(v: number[] | undefined) {
@@ -149,7 +144,7 @@ function onMaxTokensSliderCommit(v: number[]) {
         />
       </div>
 
-      <!-- Unified cleanup dropdown -->
+      <!-- Unified cleanup dropdown with optgroups -->
       <div class="wf-form-row">
         <div>
           <div class="wf-form-label">{{ t('settings.postProcessing.textCleanup') }}</div>
@@ -163,27 +158,25 @@ function onMaxTokensSliderCommit(v: number[]) {
               {{ t('settings.shortcut.cancel.none') }}
             </span>
             <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
+              <component :is="cleanupTypeIcon(selectedCleanupModel.group)" :class="['w-3 h-3 shrink-0', cleanupTypeColor(selectedCleanupModel.group)]" />
               <span class="truncate">{{ selectedCleanupModel.label }}</span>
-              <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', cleanupGroupClass(selectedCleanupModel.group)]">
-                {{ cleanupGroupLabel(selectedCleanupModel.group) }}
-              </Badge>
+              <span v-if="selectedCleanupModel.params" class="text-muted-foreground/60 tabular-nums shrink-0">{{ formatParams(selectedCleanupModel.params) }}</span>
+              <span v-if="selectedCleanupModel.quantization" class="text-purple-500/70 tabular-nums shrink-0">{{ selectedCleanupModel.quantization }}</span>
+              <component :is="isCloudCleanup(selectedCleanupModel.group) ? Cloud : Cpu" :class="['w-3 h-3 shrink-0', isCloudCleanup(selectedCleanupModel.group) ? 'text-sky-500' : 'text-blue-500']" />
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
             <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
-              <div class="flex flex-col gap-0.5">
-                <span class="flex items-center gap-1.5">
-                  {{ m.label }}
-                  <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                  <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', cleanupGroupClass(m.group)]">{{ cleanupGroupLabel(m.group) }}</Badge>
-                </span>
-                <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
-                  <Badge v-if="m.params != null" variant="secondary" class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium">{{ formatParams(m.params) }}</Badge>
-                  <Badge v-if="m.ram != null" variant="secondary" class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium">RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
-                  <Badge v-if="m.lang_codes && m.lang_codes.length > 0" variant="secondary" class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium">{{ formatLangs(m.lang_codes) }}</Badge>
-                </span>
-              </div>
+              <span class="flex items-center gap-1.5">
+                <component :is="cleanupTypeIcon(m.group)" :class="['w-3 h-3 shrink-0', cleanupTypeColor(m.group)]" />
+                {{ m.label }}
+                <span v-if="m.params" class="text-muted-foreground/60 tabular-nums">{{ formatParams(m.params) }}</span>
+                <span v-if="m.quantization" class="text-purple-500/70 tabular-nums">{{ m.quantization }}</span>
+                <span v-if="m.lang_codes?.length" class="text-muted-foreground/60 tabular-nums">{{ m.lang_codes.length }} {{ t('settings.langs') }}</span>
+                <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
+                <component :is="isCloudCleanup(m.group) ? Cloud : Cpu" :class="['w-3 h-3 shrink-0 ml-auto', isCloudCleanup(m.group) ? 'text-sky-500' : 'text-blue-500']" />
+              </span>
             </SelectItem>
           </SelectContent>
         </Select>
@@ -198,37 +191,13 @@ function onMaxTokensSliderCommit(v: number[]) {
           <div>
             <div class="wf-form-label">{{ t('settings.llm.model') }}</div>
           </div>
-          <div class="flex items-center gap-2">
-            <Select
-              v-if="!isCustomLlmModel"
-              :model-value="settings.llmModel"
-              @update:model-value="onLlmModelSelect"
-            >
-              <SelectTrigger class="w-auto min-w-[140px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="m in llmModelOptions" :key="m" :value="m">{{ m }}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              v-else
-              :value="settings.llmModel"
-              @input="onLlmModelInput"
-              class="h-8 text-xs min-w-[140px]"
-            />
-            <TooltipProvider :delay-duration="300">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button variant="outline" size="icon" class="h-8 w-8 shrink-0" :disabled="refreshingLlm" @click="refreshLlmModels">
-                    <Loader2 v-if="refreshingLlm" class="w-3.5 h-3.5 animate-spin" />
-                    <RefreshCw v-else class="w-3.5 h-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
+          <CloudModelPicker
+            :model-options="llmModelOptions"
+            :model-value="settings.llmModel"
+            :refreshing="refreshingLlm"
+            @update:model-value="onLlmModelChange"
+            @refresh="refreshLlmModels"
+          />
         </div>
         <div class="wf-form-row">
           <div>

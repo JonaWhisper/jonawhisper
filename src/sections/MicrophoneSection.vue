@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import SpectrumBars from '@/components/SpectrumBars.vue'
+import { Badge } from '@/components/ui/badge'
 import { Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Mic } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
@@ -64,6 +65,18 @@ function onDuckingSliderCommit(v: number[]) {
   const val = v[0] ?? duckingSliderValue.value
   settings.setSetting('audio_ducking_level', String(val / 100))
 }
+
+const micLevelBadge = computed(() => {
+  if (!isTesting.value) return null
+  const spectrum = testSpectrum.value
+  const avg = spectrum.reduce((a, b) => a + b, 0) / spectrum.length
+  // Values are 0..1 (clamped in Rust), smoothed in frontend
+  // Silence: no badge. Weak: very faint signal. Good: normal speech. Saturated: near clipping.
+  if (avg < 0.005) return null
+  if (avg < 0.03) return { label: t('settings.microphone.level.weak'), cls: 'bg-orange-500/12 text-orange-600 dark:bg-orange-500/18 dark:text-orange-400' }
+  if (avg < 0.6) return { label: t('settings.microphone.level.good'), cls: 'bg-emerald-500/12 text-emerald-600 dark:bg-emerald-500/18 dark:text-emerald-400' }
+  return { label: t('settings.microphone.level.saturated'), cls: 'bg-red-500/10 text-red-600 dark:bg-red-500/18 dark:text-red-400' }
+})
 
 async function startMicTest() {
   if (isTesting.value) return
@@ -158,15 +171,24 @@ onUnmounted(() => {
         <div class="w-full flex justify-center">
           <SpectrumBars :spectrum="testSpectrum" size="md" />
         </div>
-        <Button
-          variant="default"
-          size="sm"
-          class="min-w-16"
-          :disabled="engines.audioDevices.length === 0"
-          @click="isTesting ? stopMicTest() : startMicTest()"
-        >
-          {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
-        </Button>
+        <div class="flex items-center gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            class="min-w-16"
+            :disabled="engines.audioDevices.length === 0"
+            @click="isTesting ? stopMicTest() : startMicTest()"
+          >
+            {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
+          </Button>
+          <Badge
+            v-if="micLevelBadge"
+            variant="secondary"
+            :class="['text-[10px] px-1.5 py-0.5 border-transparent font-medium transition-colors duration-300', micLevelBadge.cls]"
+          >
+            {{ micLevelBadge.label }}
+          </Badge>
+        </div>
       </div>
     </div>
 

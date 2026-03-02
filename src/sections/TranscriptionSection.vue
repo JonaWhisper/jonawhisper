@@ -5,23 +5,17 @@ import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getAsrModels } from '@/config/providers'
-import type { AsrModelOption, Provider } from '@/stores/types'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
-import { formatRam } from '@/utils/format'
-import { RefreshCw, Loader2 } from 'lucide-vue-next'
+import CloudModelPicker from '@/components/CloudModelPicker.vue'
+import { Cpu, Cloud } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
 const engines = useEnginesStore()
-
-const CUSTOM_MODEL_VALUE = '_custom'
 
 async function onAsrModelChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
@@ -46,89 +40,34 @@ const asrModelOptions = computed(() => {
   return provider ? getAsrModels(provider) : []
 })
 
-const isCustomAsrModel = computed(() => {
-  if (asrModelOptions.value.length === 0) return true
-  return !asrModelOptions.value.includes(settings.asrCloudModel)
-})
-
-const asrModelSelectValue = computed(() => {
-  if (asrModelOptions.value.length === 0) return CUSTOM_MODEL_VALUE
-  if (asrModelOptions.value.includes(settings.asrCloudModel)) return settings.asrCloudModel
-  return CUSTOM_MODEL_VALUE
-})
-
-async function onAsrModelSelect(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
-  if (value === CUSTOM_MODEL_VALUE) {
-    await settings.setSetting('asr_cloud_model', '')
-    return
-  }
-  await settings.setSetting('asr_cloud_model', value)
-}
-
-let asrModelDebounce: ReturnType<typeof setTimeout> | null = null
-
-function onAsrModelInput(event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  settings.asrCloudModel = value
-  if (asrModelDebounce) clearTimeout(asrModelDebounce)
-  asrModelDebounce = setTimeout(() => {
-    settings.setSetting('asr_cloud_model', value)
-  }, 500)
-}
-
 const refreshingAsr = ref(false)
 
-async function refreshModels(provider: Provider | undefined, loadingRef: { value: boolean }) {
-  if (!provider || loadingRef.value) return
-  loadingRef.value = true
+async function refreshAsrModels() {
+  const provider = asrSelectedProvider.value
+  if (!provider || refreshingAsr.value) return
+  refreshingAsr.value = true
   try {
     const models = await invoke<string[]>('fetch_provider_models', { provider })
     await engines.updateProvider({ ...provider, cached_models: models })
   } catch (e) {
     console.error('refreshModels failed:', e)
   } finally {
-    loadingRef.value = false
+    refreshingAsr.value = false
   }
 }
 
-function refreshAsrModels() {
-  refreshModels(asrSelectedProvider.value, refreshingAsr)
+async function onAsrCloudModelChange(value: string) {
+  settings.asrCloudModel = value
+  await settings.setSetting('asr_cloud_model', value)
 }
 
 const selectedAsrModel = computed(() =>
   engines.asrModels.find(m => m.id === settings.selectedModelId) ?? null
 )
 
-const asrGroupLabel = (group: AsrModelOption['group']) => t(`settings.asrGroup.${group}`)
-const asrGroupClass = (group: AsrModelOption['group']) => {
-  switch (group) {
-    case 'local': return 'bg-blue-500/10 text-blue-600'
-    case 'cloud': return 'bg-sky-500/10 text-sky-600'
-  }
-}
-
-function formatParams(params: number): string {
-  return params % 1 === 0 ? params.toFixed(0) + 'B' : params.toFixed(1) + 'B'
-}
-
-function formatLangs(codes: string[]): string {
-  if (codes.length <= 6) return codes.map(c => c.toUpperCase()).join(' ')
-  return `${codes.length} ${t('settings.langs')}`
-}
-
-function werBadge(wer: number) {
-  if (wer < 3) return { label: t('benchmark.wer.excellent'), cls: 'bg-emerald-500/10 text-emerald-600' }
-  if (wer < 5) return { label: t('benchmark.wer.good'), cls: 'bg-blue-500/10 text-blue-600' }
-  if (wer < 8) return { label: t('benchmark.wer.fair'), cls: 'bg-amber-500/10 text-amber-600' }
-  return { label: t('benchmark.wer.basic'), cls: 'bg-orange-500/10 text-orange-600' }
-}
-
-function rtfBadge(rtf: number) {
-  if (rtf < 0.05) return { label: t('benchmark.rtf.lightning'), cls: 'bg-violet-500/10 text-violet-600' }
-  if (rtf < 0.15) return { label: t('benchmark.rtf.fast'), cls: 'bg-emerald-500/10 text-emerald-600' }
-  if (rtf < 0.35) return { label: t('benchmark.rtf.normal'), cls: 'bg-blue-500/10 text-blue-600' }
-  return { label: t('benchmark.rtf.slow'), cls: 'bg-amber-500/10 text-amber-600' }
+function formatParams(p: number): string {
+  if (p < 0.1) return Math.round(p * 1000) + 'M'
+  return (p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)) + 'B'
 }
 </script>
 
@@ -152,29 +91,28 @@ function rtfBadge(rtf: number) {
         >
           <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs">
             <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
+              <component
+                :is="selectedAsrModel.group === 'cloud' ? Cloud : Cpu"
+                :class="['w-3 h-3 shrink-0', selectedAsrModel.group === 'cloud' ? 'text-sky-500' : 'text-blue-500']"
+              />
               <span class="truncate">{{ selectedAsrModel.label }}</span>
-              <Badge
-                variant="secondary"
-                :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', asrGroupClass(selectedAsrModel.group)]"
-              >{{ asrGroupLabel(selectedAsrModel.group) }}</Badge>
+              <span v-if="selectedAsrModel.params" class="text-muted-foreground/60 tabular-nums shrink-0">{{ formatParams(selectedAsrModel.params) }}</span>
+              <span v-if="selectedAsrModel.quantization" class="text-purple-500/70 tabular-nums shrink-0">{{ selectedAsrModel.quantization }}</span>
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
-              <div class="flex flex-col gap-0.5">
-                <span class="flex items-center gap-1.5">
-                  {{ m.label }}
-                  <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                  <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', asrGroupClass(m.group)]">{{ asrGroupLabel(m.group) }}</Badge>
-                </span>
-                <span v-if="m.wer != null || m.rtf != null || m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
-                  <Badge v-if="m.wer != null" variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', werBadge(m.wer).cls]">{{ werBadge(m.wer).label }} <span class="opacity-50 font-normal">{{ +m.wer.toFixed(1) }}%</span></Badge>
-                  <Badge v-if="m.rtf != null" variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', rtfBadge(m.rtf).cls]">{{ rtfBadge(m.rtf).label }} <span class="opacity-50 font-normal">{{ +m.rtf.toFixed(2) }}x</span></Badge>
-                  <Badge v-if="m.params != null" variant="secondary" class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium">{{ formatParams(m.params) }}</Badge>
-                  <Badge v-if="m.ram != null" variant="secondary" class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium">RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
-                  <Badge v-if="m.lang_codes && m.lang_codes.length > 0" variant="secondary" class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium">{{ formatLangs(m.lang_codes) }}</Badge>
-                </span>
-              </div>
+              <span class="flex items-center gap-1.5">
+                <component
+                  :is="m.group === 'cloud' ? Cloud : Cpu"
+                  :class="['w-3 h-3 shrink-0', m.group === 'cloud' ? 'text-sky-500' : 'text-blue-500']"
+                />
+                {{ m.label }}
+                <span v-if="m.params" class="text-muted-foreground/60 tabular-nums">{{ formatParams(m.params) }}</span>
+                <span v-if="m.quantization" class="text-purple-500/70 tabular-nums">{{ m.quantization }}</span>
+                <span v-if="m.lang_codes?.length" class="text-muted-foreground/60 tabular-nums">{{ m.lang_codes.length }} {{ t('settings.langs') }}</span>
+                <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
+              </span>
             </SelectItem>
           </SelectContent>
         </Select>
@@ -189,46 +127,12 @@ function rtfBadge(rtf: number) {
           <div>
             <div class="wf-form-label">{{ t('settings.cloudAsr.model') }}</div>
           </div>
-          <div class="flex items-center gap-2">
-            <Select v-if="asrModelOptions.length > 0" :model-value="asrModelSelectValue" @update:model-value="onAsrModelSelect">
-              <SelectTrigger class="w-auto min-w-[140px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="m in asrModelOptions" :key="m" :value="m">{{ m }}</SelectItem>
-                <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              v-else
-              :value="settings.asrCloudModel"
-              @input="onAsrModelInput"
-              :placeholder="t('settings.cloudAsr.customPlaceholder')"
-              class="h-8 text-xs min-w-[140px]"
-            />
-            <TooltipProvider :delay-duration="300">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button variant="outline" size="icon" class="h-8 w-8 shrink-0" :disabled="refreshingAsr" @click="refreshAsrModels">
-                    <Loader2 v-if="refreshingAsr" class="w-3.5 h-3.5 animate-spin" />
-                    <RefreshCw v-else class="w-3.5 h-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
-        <!-- Custom model input (shown below when "Custom" selected from dropdown) -->
-        <div v-if="asrModelOptions.length > 0 && isCustomAsrModel" class="wf-form-row">
-          <div>
-            <div class="wf-form-label">{{ t('settings.cloudAsr.customPlaceholder') }}</div>
-          </div>
-          <Input
-            :value="settings.asrCloudModel"
-            @input="onAsrModelInput"
-            :placeholder="t('settings.cloudAsr.customPlaceholder')"
-            class="h-8 text-xs min-w-[140px] max-w-[200px]"
+          <CloudModelPicker
+            :model-options="asrModelOptions"
+            :model-value="settings.asrCloudModel"
+            :refreshing="refreshingAsr"
+            @update:model-value="onAsrCloudModelChange"
+            @refresh="refreshAsrModels"
           />
         </div>
       </template>
