@@ -316,6 +316,11 @@ function formatParams(params: number): string {
   return params % 1 === 0 ? params.toFixed(0) + 'B' : params.toFixed(1) + 'B'
 }
 
+function formatLangs(codes: string[]): string {
+  if (codes.length <= 6) return codes.map(c => c.toUpperCase()).join(' ')
+  return `${codes.length} ${t('settings.langs')}`
+}
+
 function werBadge(wer: number) {
   if (wer < 3) return { label: t('benchmark.wer.excellent'), cls: 'bg-emerald-500/10 text-emerald-600' }
   if (wer < 5) return { label: t('benchmark.wer.good'), cls: 'bg-blue-500/10 text-blue-600' }
@@ -590,7 +595,7 @@ onUnmounted(() => {
                         v-if="m.lang_codes && m.lang_codes.length > 0"
                         variant="secondary"
                         class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium"
-                      >{{ m.lang_codes.map(c => c.toUpperCase()).join(' ') }}</Badge>
+                      >{{ formatLangs(m.lang_codes) }}</Badge>
                     </span>
                   </div>
                 </SelectItem>
@@ -771,7 +776,7 @@ onUnmounted(() => {
                           v-if="m.lang_codes && m.lang_codes.length > 0"
                           variant="secondary"
                           class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium"
-                        >{{ m.lang_codes.map(c => c.toUpperCase()).join(' ') }}</Badge>
+                        >{{ formatLangs(m.lang_codes) }}</Badge>
                       </span>
                     </div>
                   </SelectItem>

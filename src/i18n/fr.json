@@ -83,6 +83,7 @@
   "settings.cleanupGroup.llm": "LLM",
   "settings.cleanupGroup.cloud": "Cloud",
   "settings.cleanup.recommended": "Recommandé",
+  "settings.langs": "langues",
   "settings.asrGroup.local": "Local",
   "settings.asrGroup.cloud": "Cloud",
   "settings.models.refresh": "Actualiser les modèles",
