@@ -44,7 +44,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
-| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, BERT, PCS, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, BERT, Candle, PCS, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
 | `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD → transcribe → paste) and background thread spawning. Threads `vad_trimmed` to history. Cancel support during recording and transcription. Uses `PILL_CLOSE_GENERATION` guard to prevent stale pill closes. |
 | `events.rs` | Centralised event name constants to avoid string typos |
@@ -73,7 +73,7 @@ Each speech engine implements the `ASREngine` trait (with `recommended_model_id(
 | `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) — works with OpenAI, local servers, etc. |
 | `downloader.rs` | Streaming HTTP downloads with resume (Range headers), per-model state, 250ms-throttled progress events, HuggingFace repos, ZIP extraction |
 
-Additionally, `bert.rs` and `pcs.rs` provide punctuation-category engines (BERT and PCS). Punctuation engines return empty `supported_languages()` to avoid polluting the ASR language selector — their language support is indicated via `lang_codes` on each model.
+Additionally, `bert.rs` and `pcs.rs` provide punctuation-category engines (BERT and PCS). Punctuation engines return empty `supported_languages()` to avoid polluting the ASR language selector — their language support is indicated via `lang_codes` on each model. BERT models declare a `runtime` field (`"ort"` for ONNX, `"candle"` for safetensors) so `recording.rs` can route to the right inference backend.
 
 The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup, language listing, availability checks, and recommended model selection per language.
 
@@ -90,7 +90,9 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 |------|------|
 | `transcriber.rs` | Thin dispatcher: routes to cloud API or native Whisper based on `selected_model_id` prefix. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (spacing, capitalization) |
-| `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime. Cached `BertContext` in `AppState`, sentence-level batching. |
+| `punct_common.rs` | Shared punctuation logic: labels, windowed inference (`restore_punctuation_windowed`), `strip_and_split`, `download_file`. Used by BERT, Candle, and PCS modules. |
+| `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime. Cached `BertContext` in `AppState`. Delegates windowing to `punct_common`. |
+| `candle_punctuation.rs` | BERT punctuation restoration via Candle (safetensors, Metal GPU). `XLMRobertaForTokenClassification` built from base model + Linear head. Cached `CandlePunctContext` in `AppState`. Delegates windowing to `punct_common`. |
 | `pcs_punctuation.rs` | PCS punctuation + capitalization + segmentation (47 languages) via ONNX Runtime. SentencePiece Unigram tokenizer parsed from protobuf (`.model`) via `prost`, built into `tokenizers::Tokenizer`, cached as `tokenizer.json`. 4-head model (pre/post punctuation, capitalization, segmentation). Sliding window (128 tokens, 16 overlap). Cached `PcsContext` in `AppState`. |
 | `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Falls back to raw transcription on error. |
 | `llm_local.rs` | Local LLM text cleanup via llama.cpp with Metal GPU offload. Cached `LlmContext` in `AppState`. |

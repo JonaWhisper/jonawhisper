@@ -139,6 +139,7 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Native Whisper transcription (GGML, Metal GPU on macOS) |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF, Metal GPU, text cleanup) |
 | [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT punctuation, PCS punctuation) |
+| [`candle-core`](https://github.com/huggingface/candle) / [`candle-nn`](https://github.com/huggingface/candle) / [`candle-transformers`](https://github.com/huggingface/candle) | Candle ML framework (safetensors BERT punctuation, Metal GPU) |
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD (LSTM state, ONNX inputs/outputs) |
 | [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizers (PCS SentencePiece Unigram) |
 | [`prost`](https://github.com/tokio-rs/prost) | Protobuf decoding (SentencePiece `.model` files) |
@@ -246,7 +247,9 @@ src-tauri/               Rust backend
     llm_cleanup.rs       Cloud LLM text cleanup (OpenAI/Anthropic)
     llm_local.rs         Local LLM text cleanup (llama.cpp)
     llm_prompt.rs        Shared LLM module (error types, output sanitization, prompt)
+    punct_common.rs      Shared punctuation logic (windowing, labels, download)
     bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
+    candle_punctuation.rs BERT punctuation restoration (Candle, safetensors, Metal GPU)
     pcs_punctuation.rs   PCS punctuation + capitalization + segmentation (ONNX Runtime, 47 languages)
     tray.rs              Menu bar menu & tray icon states
     pill.rs              Native pill overlay (AppKit NSWindow, SDF rendering)
