@@ -143,39 +143,142 @@ Modèles GGUF téléchargeables depuis le Model Manager, exécutés en local via
 | Ministral 3B | `llama:ministral3-3b` | ~1.8 GB | 3B | 2 GB | Oui | | **Intégré** |
 | Phi-4 Mini | `llama:phi4-mini` | 2.49 GB | 3.8B | 3 GB | EN seul | | **Intégré** |
 
-### Ponctuation (natif intégré)
+## Post-traitement texte — Ponctuation, Correction & Formatage
 
-| Modèle | ID | Params | Taille | RAM | Runtime | Langues | Vitesse | Statut |
-|---|---|---|---|---|---|---|---|---|
-| **Fullstop Large INT8** | `bert-punctuation:fullstop-multilang-large` | 560M | 562 MB | 600 MB | ort (CoreML) | FR, EN, DE, IT | ~100ms | **Intégré** |
-| Fullstop Base FP32 | `bert-punctuation:fullstop-multilingual-base` | 280M | 1.1 GB | 560 MB | Candle (Metal) | FR, EN, DE, IT, NL | ~80ms | **Intégré** |
-| PCS 47 Languages | `pcs-punctuation:47lang` | 230M | 233 MB | 300 MB | ort (CoreML) | 47 langues | ~50ms | **Intégré** |
+Voir `docs/TEXT-PIPELINE.md` pour l'architecture complète du pipeline texte post-ASR.
 
-### Modèles de ponctuation candidats
+```
+Pipeline texte actuel (7 étapes) :
+  ASR brut → [1. Filtre hallucinations] → [2. Commandes dictée] → [3. —]
+           → [4. Ponctuation OU 5. Correction OU LLM] → [7. Finalize] → Paste
+```
 
-Alternatives ou compléments aux modèles intégrés.
+### Ponctuation & Capitalisation — Modèles intégrés
 
-| Modèle | Architecture | Taille | Langues | ONNX | Intérêt | Statut |
+| Modèle | ID | Params | Taille | RAM | Runtime | Langues | Capitalisation | Vitesse | Statut |
+|---|---|---|---|---|---|---|---|---|---|
+| **Fullstop Large INT8** | `bert-punctuation:fullstop-multilang-large` | 560M | 562 MB | 600 MB | ort (CoreML) | FR, EN, DE, IT | Non | ~100ms | **Intégré** |
+| Fullstop Base FP32 | `bert-punctuation:fullstop-multilingual-base` | 280M | 1.1 GB | 560 MB | Candle (Metal) | FR, EN, DE, IT, NL | Non | ~80ms | **Intégré** |
+| **PCS 47 Languages** | `pcs-punctuation:47lang` | 230M | 233 MB | 300 MB | ort (CoreML) | 47 langues | **Oui** (4 heads) | ~50ms | **Intégré** |
+
+**Note** : seul PCS restaure la casse (capitalisation). Les modèles BERT fullstop ne prédisent que la ponctuation (`.` `,` `?` `-` `:`). La capitalisation post-BERT repose uniquement sur le `finalize()` de `post_processor.rs` (début de phrase + après `.?!`).
+
+### Ponctuation — Modèles candidats
+
+| Modèle | Architecture | Taille | Langues | Capitalisation | Intérêt | Statut |
 |---|---|---|---|---|---|---|
-| **sherpa-onnx-online-punct-en** | CNN-BiLSTM | **7.1 MB** (int8) | EN | Oui | Ultra-léger, 1/40e la taille de BERT, 2.5x plus rapide | Écarté — EN seul, intérêt limité vs PCS 47lang |
+| **EdgePunct** (sherpa-onnx) | CNN-BiLSTM INT8 | **7.1 MB** | EN | **Oui** (inclut casing) | Ultra-léger, 1/40e de BERT, 2.5x plus rapide | Écarté — EN seul, PCS couvre 47 langues |
+| **FunASR ct-punc** | Transformer | ~300 MB | ZH, EN | Non | Alibaba, haute précision chinois | Écarté — focus chinois, pas de FR |
+| **Mark My Words / Cadence** | Gemma3-1B fine-tuné | ~2 GB | Multi | Oui | 30 classes ponctuation, mars 2025 | Non intégré — 1B params trop lourd, trop récent |
+| **ELECTRA-Small Punct** | ELECTRA | 13 MB | EN | Non | Ultra-léger, latence 3-4 mots | Écarté — EN seul |
+| **Universal-2-TF** (AssemblyAI) | Transformer | Propriétaire | Multi | Oui + ITN | Ponctuation + truecasing + ITN combiné | Écarté — propriétaire, cloud uniquement |
+| **DeepPunct** | Transformer | ~150 MB | EN | Non | Ponctuation contextuelle | Écarté — EN seul, pas maintenu |
 
-### Modèles de correction spécialisés (alternative au LLM)
+**Conclusion** : PCS reste le meilleur choix intégré — 47 langues, capitalisation native (4 heads : pre-punct, post-punct, casing, segmentation), 233 MB, ~50ms, SentencePiece tokenizer universel.
 
-Approche pipeline : chaîner des modèles légers spécialisés au lieu d'un LLM généraliste.
+### Correction grammaticale & orthographique — Modèles intégrés
 
-| Modèle | Architecture | Params | Langues | Tâche | Intérêt | Statut |
+| Modèle | ID | Params | Taille | Langues | Vitesse | Anti-hallucination | Statut |
+|---|---|---|---|---|---|---|---|
+| **GEC T5 Small** | `correction:gec-t5-small` | 60M | 242 MB | Multilingue (11 langues) | ~200ms | Repeat penalty 1.1, n-gram block | **Intégré** — **Recommandé** |
+| T5 Spell FR | `correction:t5-spell-fr` | 220M | 892 MB | FR | ~500ms | Repeat penalty 1.1, n-gram block | **Intégré** |
+| FlanEC Large | `correction:flanec-large` | 250M | 990 MB | EN | ~800ms | Repeat penalty 1.1, n-gram block | **Intégré** |
+| Flan-T5 Grammar | `correction:flan-t5-grammar` | 783M | 3.1 GB | EN | ~2s | Repeat penalty 1.1, n-gram block | **Intégré** |
+
+Tous utilisent le runtime **Candle** (Metal GPU) avec décodage autorégressif, KV cache, température 0.1. Sortie sanitisée : vide → garder l'original, >3x longueur input → garder l'original (protection anti-hallucination).
+
+### Correction — Modèles candidats
+
+| Modèle | Architecture | Params | Langues | Vitesse | Intérêt | Statut |
 |---|---|---|---|---|---|---|
-| **FlanEC** (morenolq/flanec-large-cd) | Flan-T5 Base/Large | 250M | EN | Post-ASR error correction | Seul modèle conçu spécifiquement pour corriger les erreurs ASR | **Intégré** (`correction:flanec-large`) |
-| **fdemelo/t5-base-spell-correction-fr** | T5-Base | 220M | **FR** | Correction orthographe + ponctuation | Entraîné sur corpus FR, licence MIT | **Intégré** (`correction:t5-spell-fr`) |
-| **Unbabel/gec-t5_small** | T5-Small | 60M | Multilingue | Grammar error correction | Le plus petit T5 GEC, multilingue | **Intégré** (`correction:gec-t5-small`) |
-| **pszemraj/flan-t5-large-grammar-synthesis** | Flan-T5-Large | 783M | EN | Grammar correction | ONNX + **GGUF** disponibles, conçu pour ASR | **Intégré** (`correction:flan-t5-grammar`) |
-| **sdadas/byt5-text-correction** | ByT5 | 300M | 102+ langues | Correction character-level | Robuste aux erreurs ASR (pas de tokenizer) | Non intégré — architecture ByT5 différente, nécessiterait un runtime dédié |
-| **Harper** (crate Rust) | Rule-based | N/A | EN | Grammar checking | <10ms, pure Rust, offline | Non intégré — EN seul, recherche en cours pour approche multilingue |
+| **GECToR** (Grammarly) | BERT + 2 linear, tag-based | ~110M | EN | **~20ms** (10x T5) | Tags (KEEP/DELETE/REPLACE), pas autorégressif → pas de hallucination | **Candidat sérieux** — nécessite ONNX export |
+| **ByT5** (sdadas) | ByT5 character-level | 300M | 102+ langues | ~1s | Robuste aux erreurs ASR (opère au caractère) | Non intégré — architecture ByT5 non supportée par Candle |
+| **Harper** (crate Rust) | Rule-based | N/A | EN | **<10ms** | Rust pur, MIT, offline, `harper-core` crate | **Candidat complémentaire** — EN seul, léger |
+| **LanguageTool** | Rules + ngram | N/A | 25+ langues | ~50ms | Le plus complet, 25+ langues | Écarté — Java runtime requis, 200 MB+ |
+| **GECFramework** (ACL 2024) | Detection-Correction | Var. | Multi | Var. | Architecture detection+correction deux passes | Non intégré — Python only |
+| **Gramformer** | T5/BART GEC | 220M | EN | ~500ms | Fine-tuné GEC | Écarté — doublon des T5 intégrés |
 
-**Approche pipeline recommandée** (alternative au LLM, <50ms total) :
-1. Regex filler words ("euh", "uh", "um", "hein", "you know") — ~0ms
-2. Token classification ponctuation (7-200 MB ONNX) — ~10-30ms
-3. Grammar légère : Harper (EN) / règles regex (FR) — ~5ms
+**GECToR** est le candidat le plus intéressant : approche tag-based (non-autorégressif) = aucun risque de hallucination, latence ~20ms vs ~200ms-2s pour T5. Limitation : EN seul pour le modèle Grammarly original. Nécessiterait un ONNX export du modèle PyTorch.
+
+### Suppression des disfluences
+
+Les fillers/disfluences sont des mots parasites émis naturellement à l'oral. Les modèles ASR les transcrivent fidèlement.
+
+| Langue | Fillers courants |
+|---|---|
+| FR | euh, heu, hum, bah, ben, beh, enfin, quoi, genre, voilà, du coup, en fait, tu vois |
+| EN | uh, um, hmm, like, you know, I mean, basically, actually, so, well, right |
+
+**Approche recommandée** : regex simple (~0ms, fiabilité >95% sur fillers isolés).
+
+| Approche | Latence | Précision | Complexité | Statut |
+|---|---|---|---|---|
+| **Regex fillers** | ~0ms | >95% (fillers isolés) | Triviale | ❌ Non implémenté |
+| CTC Forced Alignment | ~100ms | 81.6% (disfluences complexes) | Élevée (modèle CTC + alignement) | Écarté — trop lourd |
+| Smooth-LLaMa | ~500ms | ~85% | Élevée (LLM fine-tuné) | Écarté — trop lourd |
+| Whisper word timestamps | ~0ms (déjà disponible) | Variable | Moyenne | Non exploré — nécessite word-level timestamps |
+
+**Conclusion** : un regex couvrant les fillers classiques FR/EN est suffisant pour la dictée. Les disfluences complexes (faux départs, répétitions) sont rares en dictée volontaire vs conversation spontanée.
+
+### ITN — Inverse Text Normalization
+
+Convertit les nombres et entités textuelles en forme écrite canonique.
+
+| Exemple entrée | Sortie attendue | Catégorie |
+|---|---|---|
+| vingt-trois | 23 | Nombre |
+| dix pour cent | 10% | Pourcentage |
+| trois heures et quart | 3h15 | Heure |
+| cinq euros cinquante | 5,50 € | Devise |
+| premier janvier deux mille vingt-cinq | 1er janvier 2025 | Date |
+| twenty three | 23 | Number (EN) |
+| ten percent | 10% | Percentage (EN) |
+
+| Approche | Langues | Précision | Portabilité Rust | Statut |
+|---|---|---|---|---|
+| **Regex rules FR/EN** | FR, EN | ~80% (cas courants) | Native | **Candidat immédiat** — couvre nombres, %, heures, devises |
+| **NeMo ITN** (NVIDIA) | Multi (WFST) | >95% | Difficile (WFST C++) | Non intégré — WFST complexe à porter en Rust |
+| **Thutmose Tagger** | Multi (neural) | >90% | Difficile (Python, pas d'ONNX) | Non intégré — pas d'export ONNX disponible |
+| **Sparrowhawk** (Google) | Multi (WFST C++) | >95% | FFI possible mais complexe | Non intégré — FFI C++ + grammaires WFST |
+| LLM prompt | Multi | Variable | Via LLM existant | Non intégré — déjà couvert par le cleanup LLM si activé |
+
+**Conclusion** : un jeu de regex FR/EN couvrant nombres cardinaux/ordinaux, pourcentages, heures et devises est le meilleur rapport effort/valeur. Les cas edge (grands nombres composés, dates complexes) peuvent être délégués au LLM si activé.
+
+### Écosystème Rust — Crates pertinents post-traitement
+
+| Crate | Version | Usage | Licence | Notes |
+|---|---|---|---|---|
+| `harper-core` | 0.x | Grammar checking rule-based | MIT | EN seul, <10ms, offline |
+| `nlprule` | 0.6 | LanguageTool rules en Rust | MIT/Apache | Bindings Rust de LanguageTool, limité |
+| `rust-stemmers` | 1.2 | Stemming multi-langues | MIT | Utile pour normalisation |
+| `unicode-segmentation` | 1.x | Segmentation texte Unicode | MIT/Apache | Déjà utilisé indirectement |
+| `whatlang` | 0.16 | Détection de langue | MIT | Alternative au resolve_language() actuel |
+| `num-to-words` | 0.1 | Nombres → mots (EN) | MIT | Utile pour ITN inverse (validation) |
+
+### Pipeline recommandé (7 étapes)
+
+| # | Étape | Traitement | Latence | Fichier | Statut |
+|---|---|---|---|---|---|
+| 1 | Filtre hallucinations | Regex 30+ patterns (HALLUCINATIONS) | ~0ms | `post_processor.rs` | ✅ Implémenté |
+| 2 | Commandes dictée | Substitution FR/EN ("virgule" → ",") | ~0ms | `post_processor.rs` | ✅ Implémenté |
+| 3 | Suppression disfluences | Regex fillers FR/EN | ~0ms | — | ❌ Non implémenté |
+| 4 | Ponctuation + Capitalisation | BERT/PCS token classification | ~50-100ms | `bert_punctuation.rs`, `candle_punctuation.rs`, `pcs_punctuation.rs` | ✅ Implémenté |
+| 5 | Correction gram/ortho | T5 encoder-decoder autorégressif | ~200ms-2s | `t5_correction.rs` | ✅ Implémenté |
+| 6 | ITN | Regex nombres/dates/heures | ~0ms | — | ❌ Non implémenté |
+| 7 | Finalize | Espacement ponctuation + capitalisation initiale | ~0ms | `post_processor.rs` | ✅ Implémenté |
+
+**Limitation actuelle** : les étapes 4 et 5 sont mutuellement exclusives (ponctuation OU correction OU LLM, pas chaînés). Le chaînage ponctuation → correction est une amélioration future. Voir `docs/TEXT-PIPELINE.md` pour le détail.
+
+### Roadmap post-traitement texte
+
+| Priorité | Action | Effort | Impact |
+|---|---|---|---|
+| **1 — Immédiat** | Regex disfluences FR/EN (étape 3) | Très faible | Texte plus propre, ~0ms |
+| **2 — Court terme** | Regex ITN nombres/heures FR/EN (étape 6) | Faible | "vingt-trois" → "23" |
+| **3 — Court terme** | Chaînage ponctuation + correction | Modéré | Pipeline complet au lieu de OU exclusif |
+| **4 — Moyen terme** | Évaluer GECToR (tag-based, 10x T5) | Modéré | Correction ~20ms sans hallucination |
+| **5 — Moyen terme** | Évaluer Harper (rule-based Rust, EN) | Faible | Correction instantanée, complémentaire |
+| **6 — Optionnel** | ITN WFST (NeMo/Sparrowhawk) pour couverture complète | Élevé | >95% ITN multi-langues |
 
 ---
 
