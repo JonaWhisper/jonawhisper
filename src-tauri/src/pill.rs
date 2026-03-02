@@ -192,8 +192,8 @@ unsafe fn create_pill_window() -> (*mut AnyObject, *mut AnyObject) {
     let _: () = msg_send![ns_win, setLevel: 3i64]; // NSFloatingWindowLevel
     let _: () = msg_send![ns_win, setCollectionBehavior: 17u64]; // canJoinAllSpaces|stationary
 
-    // Position top-center
-    let screen: *mut AnyObject = msg_send![ns_win, screen];
+    // Position top-center on the screen with keyboard focus
+    let screen: *mut AnyObject = msg_send![AnyClass::get(c"NSScreen").unwrap(), mainScreen];
     if !screen.is_null() {
         let frame: NSRect = msg_send![screen, frame];
         let x = (frame.size.width - PILL_WIDTH) / 2.0;
