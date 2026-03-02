@@ -5,7 +5,6 @@ import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getLlmModels } from '@/config/providers'
-import type { CleanupModel } from '@/stores/types'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Slider } from '@/components/ui/slider'
@@ -13,8 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
-import { Cpu, Cloud, Type, SpellCheck, MessageSquare } from 'lucide-vue-next'
-import type { Component } from 'vue'
+import TypeBadge from '@/components/TypeBadge.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -42,29 +40,6 @@ const selectedCleanupModel = computed(() =>
   engines.cleanupModels.find(m => m.id === settings.cleanupModelId) ?? null
 )
 
-// Icon + color maps
-const CLEANUP_TYPE_ICON: Record<CleanupModel['group'], Component> = {
-  bert: Type,
-  correction: SpellCheck,
-  llm: MessageSquare,
-  cloud: MessageSquare,
-}
-const CLEANUP_TYPE_COLOR: Record<CleanupModel['group'], string> = {
-  bert: 'text-violet-500',
-  correction: 'text-amber-500',
-  llm: 'text-blue-500',
-  cloud: 'text-sky-500',
-}
-
-function cleanupTypeIcon(group: CleanupModel['group']): Component {
-  return CLEANUP_TYPE_ICON[group]
-}
-function cleanupTypeColor(group: CleanupModel['group']): string {
-  return CLEANUP_TYPE_COLOR[group]
-}
-function isCloudCleanup(group: CleanupModel['group']): boolean {
-  return group === 'cloud'
-}
 
 // LLM config (shown when cloud cleanup selected)
 const llmSelectedProvider = computed(() =>
@@ -153,19 +128,17 @@ function onMaxTokensSliderCommit(v: number[]) {
               {{ t('settings.shortcut.cancel.none') }}
             </span>
             <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
-              <component :is="cleanupTypeIcon(selectedCleanupModel.group)" :class="['w-3 h-3 shrink-0', cleanupTypeColor(selectedCleanupModel.group)]" />
+              <TypeBadge :type="selectedCleanupModel.group" />
               <span class="truncate">{{ selectedCleanupModel.label }}</span>
-              <component :is="isCloudCleanup(selectedCleanupModel.group) ? Cloud : Cpu" :class="['w-3 h-3 shrink-0', isCloudCleanup(selectedCleanupModel.group) ? 'text-sky-500' : 'text-blue-500']" />
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
             <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
               <span class="flex items-center gap-1.5">
-                <component :is="cleanupTypeIcon(m.group)" :class="['w-3 h-3 shrink-0', cleanupTypeColor(m.group)]" />
+                <TypeBadge :type="m.group" />
                 {{ m.label }}
                 <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                <component :is="isCloudCleanup(m.group) ? Cloud : Cpu" :class="['w-3 h-3 shrink-0 ml-auto', isCloudCleanup(m.group) ? 'text-sky-500' : 'text-blue-500']" />
               </span>
             </SelectItem>
           </SelectContent>

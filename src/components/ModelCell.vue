@@ -70,28 +70,30 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
       </template>
 
       <!-- Downloaded — badge swaps to trash on hover -->
-      <div v-else-if="showCustomDownloaded" class="grid place-items-center">
+      <template v-else-if="showCustomDownloaded">
         <Badge
           variant="secondary"
-          class="[grid-area:1/1] bg-green-500/10 text-green-500 border-transparent group-hover:opacity-0 transition-opacity h-8 px-3 text-xs"
+          class="bg-green-500/10 text-green-500 border-transparent group-hover:invisible h-8 px-3 text-xs"
         >
           {{ t('modelManager.downloaded') }}
         </Badge>
-        <TooltipProvider :delay-duration="300">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="ghost" size="icon-sm"
-                class="[grid-area:1/1] opacity-0 group-hover:opacity-100 transition-opacity"
-                @click="emit('delete', model)"
-              >
-                <Trash2 class="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.delete') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+        <div class="absolute inset-0 flex items-center justify-center invisible group-hover:visible">
+          <TooltipProvider :delay-duration="300">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="ghost" size="icon-sm"
+                  class="cursor-pointer"
+                  @click="emit('delete', model)"
+                >
+                  <Trash2 class="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.delete') }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </template>
 
       <!-- Common states: downloading, paused, not-downloaded -->
       <DownloadActions

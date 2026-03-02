@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Search, Copy, Check, Trash2, Cloud, Cpu, ShieldCheck, SpellCheck, Scissors, Type, MessageSquare } from 'lucide-vue-next'
+import { Search, Copy, Check, Trash2 } from 'lucide-vue-next'
+import TypeBadge from '@/components/TypeBadge.vue'
 
 const { t } = useI18n()
 const historyStore = useHistoryStore()
@@ -225,16 +226,9 @@ async function doClearAll() {
                   <div class="flex flex-wrap gap-1">
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <span
-                          class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                          :class="isCloudAsr(entry.model_id)
-                            ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'"
-                        >
-                          <Cloud v-if="isCloudAsr(entry.model_id)" class="h-2.5 w-2.5" />
-                          <Cpu v-else class="h-2.5 w-2.5" />
+                        <TypeBadge :type="isCloudAsr(entry.model_id) ? 'cloud' : 'local'">
                           {{ formatAsrLabel(entry.model_id) }}
-                        </span>
+                        </TypeBadge>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.asr') }}</TooltipContent>
                     </Tooltip>
@@ -248,38 +242,21 @@ async function doClearAll() {
                     </Tooltip>
                     <Tooltip v-if="entry.vad_trimmed">
                       <TooltipTrigger as-child>
-                        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <Scissors class="h-2.5 w-2.5" />
-                          VAD
-                        </span>
+                        <TypeBadge type="vad">VAD</TypeBadge>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.vad') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip v-if="entry.cleanup_model_id">
                       <TooltipTrigger as-child>
-                        <span
-                          class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                          :class="{
-                            'bg-violet-500/10 text-violet-600 dark:text-violet-400': cleanupBadgeType(entry.cleanup_model_id) === 'bert',
-                            'bg-amber-500/10 text-amber-600 dark:text-amber-400': cleanupBadgeType(entry.cleanup_model_id) === 'correction',
-                            'bg-blue-500/10 text-blue-600 dark:text-blue-400': cleanupBadgeType(entry.cleanup_model_id) === 'llm',
-                            'bg-sky-500/10 text-sky-600 dark:text-sky-400': cleanupBadgeType(entry.cleanup_model_id) === 'cloud',
-                          }"
-                        >
-                          <Type v-if="cleanupBadgeType(entry.cleanup_model_id) === 'bert'" class="h-2.5 w-2.5" />
-                          <SpellCheck v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'correction'" class="h-2.5 w-2.5" />
-                          <MessageSquare v-else-if="cleanupBadgeType(entry.cleanup_model_id) === 'llm'" class="h-2.5 w-2.5" />
-                          <Cloud v-else class="h-2.5 w-2.5" />
+                        <TypeBadge :type="cleanupBadgeType(entry.cleanup_model_id)">
                           {{ formatCleanupLabel(entry.cleanup_model_id) }}
-                        </span>
+                        </TypeBadge>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.cleanup') }}</TooltipContent>
                     </Tooltip>
                     <Tooltip v-if="entry.hallucination_filter">
                       <TooltipTrigger as-child>
-                        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400">
-                          <ShieldCheck class="h-2.5 w-2.5" />
-                        </span>
+                        <TypeBadge type="hallucination" />
                       </TooltipTrigger>
                       <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.hallucination') }}</TooltipContent>
                     </Tooltip>

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
-import { Cpu, Cloud } from 'lucide-vue-next'
+import TypeBadge from '@/components/TypeBadge.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -87,20 +87,14 @@ const selectedAsrModel = computed(() =>
         >
           <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs">
             <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
-              <component
-                :is="selectedAsrModel.group === 'cloud' ? Cloud : Cpu"
-                :class="['w-3 h-3 shrink-0', selectedAsrModel.group === 'cloud' ? 'text-sky-500' : 'text-blue-500']"
-              />
+              <TypeBadge :type="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'" />
               <span class="truncate">{{ selectedAsrModel.label }}</span>
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
               <span class="flex items-center gap-1.5">
-                <component
-                  :is="m.group === 'cloud' ? Cloud : Cpu"
-                  :class="['w-3 h-3 shrink-0', m.group === 'cloud' ? 'text-sky-500' : 'text-blue-500']"
-                />
+                <TypeBadge :type="m.group === 'cloud' ? 'cloud' : 'local'" />
                 {{ m.label }}
                 <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
               </span>
