@@ -20,6 +20,8 @@
 - [x] **Évaluer modèles de correction spécialisés** — **Done.** Évaluation complète dans `docs/BENCHMARK.md`. Métadonnées (params, RAM, langues, recommended) intégrées dans le sélecteur cleanup de Settings.
 - [x] **Implémenter PCS Punctuation (47 langues)** — **Done.** Moteur `1-800-BAD-CODE/punct_cap_seg_47_language` (233 MB ONNX, 4 têtes : ponctuation, capitalisation, segmentation). Tokenizer SentencePiece parsé en Rust via `prost` (protobuf). Voir `pcs_punctuation.rs`, `engines/pcs.rs`.
 
+- [ ] **Post-processeur rule-based multilingue (style Harper)** — Rechercher et évaluer des correcteurs grammaticaux rule-based qui supportent plusieurs langues (pas seulement l'anglais). Harper est anglais-only mais l'approche est excellente : zéro ML, sub-milliseconde, corrections a/an, mots confondus, répétitions. Chercher des alternatives multilingues (LanguageTool Rust bindings ? hunspell ? autres crates ?). L'idée est une couche de polish ultra-rapide après la ponctuation PCS ou correction T5, qui attrape les erreurs grammaticales fréquentes de l'ASR sans overhead ML. Pourrait être une catégorie "RuleBased" séparée ou intégré comme post-processeur automatique.
+
 ## Refactoring
 
 - [ ] **Regrouper les contextes d'inférence dans AppState** — On a maintenant 8 `Mutex<Option<...Context>>` individuels (`whisper_context`, `canary_context`, `parakeet_context`, `qwen_context`, `llm_context`, `bert_context`, `pcs_context`, `candle_punct_context`), chacun avec sa propre logique de cache invalidation éparpillée. Refactorer en un `Mutex<InferenceCache>` unique avec méthodes centralisées (`invalidate_asr()`, `invalidate_punct()`, etc.). Simplifie l'ajout de futurs moteurs et rend l'invalidation croisée explicite.
