@@ -1,11 +1,19 @@
 use std::ffi::c_void;
 use std::sync::Mutex;
 
-/// Saved state for restoring after ducking: device_id + volume.
+/// Saved state for restoring after ducking.
+/// Stores both the original and ducked volume so we can verify on restore
+/// that the volume hasn't been changed by a BT profile switch or the user.
 struct SavedState {
     device_id: u32,
-    volume: f32,
+    original_volume: f32,
+    ducked_volume: f32,
 }
+
+/// Tolerance for comparing volume values. BT profile switches or codec
+/// quantization (AVRCP for A2DP vs AT+VGS for HFP) can cause small
+/// differences between what we set and what we read back.
+const VOLUME_TOLERANCE: f32 = 0.02;
 
 static SAVED_STATE: Mutex<Option<SavedState>> = Mutex::new(None);
 
@@ -25,6 +33,10 @@ mod ca {
     /// (built-in speakers, Bluetooth, USB DACs).
     pub const kAudioHardwareServiceDeviceProperty_VirtualMainVolume: u32 =
         u32::from_be_bytes(*b"vmvc");
+    /// Transport type — identifies how the device is connected.
+    pub const kAudioDevicePropertyTransportType: u32 = u32::from_be_bytes(*b"tran");
+    pub const kAudioDeviceTransportTypeBluetooth: u32 = u32::from_be_bytes(*b"blue");
+    pub const kAudioDeviceTransportTypeBluetoothLE: u32 = u32::from_be_bytes(*b"blea");
 
     pub const kAudioObjectPropertyScopeGlobal: u32 = u32::from_be_bytes(*b"glob");
     pub const kAudioDevicePropertyScopeOutput: u32 = u32::from_be_bytes(*b"outp");
@@ -80,6 +92,31 @@ fn get_default_output_device() -> Option<u32> {
             return None;
         }
         Some(device_id)
+    }
+}
+
+fn is_bluetooth_device(device_id: u32) -> bool {
+    unsafe {
+        let address = ca::AudioObjectPropertyAddress {
+            mSelector: ca::kAudioDevicePropertyTransportType,
+            mScope: ca::kAudioObjectPropertyScopeGlobal,
+            mElement: ca::kAudioObjectPropertyElementMain,
+        };
+        let mut transport: u32 = 0;
+        let mut size = std::mem::size_of::<u32>() as u32;
+        let status = ca::AudioObjectGetPropertyData(
+            device_id,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut size,
+            &mut transport as *mut u32 as *mut c_void,
+        );
+        if status != 0 {
+            return false;
+        }
+        transport == ca::kAudioDeviceTransportTypeBluetooth
+            || transport == ca::kAudioDeviceTransportTypeBluetoothLE
     }
 }
 
@@ -140,6 +177,8 @@ pub fn duck_volume(reduction: f32) {
         }
     };
 
+    let is_bt = is_bluetooth_device(device_id);
+
     let current = match get_virtual_volume(device_id) {
         Some(v) => v,
         None => {
@@ -148,18 +187,30 @@ pub fn duck_volume(reduction: f32) {
         }
     };
 
-    *SAVED_STATE.lock().unwrap() = Some(SavedState { device_id, volume: current });
-
     let ducked = (current * (1.0 - reduction)).clamp(0.0, 1.0);
+    *SAVED_STATE.lock().unwrap() = Some(SavedState {
+        device_id,
+        original_volume: current,
+        ducked_volume: ducked,
+    });
+
     if set_virtual_volume(device_id, ducked) {
-        log::info!("audio_ducking: {:.2} -> {:.2} (reduction={}, device={})", current, ducked, reduction, device_id);
+        log::info!(
+            "audio_ducking: {:.2} -> {:.2} (reduction={}, device={}, bt={})",
+            current, ducked, reduction, device_id, is_bt
+        );
     } else {
         log::warn!("audio_ducking: failed to set VirtualMainVolume");
     }
 }
 
 /// Restore the volume saved by the last `duck_volume()` call.
-/// Skips restore if the default output device changed since ducking (e.g. user switched audio output).
+///
+/// Safety checks before restoring:
+/// 1. Device must still be the same (user didn't switch output).
+/// 2. Current volume must be close to the ducked value we set. If it differs,
+///    a BT profile switch (A2DP↔HFP have different volume mechanisms: AVRCP vs
+///    AT+VGS) or the user changed the volume manually — don't overwrite.
 pub fn restore_volume() {
     let saved = match SAVED_STATE.lock().unwrap().take() {
         Some(s) => s,
@@ -183,8 +234,28 @@ pub fn restore_volume() {
         return;
     }
 
-    if set_virtual_volume(current_device, saved.volume) {
-        log::info!("audio_ducking: restored to {:.2} (device={})", saved.volume, current_device);
+    let current_volume = match get_virtual_volume(current_device) {
+        Some(v) => v,
+        None => {
+            log::warn!("audio_ducking: could not read volume for restore verification");
+            return;
+        }
+    };
+
+    // Verify the volume is still at the ducked level we set.
+    // On BT devices, profile switches (A2DP↔HFP) use different volume mechanisms
+    // (AVRCP vs AT+VGS) and may change the value behind our back.
+    if (current_volume - saved.ducked_volume).abs() > VOLUME_TOLERANCE {
+        log::info!(
+            "audio_ducking: volume changed externally ({:.2} != ducked {:.2}), skipping restore",
+            current_volume,
+            saved.ducked_volume
+        );
+        return;
+    }
+
+    if set_virtual_volume(current_device, saved.original_volume) {
+        log::info!("audio_ducking: restored to {:.2} (device={})", saved.original_volume, current_device);
     } else {
         log::warn!("audio_ducking: failed to restore VirtualMainVolume");
     }
