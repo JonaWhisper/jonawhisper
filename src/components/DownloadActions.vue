@@ -105,7 +105,7 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
 
   <!-- Downloaded -->
   <template v-else-if="isDownloaded">
-    <Badge variant="secondary" class="bg-green-500/10 text-green-500 border-transparent text-xs">
+    <Badge variant="secondary" class="bg-green-500/10 text-green-500 border-transparent h-8 px-3 text-xs">
       {{ t('modelManager.downloaded') }}
     </Badge>
   </template>

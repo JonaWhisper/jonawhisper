@@ -48,7 +48,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
         <span class="font-medium text-sm truncate">{{ model.label }}</span>
         <span v-if="model.size > 0" class="text-xs text-muted-foreground shrink-0">{{ formatSize(model.size) }}</span>
       </div>
-      <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null || model.ram != null || (model.lang_codes && model.lang_codes.length > 0)" :wer="model.wer" :rtf="model.rtf" :params="model.params" :ram="model.ram" :lang-codes="model.lang_codes" class="mt-0.5" />
+      <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null || model.quantization || model.ram != null || (model.lang_codes && model.lang_codes.length > 0)" :wer="model.wer" :rtf="model.rtf" :params="model.params" :quantization="model.quantization" :ram="model.ram" :lang-codes="model.lang_codes" class="mt-0.5" />
     </div>
 
     <!-- Status / Actions -->
@@ -57,7 +57,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
       <template v-if="isDeleting">
         <Badge
           variant="secondary"
-          class="bg-green-500/10 text-green-500 border-transparent invisible"
+          class="bg-green-500/10 text-green-500 border-transparent invisible h-8 px-3 text-xs"
         >
           {{ t('modelManager.downloaded') }}
         </Badge>
@@ -73,7 +73,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
       <template v-else-if="showCustomDownloaded">
         <Badge
           variant="secondary"
-          class="bg-green-500/10 text-green-500 border-transparent group-hover:opacity-0 transition-opacity"
+          class="bg-green-500/10 text-green-500 border-transparent group-hover:opacity-0 transition-opacity h-8 px-3 text-xs"
         >
           {{ t('modelManager.downloaded') }}
         </Badge>
@@ -82,7 +82,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
             <TooltipTrigger as-child>
               <Button
                 variant="ghost" size="icon-sm"
-                class="absolute inset-0 m-auto opacity-0 group-hover:opacity-100 transition-opacity"
+                class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
                 @click="emit('delete', model)"
               >
                 <Trash2 class="w-4 h-4" />

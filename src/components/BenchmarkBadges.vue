@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatRam } from '@/utils/format'
 
 const { t } = useI18n()
@@ -12,6 +13,7 @@ const props = defineProps<{
   params?: number | null
   ram?: number | null
   langCodes?: string[] | null
+  quantization?: string | null
   compact?: boolean
 }>()
 
@@ -30,10 +32,15 @@ const rtfInfo = computed(() => {
   if (props.rtf < 0.35) return { label: t('benchmark.rtf.normal'), bg: 'bg-blue-500/10 text-blue-600' }
   return { label: t('benchmark.rtf.slow'), bg: 'bg-amber-500/10 text-amber-600' }
 })
+
+function formatParams(p: number): string {
+  if (p < 0.1) return Math.round(p * 1000) + 'M'
+  return (p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)) + 'B'
+}
 </script>
 
 <template>
-  <span v-if="werInfo || rtfInfo || params != null || (langCodes && langCodes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+  <span v-if="werInfo || rtfInfo || params != null || quantization || (langCodes && langCodes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
     <Badge
       v-if="werInfo"
       variant="secondary"
@@ -53,7 +60,14 @@ const rtfInfo = computed(() => {
       variant="secondary"
       :class="['bg-slate-500/10 text-slate-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
     >
-      {{ params! % 1 === 0 ? params!.toFixed(0) : params!.toFixed(1) }}B
+      {{ formatParams(params!) }}
+    </Badge>
+    <Badge
+      v-if="quantization"
+      variant="secondary"
+      :class="['bg-purple-500/10 text-purple-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
+    >
+      {{ quantization }}
     </Badge>
     <Badge
       v-if="ram != null"
@@ -62,12 +76,20 @@ const rtfInfo = computed(() => {
     >
       RAM <span class="opacity-50 font-normal">~{{ formatRam(ram!) }}</span>
     </Badge>
-    <Badge
-      v-if="langCodes && langCodes.length > 0"
-      variant="secondary"
-      :class="['bg-indigo-500/10 text-indigo-600 border-transparent font-medium', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
-    >
-      {{ langCodes.map(c => c.toUpperCase()).join(' ') }}
-    </Badge>
+    <TooltipProvider v-if="langCodes && langCodes.length > 0" :delay-duration="300">
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Badge
+            variant="secondary"
+            :class="['bg-indigo-500/10 text-indigo-600 border-transparent font-medium cursor-default', compact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0']"
+          >
+            {{ langCodes.length }} {{ t('settings.langs') }}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" :side-offset="4" class="max-w-[240px] text-[11px]">
+          {{ langCodes.map(c => c.toUpperCase()).join(', ') }}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   </span>
 </template>
