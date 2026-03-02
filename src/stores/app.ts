@@ -110,6 +110,7 @@ export const useAppStore = defineStore('app', () => {
       enginesStore.fetchPermissions(),
       historyStore.fetchHistory(),
       enginesStore.fetchProviders(),
+      enginesStore.fetchAudioDevices(),
     ])
   }
 
