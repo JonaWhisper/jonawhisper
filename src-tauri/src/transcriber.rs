@@ -39,6 +39,7 @@ pub fn transcribe(
     match model.engine_id.as_str() {
         "whisper" => crate::engines::whisper::transcribe_native(state, &model, audio_path, &language),
         "canary" => crate::canary_asr::transcribe(state, &model, audio_path, &language),
+        "parakeet" => crate::parakeet_asr::transcribe(state, &model, audio_path, &language),
         _ => Err(EngineError::LaunchFailed(format!("Unknown engine: {}", model.engine_id))),
     }
 }

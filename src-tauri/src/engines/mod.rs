@@ -1,5 +1,6 @@
 pub mod whisper;
 pub mod canary;
+pub mod parakeet;
 pub mod openai_api;
 pub mod downloader;
 pub mod llama;
@@ -168,6 +169,7 @@ impl EngineCatalog {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
             Box::new(canary::CanaryEngine),
+            Box::new(parakeet::ParakeetEngine),
             Box::new(llama::LlamaEngine),
             Box::new(bert::BertPunctuationEngine),
             Box::new(pcs::PcsPunctuationEngine),
