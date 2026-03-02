@@ -1,4 +1,5 @@
 pub mod whisper;
+pub mod canary;
 pub mod openai_api;
 pub mod downloader;
 pub mod llama;
@@ -20,11 +21,22 @@ pub enum EngineCategory {
 
 // -- Download type --
 
+/// Describes a single file within a multi-file download.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadFile {
+    pub filename: String,
+    pub url: String,
+    pub size: u64,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum DownloadType {
     #[default]
     SingleFile,
+    /// Multiple files downloaded into a directory. Model `filename` is the directory name.
+    /// Uses `download_marker` (e.g. ".complete") to track completion.
+    MultiFile { files: Vec<DownloadFile> },
     RemoteAPI,
     System,
 }
@@ -155,6 +167,7 @@ impl EngineCatalog {
     pub fn new() -> Self {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
+            Box::new(canary::CanaryEngine),
             Box::new(llama::LlamaEngine),
             Box::new(bert::BertPunctuationEngine),
             Box::new(pcs::PcsPunctuationEngine),

@@ -1,5 +1,6 @@
 mod audio;
 mod bert_punctuation;
+mod canary_asr;
 mod candle_punctuation;
 mod commands;
 mod pcs_punctuation;
@@ -9,6 +10,7 @@ mod errors;
 mod events;
 mod llm_cleanup;
 mod llm_local;
+mod mel_features;
 mod migrations;
 mod llm_prompt;
 mod menu_icons;

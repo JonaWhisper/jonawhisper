@@ -71,14 +71,14 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 
 Les modèles non-Whisper dominent le Open ASR Leaderboard. Certains sont intégrables via ONNX ou même GGML.
 
-| Modèle | Params | FR | Format | Taille | Intérêt | Intégration Rust |
-|---|---|---|---|---|---|---|
-| **bofenghuang/whisper-large-v3-french** | 1.5B | Natif FR | **GGML dispo** | ~3 GB | Meilleur Whisper FR, fine-tuné sur données françaises | Compatible whisper-rs existant ! |
-| **NVIDIA Canary-180M-Flash** | 182M | Oui (52 langues) | ONNX | ~360 MB | Ultra-léger, bat Whisper Medium | Via sherpa-onnx C API ou `canary-rs` |
-| **Qwen3-ASR** | 0.6B / 1.7B | Oui (52 langues) | PyTorch | ~1.2 / 3.4 GB | Bat Whisper sur benchmarks, Alibaba | Pas encore GGML/ONNX, à surveiller |
-| **SenseVoice Small** | 234M | Oui (50+ langues) | ONNX | ~450 MB | Alibaba, très rapide | Via sherpa-onnx |
-| **Moonshine** | 27M / 61M | EN seul | ONNX | ~50 / 120 MB | Ultra-léger, temps réel sur edge | Via sherpa-onnx |
-| **Parakeet-TDT v3** | 1.1B | Oui (25 langues) | ONNX | ~2 GB | Meilleur WER absolu | Via sherpa-onnx ou NeMo |
+| Modèle | Params | FR | Format | Taille int8 | Intérêt | Intégration Rust | Statut |
+|---|---|---|---|---|---|---|---|
+| **bofenghuang/whisper-large-v3-french** | 1.5B | Natif FR | **GGML dispo** | ~3 GB | Meilleur Whisper FR, fine-tuné sur données françaises | Compatible whisper-rs existant ! | **Intégré** (`whisper:large-v3-french-distil`) |
+| **NVIDIA Canary-180M-Flash** | 182M | Oui (4 langues : fr/en/de/es) | ONNX | ~214 MB | Ultra-léger, bat Whisper Medium, WER 1.87% clean | Via ort (canary-rs comme référence) | **Intégré** (`canary:180m-flash-int8`) |
+| **Qwen3-ASR** | 0.6B / 1.7B | Oui (52 langues) | PyTorch | ~1.2 / 3.4 GB | Bat Whisper sur benchmarks, Alibaba | Pas encore GGML/ONNX, à surveiller | À surveiller |
+| **SenseVoice Small** | 234M | Oui (5 langues : zh/yue/en/ja/ko) | ONNX | ~228 MB | Alibaba, très rapide | Via sherpa-onnx | Pas de français |
+| **Moonshine** | 27M / 61M | EN seul | ONNX | ~27 / 120 MB | Ultra-léger, temps réel sur edge | Via sherpa-onnx | Pas de français |
+| **Parakeet-TDT v3** | 1.1B | Oui (25 langues) | ONNX | ~670 MB | Meilleur WER absolu | Via sherpa-onnx ou NeMo | Phase 2 |
 
 **Écosystème Rust** :
 - **sherpa-onnx** : C API avec bindings Rust, supporte Canary, Parakeet, SenseVoice, Moonshine, Whisper

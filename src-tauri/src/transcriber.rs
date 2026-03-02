@@ -35,6 +35,10 @@ pub fn transcribe(
         return Err(EngineError::ModelNotFound(model.local_path().display().to_string()));
     }
 
-    // Native whisper-rs transcription
-    crate::engines::whisper::transcribe_native(state, &model, audio_path, &language)
+    // Dispatch to the appropriate native engine
+    match model.engine_id.as_str() {
+        "whisper" => crate::engines::whisper::transcribe_native(state, &model, audio_path, &language),
+        "canary" => crate::canary_asr::transcribe(state, &model, audio_path, &language),
+        _ => Err(EngineError::LaunchFailed(format!("Unknown engine: {}", model.engine_id))),
+    }
 }
