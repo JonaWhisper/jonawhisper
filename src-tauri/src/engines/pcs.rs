@@ -44,55 +44,9 @@ impl ASREngine for PcsPunctuationEngine {
     }
 
     fn supported_languages(&self) -> Vec<Language> {
-        vec![
-            Language { code: "af".into(), label: "Afrikaans".into() },
-            Language { code: "am".into(), label: "Amharic".into() },
-            Language { code: "ar".into(), label: "Arabic".into() },
-            Language { code: "bg".into(), label: "Bulgarian".into() },
-            Language { code: "bn".into(), label: "Bengali".into() },
-            Language { code: "cs".into(), label: "Czech".into() },
-            Language { code: "da".into(), label: "Danish".into() },
-            Language { code: "de".into(), label: "Deutsch".into() },
-            Language { code: "el".into(), label: "Greek".into() },
-            Language { code: "en".into(), label: "English".into() },
-            Language { code: "es".into(), label: "Español".into() },
-            Language { code: "et".into(), label: "Estonian".into() },
-            Language { code: "fa".into(), label: "Persian".into() },
-            Language { code: "fi".into(), label: "Finnish".into() },
-            Language { code: "fr".into(), label: "Français".into() },
-            Language { code: "gu".into(), label: "Gujarati".into() },
-            Language { code: "hi".into(), label: "Hindi".into() },
-            Language { code: "hr".into(), label: "Croatian".into() },
-            Language { code: "hu".into(), label: "Hungarian".into() },
-            Language { code: "id".into(), label: "Indonesian".into() },
-            Language { code: "is".into(), label: "Icelandic".into() },
-            Language { code: "it".into(), label: "Italiano".into() },
-            Language { code: "ja".into(), label: "Japanese".into() },
-            Language { code: "ka".into(), label: "Georgian".into() },
-            Language { code: "kk".into(), label: "Kazakh".into() },
-            Language { code: "km".into(), label: "Khmer".into() },
-            Language { code: "kn".into(), label: "Kannada".into() },
-            Language { code: "ko".into(), label: "Korean".into() },
-            Language { code: "lt".into(), label: "Lithuanian".into() },
-            Language { code: "lv".into(), label: "Latvian".into() },
-            Language { code: "mk".into(), label: "Macedonian".into() },
-            Language { code: "ml".into(), label: "Malayalam".into() },
-            Language { code: "mn".into(), label: "Mongolian".into() },
-            Language { code: "mr".into(), label: "Marathi".into() },
-            Language { code: "nl".into(), label: "Dutch".into() },
-            Language { code: "no".into(), label: "Norwegian".into() },
-            Language { code: "or".into(), label: "Oriya".into() },
-            Language { code: "pl".into(), label: "Polish".into() },
-            Language { code: "pt".into(), label: "Portuguese".into() },
-            Language { code: "ro".into(), label: "Romanian".into() },
-            Language { code: "ru".into(), label: "Russian".into() },
-            Language { code: "sk".into(), label: "Slovak".into() },
-            Language { code: "sl".into(), label: "Slovenian".into() },
-            Language { code: "ta".into(), label: "Tamil".into() },
-            Language { code: "te".into(), label: "Telugu".into() },
-            Language { code: "tr".into(), label: "Turkish".into() },
-            Language { code: "zh".into(), label: "Chinese".into() },
-        ]
+        // Don't pollute the global language selector — it's for ASR, not punctuation.
+        // PCS language support is indicated via lang_codes on each model.
+        vec![]
     }
 
     fn description(&self) -> &str {

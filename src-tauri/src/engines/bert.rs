@@ -33,12 +33,9 @@ impl ASREngine for BertPunctuationEngine {
     }
 
     fn supported_languages(&self) -> Vec<Language> {
-        vec![
-            Language { code: "fr".into(), label: "Français".into() },
-            Language { code: "en".into(), label: "English".into() },
-            Language { code: "de".into(), label: "Deutsch".into() },
-            Language { code: "it".into(), label: "Italiano".into() },
-        ]
+        // Don't pollute the global language selector — it's for ASR, not punctuation.
+        // BERT language support is indicated via lang_codes on each model.
+        vec![]
     }
 
     fn description(&self) -> &str {
