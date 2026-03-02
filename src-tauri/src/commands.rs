@@ -394,12 +394,12 @@ pub fn start_monitoring(
     if !model_ready {
         crate::ui::tray::open_window_with_min(
             &app,
-            "model-manager",
-            "Model Manager",
-            "/model-manager",
-            700.0,
-            500.0,
-            Some((650.0, 400.0)),
+            "panel",
+            "WhisperDictate",
+            "/panel",
+            750.0,
+            550.0,
+            Some((680.0, 450.0)),
         );
     }
 }

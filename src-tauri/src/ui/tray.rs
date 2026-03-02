@@ -14,9 +14,7 @@ use tauri::{
 pub struct TrayMenuState {
     pub menu: Menu<tauri::Wry>,
     pub mic_submenu: Submenu<tauri::Wry>,
-    pub settings_item: MenuItem<tauri::Wry>,
-    pub models_item: MenuItem<tauri::Wry>,
-    pub history_item: MenuItem<tauri::Wry>,
+    pub panel_item: MenuItem<tauri::Wry>,
     pub setup_item: MenuItem<tauri::Wry>,
     pub quit_item: MenuItem<tauri::Wry>,
 }
@@ -122,9 +120,7 @@ pub fn close_pill_window(app: &AppHandle) {
 fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::error::Error>> {
     let mic_submenu = Submenu::with_id(app, "mic_submenu", &t!("menu.microphone"), true)?;
 
-    let settings_item = MenuItem::with_id(app, "settings", &t!("menu.settings"), true, None::<&str>)?;
-    let models_item = MenuItem::with_id(app, "model_manager", &t!("menu.manageModels"), true, None::<&str>)?;
-    let history_item = MenuItem::with_id(app, "history", &t!("menu.history"), true, None::<&str>)?;
+    let panel_item = MenuItem::with_id(app, "panel", &t!("menu.panel"), true, None::<&str>)?;
     let setup_item = MenuItem::with_id(app, "setup", &t!("menu.setup"), true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", &t!("menu.quit"), true, Some("CmdOrCtrl+Q"))?;
 
@@ -135,9 +131,7 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
             &PredefinedMenuItem::separator(app)?,
             &mic_submenu,
             &PredefinedMenuItem::separator(app)?,
-            &settings_item,
-            &models_item,
-            &history_item,
+            &panel_item,
             &setup_item,
             &PredefinedMenuItem::separator(app)?,
             #[cfg(debug_assertions)]
@@ -151,9 +145,7 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
     Ok(TrayMenuState {
         menu,
         mic_submenu,
-        settings_item,
-        models_item,
-        history_item,
+        panel_item,
         setup_item,
         quit_item,
     })
@@ -233,9 +225,7 @@ pub fn update_tray_labels(app: &AppHandle) {
     let tray_menu = state.tray_menu.lock().unwrap();
     let Some(ref m) = *tray_menu else { return };
 
-    let _ = m.settings_item.set_text(&t!("menu.settings"));
-    let _ = m.models_item.set_text(&t!("menu.manageModels"));
-    let _ = m.history_item.set_text(&t!("menu.history"));
+    let _ = m.panel_item.set_text(&t!("menu.panel"));
     let _ = m.setup_item.set_text(&t!("menu.setup"));
     let _ = m.quit_item.set_text(&t!("menu.quit"));
 
@@ -410,14 +400,8 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             let id = event.id().0.as_str();
             match id {
                 "quit" => app.exit(0),
-                "settings" => {
-                    open_window_with_min(app, "settings", &t!("window.settings"), "/settings", 600.0, 440.0, Some((580.0, 380.0)));
-                }
-                "model_manager" => {
-                    open_window_with_min(app, "model-manager", &t!("window.modelManager"), "/model-manager", 700.0, 500.0, Some((650.0, 400.0)));
-                }
-                "history" => {
-                    open_window_with_min(app, "history", &t!("window.history"), "/history", 500.0, 500.0, Some((350.0, 300.0)));
+                "panel" => {
+                    open_window_with_min(app, "panel", &t!("window.panel"), "/panel", 750.0, 550.0, Some((680.0, 450.0)));
                 }
                 "setup" => {
                     open_fixed_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 450.0);
