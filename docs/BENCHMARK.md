@@ -179,35 +179,131 @@ Approche pipeline : chaîner des modèles légers spécialisés au lieu d'un LLM
 
 ---
 
-## Audio — Denoising & VAD
+## Audio — VAD, Denoising & Prétraitement
 
-### Constat critique : le denoising dégrade Whisper
+Voir `docs/AUDIO-PIPELINE.md` pour l'architecture complète du pipeline.
 
-Le paper **"When De-noising Hurts"** (arXiv:2512.17562, déc 2025) démontre que le speech enhancement **dégrade** les performances ASR dans **toutes** les configurations testées (40/40), avec des augmentations de WER de 1.1% à 46.6%. Whisper est entraîné sur 680K heures d'audio bruité et possède une robustesse interne au bruit. Le denoising introduit des artefacts spectraux plus nuisibles que le bruit original.
+### Architecture du pipeline audio
 
-**Ce qui aide Whisper** : le VAD (trimming silence) pour éviter les hallucinations.
+**Pipeline actuel** :
+```
+Micro (cpal) → WAV 16 kHz → VAD (Silero v5) → Trim silence → ASR
+```
 
-Voir `docs/AUDIO-PIPELINE.md` pour l'architecture complète.
+**Pipeline hybride proposé** (denoising ciblé) :
+```
+Original 16 kHz WAV ──┬──► [Denoise copie] ──► VAD (boundaries précises)
+                      │                              │
+                      │                    trim start/end
+                      │                              │
+                      └──► ASR sur ORIGINAL (trimmed) ◄──┘
 
-### VAD (Voice Activity Detection)
+                      └──► [Copie dénoisée pour playback historique]
+```
 
-| Solution | Type | Taille | Latence | Précision | Rust | Statut |
-|---|---|---|---|---|---|---|
-| **Silero VAD v6** | ML (ONNX) | 2 MB | <1ms / 30ms chunk | 87.7% TPR @ 5% FPR | `voice_activity_detector`, `silero-vad-rust` | **Intégré** (`vad.rs`, modèle bundlé via `include_bytes!`) |
-| **TEN VAD** | ML (ONNX) | ~1 MB | Ultra-faible | Meilleur que Silero sur transitions | ONNX via `ort` | Non intégré — gains marginaux vs Silero, projet récent |
-| **WebRTC VAD** | GMM | ~10 KB | ~0ms | 50% TPR @ 5% FPR | `webrtc-vad` crate | Écarté — précision 2x inférieure à Silero |
-| **NVIDIA MarbleNet v2** | CNN | ~400 KB | <1ms / 20ms frame | Bon | ONNX exportable | Non intégré — nécessite conversion ONNX, gains incertains |
-| **nnnoiseless VAD** | RNNoise | ~85 KB | <1ms / 10ms frame | Correct | Natif (inclus) | Écarté — précision inférieure à Silero |
+L'idée : le dénoisé sert à améliorer la détection VAD et le confort d'écoute, mais l'ASR reçoit toujours l'audio original (non dégradé par les artefacts spectraux du denoising).
 
-### Denoising (optionnel, configurable)
+### VAD — Comparaison détaillée
 
-| Solution | Type | Taille | RTF (CPU) | PESQ | Rust | Statut |
-|---|---|---|---|---|---|---|
-| **nnnoiseless** | Pure Rust | 85 KB | <<0.01 | ~3.88 | Natif | Écarté — le denoising dégrade l'ASR (arXiv:2512.17562) |
-| **DeepFilterNet3** | Rust + tract | ~8 MB | 0.04 | 3.5+ | `deep_filter` crate | Écarté — idem |
-| **DTLN** | ONNX | ~2 MB | <0.01 | ~2.7 | `dtln-rs` (Datadog) | Écarté — idem |
-| **GTCRN** | ONNX | <100 KB | <<0.01 | 2.87 | ONNX via `ort` | Écarté — idem |
-| **UL-UNAS** | ONNX | ~500 KB | Très rapide | 3.09 | ONNX via `ort` | Écarté — idem |
+| Modèle | Architecture | Taille | Mémoire | RTF | Précision | Licence | Statut |
+|---|---|---|---|---|---|---|---|
+| **Silero VAD v5** | LSTM ONNX | 2.3 MB | ~5 MB | 0.006 | ROC-AUC : AliMeeting 0.96, AISHELL-4 0.94 | MIT | **✓ Intégré** (`vad.rs`) |
+| **Silero VAD v6.2** | LSTM ONNX | 2 MB | ~5 MB | 0.006 | +16% vs v5 sur bruit réel, child/muted voice | MIT | **Upgrade candidat** — drop-in |
+| **Earshot** | WebRTC NN (Rust pur) | **75 KB** | 8 KiB | **0.0007** | Non publié (base WebRTC NN) | MIT/Apache-2.0 | **À évaluer** — pyke.io (équipe ort), v1.0 |
+| **TEN VAD** | ONNX | 2.2 MB | ~5 MB | 0.016 | Non publié, claims meilleures transitions | Apache 2.0 + **non-compete** | Écarté — clause non-compete |
+| Picovoice Cobra v2.1 | Propriétaire | N/A | N/A | 0.005 | **98.9% TPR** @ 5% FPR | Propriétaire $899/mois | Écarté — coût |
+| pyannote 3.0 | Transformer ONNX | 6 MB | ~20 MB | >0.05 | Excellent (diarisation) | MIT | Écarté — overkill (7 classes, chunks 10s) |
+| NVIDIA MarbleNet v2 | CNN | ~400 KB | ~2 MB | ~0.002 | Bon | NVIDIA OML (restrictive) | Écarté — licence |
+| WebRTC VAD (GMM) | GMM classique | 158 KB | <100 KB | ~0 | 50% TPR @ 5% FPR | BSD | Écarté — précision insuffisante |
+| nnnoiseless VAD | RNNoise GRU | 85 KB | <1 MB | ~0 | ~70% | BSD-3 | Écarté — sous-produit du denoiser |
+
+### VAD — Écosystème Rust
+
+| Crate | Version | Modèle | Deps | Compatible ort 2.0.0-rc.11 | Notes |
+|---|---|---|---|---|---|
+| **`earshot`** | 1.0.0 | WebRTC NN | aucune | N/A (pas d'ort) | **75 KB, no_std, même équipe que ort** |
+| `voice_activity_detector` | 0.2.1 | Silero v5 | ort rc.10 | ✗ conflit ndarray | Licence custom |
+| `silero-vad-rust` | — | Silero v4/v5 | ort 1.22.x | ✗ | ORT version incompatible |
+| `ten-vad-rs` | 0.1.5 | TEN VAD | ort | Potentiel | Clause non-compete |
+| `webrtc-vad` | 0.4.0 | GMM | C FFI | N/A | Abandonné (2019) |
+| **Direct `ort`** | 2.0.0-rc.11 | Silero | ort | ✓ | **Approche actuelle** (pas de crate VAD — conflits ndarray) |
+
+### VAD — Prochaines étapes
+
+1. **Immédiat** : Upgrade Silero v5 → v6.2 — swap ONNX, même API, CoreML pré-converti disponible.
+2. **Court terme** : Évaluer `earshot` — 30x plus petit, 20x plus rapide, zéro dépendance.
+3. **Optionnel** : Double-VAD (earshot pré-filtre rapide + Silero confirme si ambigu).
+
+### Analyse nuancée du denoising
+
+Le paper **"When De-noising Hurts"** (arXiv:2512.17562, déc 2025) est souvent cité pour rejeter catégoriquement le denoising. Voici une lecture plus nuancée :
+
+**Ce que dit le paper** : le denoising dégrade l'ASR dans 40/40 configurations testées (+1% à +47% WER). Les artefacts spectraux (smearing, discontinuités) sont plus nuisibles que le bruit original pour Whisper (entraîné sur 680K heures d'audio bruité).
+
+**Ce que le paper ne teste PAS** :
+- Denoising pour **améliorer la VAD** (pré-traitement des boundaries, pas envoi direct à ASR)
+- Denoising pour le **playback** (qualité d'écoute dans l'historique)
+- **Canary-180M / Parakeet-TDT / Qwen3-ASR** (modèles récents hors étude)
+- L'approche **hybride** : dénoisé pour VAD, original pour ASR
+
+**Quand le denoising aide** : VAD boundaries en environnement bruité, playback historique, SNR extrême (<5 dB).
+
+**Quand le denoising nuit** : envoi direct à ASR stock (cas testé par le paper).
+
+**Conclusion** : pas rejeté catégoriquement, mais jamais en traitement direct pré-ASR. Utiliser en pipeline hybride ciblé.
+
+### Denoising — Comparaison détaillée
+
+| Modèle | Params | Taille | PESQ | STOI | DNSMOS | Sample Rate | Streaming | Licence | Statut |
+|---|---|---|---|---|---|---|---|---|---|
+| **nnnoiseless** | 60K | 85 KB | **3.88** | 0.92 | — | 48 kHz | Oui | BSD-3 | **Candidat #1** — Rust pur, inclut VAD bonus |
+| **GTCRN** | 48K | <100 KB | 2.87 | 0.940 | 3.44 | **16 kHz** | Oui | MIT | **Candidat #2** — ultra-léger, ort natif |
+| **UL-UNAS** | 169K | ~500 KB | 3.09 | — | — | **16 kHz** | Oui | MIT | **Candidat #3** — évolution GTCRN |
+| **DTLN** | <1M | <4 MB | 3.04 | — | — | **16 kHz** | Oui (stateful) | MIT | Alternative — plus lourd |
+| **DeepFilterNet3** | 2.13M | ~8 MB | 3.17 | 0.944 | — | 48 kHz | Oui | MIT/Apache | Meilleure qualité — mais 48 kHz, tract, stale |
+| NSNet2 | ~6M | ~20 MB | 2.94 | — | — | 16 kHz | Problématique | MIT | Écarté — GRU state streaming issue |
+| FRCRN | 10.3M | N/A | — | — | — | — | Non | — | Écarté — trop lourd, pas d'ONNX |
+| Demucs | ~135 MB | 135 MB | — | — | — | 44.1 kHz | Non | CC-BY-NC | Écarté — licence, taille |
+
+### Denoising — Écosystème Rust
+
+| Option | Crate/Méthode | Runtime | 16 kHz natif | Effort intégration |
+|---|---|---|---|---|
+| **nnnoiseless** | `nnnoiseless` 0.5.2 | Rust pur | Non (48 kHz, `rubato` requis) | Faible |
+| **GTCRN via ort** | ONNX direct | `ort` + CoreML | **Oui** | Moyen (STFT/ISTFT manuelle) |
+| **UL-UNAS via ort** | ONNX direct | `ort` + CoreML | **Oui** | Moyen (STFT/ISTFT manuelle) |
+| **DTLN via ort** | ONNX direct | `ort` | **Oui** | Moyen (stateful) |
+| **DeepFilterNet3** | `deep_filter` (git) | `tract` | Non (48 kHz) | Élevé (tract + 3 models) |
+
+### Denoising — Pipeline hybride recommandé
+
+Recommandation denoiser selon priorité :
+- **16 kHz natif préféré** : GTCRN (<100 KB, ort) ou UL-UNAS (~500 KB, meilleur PESQ)
+- **Qualité max** : nnnoiseless (PESQ 3.88, Rust pur, mais 48 kHz → `rubato` resampling)
+- **Meilleur équilibre** : UL-UNAS (16 kHz, PESQ 3.09, MIT, ort, CoreML)
+
+### Silence Trimming — Techniques classiques
+
+| Technique | Coût CPU | Précision (propre) | Précision (bruité) | Notes |
+|---|---|---|---|---|
+| Seuil énergie RMS | ~0 | Bonne | Mauvaise | Inutilisable en bruit ambiant |
+| Zero-Crossing Rate | ~0 | Médiocre | Très mauvaise | Utile uniquement combiné |
+| Double seuil adaptatif | ~0 | Modérée | Médiocre | Mieux que RMS seul |
+| Entropie spectrale | Faible (FFT) | Bonne | Modérée | Transitions signal/bruit |
+| **VAD neuronale (Silero)** | 189µs/chunk | **Excellente** | **Excellente** | **✓ Approche actuelle** |
+| **VAD neuronale (Earshot)** | <100µs/chunk | À évaluer | À évaluer | Candidat benchmark |
+
+La VAD neuronale est sans égale. Les techniques classiques ne sont pertinentes que comme pré-filtre ultra-rapide.
+
+### Mises à niveau recommandées (roadmap)
+
+| Priorité | Action | Effort | Impact |
+|---|---|---|---|
+| **1 — Immédiat** | Upgrade Silero v5 → v6.2 | Très faible (swap .onnx) | -16% erreurs VAD, meilleure gestion voix difficiles |
+| **1 — Immédiat** | Corriger documentation v5/v6 | Trivial | Cohérence code/docs |
+| **2 — Court terme** | Évaluer Earshot sur audio réel | Faible (add crate, A/B test) | Potentiel : -95% taille VAD, +20x vitesse |
+| **3 — Moyen terme** | Pipeline hybride denoise-for-VAD | Modéré | Meilleur trimming en environnement bruité |
+| **4 — Optionnel** | Denoising pour playback historique | Modéré | UX : audio propre en relecture |
 
 ---
 

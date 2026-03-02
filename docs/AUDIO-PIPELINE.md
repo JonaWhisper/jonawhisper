@@ -15,7 +15,9 @@ Le paper **"When De-noising Hurts"** (arXiv:2512.17562, déc 2025) a évalué sy
 
 **Exception** : le denoising aide si l'ASR est **fine-tuné sur de l'audio dénoisé** (pas notre cas avec Whisper standard).
 
-**Conséquence** : le denoising doit être **optionnel et désactivé par défaut**. La priorité absolue est le **VAD** (trimming silence → prévient les hallucinations).
+**Conséquence** : le denoising envoyé directement à l'ASR est nuisible. Cependant, le paper ne teste pas l'utilisation du dénoisé pour **améliorer la VAD** (boundaries) ou le **playback** (confort d'écoute). L'approche hybride (dénoisé pour VAD/playback, original pour ASR) contourne le problème.
+
+La priorité absolue reste le **VAD** (trimming silence → prévient les hallucinations).
 
 Sources : [arXiv:2512.17562](https://arxiv.org/abs/2512.17562), [Whisper discussion #2125](https://github.com/openai/whisper/discussions/2125)
 
@@ -24,10 +26,14 @@ Sources : [arXiv:2512.17562](https://arxiv.org/abs/2512.17562), [Whisper discuss
 ## Vue d'ensemble (révisée)
 
 ```
-Micro (cpal) → [1. VAD] → [2. Denoising optionnel] → [3. Calibration device] → WAV → Whisper
-                  │              │                           │
-             Silence ?      Suppression bruit          Gain, noise gate
-             → discard      (désactivé par défaut)     par type de micro
+Pipeline actuel :
+  Micro (cpal) → WAV 16 kHz → [1. VAD (Silero v5)] → Trim → ASR
+
+Pipeline hybride proposé :
+  Micro (cpal) → WAV 16 kHz ──┬──► [Denoise copie] → VAD (meilleurs boundaries)
+                               │                           │ trim
+                               └──► ASR sur ORIGINAL ◄─────┘
+                               └──► [3. Calibration device] → Gain, noise gate
 ```
 
 **Changement de priorité** : VAD en premier (haute valeur, cause racine des hallucinations), denoising optionnel (peut dégrader Whisper), calibration en dernier (polish UX).
@@ -44,18 +50,24 @@ Micro (cpal) → [1. VAD] → [2. Denoising optionnel] → [3. Calibration devic
 
 | Solution | Taille | Latence | Précision (TPR @ 5% FPR) | Rust | Dépendances |
 |---|---|---|---|---|---|
-| **Silero VAD v6** | 2 MB | <1ms / 30ms chunk | **87.7%** | `voice_activity_detector` ou `silero-vad-rust` | `ort` (ONNX Runtime) |
-| **TEN VAD** | ~1 MB | Ultra-faible | Meilleur sur transitions | ONNX via `ort` | `ort` |
+| **Silero VAD v5** | 2.3 MB | <1ms / 30ms chunk | ROC-AUC : AliMeeting 0.96, AISHELL-4 0.94 | Direct `ort` (pas de crate VAD — conflits ndarray) | `ort` (ONNX Runtime) |
+| **Silero VAD v6.2** | 2 MB | <1ms / 30ms chunk | +16% vs v5 sur bruit réel | Direct `ort` (drop-in) | `ort` |
+| **Earshot** | **75 KB** | <0.1ms / chunk | Non publié (base WebRTC NN) | `earshot` crate (Rust pur, no_std) | Aucune |
+| **TEN VAD** | 2.2 MB | Ultra-faible | Non publié, claims meilleures transitions | ONNX via `ort` | `ort` — **⚠ clause non-compete** |
 | RNNoise/nnnoiseless VAD | ~85 KB | <1ms / 10ms frame | Correct (~70%) | Natif (inclus dans nnnoiseless) | Aucune |
-| WebRTC VAD | ~10 KB | ~0ms | **50%** (2x moins que Silero) | `webrtc-vad` crate | C FFI |
+| WebRTC VAD | 158 KB | ~0ms | **50% TPR** @ 5% FPR | `webrtc-vad` crate (abandonné 2019) | C FFI |
 | Énergie RMS | 0 | ~1ms | Limité (pas voix vs bruit) | Natif | Aucune |
-| NVIDIA MarbleNet v2 | ~400 KB | <1ms / 20ms | Bon | ONNX via `ort` | `ort` |
+| NVIDIA MarbleNet v2 | ~400 KB | <1ms / 20ms | Bon | ONNX via `ort` | `ort` — licence NVIDIA OML restrictive |
 
-**Recommandation** : **Silero VAD v6** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/vad.rs`.
+**Recommandation** : **Silero VAD v5** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/vad.rs`.
 - 4x moins d'erreurs que WebRTC VAD
-- <1ms par chunk, 2 MB de modèle
-- Inférence directe : `forward_chunk` → probabilité 0.0-1.0, état LSTM [2,1,128] + contexte 64 samples
-- L'app utilise déjà `ort` pour BERT punctuation → pas de nouvelle dépendance
+- <1ms par chunk, 2.3 MB de modèle, état LSTM [2,1,128] + contexte 64 samples
+- Inférence directe : `forward_chunk` → probabilité 0.0-1.0
+- L'app utilise déjà `ort` pour BERT/PCS punctuation + ASR → pas de nouvelle dépendance
+
+**Upgrade ciblé** : Silero v6.2 est un drop-in (+16% précision sur bruit réel, voix enfants/étouffées). CoreML pré-converti disponible.
+
+**Alternative légère** : `earshot` (pyke.io, même équipe que `ort`) — 75 KB, Rust pur, no_std, ~20x plus rapide. À évaluer sur audio réel WhisperDictate.
 
 **Fonctionnalités VAD** :
 1. **Discard silence** : si aucun segment de parole détecté → son Basso + pas de transcription
@@ -69,9 +81,22 @@ Micro (cpal) → [1. VAD] → [2. Denoising optionnel] → [3. Calibration devic
 
 ## Niveau 2 — Noise reduction (OPTIONNEL, désactivé par défaut)
 
-**But** : supprimer le bruit de fond. Peut améliorer le confort d'écoute (pour le playback dans l'historique) mais **dégrade la qualité de transcription Whisper**.
+**But** : supprimer le bruit de fond. Peut améliorer le confort d'écoute (playback historique) et la précision VAD, mais **dégrade la transcription ASR si envoyé directement**.
 
-**Usage recommandé** : toggle optionnel dans les préférences, désactivé par défaut. Utile uniquement pour :
+**Approche hybride recommandée** : ne jamais envoyer l'audio dénoisé directement à l'ASR. À la place :
+```
+Original 16 kHz WAV ──┬──► [Denoise copie] ──► VAD (boundaries précises)
+                      │                              │
+                      │                    trim start/end
+                      │                              │
+                      └──► ASR sur ORIGINAL (trimmed) ◄──┘
+                      └──► [Copie dénoisée pour playback historique]
+```
+
+Le paper "When De-noising Hurts" (arXiv:2512.17562) teste uniquement le denoising → ASR directement. Il ne couvre pas l'utilisation du dénoisé pour améliorer la VAD ni le playback. L'approche hybride contourne le problème : l'ASR reçoit toujours l'audio original.
+
+**Usage recommandé** : toggle optionnel dans les préférences, désactivé par défaut. Utile pour :
+- **Pipeline hybride** : améliorer les boundaries VAD en environnement bruité
 - Nettoyer l'audio sauvegardé dans l'historique (confort d'écoute)
 - Environnements extrêmement bruités (SNR < 5 dB) où l'utilisateur préfère tenter
 
@@ -113,14 +138,19 @@ Micro (cpal) → [1. VAD] → [2. Denoising optionnel] → [3. Calibration devic
 
 #### Modèles ultra-légers (hidden gems)
 
-| Modèle | Params | Taille ONNX | PESQ | Note |
-|---|---|---|---|---|
-| **GTCRN** | **23.7K** | <100 KB | 2.87 | Le plus petit existant (ICASSP 2024) |
-| **UL-UNAS** | **169K** | ~500 KB | 3.09 | Évolution de GTCRN, bien meilleure qualité (mars 2025) |
+| Modèle | Params | Taille ONNX | PESQ | STOI | DNSMOS | Sample Rate | Note |
+|---|---|---|---|---|---|---|---|
+| **GTCRN** | **48.2K** | <100 KB | 2.87 | 0.940 | 3.44 | **16 kHz** | Ultra-léger, ICASSP 2024, streaming natif |
+| **UL-UNAS** | **169K** | ~500 KB | 3.09 | — | — | **16 kHz** | Évolution de GTCRN, bien meilleure qualité (mars 2025) |
 
-Ces modèles nécessitent ONNX export + `ort` crate + gestion STFT/ISTFT manuelle.
+Ces modèles sont en **16 kHz natif** (pas de resampling nécessaire — notre pipeline est déjà en 16 kHz). Nécessitent ONNX export + `ort` crate + CoreML + gestion STFT/ISTFT manuelle.
 
-**Recommandation** : si denoising activé → **nnnoiseless** (le plus simple à intégrer, pure Rust, inclut VAD bonus). Si qualité insuffisante → **DeepFilterNet3** (meilleure qualité, déjà en Rust via tract).
+**Avantage clé vs nnnoiseless** : pas besoin de `rubato` pour le resampling 48→16 kHz.
+
+**Recommandation par priorité** :
+- **16 kHz natif préféré** : GTCRN (<100 KB, ort + CoreML) ou UL-UNAS (~500 KB, meilleur PESQ) — pas de resampling
+- **Qualité max** : nnnoiseless (PESQ 3.88, Rust pur, mais 48 kHz → `rubato` resampling requis)
+- **Meilleur équilibre** : UL-UNAS (16 kHz, PESQ 3.09, MIT, ort, CoreML possible)
 
 ---
 
@@ -150,17 +180,22 @@ Ces modèles nécessitent ONNX export + `ort` crate + gestion STFT/ISTFT manuell
 
 ```
 Phase 1 — VAD seul (haute valeur, effort faible) ✅ DONE
-├── Silero VAD v6 ONNX embarqué, inférence via ort (pas de crate VAD — conflits ndarray)
+├── Silero VAD v5 ONNX embarqué, inférence via ort (pas de crate VAD — conflits ndarray)
 ├── Discard si pas de parole (son Basso + pas de transcription)
 ├── Trimming silences début/fin avant Whisper
 └── Toggle vad_enabled dans Settings > Post-traitement (activé par défaut)
 
-Phase 2 — Denoising optionnel (valeur conditionnelle, effort modéré)
-├── Intégrer nnnoiseless (pure Rust, ~85 KB)
+Phase 1.5 — Améliorations VAD (haute valeur, effort faible)
+├── Upgrade Silero v5 → v6.2 (swap .onnx, même API, CoreML dispo)
+└── Évaluer earshot (75 KB, Rust pur, 20x plus rapide) — A/B test sur audio réel
+
+Phase 2 — Pipeline hybride denoising (valeur conditionnelle, effort modéré)
+├── Intégrer GTCRN ou UL-UNAS via ort (16 kHz natif, <500 KB)
+├── Pipeline hybride : dénoisé pour VAD boundaries, original pour ASR
 ├── Toggle dans les préférences (désactivé par défaut)
-├── Avertir l'utilisateur que ça peut dégrader la transcription
-├── Utile pour : playback audio propre dans l'historique
-└── Si qualité insuffisante : DeepFilterNet3 via deep_filter crate
+├── Copie dénoisée stockée pour playback historique
+├── Alternative : nnnoiseless (Rust pur, PESQ 3.88, mais 48 kHz → rubato)
+└── Ne JAMAIS envoyer le dénoisé directement à l'ASR (arXiv:2512.17562)
 
 Phase 3 — Presets device (polish UX)
 ├── Détecter le type de micro (transport type déjà dispo)
@@ -175,7 +210,7 @@ Phase 3 — Presets device (polish UX)
 | Traitement | Réduit hallucinations | Améliore transcription | Risque | Effort |
 |---|---|---|---|---|
 | **VAD (Silero)** | **Fortement** (cause racine) | Oui (trimming → moins de bruit) | Aucun | Faible |
-| **Denoising** | Indirectement | **Non — peut dégrader** | WER +1-47% | Modéré |
+| **Denoising** | Indirectement (via meilleure VAD) | **Non directement** — dégrade ASR si envoyé tel quel, mais aide la VAD en pipeline hybride | WER +1-47% si direct | Modéré |
 | **Presets device** | Indirectement | Oui (niveau/bruit) | Aucun | Élevé |
 
 ---
