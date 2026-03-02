@@ -8,7 +8,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
 - **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible cloud API — unified model selector
 - **9 cloud providers** — preconfigured presets (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) with API key testing and dynamic model discovery
-- **Post-processing** — VAD silence detection (Silero VAD v6, discards silent recordings + trims silence), hallucination filtering, dictation commands, text cleanup via BERT punctuation restoration or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
+- **Post-processing** — VAD silence detection (Silero VAD v6, discards silent recordings + trims silence), hallucination filtering, dictation commands, text cleanup via punctuation restoration (BERT or PCS 47-language) or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual feedback (recording → transcribing), real-time spectrum bars, cancel support during recording or transcription
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
@@ -64,7 +64,7 @@ On first launch, a setup wizard asks for three macOS permissions:
 - **Whisper** is the default and recommended engine — runs locally with Metal GPU acceleration on Apple Silicon (M1/M2/M3/M4). Multiple model sizes available (tiny to large-v3-turbo).
 - **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server.
 
-Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `llm/`, `bert/`).
+Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `llm/`, `bert/`, `pcs/`).
 
 ## Usage
 
@@ -93,7 +93,8 @@ Open Settings from the tray menu to configure:
 ### Text cleanup
 
 Optional post-transcription cleanup via a unified model selector:
-- **BERT punctuation** — fast, lightweight punctuation restoration (ONNX Runtime)
+- **BERT punctuation** — fast punctuation restoration, 4 languages (ONNX Runtime)
+- **PCS punctuation** — punctuation + capitalization + segmentation, 47 languages (ONNX Runtime, SentencePiece tokenizer)
 - **Local LLM** — full text correction via llama.cpp with Metal GPU (GGUF models)
 - **Cloud LLM** — full text correction via OpenAI-compatible or Anthropic API
 
@@ -137,8 +138,10 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT for audio spectrum (visualization) |
 | [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Native Whisper transcription (GGML, Metal GPU on macOS) |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF, Metal GPU, text cleanup) |
-| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT punctuation) |
+| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT punctuation, PCS punctuation) |
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD (LSTM state, ONNX inputs/outputs) |
+| [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizers (PCS SentencePiece Unigram) |
+| [`prost`](https://github.com/tokio-rs/prost) | Protobuf decoding (SentencePiece `.model` files) |
 | [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Incremental UTF-8 decoding (LLM token-by-token output) |
 
 **Network / IO**
@@ -244,6 +247,7 @@ src-tauri/               Rust backend
     llm_local.rs         Local LLM text cleanup (llama.cpp)
     llm_prompt.rs        Shared LLM module (error types, output sanitization, prompt)
     bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
+    pcs_punctuation.rs   PCS punctuation + capitalization + segmentation (ONNX Runtime, 47 languages)
     tray.rs              Menu bar menu & tray icon states
     pill.rs              Native pill overlay (AppKit NSWindow, SDF rendering)
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)

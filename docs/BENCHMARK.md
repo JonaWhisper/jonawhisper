@@ -85,7 +85,7 @@ Les modèles non-Whisper dominent le Open ASR Leaderboard. Certains sont intégr
 - **transcribe-rs** : Crate Rust abstrayant plusieurs backends ASR
 - **canary-rs** : Bindings Rust spécifiques pour NVIDIA Canary
 
-**Candidat prioritaire** : `bofenghuang/whisper-large-v3-french` — compatible avec notre whisper-rs existant (format GGML), meilleur WER français. Juste une entrée catalogue à ajouter.
+**Candidat prioritaire** : `bofenghuang/whisper-large-v3-french` — compatible avec notre whisper-rs existant (format GGML), meilleur WER français. **Intégré** comme `whisper:large-v3-french-distil`.
 
 ---
 
@@ -139,16 +139,16 @@ Modèles GGUF téléchargeables depuis le Model Manager, exécutés en local via
 
 ### Modèles candidats à ajouter au catalogue natif
 
-Ces modèles GGUF tournent directement via llama-cpp-2 sans code supplémentaire — juste une entrée dans le catalogue.
+Ces modèles GGUF tournent directement via llama-cpp-2 sans code supplémentaire — juste une entrée dans le catalogue. **Tous ajoutés au catalogue.**
 
-| Modèle | Taille Q4 | Params | FR/EN | Intérêt | Source |
-|---|---|---|---|---|---|
-| **Qwen3 0.6B** | ~400 MB | 0.6B | Oui | Ultra rapide (80-120 tok/s M1) | bartowski/Qwen_Qwen3-0.6B-GGUF |
-| **Gemma 3 4B** | ~2.5 GB | 4B | Oui | Alternative à Qwen3 4B, 140+ langues | bartowski/google_gemma-3-4b-it-GGUF |
-| **SmolLM3 3B** | ~1.8 GB | 3B | Partiel | Bat Llama 3.2 3B et Qwen2.5 3B | bartowski/SmolLM3-3B-Instruct-GGUF |
-| **Llama 3.2 1B** | ~700 MB | 1B | Partiel | Meta, bon en summarization | bartowski/Llama-3.2-1B-Instruct-GGUF |
-| **Llama 3.2 3B** | ~1.8 GB | 3B | Partiel | Meta, bat Gemma 2 2.6B | bartowski/Llama-3.2-3B-Instruct-GGUF |
-| **Ministral 3B** | ~1.8 GB | 3B | Oui | Mistral, bon en FR | bartowski/Ministral-3B-Instruct-GGUF |
+| Modèle | Taille Q4 | Params | FR/EN | Intérêt | Source | Statut |
+|---|---|---|---|---|---|---|
+| **Qwen3 0.6B** | ~400 MB | 0.6B | Oui | Ultra rapide (80-120 tok/s M1) | bartowski/Qwen_Qwen3-0.6B-GGUF | **Intégré** |
+| **Gemma 3 4B** | ~2.5 GB | 4B | Oui | Alternative à Qwen3 4B, 140+ langues | bartowski/google_gemma-3-4b-it-GGUF | **Intégré** |
+| **SmolLM3 3B** | ~1.8 GB | 3B | Partiel | Bat Llama 3.2 3B et Qwen2.5 3B | bartowski/SmolLM3-3B-Instruct-GGUF | **Intégré** |
+| **Llama 3.2 1B** | ~700 MB | 1B | Partiel | Meta, bon en summarization | bartowski/Llama-3.2-1B-Instruct-GGUF | **Intégré** |
+| **Llama 3.2 3B** | ~1.8 GB | 3B | Partiel | Meta, bat Gemma 2 2.6B | bartowski/Llama-3.2-3B-Instruct-GGUF | **Intégré** |
+| **Ministral 3B** | ~1.8 GB | 3B | Oui | Mistral, bon en FR | bartowski/Ministral-3B-Instruct-GGUF | **Intégré** |
 
 ### BERT Punctuation (natif intégré)
 
@@ -160,11 +160,11 @@ Ces modèles GGUF tournent directement via llama-cpp-2 sans code supplémentaire
 
 Alternatives ou compléments au BERT fullstop actuel.
 
-| Modèle | Architecture | Taille | Langues | ONNX | Intérêt |
-|---|---|---|---|---|---|
-| **1-800-BAD-CODE/punct_cap_seg_47_language** | Transformer 6L d=512 | ~200 MB | 47 langues (FR, EN) | Exportable | Ponctuation + capitalisation + segmentation en un pass. F1=97.39 |
-| **sherpa-onnx-online-punct-en** | CNN-BiLSTM | **7.1 MB** (int8) | EN | Oui | Ultra-léger, 1/40e la taille de BERT, 2.5x plus rapide |
-| **oliverguhr/fullstop-multilingual-sonar-base** | XLM-RoBERTa Base | ~500 MB | FR, EN, DE, IT, NL | Exportable | Version Base du modèle actuel, plus petit |
+| Modèle | Architecture | Taille | Langues | ONNX | Intérêt | Statut |
+|---|---|---|---|---|---|---|
+| **1-800-BAD-CODE/punct_cap_seg_47_language** | Transformer 6L d=512 | ~200 MB | 47 langues (FR, EN) | Exportable | Ponctuation + capitalisation + segmentation en un pass. F1=97.39 | **Intégré** (`pcs_punctuation.rs`) |
+| **sherpa-onnx-online-punct-en** | CNN-BiLSTM | **7.1 MB** (int8) | EN | Oui | Ultra-léger, 1/40e la taille de BERT, 2.5x plus rapide | Candidat |
+| **oliverguhr/fullstop-multilingual-sonar-base** | XLM-RoBERTa Base | ~500 MB | FR, EN, DE, IT, NL | Exportable | Version Base du modèle actuel, plus petit | Candidat |
 
 ### Modèles de correction spécialisés (alternative au LLM)
 

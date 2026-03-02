@@ -18,6 +18,7 @@
 
 - [ ] **Intégration Deepgram Nova-3** — API propriétaire mais simple (REST, audio brut en body, ~80 lignes Rust). Meilleure qualité sur audio bruité. Voir `docs/CLOUD-INTEGRATION.md`.
 - [x] **Évaluer modèles de correction spécialisés** — **Done.** Évaluation complète dans `docs/BENCHMARK.md`. Métadonnées (params, RAM, langues, recommended) intégrées dans le sélecteur cleanup de Settings.
+- [x] **Implémenter PCS Punctuation (47 langues)** — **Done.** Moteur `1-800-BAD-CODE/punct_cap_seg_47_language` (233 MB ONNX, 4 têtes : ponctuation, capitalisation, segmentation). Tokenizer SentencePiece parsé en Rust via `prost` (protobuf). Voir `pcs_punctuation.rs`, `engines/pcs.rs`.
 
 ## Refactoring
 
