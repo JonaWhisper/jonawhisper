@@ -77,7 +77,7 @@
   "settings.transcription.gpuMode.auto": "Auto (recommended)",
   "settings.transcription.gpuMode.gpu": "GPU",
   "settings.transcription.gpuMode.cpu": "CPU",
-  "settings.transcription.noModels": "No models downloaded. Use the model manager to download one.",
+  "settings.transcription.noModels": "No model",
   "settings.cloudAsr.model": "Model",
   "settings.cloudAsr.custom": "Custom model\u2026",
   "settings.cloudAsr.customPlaceholder": "Model name",

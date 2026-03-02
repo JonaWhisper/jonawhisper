@@ -102,9 +102,9 @@ const selectedAsrModel = computed(() =>
             </SelectItem>
           </SelectContent>
         </Select>
-        <p v-else class="text-xs text-muted-foreground">
+        <div v-else class="flex h-8 items-center rounded-md border border-input px-3 text-xs text-muted-foreground opacity-60 min-w-[180px]">
           {{ t('settings.transcription.noModels') }}
-        </p>
+        </div>
       </div>
 
       <!-- Cloud ASR sub-settings (model + refresh) -->
