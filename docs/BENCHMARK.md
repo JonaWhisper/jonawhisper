@@ -75,10 +75,10 @@ Les modèles non-Whisper dominent le Open ASR Leaderboard. Certains sont intégr
 |---|---|---|---|---|---|---|---|
 | **bofenghuang/whisper-large-v3-french** | 1.5B | Natif FR | **GGML dispo** | ~3 GB | Meilleur Whisper FR, fine-tuné sur données françaises | Compatible whisper-rs existant ! | **Intégré** (`whisper:large-v3-french-distil`) |
 | **NVIDIA Canary-180M-Flash** | 182M | Oui (4 langues : fr/en/de/es) | ONNX | ~214 MB | Ultra-léger, bat Whisper Medium, WER 1.87% clean | Via ort (canary-rs comme référence) | **Intégré** (`canary:180m-flash-int8`) |
-| **Qwen3-ASR** | 0.6B / 1.7B | Oui (52 langues) | PyTorch | ~1.2 / 3.4 GB | Bat Whisper sur benchmarks, Alibaba | Pas encore GGML/ONNX, à surveiller | À surveiller |
+| **Qwen3-ASR 0.6B** | 0.6B | Oui (30 langues) | Safetensors | ~1.88 GB | Bat Whisper sur benchmarks, Alibaba, Accelerate/AMX | Via `qwen-asr` crate (pure Rust) | **Intégré** (`qwen-asr:0.6b`) |
 | **SenseVoice Small** | 234M | Oui (5 langues : zh/yue/en/ja/ko) | ONNX | ~228 MB | Alibaba, très rapide | Via sherpa-onnx | Pas de français |
 | **Moonshine** | 27M / 61M | EN seul | ONNX | ~27 / 120 MB | Ultra-léger, temps réel sur edge | Via sherpa-onnx | Pas de français |
-| **Parakeet-TDT v3** | 1.1B | Oui (25 langues) | ONNX | ~670 MB | Meilleur WER absolu | Via sherpa-onnx ou NeMo | Phase 2 |
+| **Parakeet-TDT 0.6B v3** | 0.6B | Oui (25 langues) | ONNX int8 | ~670 MB | Excellent WER, TDT transducer rapide, CoreML GPU | Vendored TDT decoder + ort CoreML | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
 
 **Écosystème Rust** :
 - **sherpa-onnx** : C API avec bindings Rust, supporte Canary, Parakeet, SenseVoice, Moonshine, Whisper
