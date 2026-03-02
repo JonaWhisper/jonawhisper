@@ -94,7 +94,7 @@ pub fn transcribe(
     }
 
     // Read WAV audio
-    let audio = crate::engines::whisper::read_wav_f32(audio_path)?;
+    let audio = crate::audio::read_wav_f32(audio_path)?;
 
     // Transcribe
     let text = qwen_asr::transcribe::transcribe_audio(&mut qwen.ctx, &audio)

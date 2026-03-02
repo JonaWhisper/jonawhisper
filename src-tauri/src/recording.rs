@@ -617,7 +617,7 @@ enum VadResult {
 }
 
 fn vad_preprocess(audio_path: &std::path::Path) -> VadResult {
-    let audio = match crate::engines::whisper::read_wav_f32(audio_path) {
+    let audio = match crate::audio::read_wav_f32(audio_path) {
         Ok(a) => a,
         Err(e) => {
             log::warn!("VAD: failed to read WAV, skipping: {}", e);

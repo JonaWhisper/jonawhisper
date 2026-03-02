@@ -113,7 +113,7 @@ pub fn transcribe(
     let ctx = ctx_guard.as_mut().unwrap();
 
     // Read WAV audio
-    let audio = crate::engines::whisper::read_wav_f32(audio_path)?;
+    let audio = crate::audio::read_wav_f32(audio_path)?;
 
     // Compute mel spectrogram with Slaney scale + pre-emphasis
     let (features, n_frames) = crate::mel_features::extract_features_with_config(
