@@ -125,9 +125,8 @@ const kindGradients: Record<string, string> = {
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
-          <Button variant="outline" size="sm" class="h-7 text-[11px] px-2" @click="openEditDialog(provider)">
-            <Pencil class="w-3 h-3 mr-1" />
-            Modifier
+          <Button variant="outline" size="icon" class="h-7 w-7" @click="openEditDialog(provider)">
+            <Pencil class="w-3.5 h-3.5" />
           </Button>
           <Button variant="destructive" size="icon" class="h-7 w-7" @click="requestRemoveProvider(provider)">
             <X class="w-3.5 h-3.5" />

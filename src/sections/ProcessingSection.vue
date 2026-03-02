@@ -128,17 +128,19 @@ function onMaxTokensSliderCommit(v: number[]) {
               {{ t('settings.shortcut.cancel.none') }}
             </span>
             <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
-              <TypeBadge :type="selectedCleanupModel.group" />
+              <TypeBadge :type="selectedCleanupModel.group === 'cloud' ? 'llm' : selectedCleanupModel.group" />
               <span class="truncate">{{ selectedCleanupModel.label }}</span>
+              <TypeBadge :type="selectedCleanupModel.group === 'cloud' ? 'cloud' : 'local'" />
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
             <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
               <span class="flex items-center gap-1.5">
-                <TypeBadge :type="m.group" />
+                <TypeBadge :type="m.group === 'cloud' ? 'llm' : m.group" />
                 {{ m.label }}
                 <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
+                <TypeBadge :type="m.group === 'cloud' ? 'cloud' : 'local'" class="ml-auto" />
               </span>
             </SelectItem>
           </SelectContent>
