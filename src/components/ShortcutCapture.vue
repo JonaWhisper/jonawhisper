@@ -98,7 +98,7 @@ onUnmounted(() => {
     <!-- Display mode: key caps -->
     <template v-else-if="keyCaps.length > 0">
       <span v-for="(part, i) in keyCaps" :key="i" class="key-cap">
-        <span v-if="part.side" class="key-cap-side">{{ sideLabels[part.side] ?? part.side }}</span>{{ part.symbol }}
+        {{ part.symbol }}<span v-if="part.side" class="key-cap-side">{{ sideLabels[part.side] ?? part.side }}</span>
       </span>
     </template>
 
@@ -172,7 +172,7 @@ onUnmounted(() => {
   font-size: 9px;
   font-weight: 400;
   opacity: 0.7;
-  margin-right: 2px;
+  margin-left: 2px;
 }
 
 .shortcut-capture-hint {
