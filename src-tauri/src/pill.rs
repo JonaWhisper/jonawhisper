@@ -192,11 +192,28 @@ unsafe fn create_pill_window() -> (*mut AnyObject, *mut AnyObject) {
     let _: () = msg_send![ns_win, setLevel: 3i64]; // NSFloatingWindowLevel
     let _: () = msg_send![ns_win, setCollectionBehavior: 17u64]; // canJoinAllSpaces|stationary
 
-    // Position top-center on the screen with keyboard focus
-    let screen: *mut AnyObject = msg_send![AnyClass::get(c"NSScreen").unwrap(), mainScreen];
-    if !screen.is_null() {
-        let frame: NSRect = msg_send![screen, frame];
-        let x = (frame.size.width - PILL_WIDTH) / 2.0;
+    // Position top-center on the screen where the mouse cursor is.
+    // NSScreen.mainScreen is unreliable for Accessory apps (Apple bug FB11506568) —
+    // it returns the menu bar screen instead of the focused screen. Mouse location
+    // is a reliable proxy for "where the user is working."
+    let mouse_loc: NSPoint = msg_send![AnyClass::get(c"NSEvent").unwrap(), mouseLocation];
+    let screens: *mut AnyObject = msg_send![AnyClass::get(c"NSScreen").unwrap(), screens];
+    let count: usize = msg_send![screens, count];
+    let mut target_frame: Option<NSRect> = None;
+    for i in 0..count {
+        let scr: *mut AnyObject = msg_send![screens, objectAtIndex: i];
+        let frame: NSRect = msg_send![scr, frame];
+        if mouse_loc.x >= frame.origin.x
+            && mouse_loc.x < frame.origin.x + frame.size.width
+            && mouse_loc.y >= frame.origin.y
+            && mouse_loc.y < frame.origin.y + frame.size.height
+        {
+            target_frame = Some(frame);
+            break;
+        }
+    }
+    if let Some(frame) = target_frame {
+        let x = frame.origin.x + (frame.size.width - PILL_WIDTH) / 2.0;
         let y = frame.origin.y + frame.size.height - PILL_HEIGHT - PILL_TOP_OFFSET;
         let _: () = msg_send![ns_win, setFrameOrigin: NSPoint::new(x, y)];
     }
