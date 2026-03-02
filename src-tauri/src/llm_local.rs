@@ -42,7 +42,10 @@ impl LlmContext {
         })
     }
 
-    pub fn model_id(&self) -> &str {
+}
+
+impl crate::state::HasModelId for LlmContext {
+    fn model_id(&self) -> &str {
         &self.model_id
     }
 }

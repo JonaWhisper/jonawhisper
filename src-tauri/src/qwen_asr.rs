@@ -50,6 +50,12 @@ pub struct QwenContext {
     pub model_id: String,
 }
 
+impl crate::state::HasModelId for QwenContext {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
 /// Transcribe an audio file using Qwen3-ASR.
 pub fn transcribe(
     state: &AppState,
@@ -62,23 +68,20 @@ pub fn transcribe(
         return Err(EngineError::ModelNotFound(model_dir.display().to_string()));
     }
 
-    // Load or reuse cached context
-    let mut ctx_guard = state.qwen_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |c| c.model_id != model.id) {
-        log::info!("Loading Qwen3-ASR model: {}", model.id);
+    let model_id = model.id.clone();
+    let mut ctx_guard = state.inference.qwen.get_or_load(&model_id, || {
+        log::info!("Loading Qwen3-ASR model: {}", model_id);
         let dir_str = model_dir.to_string_lossy().to_string();
         let qwen_ctx = qwen_asr::context::QwenCtx::load(&dir_str)
             .ok_or_else(|| EngineError::LaunchFailed(
                 format!("Failed to load Qwen3-ASR from {}", model_dir.display())
             ))?;
-
         log::info!("Qwen3-ASR loaded, optimizations: {:?}", qwen_asr::optimization_flags());
-
-        *ctx_guard = Some(QwenContext {
+        Ok(QwenContext {
             ctx: qwen_ctx,
-            model_id: model.id.clone(),
-        });
-    }
+            model_id: model_id.clone(),
+        })
+    })?;
     let qwen = ctx_guard.as_mut().unwrap();
 
     // Set forced language if not auto

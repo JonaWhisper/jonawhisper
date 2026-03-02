@@ -29,6 +29,12 @@ pub struct ParakeetContext {
     pub model_id: String,
 }
 
+impl crate::state::HasModelId for ParakeetContext {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
 impl ParakeetContext {
     pub fn load(model_dir: &Path, model_id: &str) -> Result<Self, String> {
         // Find encoder file
@@ -99,14 +105,11 @@ pub fn transcribe(
         return Err(EngineError::ModelNotFound(model_dir.display().to_string()));
     }
 
-    // Load or reuse cached context
-    let mut ctx_guard = state.parakeet_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |c| c.model_id != model.id) {
-        log::info!("Loading Parakeet model: {}", model.id);
-        let ctx = ParakeetContext::load(&model_dir, &model.id)
-            .map_err(EngineError::LaunchFailed)?;
-        *ctx_guard = Some(ctx);
-    }
+    let model_id = model.id.clone();
+    let mut ctx_guard = state.inference.parakeet.get_or_load(&model_id, || {
+        log::info!("Loading Parakeet model: {}", model_id);
+        ParakeetContext::load(&model_dir, &model_id).map_err(EngineError::LaunchFailed)
+    })?;
     let ctx = ctx_guard.as_mut().unwrap();
 
     // Read WAV audio

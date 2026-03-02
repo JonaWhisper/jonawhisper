@@ -59,6 +59,12 @@ pub struct CandlePunctContext {
     model_id: String,
 }
 
+impl crate::state::HasModelId for CandlePunctContext {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
 impl CandlePunctContext {
     /// Load a safetensors punctuation model and its tokenizer from disk.
     /// Tokenizer and config are auto-downloaded if not present alongside the model.
@@ -125,10 +131,6 @@ impl CandlePunctContext {
             device,
             model_id: model_id.to_string(),
         })
-    }
-
-    pub fn model_id(&self) -> &str {
-        &self.model_id
     }
 }
 

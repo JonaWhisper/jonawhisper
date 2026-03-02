@@ -103,7 +103,10 @@ impl PcsContext {
         })
     }
 
-    pub fn model_id(&self) -> &str {
+}
+
+impl crate::state::HasModelId for PcsContext {
+    fn model_id(&self) -> &str {
         &self.model_id
     }
 }

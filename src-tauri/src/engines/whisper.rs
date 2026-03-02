@@ -1,7 +1,20 @@
 use super::*;
-use crate::state::AppState;
+use crate::state::{AppState, HasModelId};
 use std::path::Path;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+/// Wrapper around `whisper_rs::WhisperContext` carrying model_id + gpu_mode for cache invalidation.
+pub struct WhisperCtx {
+    pub context: WhisperContext,
+    pub model_id: String,
+    pub gpu_mode: String,
+}
+
+impl HasModelId for WhisperCtx {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
 
 pub struct WhisperEngine;
 
@@ -168,22 +181,26 @@ pub fn transcribe_native(
     let gpu_mode = state.settings.lock().unwrap().gpu_mode.clone();
 
     // Load or reuse cached WhisperContext (invalidate if model or gpu_mode changed)
-    let mut ctx_guard = state.whisper_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |(id, mode, _)| id != &model.id || mode != &gpu_mode) {
+    let mut ctx_guard = state.inference.whisper.lock();
+    if ctx_guard.as_ref().map_or(true, |w| w.model_id != model.id || w.gpu_mode != gpu_mode) {
         let use_gpu = gpu_mode != "cpu";
         log::info!("Loading whisper model: {} (gpu_mode={})", model.id, gpu_mode);
         let mut ctx_params = WhisperContextParameters::default();
         ctx_params.use_gpu(use_gpu);
         ctx_params.flash_attn(true);
-        let ctx = WhisperContext::new_with_params(
+        let wctx = WhisperContext::new_with_params(
             &model_path_str,
             ctx_params,
         ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
-        *ctx_guard = Some((model.id.clone(), gpu_mode.clone(), ctx));
+        *ctx_guard = Some(WhisperCtx {
+            context: wctx,
+            model_id: model.id.clone(),
+            gpu_mode: gpu_mode.clone(),
+        });
         log::info!("Whisper model loaded: {} (gpu={})", model.id, use_gpu);
     }
 
-    let (_, _, ctx) = ctx_guard.as_ref().unwrap();
+    let ctx = &ctx_guard.as_ref().unwrap().context;
 
     // Create a lightweight state for this transcription
     let mut wstate = ctx.create_state()

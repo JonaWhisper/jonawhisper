@@ -212,14 +212,13 @@ pub fn set_setting(
             }
         }
     }
-    // Invalidate cached whisper context when model or GPU mode changes
+    // Invalidate cached ASR contexts when model or GPU mode changes
     if key == "selected_model_id" || key == "gpu_mode" {
-        *state.whisper_context.lock().unwrap() = None;
+        state.inference.invalidate_asr();
     }
-    // Invalidate cached contexts when cleanup model changes
+    // Invalidate all cleanup contexts when cleanup model changes
     if key == "cleanup_model_id" {
-        *state.llm_context.lock().unwrap() = None;
-        *state.bert_context.lock().unwrap() = None;
+        state.inference.invalidate_cleanup();
     }
     // Send hotkey updates outside the settings lock
     match key.as_str() {

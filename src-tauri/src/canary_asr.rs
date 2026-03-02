@@ -28,6 +28,12 @@ pub struct CanaryContext {
     pub model_id: String,
 }
 
+impl crate::state::HasModelId for CanaryContext {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
 impl CanaryContext {
     /// Load encoder + decoder sessions and vocabulary from a model directory.
     pub fn load(model_dir: &Path, model_id: &str) -> Result<Self, String> {
@@ -122,14 +128,11 @@ pub fn transcribe(
         return Err(EngineError::ModelNotFound(model_dir.display().to_string()));
     }
 
-    // Load or reuse cached context
-    let mut ctx_guard = state.canary_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |c| c.model_id != model.id) {
-        log::info!("Loading Canary model: {}", model.id);
-        let ctx = CanaryContext::load(&model_dir, &model.id)
-            .map_err(EngineError::LaunchFailed)?;
-        *ctx_guard = Some(ctx);
-    }
+    let model_id = model.id.clone();
+    let mut ctx_guard = state.inference.canary.get_or_load(&model_id, || {
+        log::info!("Loading Canary model: {}", model_id);
+        CanaryContext::load(&model_dir, &model_id).map_err(EngineError::LaunchFailed)
+    })?;
     let ctx = ctx_guard.as_mut().unwrap();
 
     // Read WAV audio

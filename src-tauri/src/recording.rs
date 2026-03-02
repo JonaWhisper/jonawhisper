@@ -551,15 +551,12 @@ fn run_bert_punctuation(
 
     let model_path = model.local_path();
 
-    // Load or reuse cached BertContext
-    let mut ctx_guard = state.bert_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
-        log::info!("Loading BERT punctuation model: {}", model.id);
-        let ctx = crate::bert_punctuation::BertContext::load(&model_path, &model.id)?;
-        *ctx_guard = Some(ctx);
-    }
-
-    let ctx = ctx_guard.as_mut().unwrap();
+    let model_id = model.id.clone();
+    let mut guard = state.inference.bert.get_or_load(&model_id, || {
+        log::info!("Loading BERT punctuation model: {}", model_id);
+        crate::bert_punctuation::BertContext::load(&model_path, &model_id)
+    })?;
+    let ctx = guard.as_mut().unwrap();
     crate::bert_punctuation::restore_punctuation(ctx, text)
 }
 
@@ -580,15 +577,12 @@ fn run_candle_punctuation(
 
     let model_path = model.local_path();
 
-    // Load or reuse cached CandlePunctContext
-    let mut ctx_guard = state.candle_punct_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
-        log::info!("Loading candle punctuation model: {}", model.id);
-        let ctx = crate::candle_punctuation::CandlePunctContext::load(&model_path, &model.id)?;
-        *ctx_guard = Some(ctx);
-    }
-
-    let ctx = ctx_guard.as_ref().unwrap();
+    let model_id = model.id.clone();
+    let guard = state.inference.candle_punct.get_or_load(&model_id, || {
+        log::info!("Loading candle punctuation model: {}", model_id);
+        crate::candle_punctuation::CandlePunctContext::load(&model_path, &model_id)
+    })?;
+    let ctx = guard.as_ref().unwrap();
     crate::candle_punctuation::restore_punctuation(ctx, text)
 }
 
@@ -609,15 +603,12 @@ fn run_pcs_punctuation(
 
     let model_path = model.local_path();
 
-    // Load or reuse cached PcsContext
-    let mut ctx_guard = state.pcs_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
-        log::info!("Loading PCS punctuation model: {}", model.id);
-        let ctx = crate::pcs_punctuation::PcsContext::load(&model_path, &model.id)?;
-        *ctx_guard = Some(ctx);
-    }
-
-    let ctx = ctx_guard.as_mut().unwrap();
+    let model_id = model.id.clone();
+    let mut guard = state.inference.pcs.get_or_load(&model_id, || {
+        log::info!("Loading PCS punctuation model: {}", model_id);
+        crate::pcs_punctuation::PcsContext::load(&model_path, &model_id)
+    })?;
+    let ctx = guard.as_mut().unwrap();
     crate::pcs_punctuation::restore_punctuation_and_case(ctx, text)
 }
 
@@ -638,15 +629,12 @@ fn run_t5_correction(
 
     let model_dir = model.local_path();
 
-    // Load or reuse cached T5Context
-    let mut ctx_guard = state.t5_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
-        log::info!("Loading T5 correction model: {}", model.id);
-        let ctx = crate::t5_correction::T5Context::load(&model_dir, &model.id)?;
-        *ctx_guard = Some(ctx);
-    }
-
-    let ctx = ctx_guard.as_mut().unwrap();
+    let model_id = model.id.clone();
+    let mut guard = state.inference.t5.get_or_load(&model_id, || {
+        log::info!("Loading T5 correction model: {}", model_id);
+        crate::t5_correction::T5Context::load(&model_dir, &model_id)
+    })?;
+    let ctx = guard.as_mut().unwrap();
     crate::t5_correction::correct(ctx, text)
 }
 
@@ -676,15 +664,11 @@ fn run_local_llm_cleanup(
 
     let model_path = model.local_path();
 
-    // Load or reuse cached LlmContext
-    let mut ctx_guard = state.llm_context.lock().unwrap();
-    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != llm_local_model_id) {
+    let guard = state.inference.llm.get_or_load(llm_local_model_id, || {
         log::info!("Loading local LLM model: {}", llm_local_model_id);
-        let ctx = crate::llm_local::LlmContext::load(&model_path, llm_local_model_id)?;
-        *ctx_guard = Some(ctx);
-    }
-
-    let ctx = ctx_guard.as_ref().unwrap();
+        crate::llm_local::LlmContext::load(&model_path, llm_local_model_id)
+    })?;
+    let ctx = guard.as_ref().unwrap();
     crate::llm_local::cleanup_text(ctx, text, language, max_tokens as usize)
 }
 

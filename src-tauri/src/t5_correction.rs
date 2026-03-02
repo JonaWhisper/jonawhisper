@@ -67,7 +67,10 @@ impl T5Context {
         })
     }
 
-    pub fn model_id(&self) -> &str {
+}
+
+impl crate::state::HasModelId for T5Context {
+    fn model_id(&self) -> &str {
         &self.model_id
     }
 }

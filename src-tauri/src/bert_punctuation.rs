@@ -17,6 +17,12 @@ pub struct BertContext {
     model_id: String,
 }
 
+impl crate::state::HasModelId for BertContext {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
 impl BertContext {
     /// Load an ONNX punctuation model and its tokenizer from disk.
     /// The tokenizer is auto-downloaded if not present alongside the model.
@@ -53,10 +59,6 @@ impl BertContext {
             tokenizer,
             model_id: model_id.to_string(),
         })
-    }
-
-    pub fn model_id(&self) -> &str {
-        &self.model_id
     }
 }
 

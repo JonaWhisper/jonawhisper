@@ -2,8 +2,97 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::path::PathBuf;
+
+// -- Inference context abstractions --
+
+/// Trait for inference contexts that cache a loaded model.
+pub trait HasModelId: Send {
+    fn model_id(&self) -> &str;
+}
+
+/// A thread-safe slot for a cached inference context.
+/// Wraps `Mutex<Option<T>>` with convenience helpers.
+pub struct ContextSlot<T>(Mutex<Option<T>>);
+
+impl<T> ContextSlot<T> {
+    pub fn empty() -> Self {
+        Self(Mutex::new(None))
+    }
+
+    pub fn lock(&self) -> MutexGuard<'_, Option<T>> {
+        self.0.lock().unwrap()
+    }
+
+    pub fn invalidate(&self) {
+        *self.0.lock().unwrap() = None;
+    }
+}
+
+impl<T: HasModelId> ContextSlot<T> {
+    /// Ensure the slot contains a context for `model_id`, loading via `loader` if needed.
+    /// Returns the locked guard (guaranteed `Some` after success).
+    pub fn get_or_load<E>(
+        &self,
+        model_id: &str,
+        loader: impl FnOnce() -> Result<T, E>,
+    ) -> Result<MutexGuard<'_, Option<T>>, E> {
+        let mut guard = self.0.lock().unwrap();
+        if guard.as_ref().map_or(true, |ctx| ctx.model_id() != model_id) {
+            *guard = Some(loader()?);
+        }
+        Ok(guard)
+    }
+}
+
+/// All inference contexts, grouped together.
+pub struct InferenceContexts {
+    // ASR
+    pub whisper: ContextSlot<crate::engines::whisper::WhisperCtx>,
+    pub canary: ContextSlot<crate::canary_asr::CanaryContext>,
+    pub parakeet: ContextSlot<crate::parakeet_asr::ParakeetContext>,
+    pub qwen: ContextSlot<crate::qwen_asr::QwenContext>,
+    // Cleanup
+    pub llm: ContextSlot<crate::llm_local::LlmContext>,
+    pub bert: ContextSlot<crate::bert_punctuation::BertContext>,
+    pub candle_punct: ContextSlot<crate::candle_punctuation::CandlePunctContext>,
+    pub pcs: ContextSlot<crate::pcs_punctuation::PcsContext>,
+    pub t5: ContextSlot<crate::t5_correction::T5Context>,
+}
+
+impl InferenceContexts {
+    pub fn new() -> Self {
+        Self {
+            whisper: ContextSlot::empty(),
+            canary: ContextSlot::empty(),
+            parakeet: ContextSlot::empty(),
+            qwen: ContextSlot::empty(),
+            llm: ContextSlot::empty(),
+            bert: ContextSlot::empty(),
+            candle_punct: ContextSlot::empty(),
+            pcs: ContextSlot::empty(),
+            t5: ContextSlot::empty(),
+        }
+    }
+
+    /// Invalidate all ASR contexts (when selected_model_id or gpu_mode changes).
+    pub fn invalidate_asr(&self) {
+        self.whisper.invalidate();
+        self.canary.invalidate();
+        self.parakeet.invalidate();
+        self.qwen.invalidate();
+    }
+
+    /// Invalidate all cleanup contexts (when cleanup_model_id changes).
+    pub fn invalidate_cleanup(&self) {
+        self.llm.invalidate();
+        self.bert.invalidate();
+        self.candle_punct.invalidate();
+        self.pcs.invalidate();
+        self.t5.invalidate();
+    }
+}
 
 const APP_DIR_NAME: &str = "WhisperDictate";
 const PREFS_FILE: &str = "preferences.json";
@@ -60,24 +149,9 @@ pub struct AppState {
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
     pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
-    /// Cached WhisperContext: (model_id, gpu_mode, context). Invalidated when model or GPU mode changes.
-    pub whisper_context: Mutex<Option<(String, String, whisper_rs::WhisperContext)>>,
-    /// Cached LLM context for local inference. Invalidated when cleanup_model_id changes to a different LLM.
-    pub llm_context: Mutex<Option<crate::llm_local::LlmContext>>,
-    /// Cached BERT punctuation context. Invalidated when cleanup_model_id changes to a different BERT model.
-    pub bert_context: Mutex<Option<crate::bert_punctuation::BertContext>>,
-    /// Cached PCS punctuation context. Invalidated when cleanup_model_id changes to a different PCS model.
-    pub pcs_context: Mutex<Option<crate::pcs_punctuation::PcsContext>>,
-    /// Cached candle punctuation context (safetensors models). Invalidated when cleanup_model_id changes.
-    pub candle_punct_context: Mutex<Option<crate::candle_punctuation::CandlePunctContext>>,
-    /// Cached Canary ASR context (encoder + decoder ONNX sessions). Invalidated when ASR model changes.
-    pub canary_context: Mutex<Option<crate::canary_asr::CanaryContext>>,
-    /// Cached Parakeet TDT ASR context (encoder + decoder ONNX sessions). Invalidated when ASR model changes.
-    pub parakeet_context: Mutex<Option<crate::parakeet_asr::ParakeetContext>>,
-    /// Cached Qwen3-ASR context (safetensors model). Invalidated when ASR model changes.
-    pub qwen_context: Mutex<Option<crate::qwen_asr::QwenContext>>,
-    /// Cached T5 correction context (Candle encoder-decoder). Invalidated when cleanup_model_id changes.
-    pub t5_context: Mutex<Option<crate::t5_correction::T5Context>>,
+    /// Cached inference contexts (ASR + cleanup models). Each slot is lazy-loaded and
+    /// invalidated when the corresponding model selection changes.
+    pub inference: InferenceContexts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -312,15 +386,7 @@ impl Default for AppState {
             settings: Mutex::new(prefs),
             history_db: Mutex::new(open_history_db()),
             tray_menu: Mutex::new(None),
-            whisper_context: Mutex::new(None),
-            llm_context: Mutex::new(None),
-            bert_context: Mutex::new(None),
-            pcs_context: Mutex::new(None),
-            candle_punct_context: Mutex::new(None),
-            canary_context: Mutex::new(None),
-            parakeet_context: Mutex::new(None),
-            qwen_context: Mutex::new(None),
-            t5_context: Mutex::new(None),
+            inference: InferenceContexts::new(),
         }
     }
 }
