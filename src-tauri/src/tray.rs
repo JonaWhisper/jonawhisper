@@ -109,7 +109,7 @@ fn activate_app() {
 fn activate_app() {}
 
 pub fn open_pill_window(app: &AppHandle) {
-    crate::pill::open(app);
+    crate::pill::open(app, crate::pill::PillMode::Recording);
 }
 
 pub fn close_pill_window(app: &AppHandle) {

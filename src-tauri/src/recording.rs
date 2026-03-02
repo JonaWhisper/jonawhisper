@@ -67,6 +67,10 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     rec.key_down_time = Some(Instant::now());
     PILL_CLOSE_GENERATION.fetch_add(1, Ordering::SeqCst);
 
+    // Show pill immediately in Preparing mode (before stream starts)
+    crate::pill::open(app, crate::pill::PillMode::Preparing);
+    crate::tray::set_tray_state(app, "recording");
+
     let (device_uid, ducking_enabled, ducking_level) = {
         let s = state.settings.lock().unwrap();
         (s.selected_input_device_uid.clone(), s.audio_ducking_enabled, s.audio_ducking_level)
@@ -79,9 +83,8 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         platform::audio_ducking::duck_volume(ducking_level);
     }
 
+    // Stream is ready — transition to Recording mode + audible cue
     platform::play_sound("Tink");
-    crate::tray::open_pill_window(app);
-    crate::tray::set_tray_state(app, "recording");
     crate::pill::set_mode(crate::pill::PillMode::Recording);
     let _ = app.emit(crate::events::RECORDING_STARTED, ());
 }

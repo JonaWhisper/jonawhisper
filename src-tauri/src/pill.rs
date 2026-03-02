@@ -19,6 +19,7 @@ const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum PillMode {
+    Preparing,
     Recording,
     Transcribing,
     Success,
@@ -46,7 +47,7 @@ static PILL: Mutex<Option<PillInner>> = Mutex::new(None);
 
 // -- Public API --
 
-pub fn open(app: &AppHandle) {
+pub fn open(app: &AppHandle, initial_mode: PillMode) {
     #[cfg(target_os = "macos")]
     {
         if PILL.lock().unwrap().is_some() {
@@ -58,7 +59,7 @@ pub fn open(app: &AppHandle) {
             let mut inner = PillInner {
                 ns_window: ns_win,
                 image_view,
-                mode: PillMode::Recording,
+                mode: initial_mode,
                 spectrum: [0.0; 12],
                 smoothed: [0.0; 12],
                 dot_phase: 0.0,
@@ -79,7 +80,10 @@ pub fn open(app: &AppHandle) {
         std::thread::spawn(move || animation_loop(anim_handle));
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    {
+        let _ = app;
+        let _ = initial_mode;
+    }
 }
 
 pub fn close(app: &AppHandle) {
@@ -267,6 +271,16 @@ fn render_frame(p: &PillInner) -> Vec<u8> {
 
             // Content overlay
             match p.mode {
+                PillMode::Preparing => {
+                    // Pulsing bars at rest — signals "preparing mic, wait to speak"
+                    let pulse = (p.dot_phase * 2.5).sin() * 0.15 + 0.2;
+                    let fake = [pulse; 12];
+                    let sa = spectrum_alpha(px, py, &fake, cw, ch);
+                    if sa > 0.0 {
+                        let dim = sa * 0.4;
+                        over(&mut r, &mut g, &mut b, &mut a, dim, dim, dim, dim);
+                    }
+                }
                 PillMode::Recording => {
                     let sa = spectrum_alpha(px, py, &p.smoothed, cw, ch);
                     if sa > 0.0 {
