@@ -1,55 +1,18 @@
 //! Global hotkey monitoring via CGEvent tap (macOS).
 //! Supports three shortcut kinds:
-//! - ModifierOnly: single modifier key (e.g. Right Command)
-//! - Combo: modifier(s) + regular key (e.g. Cmd+R, Ctrl+Space)
-//! - Key: standalone key without modifiers (e.g. F13, F14)
+//! - ModifierOnly: modifier key(s) only (e.g. Right Command, Right ⌘ + Left ⌥)
+//! - Combo: modifier(s) + regular key(s) (e.g. Cmd+R, Ctrl+Space, Cmd+A+B)
+//! - Key: standalone key(s) without modifiers (e.g. F13, Escape)
+//!
+//! Multi-key shortcuts: during capture, keys accumulate until the first key-up
+//! finalises the shortcut.  In normal mode, the shortcut fires when ALL required
+//! keys are held simultaneously.
 
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::Arc;
 
-/// Shared capture-mode state, accessible from both the CGEvent callback thread
-/// and the Tauri command handler.  Commands set capture mode **immediately** via
-/// atomics, bypassing the channel delay that caused the race condition.
-pub struct CaptureControl {
-    pub mode: AtomicBool,
-    pub modifiers: AtomicU64,
-    pub key: AtomicU16,
-    pub had_key: AtomicBool,
-    pub active: AtomicBool,
-}
-
-impl CaptureControl {
-    pub fn new() -> Self {
-        Self {
-            mode: AtomicBool::new(false),
-            modifiers: AtomicU64::new(0),
-            key: AtomicU16::new(0),
-            had_key: AtomicBool::new(false),
-            active: AtomicBool::new(false),
-        }
-    }
-
-    /// Enter capture mode: reset fields then set mode=true.
-    pub fn enter(&self) {
-        self.modifiers.store(0, Ordering::SeqCst);
-        self.key.store(0, Ordering::SeqCst);
-        self.had_key.store(false, Ordering::SeqCst);
-        self.active.store(false, Ordering::SeqCst);
-        self.mode.store(true, Ordering::SeqCst);
-        log::info!("Entering shortcut capture mode (immediate)");
-    }
-
-    /// Exit capture mode: set mode=false then reset fields.
-    pub fn exit(&self) {
-        self.mode.store(false, Ordering::SeqCst);
-        self.modifiers.store(0, Ordering::SeqCst);
-        self.key.store(0, Ordering::SeqCst);
-        self.had_key.store(false, Ordering::SeqCst);
-        self.active.store(false, Ordering::SeqCst);
-        log::info!("Exiting shortcut capture mode (immediate)");
-    }
-}
+const MAX_SHORTCUT_KEYS: usize = 4;
 
 // -- CGEventFlags masks --
 
@@ -57,8 +20,8 @@ const CG_MASK_COMMAND: u64 = 1 << 20;
 const CG_MASK_SHIFT: u64 = 1 << 17;
 const CG_MASK_ALTERNATE: u64 = 1 << 19;
 const CG_MASK_CONTROL: u64 = 1 << 18;
-// Combined mask for all 4 modifier bits
-const CG_MASK_ALL_MODIFIERS: u64 = CG_MASK_COMMAND | CG_MASK_SHIFT | CG_MASK_ALTERNATE | CG_MASK_CONTROL;
+const CG_MASK_ALL_MODIFIERS: u64 =
+    CG_MASK_COMMAND | CG_MASK_SHIFT | CG_MASK_ALTERNATE | CG_MASK_CONTROL;
 
 // -- Shortcut types --
 
@@ -71,7 +34,7 @@ pub enum ShortcutKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Shortcut {
-    pub key_code: u16,
+    pub key_codes: Vec<u16>,
     pub modifiers: u64,
     pub kind: ShortcutKind,
 }
@@ -79,49 +42,72 @@ pub struct Shortcut {
 impl Shortcut {
     /// A disabled shortcut (won't match anything).
     pub fn disabled() -> Self {
-        Self { key_code: 0, modifiers: 0, kind: ShortcutKind::Key }
+        Self {
+            key_codes: vec![],
+            modifiers: 0,
+            kind: ShortcutKind::Key,
+        }
     }
 
     pub fn is_disabled(&self) -> bool {
-        self.key_code == 0 && self.modifiers == 0
+        self.key_codes.is_empty() && self.modifiers == 0
     }
 
-    /// Parse from a string — tries JSON first, then legacy format.
+    /// Parse from a string — tries new JSON, old JSON, then legacy format.
     pub fn parse(s: &str) -> Self {
-        // Try JSON
+        // New JSON format: { "key_codes": [...], "modifiers": ..., "kind": ... }
         if let Ok(shortcut) = serde_json::from_str::<Shortcut>(s) {
             return shortcut;
         }
-        // Legacy format
+        // Old JSON format: { "key_code": ..., "modifiers": ..., "kind": ... }
+        #[derive(Deserialize)]
+        struct OldShortcut {
+            key_code: u16,
+            modifiers: u64,
+            kind: ShortcutKind,
+        }
+        if let Ok(old) = serde_json::from_str::<OldShortcut>(s) {
+            let key_codes = if old.key_code == 0 && old.modifiers == 0 {
+                vec![]
+            } else {
+                vec![old.key_code]
+            };
+            return Shortcut {
+                key_codes,
+                modifiers: old.modifiers,
+                kind: old.kind,
+            };
+        }
+        // Legacy string format
         match s {
             "right_command" => Self {
-                key_code: 0x36,
+                key_codes: vec![0x36],
                 modifiers: CG_MASK_COMMAND,
                 kind: ShortcutKind::ModifierOnly,
             },
             "right_option" => Self {
-                key_code: 0x3D,
+                key_codes: vec![0x3D],
                 modifiers: CG_MASK_ALTERNATE,
                 kind: ShortcutKind::ModifierOnly,
             },
             "right_control" => Self {
-                key_code: 0x3E,
+                key_codes: vec![0x3E],
                 modifiers: CG_MASK_CONTROL,
                 kind: ShortcutKind::ModifierOnly,
             },
             "right_shift" => Self {
-                key_code: 0x3C,
+                key_codes: vec![0x3C],
                 modifiers: CG_MASK_SHIFT,
                 kind: ShortcutKind::ModifierOnly,
             },
             "escape" => Self {
-                key_code: 0x35,
+                key_codes: vec![0x35],
                 modifiers: 0,
                 kind: ShortcutKind::Key,
             },
             "none" | "" => Self::disabled(),
             _ => Self {
-                key_code: 0x36,
+                key_codes: vec![0x36],
                 modifiers: CG_MASK_COMMAND,
                 kind: ShortcutKind::ModifierOnly,
             },
@@ -140,17 +126,25 @@ impl Shortcut {
         }
         match self.kind {
             ShortcutKind::ModifierOnly => {
-                // Show the specific modifier key name
-                modifier_only_label(self.key_code).to_string()
+                self.key_codes
+                    .iter()
+                    .map(|&kc| modifier_only_label(kc))
+                    .collect::<Vec<_>>()
+                    .join("+")
             }
             ShortcutKind::Combo => {
                 let mut s = modifier_symbols(self.modifiers);
-                s.push_str(key_code_label(self.key_code));
+                for &kc in &self.key_codes {
+                    s.push_str(key_code_label(kc));
+                }
                 s
             }
-            ShortcutKind::Key => {
-                key_code_label(self.key_code).to_string()
-            }
+            ShortcutKind::Key => self
+                .key_codes
+                .iter()
+                .map(|&kc| key_code_label(kc))
+                .collect::<Vec<_>>()
+                .join("+"),
         }
     }
 }
@@ -158,10 +152,18 @@ impl Shortcut {
 /// Modifier symbols in macOS standard order: ⌃⌥⇧⌘
 fn modifier_symbols(flags: u64) -> String {
     let mut s = String::new();
-    if flags & CG_MASK_CONTROL != 0 { s.push('⌃'); }
-    if flags & CG_MASK_ALTERNATE != 0 { s.push('⌥'); }
-    if flags & CG_MASK_SHIFT != 0 { s.push('⇧'); }
-    if flags & CG_MASK_COMMAND != 0 { s.push('⌘'); }
+    if flags & CG_MASK_CONTROL != 0 {
+        s.push('⌃');
+    }
+    if flags & CG_MASK_ALTERNATE != 0 {
+        s.push('⌥');
+    }
+    if flags & CG_MASK_SHIFT != 0 {
+        s.push('⇧');
+    }
+    if flags & CG_MASK_COMMAND != 0 {
+        s.push('⌘');
+    }
     s
 }
 
@@ -232,7 +234,176 @@ fn key_code_label(key_code: u16) -> &'static str {
 
 /// Check if a key_code is a modifier key (not a regular key).
 fn is_modifier_key_code(key_code: u16) -> bool {
-    matches!(key_code, 0x36 | 0x37 | 0x3A | 0x3B | 0x3C | 0x3D | 0x3E | 0x38 | 0x3F)
+    matches!(
+        key_code,
+        0x36 | 0x37 | 0x3A | 0x3B | 0x3C | 0x3D | 0x3E | 0x38 | 0x3F
+    )
+}
+
+/// Get the modifier flag for a specific modifier key code.
+fn modifier_flag_for_key_code(key_code: u16) -> u64 {
+    match key_code {
+        0x36 | 0x37 => CG_MASK_COMMAND,
+        0x3A | 0x3D => CG_MASK_ALTERNATE,
+        0x3B | 0x3E => CG_MASK_CONTROL,
+        0x38 | 0x3C => CG_MASK_SHIFT,
+        _ => 0,
+    }
+}
+
+// -- Packed key helpers --
+// Pack up to 4 u16 key codes into a single u64 for lock-free atomic access.
+// The CGEvent callback is single-threaded, so load-modify-store is safe.
+
+fn pack_keys(keys: &[u16]) -> (u64, u8) {
+    let count = keys.len().min(MAX_SHORTCUT_KEYS);
+    let mut packed: u64 = 0;
+    for (i, &k) in keys[..count].iter().enumerate() {
+        packed |= (k as u64) << (i * 16);
+    }
+    (packed, count as u8)
+}
+
+fn unpack_keys(packed: u64, count: u8) -> Vec<u16> {
+    (0..count as usize)
+        .map(|i| ((packed >> (i * 16)) & 0xFFFF) as u16)
+        .collect()
+}
+
+fn packed_contains(packed: u64, count: u8, key: u16) -> bool {
+    for i in 0..count as usize {
+        if ((packed >> (i * 16)) & 0xFFFF) as u16 == key {
+            return true;
+        }
+    }
+    false
+}
+
+/// Add a key to a packed set (deduplicated). Returns true if added.
+fn packed_add(packed: &AtomicU64, count: &AtomicU8, key: u16) -> bool {
+    let p = packed.load(Ordering::SeqCst);
+    let c = count.load(Ordering::SeqCst) as usize;
+    if packed_contains(p, c as u8, key) {
+        return false;
+    }
+    if c >= MAX_SHORTCUT_KEYS {
+        return false;
+    }
+    packed.store(p | ((key as u64) << (c * 16)), Ordering::SeqCst);
+    count.store((c + 1) as u8, Ordering::SeqCst);
+    true
+}
+
+/// Remove a key from a packed set. Returns true if removed.
+fn packed_remove(packed: &AtomicU64, count: &AtomicU8, key: u16) -> bool {
+    let p = packed.load(Ordering::SeqCst);
+    let c = count.load(Ordering::SeqCst) as usize;
+    let mut idx = None;
+    for i in 0..c {
+        if ((p >> (i * 16)) & 0xFFFF) as u16 == key {
+            idx = Some(i);
+            break;
+        }
+    }
+    let i = match idx {
+        Some(i) => i,
+        None => return false,
+    };
+    let mut new: u64 = 0;
+    let mut j = 0;
+    for k in 0..c {
+        if k != i {
+            let v = ((p >> (k * 16)) & 0xFFFF) as u16;
+            new |= (v as u64) << (j * 16);
+            j += 1;
+        }
+    }
+    packed.store(new, Ordering::SeqCst);
+    count.store((c - 1) as u8, Ordering::SeqCst);
+    true
+}
+
+/// Check if all keys in `need` are present in `have`.
+fn packed_contains_all(
+    have_packed: u64,
+    have_count: u8,
+    need_packed: u64,
+    need_count: u8,
+) -> bool {
+    if need_count == 0 {
+        return false;
+    }
+    for i in 0..need_count as usize {
+        let key = ((need_packed >> (i * 16)) & 0xFFFF) as u16;
+        if !packed_contains(have_packed, have_count, key) {
+            return false;
+        }
+    }
+    true
+}
+
+// -- Capture control --
+
+/// Shared capture-mode state, accessible from both the CGEvent callback thread
+/// and the Tauri command handler.
+pub struct CaptureControl {
+    pub mode: AtomicBool,
+    /// Cumulative OR of modifier flags (never reduced during capture).
+    pub peak_modifiers: AtomicU64,
+    /// Accumulated regular key codes (packed 4×u16).
+    pub keys_packed: AtomicU64,
+    pub key_count: AtomicU8,
+    /// Accumulated modifier key codes (packed 4×u16).
+    pub mod_keys_packed: AtomicU64,
+    pub mod_key_count: AtomicU8,
+    pub active: AtomicBool,
+}
+
+impl CaptureControl {
+    pub fn new() -> Self {
+        Self {
+            mode: AtomicBool::new(false),
+            peak_modifiers: AtomicU64::new(0),
+            keys_packed: AtomicU64::new(0),
+            key_count: AtomicU8::new(0),
+            mod_keys_packed: AtomicU64::new(0),
+            mod_key_count: AtomicU8::new(0),
+            active: AtomicBool::new(false),
+        }
+    }
+
+    /// Enter capture mode: reset fields then set mode=true.
+    pub fn enter(&self) {
+        self.peak_modifiers.store(0, Ordering::SeqCst);
+        self.keys_packed.store(0, Ordering::SeqCst);
+        self.key_count.store(0, Ordering::SeqCst);
+        self.mod_keys_packed.store(0, Ordering::SeqCst);
+        self.mod_key_count.store(0, Ordering::SeqCst);
+        self.active.store(false, Ordering::SeqCst);
+        self.mode.store(true, Ordering::SeqCst);
+        log::info!("Entering shortcut capture mode");
+    }
+
+    /// Exit capture mode: set mode=false then reset fields.
+    pub fn exit(&self) {
+        self.mode.store(false, Ordering::SeqCst);
+        self.peak_modifiers.store(0, Ordering::SeqCst);
+        self.keys_packed.store(0, Ordering::SeqCst);
+        self.key_count.store(0, Ordering::SeqCst);
+        self.mod_keys_packed.store(0, Ordering::SeqCst);
+        self.mod_key_count.store(0, Ordering::SeqCst);
+        self.active.store(false, Ordering::SeqCst);
+        log::info!("Exiting shortcut capture mode");
+    }
+
+    fn reset(&self) {
+        self.peak_modifiers.store(0, Ordering::SeqCst);
+        self.keys_packed.store(0, Ordering::SeqCst);
+        self.key_count.store(0, Ordering::SeqCst);
+        self.mod_keys_packed.store(0, Ordering::SeqCst);
+        self.mod_key_count.store(0, Ordering::SeqCst);
+        self.active.store(false, Ordering::SeqCst);
+    }
 }
 
 // -- Events --
@@ -242,7 +413,10 @@ pub enum HotkeyEvent {
     KeyDown,
     KeyUp,
     CancelPressed,
-    CaptureUpdate { modifiers: u64, key_code: Option<u16> },
+    CaptureUpdate {
+        modifiers: u64,
+        key_codes: Vec<u16>,
+    },
     CaptureComplete(Shortcut),
 }
 
@@ -262,7 +436,10 @@ pub fn start_monitor(
     initial_cancel: Shortcut,
     enabled: Arc<AtomicBool>,
     capture: Arc<CaptureControl>,
-) -> (crossbeam_channel::Receiver<HotkeyEvent>, crossbeam_channel::Sender<HotkeyUpdate>) {
+) -> (
+    crossbeam_channel::Receiver<HotkeyEvent>,
+    crossbeam_channel::Sender<HotkeyUpdate>,
+) {
     let (event_tx, event_rx) = crossbeam_channel::unbounded::<HotkeyEvent>();
     let (update_tx, update_rx) = crossbeam_channel::unbounded::<HotkeyUpdate>();
 
@@ -271,25 +448,40 @@ pub fn start_monitor(
             std::thread::sleep(std::time::Duration::from_millis(200));
         }
         log::info!("Hotkey monitoring enabled, starting event tap");
-        run_event_tap(initial_record, initial_cancel, event_tx, update_rx, capture);
+        run_event_tap(
+            initial_record,
+            initial_cancel,
+            event_tx,
+            update_rx,
+            capture,
+        );
     });
 
     (event_rx, update_tx)
 }
 
-/// Shared state between the CGEvent callback and the main hotkey thread.
+// -- TapState: shared between CGEvent callback and hotkey thread --
+
 #[cfg(target_os = "macos")]
 struct TapState {
     // Record shortcut (atomics for lock-free callback access)
-    rec_key_code: AtomicU16,
+    rec_keys_packed: AtomicU64,
+    rec_key_count: AtomicU8,
     rec_modifiers: AtomicU64,
-    rec_kind: std::sync::atomic::AtomicU8, // 0=ModifierOnly, 1=Combo, 2=Key
+    rec_kind: AtomicU8, // 0=ModifierOnly, 1=Combo, 2=Key
     rec_held: AtomicBool,
 
     // Cancel shortcut
-    cancel_key_code: AtomicU16,
+    cancel_keys_packed: AtomicU64,
+    cancel_key_count: AtomicU8,
     cancel_modifiers: AtomicU64,
-    cancel_kind: std::sync::atomic::AtomicU8,
+    cancel_kind: AtomicU8,
+
+    // Currently pressed keys (for multi-key matching in normal mode)
+    pressed_keys_packed: AtomicU64,
+    pressed_key_count: AtomicU8,
+    pressed_mod_keys_packed: AtomicU64,
+    pressed_mod_key_count: AtomicU8,
 
     // Capture mode (shared with Tauri commands via Arc)
     capture: Arc<CaptureControl>,
@@ -316,32 +508,42 @@ impl TapState {
     }
 
     fn load_rec_shortcut(&self) -> Shortcut {
+        let packed = self.rec_keys_packed.load(Ordering::SeqCst);
+        let count = self.rec_key_count.load(Ordering::SeqCst);
         Shortcut {
-            key_code: self.rec_key_code.load(Ordering::SeqCst),
+            key_codes: unpack_keys(packed, count),
             modifiers: self.rec_modifiers.load(Ordering::SeqCst),
             kind: Self::u8_to_kind(self.rec_kind.load(Ordering::SeqCst)),
         }
     }
 
     fn store_rec_shortcut(&self, s: &Shortcut) {
-        self.rec_key_code.store(s.key_code, Ordering::SeqCst);
+        let (packed, count) = pack_keys(&s.key_codes);
+        self.rec_keys_packed.store(packed, Ordering::SeqCst);
+        self.rec_key_count.store(count, Ordering::SeqCst);
         self.rec_modifiers.store(s.modifiers, Ordering::SeqCst);
-        self.rec_kind.store(Self::kind_to_u8(s.kind), Ordering::SeqCst);
+        self.rec_kind
+            .store(Self::kind_to_u8(s.kind), Ordering::SeqCst);
         self.rec_held.store(false, Ordering::SeqCst);
     }
 
     fn load_cancel_shortcut(&self) -> Shortcut {
+        let packed = self.cancel_keys_packed.load(Ordering::SeqCst);
+        let count = self.cancel_key_count.load(Ordering::SeqCst);
         Shortcut {
-            key_code: self.cancel_key_code.load(Ordering::SeqCst),
+            key_codes: unpack_keys(packed, count),
             modifiers: self.cancel_modifiers.load(Ordering::SeqCst),
             kind: Self::u8_to_kind(self.cancel_kind.load(Ordering::SeqCst)),
         }
     }
 
     fn store_cancel_shortcut(&self, s: &Shortcut) {
-        self.cancel_key_code.store(s.key_code, Ordering::SeqCst);
+        let (packed, count) = pack_keys(&s.key_codes);
+        self.cancel_keys_packed.store(packed, Ordering::SeqCst);
+        self.cancel_key_count.store(count, Ordering::SeqCst);
         self.cancel_modifiers.store(s.modifiers, Ordering::SeqCst);
-        self.cancel_kind.store(Self::kind_to_u8(s.kind), Ordering::SeqCst);
+        self.cancel_kind
+            .store(Self::kind_to_u8(s.kind), Ordering::SeqCst);
     }
 }
 
@@ -355,15 +557,25 @@ fn run_event_tap(
 ) {
     use std::os::raw::c_void;
 
+    let (rec_packed, rec_count) = pack_keys(&initial_record.key_codes);
+    let (cancel_packed, cancel_count) = pack_keys(&initial_cancel.key_codes);
+
     let state = Box::new(TapState {
-        rec_key_code: AtomicU16::new(initial_record.key_code),
+        rec_keys_packed: AtomicU64::new(rec_packed),
+        rec_key_count: AtomicU8::new(rec_count),
         rec_modifiers: AtomicU64::new(initial_record.modifiers),
-        rec_kind: std::sync::atomic::AtomicU8::new(TapState::kind_to_u8(initial_record.kind)),
+        rec_kind: AtomicU8::new(TapState::kind_to_u8(initial_record.kind)),
         rec_held: AtomicBool::new(false),
 
-        cancel_key_code: AtomicU16::new(initial_cancel.key_code),
+        cancel_keys_packed: AtomicU64::new(cancel_packed),
+        cancel_key_count: AtomicU8::new(cancel_count),
         cancel_modifiers: AtomicU64::new(initial_cancel.modifiers),
-        cancel_kind: std::sync::atomic::AtomicU8::new(TapState::kind_to_u8(initial_cancel.kind)),
+        cancel_kind: AtomicU8::new(TapState::kind_to_u8(initial_cancel.kind)),
+
+        pressed_keys_packed: AtomicU64::new(0),
+        pressed_key_count: AtomicU8::new(0),
+        pressed_mod_keys_packed: AtomicU64::new(0),
+        pressed_mod_key_count: AtomicU8::new(0),
 
         capture,
 
@@ -384,7 +596,10 @@ fn run_event_tap(
         const TAP_DISABLED_BY_USER: u32 = 0xFFFFFFFF;
 
         if event_type == TAP_DISABLED_BY_TIMEOUT || event_type == TAP_DISABLED_BY_USER {
-            log::warn!("CGEvent tap disabled (type={}), will re-enable", event_type);
+            log::warn!(
+                "CGEvent tap disabled (type={}), will re-enable",
+                event_type
+            );
             return event;
         }
 
@@ -413,9 +628,14 @@ fn run_event_tap(
         event
     }
 
-    /// Handle events in capture mode.
+    /// Handle events in capture mode: accumulate keys, finalise on first release.
     #[cfg(target_os = "macos")]
-    unsafe fn handle_capture(state: &TapState, event_type: u32, key_code: u16, mod_flags: u64) {
+    unsafe fn handle_capture(
+        state: &TapState,
+        event_type: u32,
+        key_code: u16,
+        mod_flags: u64,
+    ) {
         const KEY_DOWN: u32 = 10;
         const KEY_UP: u32 = 11;
         const FLAGS_CHANGED: u32 = 12;
@@ -425,71 +645,92 @@ fn run_event_tap(
         match event_type {
             KEY_DOWN => {
                 if !is_modifier_key_code(key_code) {
-                    cap.key.store(key_code, Ordering::SeqCst);
-                    cap.modifiers.store(mod_flags, Ordering::SeqCst);
-                    cap.had_key.store(true, Ordering::SeqCst);
+                    packed_add(&cap.keys_packed, &cap.key_count, key_code);
+                    cap.peak_modifiers.fetch_or(mod_flags, Ordering::SeqCst);
                     cap.active.store(true, Ordering::SeqCst);
 
+                    let peak = cap.peak_modifiers.load(Ordering::SeqCst);
+                    let keys = unpack_keys(
+                        cap.keys_packed.load(Ordering::SeqCst),
+                        cap.key_count.load(Ordering::SeqCst),
+                    );
                     let _ = state.event_tx.send(HotkeyEvent::CaptureUpdate {
-                        modifiers: mod_flags,
-                        key_code: Some(key_code),
+                        modifiers: peak,
+                        key_codes: keys,
                     });
                 }
             }
             KEY_UP => {
-                if !is_modifier_key_code(key_code) && cap.had_key.load(Ordering::SeqCst) {
-                    let captured_key = cap.key.load(Ordering::SeqCst);
-                    let captured_mods = cap.modifiers.load(Ordering::SeqCst);
+                if !is_modifier_key_code(key_code)
+                    && cap.key_count.load(Ordering::SeqCst) > 0
+                {
+                    let peak = cap.peak_modifiers.load(Ordering::SeqCst);
+                    let mut keys = unpack_keys(
+                        cap.keys_packed.load(Ordering::SeqCst),
+                        cap.key_count.load(Ordering::SeqCst),
+                    );
+                    keys.sort();
 
-                    let kind = if captured_mods != 0 {
+                    let kind = if peak != 0 {
                         ShortcutKind::Combo
                     } else {
                         ShortcutKind::Key
                     };
 
                     let shortcut = Shortcut {
-                        key_code: captured_key,
-                        modifiers: captured_mods,
+                        key_codes: keys,
+                        modifiers: peak,
                         kind,
                     };
 
-                    // Reset capture state
-                    cap.key.store(0, Ordering::SeqCst);
-                    cap.modifiers.store(0, Ordering::SeqCst);
-                    cap.had_key.store(false, Ordering::SeqCst);
-                    cap.active.store(false, Ordering::SeqCst);
-
-                    let _ = state.event_tx.send(HotkeyEvent::CaptureComplete(shortcut));
+                    cap.reset();
+                    let _ = state
+                        .event_tx
+                        .send(HotkeyEvent::CaptureComplete(shortcut));
                 }
             }
             FLAGS_CHANGED => {
-                cap.modifiers.store(mod_flags, Ordering::SeqCst);
+                let modifier_pressed =
+                    modifier_flag_for_key_code(key_code) & mod_flags != 0;
 
-                if mod_flags != 0 {
+                if modifier_pressed {
+                    packed_add(&cap.mod_keys_packed, &cap.mod_key_count, key_code);
+                    cap.peak_modifiers.fetch_or(mod_flags, Ordering::SeqCst);
                     cap.active.store(true, Ordering::SeqCst);
-                    let cap_key = cap.key.load(Ordering::SeqCst);
+                }
+
+                if mod_flags != 0 || cap.key_count.load(Ordering::SeqCst) > 0 {
+                    // Still have active modifiers or regular keys — emit update
+                    let peak = cap.peak_modifiers.load(Ordering::SeqCst);
+                    let keys = unpack_keys(
+                        cap.keys_packed.load(Ordering::SeqCst),
+                        cap.key_count.load(Ordering::SeqCst),
+                    );
                     let _ = state.event_tx.send(HotkeyEvent::CaptureUpdate {
-                        modifiers: mod_flags,
-                        key_code: if cap.had_key.load(Ordering::SeqCst) { Some(cap_key) } else { None },
+                        modifiers: peak,
+                        key_codes: keys,
                     });
-                } else if cap.active.load(Ordering::SeqCst) {
-                    // All modifiers released
-                    if !cap.had_key.load(Ordering::SeqCst) {
-                        // ModifierOnly: we need to figure out which modifier was released
-                        // The key_code in flagsChanged tells us which modifier changed
-                        let shortcut = Shortcut {
-                            key_code,
-                            modifiers: modifier_flag_for_key_code(key_code),
-                            kind: ShortcutKind::ModifierOnly,
-                        };
+                } else if cap.active.load(Ordering::SeqCst)
+                    && cap.key_count.load(Ordering::SeqCst) == 0
+                {
+                    // All modifiers released, no regular keys → ModifierOnly
+                    let mut mod_keys = unpack_keys(
+                        cap.mod_keys_packed.load(Ordering::SeqCst),
+                        cap.mod_key_count.load(Ordering::SeqCst),
+                    );
+                    mod_keys.sort();
+                    let peak = cap.peak_modifiers.load(Ordering::SeqCst);
 
-                        cap.key.store(0, Ordering::SeqCst);
-                        cap.modifiers.store(0, Ordering::SeqCst);
-                        cap.active.store(false, Ordering::SeqCst);
+                    let shortcut = Shortcut {
+                        key_codes: mod_keys,
+                        modifiers: peak,
+                        kind: ShortcutKind::ModifierOnly,
+                    };
 
-                        let _ = state.event_tx.send(HotkeyEvent::CaptureComplete(shortcut));
-                    }
-                    // If had_key, we already sent CaptureComplete on KeyUp
+                    cap.reset();
+                    let _ = state
+                        .event_tx
+                        .send(HotkeyEvent::CaptureComplete(shortcut));
                 }
             }
             _ => {}
@@ -498,7 +739,12 @@ fn run_event_tap(
 
     /// Handle events in normal mode (record/cancel shortcuts).
     #[cfg(target_os = "macos")]
-    unsafe fn handle_normal(state: &TapState, event_type: u32, key_code: u16, mod_flags: u64) {
+    unsafe fn handle_normal(
+        state: &TapState,
+        event_type: u32,
+        key_code: u16,
+        mod_flags: u64,
+    ) {
         const KEY_DOWN: u32 = 10;
         const KEY_UP: u32 = 11;
         const FLAGS_CHANGED: u32 = 12;
@@ -508,18 +754,38 @@ fn run_event_tap(
 
         match event_type {
             KEY_DOWN => {
-                // Check cancel shortcut
+                if is_modifier_key_code(key_code) {
+                    return;
+                }
+                // Track pressed regular keys
+                packed_add(
+                    &state.pressed_keys_packed,
+                    &state.pressed_key_count,
+                    key_code,
+                );
+
+                let pressed_p = state.pressed_keys_packed.load(Ordering::SeqCst);
+                let pressed_c = state.pressed_key_count.load(Ordering::SeqCst);
+
+                // Check cancel shortcut (Combo/Key)
                 if !cancel.is_disabled() {
+                    let (cancel_p, cancel_c) = pack_keys(&cancel.key_codes);
                     match cancel.kind {
                         ShortcutKind::Combo => {
-                            if key_code == cancel.key_code && (mod_flags & cancel.modifiers) == cancel.modifiers {
-                                let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
+                            if packed_contains_all(pressed_p, pressed_c, cancel_p, cancel_c)
+                                && (mod_flags & cancel.modifiers) == cancel.modifiers
+                            {
+                                let _ =
+                                    state.event_tx.send(HotkeyEvent::CancelPressed);
                                 return;
                             }
                         }
                         ShortcutKind::Key => {
-                            if key_code == cancel.key_code && mod_flags == 0 {
-                                let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
+                            if packed_contains_all(pressed_p, pressed_c, cancel_p, cancel_c)
+                                && mod_flags == 0
+                            {
+                                let _ =
+                                    state.event_tx.send(HotkeyEvent::CancelPressed);
                                 return;
                             }
                         }
@@ -527,24 +793,38 @@ fn run_event_tap(
                     }
                 }
 
-                // Check record shortcut
+                // Check record shortcut (Combo/Key)
                 if !rec.is_disabled() {
+                    let (rec_p, rec_c) = pack_keys(&rec.key_codes);
                     match rec.kind {
                         ShortcutKind::Combo => {
-                            if key_code == rec.key_code && (mod_flags & rec.modifiers) == rec.modifiers {
+                            if packed_contains_all(pressed_p, pressed_c, rec_p, rec_c)
+                                && (mod_flags & rec.modifiers) == rec.modifiers
+                            {
                                 if !state.rec_held.load(Ordering::SeqCst) {
                                     state.rec_held.store(true, Ordering::SeqCst);
-                                    log::debug!("Hotkey KeyDown (Combo): key=0x{:02x} mods=0x{:x}", key_code, mod_flags);
-                                    let _ = state.event_tx.send(HotkeyEvent::KeyDown);
+                                    log::debug!(
+                                        "Hotkey KeyDown (Combo): key=0x{:02x} mods=0x{:x}",
+                                        key_code,
+                                        mod_flags
+                                    );
+                                    let _ =
+                                        state.event_tx.send(HotkeyEvent::KeyDown);
                                 }
                             }
                         }
                         ShortcutKind::Key => {
-                            if key_code == rec.key_code && mod_flags == 0 {
+                            if packed_contains_all(pressed_p, pressed_c, rec_p, rec_c)
+                                && mod_flags == 0
+                            {
                                 if !state.rec_held.load(Ordering::SeqCst) {
                                     state.rec_held.store(true, Ordering::SeqCst);
-                                    log::debug!("Hotkey KeyDown (Key): key=0x{:02x}", key_code);
-                                    let _ = state.event_tx.send(HotkeyEvent::KeyDown);
+                                    log::debug!(
+                                        "Hotkey KeyDown (Key): key=0x{:02x}",
+                                        key_code
+                                    );
+                                    let _ =
+                                        state.event_tx.send(HotkeyEvent::KeyDown);
                                 }
                             }
                         }
@@ -553,13 +833,27 @@ fn run_event_tap(
                 }
             }
             KEY_UP => {
+                if is_modifier_key_code(key_code) {
+                    return;
+                }
+                packed_remove(
+                    &state.pressed_keys_packed,
+                    &state.pressed_key_count,
+                    key_code,
+                );
+
                 if !rec.is_disabled() && state.rec_held.load(Ordering::SeqCst) {
                     match rec.kind {
                         ShortcutKind::Combo | ShortcutKind::Key => {
-                            if key_code == rec.key_code {
+                            // If a required key was released, send KeyUp
+                            if rec.key_codes.contains(&key_code) {
                                 state.rec_held.store(false, Ordering::SeqCst);
-                                log::debug!("Hotkey KeyUp: key=0x{:02x}", key_code);
-                                let _ = state.event_tx.send(HotkeyEvent::KeyUp);
+                                log::debug!(
+                                    "Hotkey KeyUp: key=0x{:02x}",
+                                    key_code
+                                );
+                                let _ =
+                                    state.event_tx.send(HotkeyEvent::KeyUp);
                             }
                         }
                         _ => {}
@@ -567,51 +861,89 @@ fn run_event_tap(
                 }
             }
             FLAGS_CHANGED => {
-                if rec.is_disabled() {
-                    return;
+                // Track pressed modifier key codes
+                let modifier_pressed =
+                    modifier_flag_for_key_code(key_code) & mod_flags != 0;
+                if modifier_pressed {
+                    packed_add(
+                        &state.pressed_mod_keys_packed,
+                        &state.pressed_mod_key_count,
+                        key_code,
+                    );
+                } else {
+                    packed_remove(
+                        &state.pressed_mod_keys_packed,
+                        &state.pressed_mod_key_count,
+                        key_code,
+                    );
                 }
 
-                match rec.kind {
-                    ShortcutKind::ModifierOnly => {
-                        if key_code == rec.key_code {
-                            if (mod_flags & rec.modifiers) != 0 {
+                let pressed_mod_p =
+                    state.pressed_mod_keys_packed.load(Ordering::SeqCst);
+                let pressed_mod_c =
+                    state.pressed_mod_key_count.load(Ordering::SeqCst);
+
+                // -- Record shortcut --
+                if !rec.is_disabled() {
+                    match rec.kind {
+                        ShortcutKind::ModifierOnly => {
+                            let (rec_p, rec_c) = pack_keys(&rec.key_codes);
+                            if packed_contains_all(
+                                pressed_mod_p,
+                                pressed_mod_c,
+                                rec_p,
+                                rec_c,
+                            ) {
                                 if !state.rec_held.load(Ordering::SeqCst) {
                                     state.rec_held.store(true, Ordering::SeqCst);
-                                    log::debug!("Hotkey KeyDown (ModifierOnly): key=0x{:02x} flags=0x{:x}", key_code, mod_flags);
-                                    let _ = state.event_tx.send(HotkeyEvent::KeyDown);
+                                    log::debug!(
+                                        "Hotkey KeyDown (ModifierOnly): key=0x{:02x} flags=0x{:x}",
+                                        key_code,
+                                        mod_flags
+                                    );
+                                    let _ =
+                                        state.event_tx.send(HotkeyEvent::KeyDown);
                                 }
                             } else if state.rec_held.load(Ordering::SeqCst) {
+                                // A required modifier was released
                                 state.rec_held.store(false, Ordering::SeqCst);
-                                log::debug!("Hotkey KeyUp (ModifierOnly): key=0x{:02x} flags=0x{:x}", key_code, mod_flags);
+                                log::debug!(
+                                    "Hotkey KeyUp (ModifierOnly): key=0x{:02x} flags=0x{:x}",
+                                    key_code,
+                                    mod_flags
+                                );
                                 let _ = state.event_tx.send(HotkeyEvent::KeyUp);
                             }
                         }
-                    }
-                    ShortcutKind::Combo => {
-                        // If the modifier was released while holding a combo, send KeyUp
-                        if state.rec_held.load(Ordering::SeqCst) {
-                            if (mod_flags & rec.modifiers) != rec.modifiers {
+                        ShortcutKind::Combo => {
+                            // If modifier released while holding combo, send KeyUp
+                            if state.rec_held.load(Ordering::SeqCst)
+                                && (mod_flags & rec.modifiers) != rec.modifiers
+                            {
                                 state.rec_held.store(false, Ordering::SeqCst);
-                                log::debug!("Hotkey KeyUp (Combo modifier released): flags=0x{:x}", mod_flags);
+                                log::debug!(
+                                    "Hotkey KeyUp (Combo modifier released): flags=0x{:x}",
+                                    mod_flags
+                                );
                                 let _ = state.event_tx.send(HotkeyEvent::KeyUp);
                             }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
 
-                // Cancel shortcut (ModifierOnly)
-                if !cancel.is_disabled() && cancel.kind == ShortcutKind::ModifierOnly {
-                    if key_code == cancel.key_code {
-                        // Detect press (flags set) then release (flags cleared)
-                        // For cancel we only need the press event
-                        if (mod_flags & cancel.modifiers) != 0 {
-                            // We could track state, but for cancel a simple press is enough
-                        } else {
-                            // Modifier released — this could be a cancel tap
-                            // But this gets complex; cancel with ModifierOnly is unusual.
-                            // For now, send CancelPressed on modifier press.
-                        }
+                // -- Cancel shortcut (ModifierOnly) --
+                if !cancel.is_disabled()
+                    && cancel.kind == ShortcutKind::ModifierOnly
+                {
+                    let (cancel_p, cancel_c) = pack_keys(&cancel.key_codes);
+                    if packed_contains_all(
+                        pressed_mod_p,
+                        pressed_mod_c,
+                        cancel_p,
+                        cancel_c,
+                    ) {
+                        let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
                     }
                 }
             }
@@ -625,16 +957,22 @@ fn run_event_tap(
     // SAFETY: CGEventTapCreate creates an active event tap.
     // state_ptr is a leaked Box<TapState> — lives until process exit.
     unsafe {
-        use std::os::raw::c_void;
         use super::ffi;
+        use std::os::raw::c_void;
 
         let tap = ffi::CGEventTapCreate(
-            1, 0, 0, event_mask, callback,
+            1,
+            0,
+            0,
+            event_mask,
+            callback,
             state_ptr as *mut c_void,
         );
 
         if tap.is_null() {
-            log::error!("Failed to create CGEvent tap. Input Monitoring permission required.");
+            log::error!(
+                "Failed to create CGEvent tap. Input Monitoring permission required."
+            );
             return;
         }
 
@@ -643,9 +981,11 @@ fn run_event_tap(
         ffi::CFRunLoopAddSource(rl, source, ffi::kCFRunLoopCommonModes);
         ffi::CGEventTapEnable(tap, true);
 
-        log::info!("Hotkey monitor started (record={}, cancel={})",
+        log::info!(
+            "Hotkey monitor started (record={}, cancel={})",
             initial_record.display_string(),
-            initial_cancel.display_string());
+            initial_cancel.display_string()
+        );
 
         let state = &*state_ptr;
         loop {
@@ -655,27 +995,22 @@ fn run_event_tap(
             while let Ok(update) = update_rx.try_recv() {
                 match update {
                     HotkeyUpdate::SetRecordShortcut(s) => {
-                        log::info!("Record shortcut changed to {}", s.display_string());
+                        log::info!(
+                            "Record shortcut changed to {}",
+                            s.display_string()
+                        );
                         state.store_rec_shortcut(&s);
                     }
                     HotkeyUpdate::SetCancelShortcut(s) => {
-                        log::info!("Cancel shortcut changed to {}", s.display_string());
+                        log::info!(
+                            "Cancel shortcut changed to {}",
+                            s.display_string()
+                        );
                         state.store_cancel_shortcut(&s);
                     }
                 }
             }
         }
-    }
-}
-
-/// Get the modifier flag for a specific modifier key code.
-fn modifier_flag_for_key_code(key_code: u16) -> u64 {
-    match key_code {
-        0x36 | 0x37 => CG_MASK_COMMAND,
-        0x3A | 0x3D => CG_MASK_ALTERNATE,
-        0x3B | 0x3E => CG_MASK_CONTROL,
-        0x38 | 0x3C => CG_MASK_SHIFT,
-        _ => 0,
     }
 }
 
@@ -685,7 +1020,10 @@ pub fn start_monitor(
     _initial_cancel: Shortcut,
     _enabled: Arc<AtomicBool>,
     _capture: Arc<CaptureControl>,
-) -> (crossbeam_channel::Receiver<HotkeyEvent>, crossbeam_channel::Sender<HotkeyUpdate>) {
+) -> (
+    crossbeam_channel::Receiver<HotkeyEvent>,
+    crossbeam_channel::Sender<HotkeyUpdate>,
+) {
     let (_event_tx, event_rx) = crossbeam_channel::unbounded();
     let (update_tx, _update_rx) = crossbeam_channel::unbounded();
     log::warn!("Hotkey monitoring not implemented on this platform");

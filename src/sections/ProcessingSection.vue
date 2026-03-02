@@ -124,7 +124,7 @@ function onMaxTokensSliderCommit(v: number[]) {
         >
           <SelectTrigger class="w-auto min-w-[190px] h-8 text-xs">
             <span v-if="unifiedCleanupValue === DISABLED_VALUE" class="text-muted-foreground">
-              {{ t('settings.shortcut.cancel.none') }}
+              {{ t('settings.cleanup.disabled') }}
             </span>
             <ModelOption
               v-else-if="selectedCleanupModel"
@@ -135,7 +135,7 @@ function onMaxTokensSliderCommit(v: number[]) {
             />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
+            <SelectItem :value="DISABLED_VALUE">{{ t('settings.cleanup.disabled') }}</SelectItem>
             <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
               <ModelOption
                 :label="m.label"

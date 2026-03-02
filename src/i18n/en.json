@@ -1,9 +1,9 @@
 {
   "_version": 1,
   "_meta": {
-    "rust_only": ["menu.microphone", "menu.panel", "menu.setup", "menu.quit", "pill.recording", "pill.transcribing", "window.panel", "window.setup"],
-    "shared": ["app.name", "menu.noDevices"],
-    "front_dynamic": ["panel.*", "settings.locale.*", "models.filter.*"]
+    "backend": ["menu.microphone", "menu.panel", "menu.quit", "pill.recording", "pill.transcribing", "window.panel", "window.setup"],
+    "both": ["app.name", "menu.noDevices"],
+    "patterns": ["panel.*", "settings.locale.*", "models.filter.*"]
   },
   "common.cancel": "Cancel",
   "app.name": "WhisperDictate",
@@ -86,7 +86,8 @@
   "settings.shortcut.mode.pushToTalk": "Push to talk",
   "settings.shortcut.mode.toggle": "Toggle",
   "settings.shortcut.cancel": "Cancel transcription",
-  "settings.shortcut.cancel.none": "Disabled",
+  "settings.shortcut.cancel.none": "Not set",
+  "settings.cleanup.disabled": "Disabled",
   "settings.microphone": "Microphone",
   "settings.microphone.defaultTag": "Default",
   "settings.microphone.test": "Test",
@@ -131,6 +132,7 @@
   "panel.shortcuts": "Shortcuts",
   "panel.microphone": "Microphone",
   "panel.providers": "Providers",
+  "panel.permissions": "Permissions",
   "panel.general": "General",
   "status.idle": "Ready",
   "status.recording": "Recording",
@@ -145,6 +147,6 @@
   "models.filter.punctuation": "Punctuation",
   "models.filter.correction": "Correction",
   "models.filter.llm": "Rewriting",
-  "menu.panel": "Panel\u2026",
+  "menu.panel": "Settings\u2026",
   "window.panel": "WhisperDictate"
 }

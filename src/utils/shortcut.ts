@@ -1,7 +1,7 @@
 export type ShortcutKind = 'ModifierOnly' | 'Combo' | 'Key'
 
 export interface ShortcutDef {
-  key_code: number
+  key_codes: number[]
   modifiers: number
   kind: ShortcutKind
 }
@@ -62,21 +62,29 @@ function modifierSymbols(flags: number): string {
 export function parseShortcut(s: string): ShortcutDef | null {
   if (!s) return null
   try {
-    const parsed = JSON.parse(s) as ShortcutDef
+    const parsed = JSON.parse(s)
+    // New format: key_codes array
+    if (Array.isArray(parsed.key_codes) && typeof parsed.modifiers === 'number' && parsed.kind) {
+      return parsed as ShortcutDef
+    }
+    // Old format: key_code singular
     if (typeof parsed.key_code === 'number' && typeof parsed.modifiers === 'number' && parsed.kind) {
-      return parsed
+      const key_codes = (parsed.key_code === 0 && parsed.modifiers === 0)
+        ? []
+        : [parsed.key_code]
+      return { key_codes, modifiers: parsed.modifiers, kind: parsed.kind }
     }
   } catch {
     // Legacy format
   }
   // Legacy string values
   const legacy: Record<string, ShortcutDef> = {
-    right_command: { key_code: 0x36, modifiers: CG_MASK_COMMAND, kind: 'ModifierOnly' },
-    right_option: { key_code: 0x3D, modifiers: CG_MASK_ALTERNATE, kind: 'ModifierOnly' },
-    right_control: { key_code: 0x3E, modifiers: CG_MASK_CONTROL, kind: 'ModifierOnly' },
-    right_shift: { key_code: 0x3C, modifiers: CG_MASK_SHIFT, kind: 'ModifierOnly' },
-    escape: { key_code: 0x35, modifiers: 0, kind: 'Key' },
-    none: { key_code: 0, modifiers: 0, kind: 'Key' },
+    right_command: { key_codes: [0x36], modifiers: CG_MASK_COMMAND, kind: 'ModifierOnly' },
+    right_option: { key_codes: [0x3D], modifiers: CG_MASK_ALTERNATE, kind: 'ModifierOnly' },
+    right_control: { key_codes: [0x3E], modifiers: CG_MASK_CONTROL, kind: 'ModifierOnly' },
+    right_shift: { key_codes: [0x3C], modifiers: CG_MASK_SHIFT, kind: 'ModifierOnly' },
+    escape: { key_codes: [0x35], modifiers: 0, kind: 'Key' },
+    none: { key_codes: [], modifiers: 0, kind: 'Key' },
   }
   return legacy[s] ?? null
 }
@@ -85,18 +93,18 @@ export function formatShortcut(s: ShortcutDef): string {
   if (isDisabled(s)) return ''
   switch (s.kind) {
     case 'ModifierOnly':
-      return KEY_CODE_LABELS[s.key_code] ?? '⌘'
+      return s.key_codes.map(kc => KEY_CODE_LABELS[kc] ?? '⌘').join('+')
     case 'Combo':
-      return modifierSymbols(s.modifiers) + (KEY_CODE_LABELS[s.key_code] ?? '?')
+      return modifierSymbols(s.modifiers) + s.key_codes.map(kc => KEY_CODE_LABELS[kc] ?? '?').join('')
     case 'Key':
-      return KEY_CODE_LABELS[s.key_code] ?? '?'
+      return s.key_codes.map(kc => KEY_CODE_LABELS[kc] ?? '?').join('+')
   }
 }
 
-export function formatCaptureState(modifiers: number, keyCode: number | null): string {
+export function formatCaptureState(modifiers: number, keyCodes: number[]): string {
   let s = modifierSymbols(modifiers)
-  if (keyCode != null && keyCode > 0) {
-    s += KEY_CODE_LABELS[keyCode] ?? '?'
+  for (const kc of keyCodes) {
+    s += KEY_CODE_LABELS[kc] ?? '?'
   }
   return s || '...'
 }
@@ -106,7 +114,7 @@ export function serializeShortcut(s: ShortcutDef): string {
 }
 
 export function isDisabled(s: ShortcutDef): boolean {
-  return s.key_code === 0 && s.modifiers === 0
+  return s.key_codes.length === 0 && s.modifiers === 0
 }
 
 // Structured key cap parts for visual rendering
@@ -123,27 +131,30 @@ export function formatShortcutParts(s: ShortcutDef): KeyCapPart[] {
   if (isDisabled(s)) return []
   switch (s.kind) {
     case 'ModifierOnly': {
-      const full = KEY_CODE_LABELS[s.key_code] ?? '⌘'
-      const spaceIdx = full.lastIndexOf(' ')
-      if (spaceIdx > 0) {
-        const side = full.slice(0, spaceIdx)
-        const symbol = full.slice(spaceIdx + 1)
-        return [{ symbol, side }]
-      }
-      return [{ symbol: full }]
+      return s.key_codes.map(kc => {
+        const full = KEY_CODE_LABELS[kc] ?? '⌘'
+        const spaceIdx = full.lastIndexOf(' ')
+        if (spaceIdx > 0) {
+          return { symbol: full.slice(spaceIdx + 1), side: full.slice(0, spaceIdx) }
+        }
+        return { symbol: full }
+      })
     }
     case 'Combo': {
       const mods = modifierSymbols(s.modifiers)
-      const key = KEY_CODE_LABELS[s.key_code] ?? '?'
       const parts: KeyCapPart[] = []
       for (const ch of mods) parts.push({ symbol: ch })
-      parts.push({ symbol: SYMBOL_MAP[s.key_code] ?? key })
+      for (const kc of s.key_codes) {
+        parts.push({ symbol: SYMBOL_MAP[kc] ?? KEY_CODE_LABELS[kc] ?? '?' })
+      }
       return parts
     }
     case 'Key': {
-      const sym = SYMBOL_MAP[s.key_code] ?? KEY_CODE_LABELS[s.key_code] ?? '?'
-      const label = KEY_CODE_LABELS[s.key_code]
-      return [{ symbol: sym, side: label !== sym ? label : undefined }]
+      return s.key_codes.map(kc => {
+        const sym = SYMBOL_MAP[kc] ?? KEY_CODE_LABELS[kc] ?? '?'
+        const label = KEY_CODE_LABELS[kc]
+        return { symbol: sym, side: label !== sym ? label : undefined }
+      })
     }
   }
 }

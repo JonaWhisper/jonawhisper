@@ -5,6 +5,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { parseShortcut, formatShortcutParts, formatCaptureState, serializeShortcut, isDisabled, type ShortcutDef } from '@/utils/shortcut'
 
+const DISABLED_SHORTCUT: ShortcutDef = { key_codes: [], modifiers: 0, kind: 'Key' }
+
 const props = defineProps<{
   modelValue: string
   disabled?: boolean
@@ -40,13 +42,13 @@ async function startCapture() {
   capturing.value = true
   captureDisplay.value = ''
 
-  unlistenUpdate = await listen<{ modifiers: number; key_code: number | null }>('shortcut-capture-update', (event) => {
-    captureDisplay.value = formatCaptureState(event.payload.modifiers, event.payload.key_code)
+  unlistenUpdate = await listen<{ modifiers: number; key_codes: number[] }>('shortcut-capture-update', (event) => {
+    captureDisplay.value = formatCaptureState(event.payload.modifiers, event.payload.key_codes)
   })
 
-  unlistenComplete = await listen<{ key_code: number; modifiers: number; kind: string; display: string }>('shortcut-capture-complete', (event) => {
+  unlistenComplete = await listen<{ key_codes: number[]; modifiers: number; kind: string; display: string }>('shortcut-capture-complete', (event) => {
     const shortcut: ShortcutDef = {
-      key_code: event.payload.key_code,
+      key_codes: event.payload.key_codes,
       modifiers: event.payload.modifiers,
       kind: event.payload.kind as ShortcutDef['kind'],
     }
@@ -62,6 +64,10 @@ function stopCapture() {
   captureDisplay.value = ''
   cleanup()
   invoke('stop_shortcut_capture')
+}
+
+function clearShortcut() {
+  emit('update:modelValue', serializeShortcut(DISABLED_SHORTCUT))
 }
 
 function cleanup() {
@@ -100,12 +106,18 @@ onUnmounted(() => {
     <!-- Disabled state -->
     <span v-else class="shortcut-capture-none">{{ t('settings.shortcut.cancel.none') }}</span>
 
-    <!-- Clear/Cancel button -->
+    <!-- Clear/Cancel button: cancel capture, or clear assigned shortcut -->
     <button
       v-if="capturing"
       type="button"
       class="shortcut-clear"
       @click.stop="stopCapture"
+    >&times;</button>
+    <button
+      v-else-if="keyCaps.length > 0 && !disabled"
+      type="button"
+      class="shortcut-clear"
+      @click.stop="clearShortcut"
     >&times;</button>
   </div>
 </template>
@@ -122,7 +134,8 @@ onUnmounted(() => {
   font-size: 13px;
   color: hsl(var(--foreground));
   cursor: pointer;
-  min-width: 100px;
+  width: 200px;
+  height: 32px;
   justify-content: center;
   transition: all 0.2s;
 }
@@ -182,7 +195,7 @@ onUnmounted(() => {
   width: 16px;
   height: 16px;
   border: none;
-  background: hsl(var(--muted-foreground));
+  background: hsl(var(--muted-foreground) / 0.5);
   color: hsl(var(--card));
   cursor: pointer;
   border-radius: 50%;
@@ -197,7 +210,7 @@ onUnmounted(() => {
 }
 
 .shortcut-clear:hover {
-  background: hsl(var(--destructive));
+  background: hsl(var(--muted-foreground));
 }
 
 @keyframes captureFlash {
