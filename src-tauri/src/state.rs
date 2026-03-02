@@ -68,6 +68,8 @@ pub struct AppState {
     pub bert_context: Mutex<Option<crate::bert_punctuation::BertContext>>,
     /// Cached PCS punctuation context. Invalidated when cleanup_model_id changes to a different PCS model.
     pub pcs_context: Mutex<Option<crate::pcs_punctuation::PcsContext>>,
+    /// Cached candle punctuation context (safetensors models). Invalidated when cleanup_model_id changes.
+    pub candle_punct_context: Mutex<Option<crate::candle_punctuation::CandlePunctContext>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -306,6 +308,7 @@ impl Default for AppState {
             llm_context: Mutex::new(None),
             bert_context: Mutex::new(None),
             pcs_context: Mutex::new(None),
+            candle_punct_context: Mutex::new(None),
         }
     }
 }

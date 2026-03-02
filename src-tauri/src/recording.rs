@@ -369,21 +369,30 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     let mut effective_cleanup_model_id = String::new();
     if text_cleanup_enabled && !cleanup_model_id.is_empty() {
         if cleanup_model_id.starts_with("bert-punctuation:") || cleanup_model_id.starts_with("pcs-punctuation:") {
-            // Punctuation restoration (BERT or PCS) — finalize after
+            // Punctuation restoration (BERT/candle/PCS) — finalize after
             let state_clone = Arc::clone(state);
             let text_for_punct = processed.clone();
             let model_id = cleanup_model_id.clone();
             let is_pcs = cleanup_model_id.starts_with("pcs-punctuation:");
+            let is_candle = !is_pcs && {
+                let cat = crate::engines::EngineCatalog::new();
+                cat.model_by_id(&cleanup_model_id)
+                    .map_or(false, |m| m.filename.ends_with(".safetensors"))
+            };
             let punct_result = if is_pcs {
                 tokio::task::spawn_blocking(move || {
                     run_pcs_punctuation(&state_clone, &text_for_punct, &model_id)
+                }).await
+            } else if is_candle {
+                tokio::task::spawn_blocking(move || {
+                    run_candle_punctuation(&state_clone, &text_for_punct, &model_id)
                 }).await
             } else {
                 tokio::task::spawn_blocking(move || {
                     run_bert_punctuation(&state_clone, &text_for_punct, &model_id)
                 }).await
             };
-            let engine_name = if is_pcs { "PCS" } else { "BERT" };
+            let engine_name = if is_pcs { "PCS" } else if is_candle { "Candle" } else { "BERT" };
             match punct_result {
                 Ok(Ok(punctuated)) => {
                     log::info!("{} punctuation: {} → {}", engine_name, processed.len(), punctuated.len());
@@ -520,6 +529,35 @@ fn run_bert_punctuation(
 
     let ctx = ctx_guard.as_mut().unwrap();
     crate::bert_punctuation::restore_punctuation(ctx, text)
+}
+
+// -- Candle punctuation (safetensors models) --
+
+fn run_candle_punctuation(
+    state: &Arc<AppState>,
+    text: &str,
+    punctuation_model_id: &str,
+) -> Result<String, String> {
+    let catalog = crate::engines::EngineCatalog::new();
+    let model = catalog.model_by_id(punctuation_model_id)
+        .ok_or_else(|| format!("Candle punctuation model not found: {}", punctuation_model_id))?;
+
+    if !model.is_downloaded() {
+        return Err(format!("Candle punctuation model not downloaded: {}", model.id));
+    }
+
+    let model_path = model.local_path();
+
+    // Load or reuse cached CandlePunctContext
+    let mut ctx_guard = state.candle_punct_context.lock().unwrap();
+    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
+        log::info!("Loading candle punctuation model: {}", model.id);
+        let ctx = crate::candle_punctuation::CandlePunctContext::load(&model_path, &model.id)?;
+        *ctx_guard = Some(ctx);
+    }
+
+    let ctx = ctx_guard.as_ref().unwrap();
+    crate::candle_punctuation::restore_punctuation(ctx, text)
 }
 
 // -- PCS punctuation --

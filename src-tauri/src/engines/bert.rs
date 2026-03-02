@@ -29,6 +29,22 @@ impl ASREngine for BertPunctuationEngine {
                 lang_codes: Some(vec!["fr".into(), "en".into(), "de".into(), "it".into()]),
                 ..Default::default()
             },
+            ASRModel {
+                id: "bert-punctuation:fullstop-multilingual-base".into(),
+                engine_id: "bert-punctuation".into(),
+                label: "Fullstop Multilingual Base (FP32)".into(),
+                filename: "model.safetensors".into(),
+                url: "https://huggingface.co/oliverguhr/fullstop-punctuation-multilingual-base/resolve/main/model.safetensors".into(),
+                size: 1_112_000_000,
+                storage_dir: storage_dir(),
+                download_type: DownloadType::SingleFile,
+                download_marker: None,
+                recommended: false,
+                params: Some(0.28),
+                ram: Some(560_000_000),
+                lang_codes: Some(vec!["fr".into(), "en".into(), "de".into(), "it".into(), "nl".into()]),
+                ..Default::default()
+            },
         ]
     }
 
