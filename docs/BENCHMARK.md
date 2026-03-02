@@ -163,8 +163,8 @@ Alternatives ou compléments au BERT fullstop actuel.
 | Modèle | Architecture | Taille | Langues | ONNX | Intérêt | Statut |
 |---|---|---|---|---|---|---|
 | **1-800-BAD-CODE/punct_cap_seg_47_language** | Transformer 6L d=512 | ~200 MB | 47 langues (FR, EN) | Exportable | Ponctuation + capitalisation + segmentation en un pass. F1=97.39 | **Intégré** (`pcs_punctuation.rs`) |
-| **sherpa-onnx-online-punct-en** | CNN-BiLSTM | **7.1 MB** (int8) | EN | Oui | Ultra-léger, 1/40e la taille de BERT, 2.5x plus rapide | Candidat |
-| **oliverguhr/fullstop-multilingual-sonar-base** | XLM-RoBERTa Base | ~500 MB | FR, EN, DE, IT, NL | Exportable | Version Base du modèle actuel, plus petit | Candidat |
+| **sherpa-onnx-online-punct-en** | CNN-BiLSTM | **7.1 MB** (int8) | EN | Oui | Ultra-léger, 1/40e la taille de BERT, 2.5x plus rapide | EN seul, intérêt limité |
+| **oliverguhr/fullstop-multilingual-sonar-base** | XLM-RoBERTa Base | ~278 MB | FR, EN, DE, IT, NL | Pas d'ONNX | Version Base, nécessite conversion + hébergement. Coincé entre BERT Large et PCS sans avantage clair | Écarté |
 
 ### Modèles de correction spécialisés (alternative au LLM)
 
