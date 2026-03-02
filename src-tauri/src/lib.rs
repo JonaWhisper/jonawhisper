@@ -16,15 +16,13 @@ mod parakeet_asr;
 mod qwen_asr;
 mod migrations;
 mod llm_prompt;
-mod menu_icons;
-mod pill;
 mod platform;
 mod post_processor;
 mod recording;
 mod state;
 mod t5_correction;
 mod transcriber;
-mod tray;
+mod ui;
 mod vad;
 
 rust_i18n::i18n!("../src/i18n");
@@ -103,7 +101,7 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
-            tray::setup_tray(app.handle())?;
+            ui::tray::setup_tray(app.handle())?;
 
             // Audio thread (cpal::Stream is not Send)
             let (cmd_tx, spectrum_data, reply_rx, stream_error) =
@@ -148,7 +146,7 @@ pub fn run() {
             if report.all_granted() {
                 monitor_enabled.store(true, Ordering::SeqCst);
             } else {
-                tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
+                ui::tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
             }
 
             // Spectrum emission (30fps) + stream error detection

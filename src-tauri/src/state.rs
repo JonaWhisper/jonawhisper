@@ -141,7 +141,7 @@ pub struct AppState {
     pub download: Mutex<DownloadState>,
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
-    pub tray_menu: Mutex<Option<crate::tray::TrayMenuState>>,
+    pub tray_menu: Mutex<Option<crate::ui::tray::TrayMenuState>>,
     /// Cached inference contexts (ASR + cleanup models). Each slot is lazy-loaded and
     /// invalidated when the corresponding model selection changes.
     pub inference: InferenceContexts,

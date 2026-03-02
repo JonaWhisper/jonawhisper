@@ -1,7 +1,7 @@
 //! Native pill overlay window — no WebView, pure AppKit + RGBA bitmap.
 //! Eliminates the WKWebView white flash entirely.
 
-use crate::menu_icons::{sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
+use super::menu_icons::{sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
 #[cfg(target_os = "macos")]
 use objc2::msg_send;
 #[cfg(target_os = "macos")]

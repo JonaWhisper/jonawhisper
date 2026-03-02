@@ -1,4 +1,4 @@
-use crate::menu_icons::{self, sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
+use super::menu_icons::{self, sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
 use crate::platform::audio_devices;
 use crate::state::AppState;
 use rust_i18n::t;
@@ -109,12 +109,12 @@ fn activate_app() {
 fn activate_app() {}
 
 pub fn open_pill_window(app: &AppHandle) {
-    crate::pill::open(app, crate::pill::PillMode::Recording);
+    super::pill::open(app, super::pill::PillMode::Recording);
 }
 
 pub fn close_pill_window(app: &AppHandle) {
     set_tray_state(app, "idle");
-    crate::pill::close(app);
+    super::pill::close(app);
 }
 
 // -- Tray menu --

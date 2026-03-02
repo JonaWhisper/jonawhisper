@@ -234,7 +234,7 @@ pub fn set_setting(
     }
     state.save_preferences();
     if key == "app_locale" {
-        crate::tray::update_tray_labels(&app);
+        crate::ui::tray::update_tray_labels(&app);
     }
     let _ = app.emit(crate::events::SETTINGS_CHANGED, &key);
 }
@@ -390,7 +390,7 @@ pub fn start_monitoring(
             .is_some_and(|m| m.is_downloaded());
 
     if !model_ready {
-        crate::tray::open_window_with_min(
+        crate::ui::tray::open_window_with_min(
             &app,
             "model-manager",
             "Model Manager",
@@ -429,9 +429,9 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
     for round in 0..rounds {
         log::info!("Simulation round {}/{}", round + 1, rounds);
 
-        crate::tray::open_pill_window(&app);
+        crate::ui::tray::open_pill_window(&app);
         tokio::time::sleep(Duration::from_millis(100)).await;
-        crate::pill::set_mode(crate::pill::PillMode::Recording);
+        crate::ui::pill::set_mode(crate::ui::pill::PillMode::Recording);
         let _ = app.emit(crate::events::RECORDING_STARTED, ());
 
         // Fake spectrum data for 2 seconds (30fps)
@@ -442,12 +442,12 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
                     (phase.sin() * 0.5 + 0.5) * 0.8
                 })
                 .collect();
-            crate::pill::set_spectrum(&spectrum);
+            crate::ui::pill::set_spectrum(&spectrum);
             tokio::time::sleep(Duration::from_millis(33)).await;
         }
 
         let _ = app.emit(crate::events::RECORDING_STOPPED, serde_json::json!({ "queue_count": rounds - round }));
-        crate::pill::set_mode(crate::pill::PillMode::Transcribing);
+        crate::ui::pill::set_mode(crate::ui::pill::PillMode::Transcribing);
         let _ = app.emit(crate::events::TRANSCRIPTION_STARTED, serde_json::json!({ "queue_count": rounds - round - 1 }));
 
         tokio::time::sleep(Duration::from_millis(2000)).await;
@@ -459,9 +459,9 @@ pub async fn simulate_pill_test(app: AppHandle, count: Option<u32>) {
         }
     }
 
-    crate::pill::set_mode(crate::pill::PillMode::Error);
+    crate::ui::pill::set_mode(crate::ui::pill::PillMode::Error);
     tokio::time::sleep(Duration::from_millis(800)).await;
 
-    crate::tray::close_pill_window(&app);
+    crate::ui::tray::close_pill_window(&app);
     log::info!("Simulation complete");
 }

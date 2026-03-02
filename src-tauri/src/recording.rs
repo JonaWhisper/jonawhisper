@@ -68,8 +68,8 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     PILL_CLOSE_GENERATION.fetch_add(1, Ordering::SeqCst);
 
     // Show pill immediately in Preparing mode (before stream starts)
-    crate::pill::open(app, crate::pill::PillMode::Preparing);
-    crate::tray::set_tray_state(app, "recording");
+    crate::ui::pill::open(app, crate::ui::pill::PillMode::Preparing);
+    crate::ui::tray::set_tray_state(app, "recording");
 
     let (device_uid, ducking_enabled, ducking_level) = {
         let s = state.settings.lock().unwrap();
@@ -85,7 +85,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
 
     // Stream is ready — transition to Recording mode + audible cue
     platform::play_sound("Tink");
-    crate::pill::set_mode(crate::pill::PillMode::Recording);
+    crate::ui::pill::set_mode(crate::ui::pill::PillMode::Recording);
     let _ = app.emit(crate::events::RECORDING_STARTED, ());
 }
 
@@ -129,7 +129,7 @@ pub fn stop_recording_and_enqueue(
         Some(p) => p,
         None => {
             log::warn!("No audio file produced, closing pill");
-            crate::tray::close_pill_window(app);
+            crate::ui::tray::close_pill_window(app);
             let _ = app.emit(crate::events::RECORDING_STOPPED, ());
             return;
         }
@@ -144,9 +144,9 @@ pub fn stop_recording_and_enqueue(
     );
     // count = queue len after enqueue; +1 if already transcribing = total pending
     let is_transcribing = state.runtime.lock().unwrap().is_transcribing;
-    crate::pill::set_pending(count as u32 + if is_transcribing { 1 } else { 0 });
-    crate::pill::set_mode(crate::pill::PillMode::Transcribing);
-    crate::tray::set_tray_state(app, "transcribing");
+    crate::ui::pill::set_pending(count as u32 + if is_transcribing { 1 } else { 0 });
+    crate::ui::pill::set_mode(crate::ui::pill::PillMode::Transcribing);
+    crate::ui::tray::set_tray_state(app, "transcribing");
 
     let app_clone = app.clone();
     let state_clone = Arc::clone(state);
@@ -181,10 +181,10 @@ fn handle_short_tap(
     drop(rt);
 
     if !is_transcribing && queue_empty {
-        crate::tray::close_pill_window(app);
+        crate::ui::tray::close_pill_window(app);
     } else {
-        crate::pill::set_mode(crate::pill::PillMode::Transcribing);
-        crate::tray::set_tray_state(app, "transcribing");
+        crate::ui::pill::set_mode(crate::ui::pill::PillMode::Transcribing);
+        crate::ui::tray::set_tray_state(app, "transcribing");
     }
     let _ = app.emit(crate::events::RECORDING_STOPPED, ());
 }
@@ -217,7 +217,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
             serde_json::json!({ "queue_count": qc }),
         );
         // pending = items still in queue + the one we're about to process
-        crate::pill::set_pending(qc as u32 + 1);
+        crate::ui::pill::set_pending(qc as u32 + 1);
 
         // VAD pre-check: discard silence, trim edges
         let vad_enabled = state.settings.lock().unwrap().vad_enabled;
@@ -281,7 +281,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     if should_close {
         if had_content {
             // Show success checkmark briefly before closing
-            crate::pill::set_mode(crate::pill::PillMode::Success);
+            crate::ui::pill::set_mode(crate::ui::pill::PillMode::Success);
             let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
             tokio::time::sleep(Duration::from_millis(600)).await;
             // Abort if a new recording started during the sleep
@@ -289,7 +289,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
                 return;
             }
         }
-        crate::tray::close_pill_window(app);
+        crate::ui::tray::close_pill_window(app);
     }
 }
 
@@ -662,14 +662,14 @@ fn write_wav_f32(path: &std::path::Path, samples: &[f32]) -> Result<(), String> 
 // -- Cleanup helpers --
 
 fn show_error_then_close(app: &AppHandle) {
-    crate::pill::set_mode(crate::pill::PillMode::Error);
+    crate::ui::pill::set_mode(crate::ui::pill::PillMode::Error);
     let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(ERROR_DISPLAY_MS)).await;
         // Only close if no new recording started since the error
         if PILL_CLOSE_GENERATION.load(Ordering::SeqCst) == gen {
-            crate::tray::close_pill_window(&app_clone);
+            crate::ui::tray::close_pill_window(&app_clone);
         }
     });
 }
@@ -706,7 +706,7 @@ fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
         rt.transcription_cancelled = true;
         rt.last_paste_had_content = false;
     }
-    crate::pill::set_pending(0);
+    crate::ui::pill::set_pending(0);
     platform::play_sound("Funk");
     let _ = app.emit(crate::events::TRANSCRIPTION_CANCELLED, ());
     show_error_then_close(app);
@@ -882,7 +882,7 @@ pub fn spawn_spectrum_emitter(
             let _ = app.emit(crate::events::MIC_TEST_SPECTRUM, &spectrum);
         } else {
             // Feed spectrum directly to native pill (no Tauri event needed)
-            crate::pill::set_spectrum(&spectrum);
+            crate::ui::pill::set_spectrum(&spectrum);
         }
     });
 }
