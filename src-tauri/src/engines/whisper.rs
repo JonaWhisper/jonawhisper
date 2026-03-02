@@ -23,6 +23,7 @@ impl ASREngine for WhisperEngine {
                 size: 3_100_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(1.8), rtf: Some(0.50),
+                ram: Some(4_000_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -32,6 +33,7 @@ impl ASREngine for WhisperEngine {
                 size: 3_090_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(1.9), rtf: Some(0.50),
+                ram: Some(4_000_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -41,6 +43,7 @@ impl ASREngine for WhisperEngine {
                 size: 1_600_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.1), rtf: Some(0.25),
+                ram: Some(2_500_000_000),
                 recommended: true,
                 ..Default::default()
             },
@@ -51,6 +54,7 @@ impl ASREngine for WhisperEngine {
                 size: 874_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.1), rtf: Some(0.20),
+                ram: Some(1_300_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -60,6 +64,7 @@ impl ASREngine for WhisperEngine {
                 size: 574_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.3), rtf: Some(0.15),
+                ram: Some(900_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -69,6 +74,7 @@ impl ASREngine for WhisperEngine {
                 size: 538_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(1.5), rtf: Some(0.20),
+                ram: Some(900_000_000),
                 lang_codes: Some(vec!["fr".into()]),
                 ..Default::default()
             },
@@ -79,6 +85,7 @@ impl ASREngine for WhisperEngine {
                 size: 1_500_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.7), rtf: Some(0.35),
+                ram: Some(2_000_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -88,6 +95,7 @@ impl ASREngine for WhisperEngine {
                 size: 539_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.8), rtf: Some(0.20),
+                ram: Some(900_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -97,6 +105,7 @@ impl ASREngine for WhisperEngine {
                 size: 466_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(3.4), rtf: Some(0.15),
+                ram: Some(750_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -106,6 +115,7 @@ impl ASREngine for WhisperEngine {
                 size: 190_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(3.6), rtf: Some(0.10),
+                ram: Some(400_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -115,6 +125,7 @@ impl ASREngine for WhisperEngine {
                 size: 142_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(5.0), rtf: Some(0.08),
+                ram: Some(300_000_000),
                 ..Default::default()
             },
             ASRModel {
@@ -124,6 +135,7 @@ impl ASREngine for WhisperEngine {
                 size: 75_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(7.6), rtf: Some(0.05),
+                ram: Some(200_000_000),
                 ..Default::default()
             },
         ]
