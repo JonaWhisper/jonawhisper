@@ -171,8 +171,8 @@ onUnmounted(() => {
 .key-cap-side {
   font-size: 9px;
   font-weight: 400;
-  opacity: 0.55;
-  margin-right: 1px;
+  opacity: 0.7;
+  margin-right: 2px;
 }
 
 .shortcut-capture-hint {
