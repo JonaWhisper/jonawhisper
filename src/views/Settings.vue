@@ -551,7 +551,7 @@ onUnmounted(() => {
                   >{{ asrGroupLabel(selectedAsrModel.group) }}</Badge>
                 </span>
               </SelectTrigger>
-              <SelectContent class="max-h-60">
+              <SelectContent>
                 <SelectItem
                   v-for="m in engines.asrModels"
                   :key="m.id"
@@ -746,7 +746,7 @@ onUnmounted(() => {
                     >{{ cleanupGroupLabel(selectedCleanupModel.group) }}</Badge>
                   </span>
                 </SelectTrigger>
-                <SelectContent class="max-h-60">
+                <SelectContent>
                   <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
                     <div class="flex flex-col gap-0.5">
                       <span class="flex items-center gap-1.5">
