@@ -151,9 +151,7 @@ export function formatShortcutParts(s: ShortcutDef): KeyCapPart[] {
     }
     case 'Key': {
       return s.key_codes.map(kc => {
-        const sym = SYMBOL_MAP[kc] ?? KEY_CODE_LABELS[kc] ?? '?'
-        const label = KEY_CODE_LABELS[kc]
-        return { symbol: sym, side: label !== sym ? label : undefined }
+        return { symbol: SYMBOL_MAP[kc] ?? KEY_CODE_LABELS[kc] ?? '?' }
       })
     }
   }
