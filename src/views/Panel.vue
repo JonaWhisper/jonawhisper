@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
-import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Settings2 } from 'lucide-vue-next'
+import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2 } from 'lucide-vue-next'
 import RecentsSection from '@/sections/RecentsSection.vue'
 import ModelsSection from '@/sections/ModelsSection.vue'
 import TranscriptionSection from '@/sections/TranscriptionSection.vue'
@@ -11,6 +11,7 @@ import ProcessingSection from '@/sections/ProcessingSection.vue'
 import ShortcutsSection from '@/sections/ShortcutsSection.vue'
 import MicrophoneSection from '@/sections/MicrophoneSection.vue'
 import ProvidersSection from '@/sections/ProvidersSection.vue'
+import PermissionsSection from '@/sections/PermissionsSection.vue'
 import GeneralSection from '@/sections/GeneralSection.vue'
 
 const { t } = useI18n()
@@ -26,6 +27,7 @@ const sections = [
   { id: 'shortcuts', icon: Keyboard, label: 'panel.shortcuts' },
   { id: 'microphone', icon: Mic, label: 'panel.microphone' },
   { id: 'providers', icon: Cloud, label: 'panel.providers' },
+  { id: 'permissions', icon: Shield, label: 'panel.permissions' },
   { id: 'general', icon: Settings2, label: 'panel.general' },
 ]
 
@@ -92,6 +94,7 @@ onMounted(async () => {
           <ShortcutsSection v-else-if="activeSection === 'shortcuts'" key="shortcuts" />
           <MicrophoneSection v-else-if="activeSection === 'microphone'" key="microphone" />
           <ProvidersSection v-else-if="activeSection === 'providers'" key="providers" />
+          <PermissionsSection v-else-if="activeSection === 'permissions'" key="permissions" />
           <GeneralSection v-else-if="activeSection === 'general'" key="general" />
         </Transition>
       </div>
