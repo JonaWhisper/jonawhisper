@@ -99,14 +99,15 @@ pub fn stop_recording_and_enqueue(
         rt.is_recording = false;
     }
 
+    // Restore BEFORE stopping stream: on BT, the mic stream keeps HFP active,
+    // so we restore volume in the same audio profile state as when we ducked.
+    // Stopping the stream triggers HFP→A2DP switch which would swallow the restore.
+    platform::audio_ducking::restore_volume();
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
     let audio_path = match rec.audio_rx.recv() {
         Ok(AudioReply::Stopped { path }) => path,
         _ => None,
     };
-    // Restore AFTER stream stopped: BT profile can begin switching back (HFP→A2DP),
-    // and we restore volume in a stable state.
-    platform::audio_ducking::restore_volume();
 
     let held_duration = rec.key_down_time.map(|t| t.elapsed());
     rec.key_down_time = None;
@@ -751,12 +752,12 @@ fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingS
         rt.is_recording = false;
     }
 
+    // Restore BEFORE stopping stream (same rationale as stop_recording_and_enqueue)
+    platform::audio_ducking::restore_volume();
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
     if let Ok(AudioReply::Stopped { path: Some(path) }) = rec.audio_rx.recv() {
         let _ = std::fs::remove_file(&path);
     }
-    // Restore AFTER stream stopped (same rationale as stop_recording_and_enqueue)
-    platform::audio_ducking::restore_volume();
     rec.key_down_time = None;
     rec.last_short_tap_time = None;
 
