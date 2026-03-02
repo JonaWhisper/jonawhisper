@@ -84,10 +84,7 @@ impl PcsContext {
             .map(|p| p.get())
             .unwrap_or(4);
 
-        let session = Session::builder()
-            .map_err(|e| format!("Failed to create ONNX session builder: {e}"))?
-            .with_intra_threads(n_threads)
-            .map_err(|e| format!("Failed to set thread count: {e}"))?
+        let session = crate::ort_session::build_session(n_threads)?
             .commit_from_file(model_path)
             .map_err(|e| format!("Failed to load PCS ONNX model: {e}"))?;
 

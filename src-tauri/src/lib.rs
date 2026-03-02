@@ -11,6 +11,7 @@ mod events;
 mod llm_cleanup;
 mod llm_local;
 mod mel_features;
+mod ort_session;
 mod migrations;
 mod llm_prompt;
 mod menu_icons;
