@@ -368,7 +368,29 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     // Step 2: cleanup based on selected model
     let mut effective_cleanup_model_id = String::new();
     if text_cleanup_enabled && !cleanup_model_id.is_empty() {
-        if cleanup_model_id.starts_with("bert-punctuation:") || cleanup_model_id.starts_with("pcs-punctuation:") {
+        if cleanup_model_id.starts_with("correction:") {
+            // T5 correction (encoder-decoder) — finalize after
+            let state_clone = Arc::clone(state);
+            let text_for_correction = processed.clone();
+            let model_id = cleanup_model_id.clone();
+            let correction_result = tokio::task::spawn_blocking(move || {
+                run_t5_correction(&state_clone, &text_for_correction, &model_id)
+            }).await;
+            match correction_result {
+                Ok(Ok(corrected)) => {
+                    log::info!("T5 correction: {} → {}", processed.len(), corrected.len());
+                    processed = corrected;
+                    effective_cleanup_model_id = cleanup_model_id.clone();
+                }
+                Ok(Err(e)) => {
+                    log::warn!("T5 correction failed, using preprocessed result: {}", e);
+                }
+                Err(e) => {
+                    log::warn!("T5 correction task panicked: {}", e);
+                }
+            }
+            processed = post_processor::finalize(&processed);
+        } else if cleanup_model_id.starts_with("bert-punctuation:") || cleanup_model_id.starts_with("pcs-punctuation:") {
             // Punctuation restoration (BERT/candle/PCS) — finalize after
             let state_clone = Arc::clone(state);
             let text_for_punct = processed.clone();
@@ -597,6 +619,35 @@ fn run_pcs_punctuation(
 
     let ctx = ctx_guard.as_mut().unwrap();
     crate::pcs_punctuation::restore_punctuation_and_case(ctx, text)
+}
+
+// -- T5 correction --
+
+fn run_t5_correction(
+    state: &Arc<AppState>,
+    text: &str,
+    correction_model_id: &str,
+) -> Result<String, String> {
+    let catalog = crate::engines::EngineCatalog::new();
+    let model = catalog.model_by_id(correction_model_id)
+        .ok_or_else(|| format!("Correction model not found: {}", correction_model_id))?;
+
+    if !model.is_downloaded() {
+        return Err(format!("Correction model not downloaded: {}", model.id));
+    }
+
+    let model_dir = model.local_path();
+
+    // Load or reuse cached T5Context
+    let mut ctx_guard = state.t5_context.lock().unwrap();
+    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
+        log::info!("Loading T5 correction model: {}", model.id);
+        let ctx = crate::t5_correction::T5Context::load(&model_dir, &model.id)?;
+        *ctx_guard = Some(ctx);
+    }
+
+    let ctx = ctx_guard.as_mut().unwrap();
+    crate::t5_correction::correct(ctx, text)
 }
 
 // -- Local LLM cleanup --

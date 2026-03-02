@@ -10,7 +10,7 @@ export interface EngineInfo {
   id: string
   name: string
   description: string
-  category: 'asr' | 'llm' | 'punctuation'
+  category: 'asr' | 'llm' | 'punctuation' | 'correction'
   available: boolean
   supported_language_codes: string[]
 }
@@ -64,7 +64,7 @@ export interface Provider {
 export interface CleanupModel {
   id: string
   label: string
-  group: 'bert' | 'llm' | 'cloud'
+  group: 'bert' | 'llm' | 'cloud' | 'correction'
   params: number | null
   ram: number | null
   lang_codes: string[] | null

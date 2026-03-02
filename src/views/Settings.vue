@@ -292,6 +292,7 @@ const cleanupGroupLabel = (group: CleanupModel['group']) => {
 const cleanupGroupClass = (group: CleanupModel['group']) => {
   switch (group) {
     case 'bert': return 'bg-violet-500/10 text-violet-600'
+    case 'correction': return 'bg-amber-500/10 text-amber-600'
     case 'llm': return 'bg-blue-500/10 text-blue-600'
     case 'cloud': return 'bg-sky-500/10 text-sky-600'
   }

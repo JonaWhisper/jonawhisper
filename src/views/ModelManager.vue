@@ -100,6 +100,26 @@ onMounted(async () => {
           </button>
         </div>
       </template>
+      <template v-if="engines.correctionEngines.length > 0">
+        <div class="px-3 pt-4 pb-1">
+          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            {{ t('settings.cleanupGroup.correction') }}
+          </h2>
+        </div>
+        <div class="space-y-1 px-1">
+          <button
+            v-for="engine in engines.correctionEngines"
+            :key="engine.id"
+            @click="selectEngine(engine)"
+            class="w-full text-left px-3 py-2 rounded-md text-sm transition-colors"
+            :class="selectedEngineId === engine.id
+              ? 'bg-accent text-accent-foreground'
+              : 'hover:bg-accent/50 text-foreground'"
+          >
+            <span class="font-medium truncate">{{ engine.name }}</span>
+          </button>
+        </div>
+      </template>
       <template v-if="engines.llmEngines.length > 0">
         <div class="px-3 pt-4 pb-1">
           <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">

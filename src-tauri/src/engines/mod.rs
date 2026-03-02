@@ -7,6 +7,7 @@ pub mod downloader;
 pub mod llama;
 pub mod bert;
 pub mod pcs;
+pub mod correction;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -19,6 +20,7 @@ pub enum EngineCategory {
     ASR,
     LLM,
     Punctuation,
+    Correction,
 }
 
 // -- Download type --
@@ -175,6 +177,7 @@ impl EngineCatalog {
             Box::new(llama::LlamaEngine),
             Box::new(bert::BertPunctuationEngine),
             Box::new(pcs::PcsPunctuationEngine),
+            Box::new(correction::CorrectionEngine),
         ];
 
         Self { engines }

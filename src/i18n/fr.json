@@ -81,6 +81,7 @@
   "settings.postProcessing.cleanupModel.none": "Aucun mod\u00e8le t\u00e9l\u00e9charg\u00e9",
   "settings.cleanupGroup.bert": "Ponctuation",
   "settings.cleanupGroup.llm": "LLM",
+  "settings.cleanupGroup.correction": "Correction",
   "settings.cleanupGroup.cloud": "Cloud",
   "settings.cleanup.recommended": "Recommandé",
   "settings.langs": "langues",

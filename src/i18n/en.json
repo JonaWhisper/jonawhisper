@@ -81,6 +81,7 @@
   "settings.postProcessing.cleanupModel.none": "No models downloaded",
   "settings.cleanupGroup.bert": "Punctuation",
   "settings.cleanupGroup.llm": "LLM",
+  "settings.cleanupGroup.correction": "Correction",
   "settings.cleanupGroup.cloud": "Cloud",
   "settings.cleanup.recommended": "Recommended",
   "settings.langs": "langs",

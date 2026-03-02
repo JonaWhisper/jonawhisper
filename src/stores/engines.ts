@@ -35,11 +35,19 @@ export const useEnginesStore = defineStore('engines', () => {
     const ids = new Set(punctuationEngines.value.map(e => e.id))
     return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
   })
+  const correctionEngines = computed(() => engines.value.filter(e => e.category === 'correction'))
+  const downloadedCorrectionModels = computed(() => {
+    const ids = new Set(correctionEngines.value.map(e => e.id))
+    return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
+  })
   const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
   const cleanupModels = computed<CleanupModel[]>(() => {
     const result: CleanupModel[] = []
     for (const m of downloadedPunctuationModels.value) {
       result.push({ id: m.id, label: m.label, group: 'bert', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
+    }
+    for (const m of downloadedCorrectionModels.value) {
+      result.push({ id: m.id, label: m.label, group: 'correction', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
     }
     for (const m of downloadedLlmModels.value) {
       result.push({ id: m.id, label: m.label, group: 'llm', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
@@ -143,6 +151,7 @@ export const useEnginesStore = defineStore('engines', () => {
     engines, models, languages, audioDevices, providers, permissions,
     selectedEngine, downloadedModels, asrEngines, llmEngines,
     downloadedLlmModels, punctuationEngines, downloadedPunctuationModels,
+    correctionEngines, downloadedCorrectionModels,
     bertModelReady, cleanupModels, asrModels,
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,

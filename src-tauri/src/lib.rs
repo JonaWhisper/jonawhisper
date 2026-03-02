@@ -22,6 +22,7 @@ mod platform;
 mod post_processor;
 mod recording;
 mod state;
+mod t5_correction;
 mod transcriber;
 mod tray;
 mod vad;
