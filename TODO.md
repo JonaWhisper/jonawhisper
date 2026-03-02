@@ -22,6 +22,7 @@
 
 ## Refactoring
 
+- [ ] **Regrouper les contextes d'inférence dans AppState** — On a 6 `Mutex<Option<...Context>>` individuels (`whisper_context`, `canary_context`, `llm_context`, `bert_context`, `pcs_context`, `candle_punct_context`), chacun avec sa propre logique de cache invalidation éparpillée. Refactorer en un `Mutex<InferenceCache>` unique avec méthodes centralisées (`invalidate_asr()`, `invalidate_punct()`, etc.). Simplifie l'ajout de futurs moteurs et rend l'invalidation croisée explicite.
 - [x] **Splitter le store Pinia** — ~~`app.ts` centralise tout.~~ **Done.** Stores séparés : `app.ts` (runtime), `history.ts` (pagination backend + infinite scroll), `settings.ts`, `engines.ts`, `downloads.ts`.
 
 ## Documentation
