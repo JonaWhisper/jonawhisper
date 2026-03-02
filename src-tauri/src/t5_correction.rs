@@ -75,6 +75,69 @@ impl crate::state::HasModelId for T5Context {
     }
 }
 
+/// Detect and strip repetition: T5 models sometimes generate the same correction twice
+/// (e.g. "corrected text corrected text"). Looks for a space-aligned split near the middle
+/// where the second half starts like the first half (≥80% char match on first 15 chars).
+fn strip_repetition(text: &str) -> String {
+    let text = text.trim();
+    let len = text.len();
+    if len < 20 {
+        return text.to_string();
+    }
+
+    let bytes = text.as_bytes();
+    let mid = len / 2;
+    let range_start = mid.saturating_sub(len / 10);
+    let range_end = (mid + len / 10).min(len.saturating_sub(1));
+
+    for i in range_start..=range_end {
+        if bytes[i] != b' ' {
+            continue;
+        }
+        let first = &text[..i];
+        let rest = text[i + 1..].trim_start();
+
+        let first_chars: Vec<char> = first.chars().take(15).collect();
+        let rest_chars: Vec<char> = rest.chars().take(15).collect();
+        let compare_len = first_chars.len().min(rest_chars.len());
+
+        if compare_len >= 8 {
+            let matching = first_chars[..compare_len]
+                .iter()
+                .zip(rest_chars[..compare_len].iter())
+                .filter(|(a, b)| a == b)
+                .count();
+            if matching >= compare_len * 80 / 100 {
+                log::warn!(
+                    "T5 correction: repetition detected, keeping first half ({} -> {} chars)",
+                    len,
+                    first.trim_end().len()
+                );
+                return first.trim_end().to_string();
+            }
+        }
+    }
+
+    text.to_string()
+}
+
+/// Returns token IDs that would complete a repeated n-gram if generated next.
+fn calc_banned_ngram_tokens(generated: &[u32], ngram_size: usize) -> Vec<u32> {
+    if generated.len() < ngram_size {
+        return Vec::new();
+    }
+    // The (n-1) tokens that would start a potential repeated n-gram
+    let ngram_prefix = &generated[generated.len() - (ngram_size - 1)..];
+    let mut banned = Vec::new();
+    // Scan history for matching (n-1)-gram prefixes
+    for i in 0..generated.len() - (ngram_size - 1) {
+        if generated[i..i + ngram_size - 1] == *ngram_prefix {
+            banned.push(generated[i + ngram_size - 1]);
+        }
+    }
+    banned
+}
+
 /// Run T5 correction on a text. Returns the corrected text.
 pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
     if text.trim().is_empty() {
@@ -111,8 +174,7 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
         .decoder_start_token_id
         .unwrap_or(ctx.config.pad_token_id) as u32;
     let max_tokens = (input_token_count as f32 * 1.5) as usize + 32;
-    let temperature = 0.1_f64;
-    let repeat_penalty = 1.1_f64;
+    let repeat_penalty = 1.2_f64;
 
     let mut generated_ids: Vec<u32> = vec![decoder_start_id];
 
@@ -155,25 +217,31 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
             logits
         };
 
-        // Sample with temperature
-        let next_token = if temperature <= 0.0 {
-            logits
-                .argmax(D::Minus1)
-                .map_err(|e| format!("Argmax failed: {e}"))?
-                .to_scalar::<u32>()
-                .map_err(|e| format!("Failed to extract token: {e}"))?
-        } else {
-            let scaled = (&logits / temperature)
-                .map_err(|e| format!("Temperature scaling failed: {e}"))?;
-            let probs = candle_nn::ops::softmax(&scaled, D::Minus1)
-                .map_err(|e| format!("Softmax failed: {e}"))?;
-            // Greedy from softmax (temperature is very low, 0.1)
-            probs
-                .argmax(D::Minus1)
-                .map_err(|e| format!("Argmax failed: {e}"))?
-                .to_scalar::<u32>()
-                .map_err(|e| format!("Failed to extract token: {e}"))?
+        // No-repeat n-gram blocking (size=3)
+        let logits = {
+            let banned = calc_banned_ngram_tokens(&generated_ids, 3);
+            if banned.is_empty() {
+                logits
+            } else {
+                let mut v: Vec<f32> = logits
+                    .to_vec1()
+                    .map_err(|e| format!("Failed to extract logits for ngram blocking: {e}"))?;
+                for &token_id in &banned {
+                    if (token_id as usize) < v.len() {
+                        v[token_id as usize] = f32::NEG_INFINITY;
+                    }
+                }
+                Tensor::new(v.as_slice(), &Device::Cpu)
+                    .map_err(|e| format!("Failed to create ngram-blocked logits: {e}"))?
+            }
         };
+
+        // Greedy decoding
+        let next_token = logits
+            .argmax(D::Minus1)
+            .map_err(|e| format!("Argmax failed: {e}"))?
+            .to_scalar::<u32>()
+            .map_err(|e| format!("Failed to extract token: {e}"))?;
 
         if next_token == eos_token_id {
             break;
@@ -200,7 +268,12 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
         log::warn!("T5 correction returned empty output, keeping original");
         return Ok(text.to_string());
     }
-    let max_len = std::cmp::max(input_len * 3, 200);
+
+    // Strip repetition: T5 models sometimes generate the correction twice
+    let result = strip_repetition(&result);
+
+    // Reject output that's much longer than input (correction shouldn't expand text significantly)
+    let max_len = std::cmp::max(input_len * 2, 200);
     if result.len() > max_len {
         log::warn!(
             "T5 correction output too long (len={} vs input={}, max={}), keeping original",
