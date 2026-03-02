@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { Plus } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const engines = useEnginesStore()
@@ -66,60 +66,68 @@ function providerInitial(provider: Provider): string {
   return provider.name.charAt(0).toUpperCase()
 }
 
-const kindColors: Record<string, string> = {
-  OpenAI: 'bg-emerald-500',
-  Anthropic: 'bg-orange-500',
-  Groq: 'bg-purple-500',
-  Cerebras: 'bg-blue-500',
-  Gemini: 'bg-sky-500',
-  Mistral: 'bg-indigo-500',
-  Fireworks: 'bg-red-500',
-  Together: 'bg-teal-500',
-  DeepSeek: 'bg-cyan-500',
-  Custom: 'bg-zinc-500',
+const kindGradients: Record<string, string> = {
+  OpenAI: 'linear-gradient(135deg, #10a37f, #0d8c6d)',
+  Anthropic: 'linear-gradient(135deg, #d97706, #b45309)',
+  Groq: 'linear-gradient(135deg, #9333ea, #7c3aed)',
+  Cerebras: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+  Gemini: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+  Mistral: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+  Fireworks: 'linear-gradient(135deg, #ef4444, #dc2626)',
+  Together: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+  DeepSeek: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+  Custom: 'linear-gradient(135deg, #636366, #48484a)',
 }
 </script>
 
 <template>
-  <div class="space-y-3">
-    <!-- Header with add button -->
-    <div class="flex items-center justify-between">
-      <span class="text-sm text-muted-foreground">
-        {{ engines.providers.length === 0 ? t('settings.providers.empty') : '' }}
-      </span>
-      <TooltipProvider :delay-duration="300">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="outline" size="icon" class="h-7 w-7" @click="openAddDialog">
-              <Plus class="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" :side-offset="4">{{ t('settings.providers.add') }}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
+  <div>
+    <!-- Provider card -->
+    <div class="wf-card">
+      <div class="flex items-center justify-between mb-2.5">
+        <div class="wf-card-title" style="margin-bottom: 0;">{{ t('settings.providers.add') }}</div>
+        <TooltipProvider :delay-duration="300">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="outline" size="icon" class="h-7 w-7" @click="openAddDialog">
+                <Plus class="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="4">{{ t('settings.providers.add') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
 
-    <!-- Provider list -->
-    <div v-for="provider in engines.providers" :key="provider.id" class="rounded-md border border-border">
-      <div class="flex items-center gap-3 px-3 py-2">
+      <!-- Empty state -->
+      <div v-if="engines.providers.length === 0" class="text-xs text-muted-foreground py-2">
+        {{ t('settings.providers.empty') }}
+      </div>
+
+      <!-- Provider rows -->
+      <div v-for="provider in engines.providers" :key="provider.id" class="wf-provider-row">
         <div
-          :class="['flex items-center justify-center w-8 h-8 rounded-md text-white text-sm font-bold shrink-0', kindColors[provider.kind] ?? 'bg-zinc-500']"
+          class="flex items-center justify-center w-8 h-8 rounded-lg text-white text-sm font-bold shrink-0"
+          :style="{ background: kindGradients[provider.kind] ?? kindGradients.Custom }"
         >
           {{ providerInitial(provider) }}
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium truncate">{{ provider.name }}</div>
-          <div class="text-xs text-muted-foreground truncate">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[13px] font-semibold truncate">{{ provider.name }}</span>
+            <Badge variant="secondary" class="text-[9px] px-1 py-0 shrink-0">{{ provider.kind }}</Badge>
+          </div>
+          <div class="text-[11px] text-muted-foreground truncate">
             {{ provider.api_key ? '••••' + provider.api_key.slice(-4) : '' }}
           </div>
         </div>
-        <Badge variant="secondary" class="text-[10px] px-1.5 py-0 shrink-0">{{ provider.kind }}</Badge>
-        <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" @click="openEditDialog(provider)">
-          <Pencil class="w-3.5 h-3.5" />
-        </Button>
-        <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0 text-destructive hover:text-destructive" @click="requestRemoveProvider(provider)">
-          <Trash2 class="w-3.5 h-3.5" />
-        </Button>
+        <div class="flex gap-1 shrink-0">
+          <Button variant="outline" size="sm" class="h-7 text-[11px] px-2" @click="openEditDialog(provider)">
+            Modifier
+          </Button>
+          <Button variant="destructive" size="sm" class="h-7 text-[11px] px-2" @click="requestRemoveProvider(provider)">
+            &times;
+          </Button>
+        </div>
       </div>
     </div>
 

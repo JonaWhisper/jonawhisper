@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import ShortcutCapture from '@/components/ShortcutCapture.vue'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
@@ -29,43 +28,55 @@ function onDisableCancel() {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <Label class="text-sm font-medium">{{ t('settings.shortcut.mode') }}</Label>
-      <SegmentedToggle
-        :model-value="settings.recordingMode"
-        :options="[
-          { value: 'push_to_talk', label: t('settings.shortcut.mode.pushToTalk') },
-          { value: 'toggle', label: t('settings.shortcut.mode.toggle') },
-        ]"
-        @update:model-value="onRecordingModeChange"
-      />
-    </div>
-
-    <div class="space-y-2">
-      <Label class="text-sm font-medium">{{ t('settings.shortcut.record') }}</Label>
-      <ShortcutCapture
-        :model-value="settings.hotkey"
-        @update:model-value="onHotkeyChange"
-      />
-    </div>
-
-    <div class="space-y-2">
-      <Label class="text-sm font-medium">{{ t('settings.shortcut.cancel') }}</Label>
-      <div class="flex gap-2">
-        <ShortcutCapture
-          class="flex-1"
-          :model-value="settings.cancelShortcut"
-          @update:model-value="onCancelShortcutChange"
+  <div>
+    <!-- Recording mode card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.shortcut.mode') }}</div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.shortcut.mode') }}</div>
+        </div>
+        <SegmentedToggle
+          :model-value="settings.recordingMode"
+          :options="[
+            { value: 'push_to_talk', label: t('settings.shortcut.mode.pushToTalk') },
+            { value: 'toggle', label: t('settings.shortcut.mode.toggle') },
+          ]"
+          @update:model-value="onRecordingModeChange"
         />
-        <Button
-          variant="outline"
-          size="sm"
-          class="shrink-0 h-9"
-          @click="onDisableCancel"
-        >
-          {{ t('settings.shortcut.cancel.none') }}
-        </Button>
+      </div>
+    </div>
+
+    <!-- Keyboard shortcuts card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.shortcut.record') }}</div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.shortcut.record') }}</div>
+        </div>
+        <ShortcutCapture
+          :model-value="settings.hotkey"
+          @update:model-value="onHotkeyChange"
+        />
+      </div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.shortcut.cancel') }}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <ShortcutCapture
+            :model-value="settings.cancelShortcut"
+            @update:model-value="onCancelShortcutChange"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            class="shrink-0 h-8 text-xs"
+            @click="onDisableCancel"
+          >
+            {{ t('settings.shortcut.cancel.none') }}
+          </Button>
+        </div>
       </div>
     </div>
   </div>

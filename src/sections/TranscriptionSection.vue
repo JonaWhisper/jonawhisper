@@ -6,7 +6,6 @@ import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getAsrModels } from '@/config/providers'
 import type { AsrModelOption, Provider } from '@/stores/types'
-import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import { formatRam } from '@/utils/format'
 import { RefreshCw, Loader2 } from 'lucide-vue-next'
 
@@ -33,9 +33,8 @@ async function onLanguageChange(value: string | number | bigint | Record<string,
   await settings.setSetting('selected_language', value)
 }
 
-async function onGpuModeChange(value: string | number | bigint | Record<string, unknown> | null) {
-  if (typeof value !== 'string') return
-  await settings.setSetting('gpu_mode', value)
+async function onGpuModeChange(mode: string) {
+  await settings.setSetting('gpu_mode', mode)
 }
 
 const asrSelectedProvider = computed(() =>
@@ -134,112 +133,127 @@ function rtfBadge(rtf: number) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- Unified model selector (local + cloud) -->
-    <div class="space-y-1">
-      <Label class="text-sm font-medium">{{ t('settings.transcription.model') }}</Label>
-      <Select
-        v-if="engines.asrModels.length > 0"
-        :model-value="settings.selectedModelId"
-        @update:model-value="onAsrModelChange"
-      >
-        <SelectTrigger class="w-full h-9 text-sm">
-          <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
-            <span class="truncate">{{ selectedAsrModel.label }}</span>
-            <Badge
-              variant="secondary"
-              :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', asrGroupClass(selectedAsrModel.group)]"
-            >{{ asrGroupLabel(selectedAsrModel.group) }}</Badge>
-          </span>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
-            <div class="flex flex-col gap-0.5">
-              <span class="flex items-center gap-1.5">
-                {{ m.label }}
-                <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', asrGroupClass(m.group)]">{{ asrGroupLabel(m.group) }}</Badge>
-              </span>
-              <span v-if="m.wer != null || m.rtf != null || m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
-                <Badge v-if="m.wer != null" variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', werBadge(m.wer).cls]">{{ werBadge(m.wer).label }} <span class="opacity-50 font-normal">{{ +m.wer.toFixed(1) }}%</span></Badge>
-                <Badge v-if="m.rtf != null" variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', rtfBadge(m.rtf).cls]">{{ rtfBadge(m.rtf).label }} <span class="opacity-50 font-normal">{{ +m.rtf.toFixed(2) }}x</span></Badge>
-                <Badge v-if="m.params != null" variant="secondary" class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium">{{ formatParams(m.params) }}</Badge>
-                <Badge v-if="m.ram != null" variant="secondary" class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium">RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
-                <Badge v-if="m.lang_codes && m.lang_codes.length > 0" variant="secondary" class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium">{{ formatLangs(m.lang_codes) }}</Badge>
-              </span>
-            </div>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-      <p v-else class="text-sm text-muted-foreground">
-        {{ t('settings.transcription.noModels') }}
-      </p>
+  <div>
+    <!-- Speech recognition card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.transcription.model') }}</div>
+
+      <!-- Model selector row -->
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.transcription.model') }}</div>
+        </div>
+        <Select
+          v-if="engines.asrModels.length > 0"
+          :model-value="settings.selectedModelId"
+          @update:model-value="onAsrModelChange"
+        >
+          <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs">
+            <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
+              <span class="truncate">{{ selectedAsrModel.label }}</span>
+              <Badge
+                variant="secondary"
+                :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', asrGroupClass(selectedAsrModel.group)]"
+              >{{ asrGroupLabel(selectedAsrModel.group) }}</Badge>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
+              <div class="flex flex-col gap-0.5">
+                <span class="flex items-center gap-1.5">
+                  {{ m.label }}
+                  <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
+                  <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', asrGroupClass(m.group)]">{{ asrGroupLabel(m.group) }}</Badge>
+                </span>
+                <span v-if="m.wer != null || m.rtf != null || m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+                  <Badge v-if="m.wer != null" variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', werBadge(m.wer).cls]">{{ werBadge(m.wer).label }} <span class="opacity-50 font-normal">{{ +m.wer.toFixed(1) }}%</span></Badge>
+                  <Badge v-if="m.rtf != null" variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', rtfBadge(m.rtf).cls]">{{ rtfBadge(m.rtf).label }} <span class="opacity-50 font-normal">{{ +m.rtf.toFixed(2) }}x</span></Badge>
+                  <Badge v-if="m.params != null" variant="secondary" class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium">{{ formatParams(m.params) }}</Badge>
+                  <Badge v-if="m.ram != null" variant="secondary" class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium">RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
+                  <Badge v-if="m.lang_codes && m.lang_codes.length > 0" variant="secondary" class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium">{{ formatLangs(m.lang_codes) }}</Badge>
+                </span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p v-else class="text-xs text-muted-foreground">
+          {{ t('settings.transcription.noModels') }}
+        </p>
+      </div>
+
+      <!-- Cloud ASR sub-settings (model + refresh) -->
+      <template v-if="engines.isCloudAsr && asrSelectedProvider">
+        <div class="wf-form-row">
+          <div>
+            <div class="wf-form-label">{{ t('settings.cloudAsr.model') }}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <Select v-if="asrModelOptions.length > 0 && !isCustomAsrModel" :model-value="asrModelSelectValue" @update:model-value="onAsrModelSelect">
+              <SelectTrigger class="w-auto min-w-[140px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="m in asrModelOptions" :key="m" :value="m">{{ m }}</SelectItem>
+                <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              v-if="isCustomAsrModel"
+              :value="settings.asrCloudModel"
+              @input="onAsrModelInput"
+              :placeholder="t('settings.cloudAsr.customPlaceholder')"
+              class="h-8 text-xs min-w-[140px]"
+            />
+            <TooltipProvider :delay-duration="300">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button variant="outline" size="icon" class="h-8 w-8 shrink-0" :disabled="refreshingAsr" @click="refreshAsrModels">
+                    <Loader2 v-if="refreshingAsr" class="w-3.5 h-3.5 animate-spin" />
+                    <RefreshCw v-else class="w-3.5 h-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
+      </template>
+
+      <!-- Language -->
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.transcription.language') }}</div>
+        </div>
+        <Select :model-value="settings.selectedLanguage" @update:model-value="onLanguageChange">
+          <SelectTrigger class="w-auto min-w-[120px] h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="lang in engines.languages" :key="lang.code" :value="lang.code">
+              {{ lang.label }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
 
-    <!-- Cloud ASR sub-settings -->
-    <template v-if="engines.isCloudAsr && asrSelectedProvider">
-      <div class="space-y-1">
-        <Label class="text-sm font-medium">{{ t('settings.cloudAsr.model') }}</Label>
-        <div v-if="asrModelOptions.length > 0" class="flex items-center gap-2">
-          <Select class="flex-1" :model-value="asrModelSelectValue" @update:model-value="onAsrModelSelect">
-            <SelectTrigger class="w-full h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="m in asrModelOptions" :key="m" :value="m">{{ m }}</SelectItem>
-              <SelectItem :value="CUSTOM_MODEL_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
-            </SelectContent>
-          </Select>
-          <TooltipProvider :delay-duration="300">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button variant="outline" size="icon" class="h-9 w-9 shrink-0" :disabled="refreshingAsr" @click="refreshAsrModels">
-                  <Loader2 v-if="refreshingAsr" class="w-4 h-4 animate-spin" />
-                  <RefreshCw v-else class="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+    <!-- GPU Acceleration card (grayed when cloud ASR) -->
+    <div class="wf-card" :class="{ 'opacity-35 pointer-events-none': engines.isCloudAsr }">
+      <div class="wf-card-title">{{ t('settings.transcription.gpuMode') }}</div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.transcription.gpuMode') }}</div>
         </div>
-        <Input
-          v-if="isCustomAsrModel"
-          :value="settings.asrCloudModel"
-          @input="onAsrModelInput"
-          :placeholder="t('settings.cloudAsr.customPlaceholder')"
-          class="h-9 text-sm mt-1.5"
+        <SegmentedToggle
+          :model-value="settings.gpuMode"
+          :options="[
+            { value: 'auto', label: t('settings.transcription.gpuMode.auto') },
+            { value: 'gpu', label: t('settings.transcription.gpuMode.gpu') },
+            { value: 'cpu', label: t('settings.transcription.gpuMode.cpu') },
+          ]"
+          @update:model-value="onGpuModeChange"
         />
       </div>
-    </template>
-
-    <!-- Language -->
-    <div class="space-y-1">
-      <Label class="text-sm font-medium">{{ t('settings.transcription.language') }}</Label>
-      <Select :model-value="settings.selectedLanguage" @update:model-value="onLanguageChange">
-        <SelectTrigger class="w-full h-9 text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem v-for="lang in engines.languages" :key="lang.code" :value="lang.code">
-            {{ lang.label }}
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <!-- GPU Acceleration (grayed when cloud ASR) -->
-    <div :class="{ 'opacity-35 pointer-events-none': engines.isCloudAsr }" class="space-y-1">
-      <Label class="text-sm font-medium">{{ t('settings.transcription.gpuMode') }}</Label>
-      <Select :model-value="settings.gpuMode" @update:model-value="onGpuModeChange">
-        <SelectTrigger class="w-full h-9 text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="auto">{{ t('settings.transcription.gpuMode.auto') }}</SelectItem>
-          <SelectItem value="gpu">{{ t('settings.transcription.gpuMode.gpu') }}</SelectItem>
-          <SelectItem value="cpu">{{ t('settings.transcription.gpuMode.cpu') }}</SelectItem>
-        </SelectContent>
-      </Select>
     </div>
   </div>
 </template>

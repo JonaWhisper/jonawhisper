@@ -6,7 +6,6 @@ import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getLlmModels } from '@/config/providers'
 import type { CleanupModel } from '@/stores/types'
-import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -118,76 +117,92 @@ function onMaxTokensSliderCommit(v: number[]) {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- VAD -->
-    <div class="flex items-center justify-between gap-4">
-      <Label class="text-sm shrink-0">{{ t('settings.postProcessing.vad') }}</Label>
-      <Switch
-        :model-value="settings.vadEnabled"
-        @update:model-value="(v: boolean) => settings.setSetting('vad_enabled', String(v))"
-      />
+  <div>
+    <!-- Pre-processing card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.postProcessing.vad') }}</div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.postProcessing.vad') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.vadEnabled"
+          @update:model-value="(v: boolean) => settings.setSetting('vad_enabled', String(v))"
+        />
+      </div>
     </div>
 
-    <!-- Hallucination filter -->
-    <div class="flex items-center justify-between gap-4">
-      <Label class="text-sm shrink-0">{{ t('settings.postProcessing.hallucinations') }}</Label>
-      <Switch
-        :model-value="settings.hallucinationFilterEnabled"
-        @update:model-value="(v: boolean) => settings.setSetting('hallucination_filter_enabled', String(v))"
-      />
-    </div>
+    <!-- Post-processing card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.postProcessing.textCleanup') }}</div>
 
-    <!-- Unified cleanup dropdown -->
-    <div class="space-y-1">
-      <Label class="text-sm font-medium">{{ t('settings.postProcessing.textCleanup') }}</Label>
-      <Select
-        :model-value="unifiedCleanupValue"
-        @update:model-value="onUnifiedCleanupChange"
-      >
-        <SelectTrigger class="w-full h-9 text-sm">
-          <span v-if="unifiedCleanupValue === DISABLED_VALUE" class="text-muted-foreground">
-            {{ t('settings.shortcut.cancel.none') }}
-          </span>
-          <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
-            <span class="truncate">{{ selectedCleanupModel.label }}</span>
-            <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', cleanupGroupClass(selectedCleanupModel.group)]">
-              {{ cleanupGroupLabel(selectedCleanupModel.group) }}
-            </Badge>
-          </span>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
-          <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
-            <div class="flex flex-col gap-0.5">
-              <span class="flex items-center gap-1.5">
-                {{ m.label }}
-                <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
-                <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', cleanupGroupClass(m.group)]">{{ cleanupGroupLabel(m.group) }}</Badge>
-              </span>
-              <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
-                <Badge v-if="m.params != null" variant="secondary" class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium">{{ formatParams(m.params) }}</Badge>
-                <Badge v-if="m.ram != null" variant="secondary" class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium">RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
-                <Badge v-if="m.lang_codes && m.lang_codes.length > 0" variant="secondary" class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium">{{ formatLangs(m.lang_codes) }}</Badge>
-              </span>
-            </div>
-          </SelectItem>
-        </SelectContent>
-      </Select>
+      <!-- Hallucination filter -->
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.postProcessing.hallucinations') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.hallucinationFilterEnabled"
+          @update:model-value="(v: boolean) => settings.setSetting('hallucination_filter_enabled', String(v))"
+        />
+      </div>
+
+      <!-- Unified cleanup dropdown -->
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.postProcessing.textCleanup') }}</div>
+        </div>
+        <Select
+          :model-value="unifiedCleanupValue"
+          @update:model-value="onUnifiedCleanupChange"
+        >
+          <SelectTrigger class="w-auto min-w-[190px] h-8 text-xs">
+            <span v-if="unifiedCleanupValue === DISABLED_VALUE" class="text-muted-foreground">
+              {{ t('settings.shortcut.cancel.none') }}
+            </span>
+            <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
+              <span class="truncate">{{ selectedCleanupModel.label }}</span>
+              <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium shrink-0', cleanupGroupClass(selectedCleanupModel.group)]">
+                {{ cleanupGroupLabel(selectedCleanupModel.group) }}
+              </Badge>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="DISABLED_VALUE">{{ t('settings.shortcut.cancel.none') }}</SelectItem>
+            <SelectItem v-for="m in engines.cleanupModels" :key="m.id" :value="m.id">
+              <div class="flex flex-col gap-0.5">
+                <span class="flex items-center gap-1.5">
+                  {{ m.label }}
+                  <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
+                  <Badge variant="secondary" :class="['text-[9px] px-1 py-0 border-transparent font-medium', cleanupGroupClass(m.group)]">{{ cleanupGroupLabel(m.group) }}</Badge>
+                </span>
+                <span v-if="m.params != null || m.ram != null || (m.lang_codes && m.lang_codes.length > 0)" class="inline-flex items-center gap-1 flex-wrap">
+                  <Badge v-if="m.params != null" variant="secondary" class="text-[9px] px-1 py-0 bg-slate-500/10 text-slate-600 border-transparent font-medium">{{ formatParams(m.params) }}</Badge>
+                  <Badge v-if="m.ram != null" variant="secondary" class="text-[9px] px-1 py-0 bg-cyan-500/10 text-cyan-600 border-transparent font-medium">RAM <span class="opacity-50 font-normal">~{{ formatRam(m.ram) }}</span></Badge>
+                  <Badge v-if="m.lang_codes && m.lang_codes.length > 0" variant="secondary" class="text-[9px] px-1 py-0 bg-indigo-500/10 text-indigo-600 border-transparent font-medium">{{ formatLangs(m.lang_codes) }}</Badge>
+                </span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
 
     <!-- Cloud LLM sub-settings -->
     <template v-if="settings.textCleanupEnabled && engines.isCloudLlm && llmSelectedProvider">
-      <div class="space-y-4 pl-4 border-l-2 border-border">
-        <div class="space-y-1">
-          <Label class="text-xs text-muted-foreground">{{ t('settings.llm.model') }}</Label>
+      <div class="wf-card">
+        <div class="wf-card-title">{{ t('settings.llm.model') }}</div>
+        <div class="wf-form-row">
+          <div>
+            <div class="wf-form-label">{{ t('settings.llm.model') }}</div>
+          </div>
           <div class="flex items-center gap-2">
             <Select
               v-if="!isCustomLlmModel"
-              class="flex-1"
               :model-value="settings.llmModel"
               @update:model-value="onLlmModelSelect"
             >
-              <SelectTrigger class="w-full h-9 text-sm">
+              <SelectTrigger class="w-auto min-w-[140px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -198,14 +213,14 @@ function onMaxTokensSliderCommit(v: number[]) {
               v-else
               :value="settings.llmModel"
               @input="onLlmModelInput"
-              class="h-9 text-sm flex-1"
+              class="h-8 text-xs min-w-[140px]"
             />
             <TooltipProvider :delay-duration="300">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <Button variant="outline" size="icon" class="h-9 w-9 shrink-0" :disabled="refreshingLlm" @click="refreshLlmModels">
-                    <Loader2 v-if="refreshingLlm" class="w-4 h-4 animate-spin" />
-                    <RefreshCw v-else class="w-4 h-4" />
+                  <Button variant="outline" size="icon" class="h-8 w-8 shrink-0" :disabled="refreshingLlm" @click="refreshLlmModels">
+                    <Loader2 v-if="refreshingLlm" class="w-3.5 h-3.5 animate-spin" />
+                    <RefreshCw v-else class="w-3.5 h-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" :side-offset="4">{{ t('settings.models.refresh') }}</TooltipContent>
@@ -213,39 +228,47 @@ function onMaxTokensSliderCommit(v: number[]) {
             </TooltipProvider>
           </div>
         </div>
-
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-            <span class="text-xs text-muted-foreground tabular-nums">{{ settings.llmMaxTokens }}</span>
+        <div class="wf-form-row">
+          <div>
+            <div class="wf-form-label">{{ t('settings.llm.maxTokens') }}</div>
           </div>
-          <Slider
-            :model-value="[settings.llmMaxTokens]"
-            :min="128"
-            :max="8192"
-            :step="128"
-            @update:model-value="onMaxTokensSliderUpdate"
-            @value-commit="onMaxTokensSliderCommit"
-          />
+          <div class="flex items-center gap-2">
+            <Slider
+              class="w-24"
+              :model-value="[settings.llmMaxTokens]"
+              :min="128"
+              :max="8192"
+              :step="128"
+              @update:model-value="onMaxTokensSliderUpdate"
+              @value-commit="onMaxTokensSliderCommit"
+            />
+            <span class="text-xs text-muted-foreground tabular-nums min-w-8 text-right">{{ settings.llmMaxTokens }}</span>
+          </div>
         </div>
       </div>
     </template>
 
     <!-- Local LLM sub-settings (token cap only) -->
     <template v-if="settings.textCleanupEnabled && engines.isLocalLlm">
-      <div class="space-y-2 pl-4 border-l-2 border-border">
-        <div class="flex items-center justify-between">
-          <Label class="text-xs text-muted-foreground">{{ t('settings.llm.maxTokens') }}</Label>
-          <span class="text-xs text-muted-foreground tabular-nums">{{ settings.llmMaxTokens }}</span>
+      <div class="wf-card">
+        <div class="wf-card-title">{{ t('settings.llm.maxTokens') }}</div>
+        <div class="wf-form-row">
+          <div>
+            <div class="wf-form-label">{{ t('settings.llm.maxTokens') }}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <Slider
+              class="w-24"
+              :model-value="[settings.llmMaxTokens]"
+              :min="128"
+              :max="8192"
+              :step="128"
+              @update:model-value="onMaxTokensSliderUpdate"
+              @value-commit="onMaxTokensSliderCommit"
+            />
+            <span class="text-xs text-muted-foreground tabular-nums min-w-8 text-right">{{ settings.llmMaxTokens }}</span>
+          </div>
         </div>
-        <Slider
-          :model-value="[settings.llmMaxTokens]"
-          :min="128"
-          :max="8192"
-          :step="128"
-          @update:model-value="onMaxTokensSliderUpdate"
-          @value-commit="onMaxTokensSliderCommit"
-        />
       </div>
     </template>
   </div>

@@ -29,6 +29,19 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Panel design tokens */
+    --panel-bg-start: #f5f5f7;
+    --panel-bg-end: #ebebed;
+    --sidebar-active-bg: rgba(0, 122, 255, 0.10);
+    --sidebar-active-border: rgba(0, 122, 255, 0.18);
+    --sidebar-hover-bg: rgba(0, 0, 0, 0.04);
+    --panel-card-bg: rgba(255, 255, 255, 0.85);
+    --panel-card-border: rgba(0, 0, 0, 0.06);
+    --panel-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --panel-divider: rgba(0, 0, 0, 0.06);
+    --panel-accent: #007AFF;
+    --panel-scrollbar-thumb: rgba(0, 0, 0, 0.15);
   }
 
   .dark {
@@ -56,6 +69,18 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Panel design tokens — dark */
+    --panel-bg-start: #1c1c1e;
+    --panel-bg-end: #2c2c2e;
+    --sidebar-active-bg: rgba(0, 122, 255, 0.18);
+    --sidebar-active-border: rgba(0, 122, 255, 0.28);
+    --sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+    --panel-card-bg: rgba(44, 44, 46, 0.85);
+    --panel-card-border: rgba(255, 255, 255, 0.06);
+    --panel-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --panel-divider: rgba(255, 255, 255, 0.06);
+    --panel-scrollbar-thumb: rgba(255, 255, 255, 0.2);
   }
 }
 
@@ -73,39 +98,189 @@
   }
 }
 
-/* Panel sidebar glassmorphism */
+/* ─── Panel sidebar glassmorphism ─── */
 .panel-sidebar {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   background: hsl(var(--background) / 0.72);
-  border-right: 1px solid hsl(var(--border) / 0.5);
+  border-right: 0.5px solid hsl(var(--border) / 0.5);
 }
 .dark .panel-sidebar {
   background: hsl(var(--background) / 0.65);
 }
 
-/* Nav pill (active item highlight) */
+/* ─── Content area gradient background ─── */
+.panel-content {
+  background: linear-gradient(160deg, var(--panel-bg-start), var(--panel-bg-end));
+}
+
+/* ─── Content scrollbar ─── */
+.panel-content-body::-webkit-scrollbar { width: 6px; }
+.panel-content-body::-webkit-scrollbar-thumb {
+  background: var(--panel-scrollbar-thumb);
+  border-radius: 3px;
+}
+.panel-content-body::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── Nav pill (sidebar item) ─── */
 .nav-pill {
-  @apply rounded-md px-2.5 py-1.5 text-sm transition-colors;
+  @apply rounded-lg px-2.5 py-1.5 text-sm transition-all;
+  border: 1px solid transparent;
 }
 .nav-pill:hover {
-  background: hsl(var(--accent) / 0.6);
+  background: var(--sidebar-hover-bg);
 }
 .nav-pill.active {
-  @apply bg-accent text-accent-foreground;
+  background: var(--sidebar-active-bg);
+  border-color: var(--sidebar-active-border);
+  font-weight: 500;
+}
+.nav-pill .nav-icon {
+  @apply opacity-70;
+}
+.nav-pill.active .nav-icon {
+  opacity: 1;
+  color: var(--panel-accent);
 }
 
-/* Fade transition for section switches */
+/* ─── Section title ─── */
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+
+/* ─── Cards (glassmorphism) ─── */
+.wf-card {
+  background: var(--panel-card-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 0.5px solid var(--panel-card-border);
+  border-radius: 12px;
+  box-shadow: var(--panel-card-shadow);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+
+.wf-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 10px;
+}
+
+/* ─── Form rows with dividers ─── */
+.wf-form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  gap: 12px;
+}
+
+.wf-form-row + .wf-form-row {
+  border-top: 0.5px solid var(--panel-divider);
+}
+
+.wf-form-label {
+  font-size: 13px;
+  color: hsl(var(--foreground));
+}
+
+.wf-form-desc {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-top: 1px;
+}
+
+/* ─── Filter chips (Models section) ─── */
+.wf-filter-chip {
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 0.5px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.wf-filter-chip.active {
+  background: var(--panel-accent);
+  color: #fff;
+  border-color: var(--panel-accent);
+}
+
+/* ─── History items as cards ─── */
+.wf-history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--panel-card-bg);
+  border: 0.5px solid var(--panel-card-border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  transition: box-shadow 0.15s;
+}
+.wf-history-item:hover {
+  box-shadow: var(--panel-card-shadow);
+}
+
+/* Day delete hidden by default, shown on group hover */
+.wf-day-group .wf-day-delete {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.wf-day-group:hover .wf-day-delete {
+  opacity: 1;
+}
+
+/* ─── Provider cards inside a wf-card ─── */
+.wf-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+.wf-provider-row + .wf-provider-row {
+  border-top: 0.5px solid var(--panel-divider);
+}
+
+/* ─── About block ─── */
+.wf-about-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
+  background: linear-gradient(135deg, var(--panel-accent), #5856d6);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* ─── Fade transition for section switches ─── */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.fade-enter-from,
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
 .fade-leave-to {
   opacity: 0;
+  transform: translateY(-4px);
 }
 
-/* Status dot in sidebar footer */
+/* ─── Status dot in sidebar footer ─── */
 .status-dot {
   @apply inline-block w-2 h-2 rounded-full;
 }
@@ -121,6 +296,6 @@
   animation: status-pulse 1.2s ease-in-out infinite;
 }
 @keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
 }

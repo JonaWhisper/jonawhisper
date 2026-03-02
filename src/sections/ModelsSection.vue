@@ -62,24 +62,22 @@ async function confirmDelete() {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div>
     <!-- Filter chips -->
-    <div class="flex flex-wrap gap-1.5">
+    <div class="flex flex-wrap gap-1 mb-3.5">
       <button
         v-for="f in filters"
         :key="f.key"
         @click="activeFilter = f.key"
-        class="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-        :class="activeFilter === f.key
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-muted text-muted-foreground hover:bg-accent'"
+        class="wf-filter-chip"
+        :class="{ active: activeFilter === f.key }"
       >
         {{ t(f.label) }}
       </button>
     </div>
 
     <!-- Model list -->
-    <div class="space-y-2">
+    <div class="space-y-1.5">
       <ModelCell
         v-for="model in filteredModels"
         :key="model.id"

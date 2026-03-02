@@ -51,10 +51,10 @@ onMounted(async () => {
     <!-- Sidebar -->
     <div class="panel-sidebar w-44 min-w-[10rem] flex flex-col flex-shrink-0">
       <!-- Drag region -->
-      <div class="h-8 shrink-0" data-tauri-drag-region />
+      <div class="h-9 shrink-0 flex items-center px-2" data-tauri-drag-region />
 
       <!-- Nav items -->
-      <nav class="flex-1 overflow-y-auto px-2 space-y-0.5">
+      <nav class="flex-1 overflow-y-auto px-2 space-y-px">
         <button
           v-for="section in sections"
           :key="section.id"
@@ -63,31 +63,31 @@ onMounted(async () => {
           :class="{ active: activeSection === section.id }"
         >
           <div class="flex items-center gap-2">
-            <component :is="section.icon" class="w-4 h-4 flex-shrink-0 opacity-60" />
-            <span class="text-sm font-medium truncate">{{ t(section.label) }}</span>
+            <component :is="section.icon" class="nav-icon w-[18px] h-[18px] flex-shrink-0" />
+            <span class="text-[13px] truncate">{{ t(section.label) }}</span>
           </div>
         </button>
       </nav>
 
       <!-- Status indicator -->
-      <div class="px-3 py-2.5 border-t border-border/50">
-        <div class="flex items-center gap-2">
+      <div class="px-2.5 py-2 border-t" style="border-color: var(--panel-divider);">
+        <div class="flex items-center gap-1.5">
           <span class="status-dot" :class="statusClass()" />
-          <span class="text-xs text-muted-foreground">{{ statusLabel() }}</span>
+          <span class="text-[11px] text-muted-foreground">{{ statusLabel() }}</span>
         </div>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="flex-1 min-w-0 overflow-y-auto">
-      <!-- Drag region for content area too -->
-      <div class="h-8 shrink-0" data-tauri-drag-region />
+    <div class="panel-content flex-1 min-w-0 flex flex-col overflow-hidden">
+      <!-- Drag region for content area -->
+      <div class="h-9 shrink-0" data-tauri-drag-region />
 
-      <div class="px-5 pb-5">
+      <div class="panel-content-body flex-1 overflow-y-auto px-5 pb-5">
         <!-- Section title -->
-        <h2 class="text-lg font-semibold mb-4">
+        <div class="section-title">
           {{ t(sections.find(s => s.id === activeSection)?.label ?? '') }}
-        </h2>
+        </div>
 
         <Transition name="fade" mode="out-in">
           <RecentsSection v-if="activeSection === 'recents'" key="recents" />

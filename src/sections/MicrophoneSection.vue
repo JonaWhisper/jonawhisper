@@ -5,10 +5,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
+import { Button } from '@/components/ui/button'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
@@ -114,17 +113,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="space-y-2">
-      <Label class="text-sm font-medium">{{ t('settings.microphone') }}</Label>
-      <div class="flex items-center gap-2">
+  <div>
+    <!-- Input device card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.microphone') }}</div>
+      <div class="wf-form-row">
+        <div class="min-w-0 flex-1">
+          <div class="wf-form-label">{{ t('settings.microphone') }}</div>
+        </div>
         <Select
           :model-value="selectedDeviceUid"
           :disabled="engines.audioDevices.length === 0"
           @update:model-value="onDeviceChange"
-          class="flex-1"
         >
-          <SelectTrigger class="w-full h-9 text-sm">
+          <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs">
             <span v-if="selectedDevice" class="inline-flex items-center gap-1.5 truncate">
               <component :is="deviceIcon(selectedDevice.transport_type)" class="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
               <span class="truncate">{{ selectedDevice.name }}{{ selectedDevice.is_default ? ` (${t('settings.microphone.defaultTag')})` : '' }}</span>
@@ -144,47 +146,63 @@ onUnmounted(() => {
             </SelectItem>
           </SelectContent>
         </Select>
+      </div>
+    </div>
+
+    <!-- Mic test card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.microphone.test') }}</div>
+      <div class="flex flex-col items-center gap-2.5">
+        <div class="w-full flex justify-center">
+          <SpectrumBars :spectrum="testSpectrum" size="md" />
+        </div>
         <Button
-          variant="outline"
+          variant="default"
           size="sm"
-          class="shrink-0 h-9 w-20"
+          class="min-w-16"
           :disabled="engines.audioDevices.length === 0"
           @click="isTesting ? stopMicTest() : startMicTest()"
         >
           {{ isTesting ? t('settings.microphone.stop') : t('settings.microphone.test') }}
         </Button>
       </div>
-      <div v-if="isTesting" class="rounded-md border border-border bg-muted/30 px-3 py-2">
-        <SpectrumBars :spectrum="testSpectrum" size="md" />
-      </div>
     </div>
 
-    <div class="flex items-center justify-between gap-4">
-      <Label class="text-sm shrink-0">{{ t('settings.microphone.ducking') }}</Label>
-      <Switch
-        :model-value="settings.audioDuckingEnabled"
-        @update:model-value="onAudioDuckingChange"
-      />
-    </div>
-
-    <div
-      v-if="settings.audioDuckingEnabled"
-      class="space-y-2 pl-4 border-l-2 border-border"
-    >
-      <div class="flex items-center justify-between">
-        <Label class="text-xs text-muted-foreground">{{ t('settings.microphone.duckingLevel') }}</Label>
-        <span class="text-xs text-muted-foreground tabular-nums">
-          {{ duckingSliderValue >= 100 ? t('settings.microphone.duckingMute') : `${Math.round(duckingSliderValue)}%` }}
-        </span>
+    <!-- Audio ducking card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('settings.microphone.ducking') }}</div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('settings.microphone.ducking') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.audioDuckingEnabled"
+          @update:model-value="onAudioDuckingChange"
+        />
       </div>
-      <Slider
-        :model-value="[duckingSliderValue]"
-        :min="5"
-        :max="100"
-        :step="5"
-        @update:model-value="onDuckingSliderUpdate"
-        @value-commit="onDuckingSliderCommit"
-      />
+      <!-- Slider always visible, grayed when toggle off -->
+      <div
+        class="wf-form-row"
+        :class="{ 'opacity-35 pointer-events-none': !settings.audioDuckingEnabled }"
+      >
+        <div>
+          <div class="wf-form-label">{{ t('settings.microphone.duckingLevel') }}</div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Slider
+            class="w-24"
+            :model-value="[duckingSliderValue]"
+            :min="5"
+            :max="100"
+            :step="5"
+            @update:model-value="onDuckingSliderUpdate"
+            @value-commit="onDuckingSliderCommit"
+          />
+          <span class="text-xs text-muted-foreground tabular-nums min-w-7 text-right">
+            {{ duckingSliderValue >= 100 ? t('settings.microphone.duckingMute') : `${Math.round(duckingSliderValue)}%` }}
+          </span>
+        </div>
+      </div>
     </div>
   </div>
 </template>

@@ -37,7 +37,10 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
 
 <template>
   <div
-    class="group flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors hover:bg-accent/30 bg-card border-border"
+    class="group flex items-center gap-3 px-3.5 py-3 rounded-[10px] transition-shadow"
+    style="background: var(--panel-card-bg); border: 0.5px solid var(--panel-card-border); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);"
+    @mouseenter="($event.currentTarget as HTMLElement).style.boxShadow = 'var(--panel-card-shadow)'"
+    @mouseleave="($event.currentTarget as HTMLElement).style.boxShadow = 'none'"
   >
     <!-- Model info -->
     <div class="flex-1 min-w-0">

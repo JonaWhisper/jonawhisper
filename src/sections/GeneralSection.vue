@@ -3,7 +3,6 @@ import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { i18n } from '@/main'
-import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -31,50 +30,59 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Appearance -->
-    <div class="space-y-3">
-      <h3 class="text-sm font-medium">{{ t('general.appearance') }}</h3>
-      <SegmentedToggle
-        :model-value="settings.theme"
-        :options="[
-          { value: 'system', label: t('general.theme.system') },
-          { value: 'light', label: t('general.theme.light') },
-          { value: 'dark', label: t('general.theme.dark') },
-        ]"
-        @update:model-value="onThemeChange"
-      />
-    </div>
-
-    <!-- Interface Language -->
-    <div class="space-y-2">
-      <Label class="text-sm font-medium">{{ t('general.interfaceLanguage') }}</Label>
-      <Select :model-value="settings.appLocale" @update:model-value="onLocaleChange">
-        <SelectTrigger class="w-full h-9 text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem
-            v-for="opt in localeOptions"
-            :key="opt.value"
-            :value="opt.value"
-          >
-            {{ t(opt.label) }}
-          </SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <!-- About -->
-    <div class="space-y-2">
-      <h3 class="text-sm font-medium">{{ t('general.about') }}</h3>
-      <div class="flex items-center gap-3 rounded-md border border-border p-3">
-        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary font-bold text-lg shrink-0">
-          W
-        </div>
+  <div>
+    <!-- Appearance card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('general.appearance') }}</div>
+      <div class="wf-form-row">
         <div>
-          <p class="text-sm font-medium">WhisperDictate</p>
-          <p class="text-xs text-muted-foreground">Tauri + Rust + Vue</p>
+          <div class="wf-form-label">{{ t('general.appearance') }}</div>
+        </div>
+        <SegmentedToggle
+          :model-value="settings.theme"
+          :options="[
+            { value: 'system', label: t('general.theme.system') },
+            { value: 'light', label: t('general.theme.light') },
+            { value: 'dark', label: t('general.theme.dark') },
+          ]"
+          @update:model-value="onThemeChange"
+        />
+      </div>
+    </div>
+
+    <!-- Interface language card -->
+    <div class="wf-card">
+      <div class="wf-card-title">{{ t('general.interfaceLanguage') }}</div>
+      <div class="wf-form-row">
+        <div>
+          <div class="wf-form-label">{{ t('general.interfaceLanguage') }}</div>
+        </div>
+        <Select :model-value="settings.appLocale" @update:model-value="onLocaleChange">
+          <SelectTrigger class="w-auto min-w-[130px] h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="opt in localeOptions"
+              :key="opt.value"
+              :value="opt.value"
+            >
+              {{ t(opt.label) }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <!-- About card -->
+    <div class="wf-card" style="padding: 20px;">
+      <div class="text-center">
+        <div class="wf-about-icon">W</div>
+        <div class="text-base font-bold">WhisperDictate</div>
+        <div class="text-xs text-muted-foreground mt-0.5">Tauri v2 — Rust + Vue</div>
+        <div class="mt-3 flex gap-4 justify-center">
+          <a class="text-xs text-[var(--panel-accent)] hover:underline cursor-pointer">GitHub</a>
+          <a class="text-xs text-[var(--panel-accent)] hover:underline cursor-pointer">Licence MIT</a>
         </div>
       </div>
     </div>
