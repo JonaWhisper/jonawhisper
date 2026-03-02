@@ -339,8 +339,10 @@ fn compute_spectrum(samples: &[f32]) -> Vec<f32> {
         let sum: f32 = magnitudes[lo..hi].iter().sum();
         let avg = sum / (hi - lo) as f32;
 
-        // Normalize to 0..1 range (approximate)
-        *band = (avg * 4.0).min(1.0);
+        // Logarithmic (dB) normalization: -50dB..0dB → 0..1, gamma 0.8 for airy mid-range
+        let db = 20.0 * avg.max(1e-10).log10();
+        let normalized = ((db + 50.0) / 50.0).clamp(0.0, 1.0);
+        *band = normalized.powf(0.8);
     }
 
     // Reorder bands symmetrically (center outward) like the Swift version

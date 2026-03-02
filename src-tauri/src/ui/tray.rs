@@ -15,7 +15,6 @@ pub struct TrayMenuState {
     pub menu: Menu<tauri::Wry>,
     pub mic_submenu: Submenu<tauri::Wry>,
     pub panel_item: MenuItem<tauri::Wry>,
-    pub setup_item: MenuItem<tauri::Wry>,
     pub quit_item: MenuItem<tauri::Wry>,
 }
 
@@ -121,7 +120,6 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
     let mic_submenu = Submenu::with_id(app, "mic_submenu", &t!("menu.microphone"), true)?;
 
     let panel_item = MenuItem::with_id(app, "panel", &t!("menu.panel"), true, None::<&str>)?;
-    let setup_item = MenuItem::with_id(app, "setup", &t!("menu.setup"), true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", &t!("menu.quit"), true, Some("CmdOrCtrl+Q"))?;
 
     let menu = Menu::with_items(
@@ -132,7 +130,6 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
             &mic_submenu,
             &PredefinedMenuItem::separator(app)?,
             &panel_item,
-            &setup_item,
             &PredefinedMenuItem::separator(app)?,
             #[cfg(debug_assertions)]
             &MenuItem::with_id(app, "test_pill", "Test Pill States", true, None::<&str>)?,
@@ -146,7 +143,6 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
         menu,
         mic_submenu,
         panel_item,
-        setup_item,
         quit_item,
     })
 }
@@ -226,7 +222,6 @@ pub fn update_tray_labels(app: &AppHandle) {
     let Some(ref m) = *tray_menu else { return };
 
     let _ = m.panel_item.set_text(&t!("menu.panel"));
-    let _ = m.setup_item.set_text(&t!("menu.setup"));
     let _ = m.quit_item.set_text(&t!("menu.quit"));
 
     drop(tray_menu);
@@ -402,9 +397,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 "quit" => app.exit(0),
                 "panel" => {
                     open_window_with_min(app, "panel", &t!("window.panel"), "/panel", 750.0, 550.0, Some((680.0, 450.0)));
-                }
-                "setup" => {
-                    open_fixed_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 450.0);
                 }
                 "test_pill" => {
                     let app_clone = app.clone();

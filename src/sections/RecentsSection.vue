@@ -267,9 +267,15 @@ async function doClearAll() {
                 <TooltipProvider :delay-duration="300">
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <button class="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="copyEntry(entry)">
+                      <button class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="copyEntry(entry)">
                         <Check v-if="copiedTimestamp === entry.timestamp" class="h-3.5 w-3.5 text-green-600" />
                         <Copy v-else class="h-3.5 w-3.5" />
+                        <Transition name="copied-toast">
+                          <span
+                            v-if="copiedTimestamp === entry.timestamp"
+                            class="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-600 text-white whitespace-nowrap pointer-events-none"
+                          >{{ t('history.copy') }}</span>
+                        </Transition>
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" :side-offset="4">{{ t('history.copy') }}</TooltipContent>
@@ -311,3 +317,10 @@ async function doClearAll() {
     />
   </div>
 </template>
+
+<style scoped>
+.copied-toast-enter-active { transition: all 0.15s ease-out; }
+.copied-toast-leave-active { transition: all 0.25s ease-in; }
+.copied-toast-enter-from,
+.copied-toast-leave-to { opacity: 0; transform: translate(-50%, 2px); }
+</style>
