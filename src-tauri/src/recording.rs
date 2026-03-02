@@ -71,11 +71,13 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         let s = state.settings.lock().unwrap();
         (s.selected_input_device_uid.clone(), s.audio_ducking_enabled, s.audio_ducking_level)
     };
+    let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
+    let _ = rec.audio_rx.recv();
+    // Duck AFTER stream started: BT profile switch (A2DP→HFP) has already happened,
+    // so we read/set volume in the actual audio state.
     if ducking_enabled {
         platform::audio_ducking::duck_volume(ducking_level);
     }
-    let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
-    let _ = rec.audio_rx.recv();
 
     platform::play_sound("Tink");
     crate::tray::open_pill_window(app);
@@ -98,11 +100,13 @@ pub fn stop_recording_and_enqueue(
     }
 
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
-    platform::audio_ducking::restore_volume();
     let audio_path = match rec.audio_rx.recv() {
         Ok(AudioReply::Stopped { path }) => path,
         _ => None,
     };
+    // Restore AFTER stream stopped: BT profile can begin switching back (HFP→A2DP),
+    // and we restore volume in a stable state.
+    platform::audio_ducking::restore_volume();
 
     let held_duration = rec.key_down_time.map(|t| t.elapsed());
     rec.key_down_time = None;
@@ -748,10 +752,11 @@ fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingS
     }
 
     let _ = rec.audio_tx.send(AudioCmd::StopRecording);
-    platform::audio_ducking::restore_volume();
     if let Ok(AudioReply::Stopped { path: Some(path) }) = rec.audio_rx.recv() {
         let _ = std::fs::remove_file(&path);
     }
+    // Restore AFTER stream stopped (same rationale as stop_recording_and_enqueue)
+    platform::audio_ducking::restore_volume();
     rec.key_down_time = None;
     rec.last_short_tap_time = None;
 

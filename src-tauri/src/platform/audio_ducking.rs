@@ -1,8 +1,13 @@
 use std::ffi::c_void;
 use std::sync::Mutex;
 
-/// Saved volume for restoring after ducking (single f32 from VirtualMainVolume).
-static SAVED_VOLUME: Mutex<Option<f32>> = Mutex::new(None);
+/// Saved state for restoring after ducking: device_id + volume.
+struct SavedState {
+    device_id: u32,
+    volume: f32,
+}
+
+static SAVED_STATE: Mutex<Option<SavedState>> = Mutex::new(None);
 
 // CoreAudio FFI
 #[allow(non_upper_case_globals, non_snake_case, dead_code)]
@@ -143,25 +148,25 @@ pub fn duck_volume(reduction: f32) {
         }
     };
 
-    *SAVED_VOLUME.lock().unwrap() = Some(current);
+    *SAVED_STATE.lock().unwrap() = Some(SavedState { device_id, volume: current });
 
     let ducked = (current * (1.0 - reduction)).clamp(0.0, 1.0);
     if set_virtual_volume(device_id, ducked) {
-        log::info!("audio_ducking: {:.2} -> {:.2} (reduction={})", current, ducked, reduction);
+        log::info!("audio_ducking: {:.2} -> {:.2} (reduction={}, device={})", current, ducked, reduction, device_id);
     } else {
         log::warn!("audio_ducking: failed to set VirtualMainVolume");
     }
 }
 
 /// Restore the volume saved by the last `duck_volume()` call.
+/// Skips restore if the default output device changed since ducking (e.g. user switched audio output).
 pub fn restore_volume() {
-    let saved = SAVED_VOLUME.lock().unwrap().take();
-    let volume = match saved {
-        Some(v) => v,
+    let saved = match SAVED_STATE.lock().unwrap().take() {
+        Some(s) => s,
         None => return,
     };
 
-    let device_id = match get_default_output_device() {
+    let current_device = match get_default_output_device() {
         Some(id) => id,
         None => {
             log::warn!("audio_ducking: no default output device for restore");
@@ -169,8 +174,17 @@ pub fn restore_volume() {
         }
     };
 
-    if set_virtual_volume(device_id, volume) {
-        log::info!("audio_ducking: restored to {:.2}", volume);
+    if current_device != saved.device_id {
+        log::warn!(
+            "audio_ducking: output device changed ({} -> {}), skipping restore",
+            saved.device_id,
+            current_device
+        );
+        return;
+    }
+
+    if set_virtual_volume(current_device, saved.volume) {
+        log::info!("audio_ducking: restored to {:.2} (device={})", saved.volume, current_device);
     } else {
         log::warn!("audio_ducking: failed to restore VirtualMainVolume");
     }
