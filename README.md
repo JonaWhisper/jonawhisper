@@ -56,15 +56,21 @@ On first launch, a setup wizard asks for three macOS permissions:
 
 ## Engines
 
-| Engine | Type | Description | Languages |
-|---|---|---|---|
-| **Whisper** ([whisper-rs](https://github.com/tazz4843/whisper-rs)) | Native (built-in) | GGML models running natively in Rust with Metal GPU acceleration on Apple Silicon. No external install needed. | Auto, FR, EN, ES, DE |
-| **OpenAI API** | Cloud | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/audio/createTranscription) server (OpenAI, local, or remote). Requires an API key. | Auto, FR, EN, ES, DE |
+| Engine | Type | Description | Languages | GPU |
+|---|---|---|---|---|
+| **Whisper** ([whisper-rs](https://github.com/tazz4843/whisper-rs)) | Native | GGML models with Metal GPU. Default engine. | 99 languages | Metal |
+| **Canary** (NVIDIA) | Native | Ultra-light encoder-decoder ASR (182M params, ONNX). | FR, EN, DE, ES | CoreML (Metal/ANE) |
+| **Parakeet-TDT** (NVIDIA) | Native | TDT transducer ASR (0.6B params, ONNX int8). Best WER. | 25 European languages | CoreML (Metal/ANE) |
+| **Qwen3-ASR** (Alibaba) | Native | Encoder-decoder audio LLM (0.6B params, safetensors). | 30 languages | Accelerate (AMX) |
+| **OpenAI API** | Cloud | Any [OpenAI-compatible](https://platform.openai.com/docs/api-reference/audio/createTranscription) server. | Depends on model | N/A |
 
 - **Whisper** is the default and recommended engine — runs locally with Metal GPU acceleration on Apple Silicon (M1/M2/M3/M4). Multiple model sizes available (tiny to large-v3-turbo).
+- **Canary** — NVIDIA's ultra-light model, beats Whisper Medium quality at 1/7th the size.
+- **Parakeet-TDT** — NVIDIA's TDT transducer with duration head for fast frame-skipping inference. Best overall accuracy.
+- **Qwen3-ASR** — Alibaba's audio LLM, hardware-accelerated via Apple's AMX coprocessor.
 - **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server.
 
-Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `llm/`, `bert/`, `pcs/`).
+Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `llm/`, `bert/`, `pcs/`).
 
 ## Usage
 
@@ -108,7 +114,7 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum), CoreAudio FFI (audio ducking) |
-| Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) (native, Metal GPU) |
+| Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) (Metal GPU), [ort](https://github.com/pykeIO/ort) + CoreML (Canary, Parakeet), [qwen-asr](https://github.com/huanglizhuo/QwenASR) (Accelerate/AMX) |
 | Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted in Rust, rendered as RGBA bitmaps — zero image dependencies, inspired by [Lucide](https://lucide.dev/) |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
 | Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
@@ -138,7 +144,8 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT for audio spectrum (visualization) |
 | [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Native Whisper transcription (GGML, Metal GPU on macOS) |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF, Metal GPU, text cleanup) |
-| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime (Silero VAD, BERT punctuation, PCS punctuation) |
+| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime + CoreML EP (Canary ASR, Parakeet-TDT ASR, Silero VAD, BERT punctuation, PCS punctuation) |
+| [`qwen-asr`](https://github.com/huanglizhuo/QwenASR) | Qwen3-ASR inference (pure Rust, Accelerate/AMX on Apple Silicon) |
 | [`candle-core`](https://github.com/huggingface/candle) / [`candle-nn`](https://github.com/huggingface/candle) / [`candle-transformers`](https://github.com/huggingface/candle) | Candle ML framework (safetensors BERT punctuation, Metal GPU) |
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD (LSTM state, ONNX inputs/outputs) |
 | [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizers (PCS SentencePiece Unigram) |
@@ -242,7 +249,12 @@ src-tauri/               Rust backend
     recording.rs         Recording state machine & audio thread
     vad.rs               Voice Activity Detection (Silero VAD v6 via ONNX Runtime)
     audio.rs             cpal recording & FFT
-    transcriber.rs       Transcription dispatcher (native whisper / cloud API)
+    transcriber.rs       Transcription dispatcher (whisper / canary / parakeet / qwen / cloud)
+    canary_asr.rs        NVIDIA Canary ASR (ONNX Runtime + CoreML)
+    parakeet_asr.rs      NVIDIA Parakeet-TDT ASR (vendored TDT decoder, ONNX + CoreML)
+    qwen_asr.rs          Alibaba Qwen3-ASR (qwen-asr crate, Accelerate/AMX)
+    ort_session.rs       Shared ort session builder with CoreML EP (Metal GPU / ANE)
+    mel_features.rs      Mel spectrogram extraction (HTK/Slaney scales, pre-emphasis)
     post_processor.rs    Text post-processing
     llm_cleanup.rs       Cloud LLM text cleanup (OpenAI/Anthropic)
     llm_local.rs         Local LLM text cleanup (llama.cpp)
