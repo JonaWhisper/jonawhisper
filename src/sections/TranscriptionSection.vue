@@ -65,10 +65,6 @@ const selectedAsrModel = computed(() =>
   engines.asrModels.find(m => m.id === settings.selectedModelId) ?? null
 )
 
-function formatParams(p: number): string {
-  if (p < 0.1) return Math.round(p * 1000) + 'M'
-  return (p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)) + 'B'
-}
 </script>
 
 <template>
@@ -96,8 +92,6 @@ function formatParams(p: number): string {
                 :class="['w-3 h-3 shrink-0', selectedAsrModel.group === 'cloud' ? 'text-sky-500' : 'text-blue-500']"
               />
               <span class="truncate">{{ selectedAsrModel.label }}</span>
-              <span v-if="selectedAsrModel.params" class="text-muted-foreground/60 tabular-nums shrink-0">{{ formatParams(selectedAsrModel.params) }}</span>
-              <span v-if="selectedAsrModel.quantization" class="text-purple-500/70 tabular-nums shrink-0">{{ selectedAsrModel.quantization }}</span>
             </span>
           </SelectTrigger>
           <SelectContent>
@@ -108,9 +102,6 @@ function formatParams(p: number): string {
                   :class="['w-3 h-3 shrink-0', m.group === 'cloud' ? 'text-sky-500' : 'text-blue-500']"
                 />
                 {{ m.label }}
-                <span v-if="m.params" class="text-muted-foreground/60 tabular-nums">{{ formatParams(m.params) }}</span>
-                <span v-if="m.quantization" class="text-purple-500/70 tabular-nums">{{ m.quantization }}</span>
-                <span v-if="m.lang_codes?.length" class="text-muted-foreground/60 tabular-nums">{{ m.lang_codes.length }} {{ t('settings.langs') }}</span>
                 <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
               </span>
             </SelectItem>

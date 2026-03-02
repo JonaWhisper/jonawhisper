@@ -97,11 +97,6 @@ async function onLlmModelChange(value: string) {
   await settings.setSetting('llm_model', value)
 }
 
-function formatParams(p: number): string {
-  if (p < 0.1) return Math.round(p * 1000) + 'M'
-  return (p % 1 === 0 ? p.toFixed(0) : p.toFixed(1)) + 'B'
-}
-
 function onMaxTokensSliderUpdate(v: number[] | undefined) {
   if (v?.[0] != null) settings.llmMaxTokens = v[0]
 }
@@ -160,8 +155,6 @@ function onMaxTokensSliderCommit(v: number[]) {
             <span v-else-if="selectedCleanupModel" class="inline-flex items-center gap-1.5 truncate">
               <component :is="cleanupTypeIcon(selectedCleanupModel.group)" :class="['w-3 h-3 shrink-0', cleanupTypeColor(selectedCleanupModel.group)]" />
               <span class="truncate">{{ selectedCleanupModel.label }}</span>
-              <span v-if="selectedCleanupModel.params" class="text-muted-foreground/60 tabular-nums shrink-0">{{ formatParams(selectedCleanupModel.params) }}</span>
-              <span v-if="selectedCleanupModel.quantization" class="text-purple-500/70 tabular-nums shrink-0">{{ selectedCleanupModel.quantization }}</span>
               <component :is="isCloudCleanup(selectedCleanupModel.group) ? Cloud : Cpu" :class="['w-3 h-3 shrink-0', isCloudCleanup(selectedCleanupModel.group) ? 'text-sky-500' : 'text-blue-500']" />
             </span>
           </SelectTrigger>
@@ -171,9 +164,6 @@ function onMaxTokensSliderCommit(v: number[]) {
               <span class="flex items-center gap-1.5">
                 <component :is="cleanupTypeIcon(m.group)" :class="['w-3 h-3 shrink-0', cleanupTypeColor(m.group)]" />
                 {{ m.label }}
-                <span v-if="m.params" class="text-muted-foreground/60 tabular-nums">{{ formatParams(m.params) }}</span>
-                <span v-if="m.quantization" class="text-purple-500/70 tabular-nums">{{ m.quantization }}</span>
-                <span v-if="m.lang_codes?.length" class="text-muted-foreground/60 tabular-nums">{{ m.lang_codes.length }} {{ t('settings.langs') }}</span>
                 <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
                 <component :is="isCloudCleanup(m.group) ? Cloud : Cpu" :class="['w-3 h-3 shrink-0 ml-auto', isCloudCleanup(m.group) ? 'text-sky-500' : 'text-blue-500']" />
               </span>
