@@ -56,12 +56,12 @@ impl CanaryContext {
             .unwrap_or(4);
 
         log::info!("Loading Canary encoder: {}", encoder_path.display());
-        let encoder = crate::ort_session::build_session(n_threads)?
+        let encoder = crate::engines::ort_session::build_session(n_threads)?
             .commit_from_file(&encoder_path)
             .map_err(|e| format!("Failed to load encoder: {e}"))?;
 
         log::info!("Loading Canary decoder: {}", decoder_path.display());
-        let decoder = crate::ort_session::build_session(n_threads)?
+        let decoder = crate::engines::ort_session::build_session(n_threads)?
             .commit_from_file(&decoder_path)
             .map_err(|e| format!("Failed to load decoder: {e}"))?;
 

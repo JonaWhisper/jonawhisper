@@ -63,12 +63,12 @@ impl ParakeetContext {
             .unwrap_or(4);
 
         log::info!("Loading Parakeet encoder: {}", encoder_path.display());
-        let encoder = crate::ort_session::build_session(n_threads)?
+        let encoder = crate::engines::ort_session::build_session(n_threads)?
             .commit_from_file(&encoder_path)
             .map_err(|e| format!("Failed to load encoder: {e}"))?;
 
         log::info!("Loading Parakeet decoder-joint: {}", decoder_path.display());
-        let decoder_joint = crate::ort_session::build_session(n_threads)?
+        let decoder_joint = crate::engines::ort_session::build_session(n_threads)?
             .commit_from_file(&decoder_path)
             .map_err(|e| format!("Failed to load decoder: {e}"))?;
 

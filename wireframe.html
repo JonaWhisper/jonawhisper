@@ -1409,6 +1409,7 @@ svg.icon-lg { width: 20px; height: 20px; }
         </div>
 
         <div class="card" id="gpuCard">
+          <div class="card-title">Accélération</div>
           <div class="form-row">
             <div>
               <div class="form-label">Mode GPU</div>
@@ -1892,7 +1893,11 @@ document.getElementById('cancelEditWindow').addEventListener('click', () => {
 // ─── ASR Model → show/hide cloud model dropdown ───
 document.getElementById('asrModelSelect').addEventListener('change', function() {
   const row = document.getElementById('cloudModelRow');
-  row.style.display = this.value === 'cloud' ? 'flex' : 'none';
+  const gpuCard = document.getElementById('gpuCard');
+  const isCloud = this.value === 'cloud';
+  row.style.display = isCloud ? 'flex' : 'none';
+  gpuCard.style.opacity = isCloud ? '0.35' : '1';
+  gpuCard.style.pointerEvents = isCloud ? 'none' : 'auto';
 });
 
 // ─── Provider Type → show/hide custom fields ───

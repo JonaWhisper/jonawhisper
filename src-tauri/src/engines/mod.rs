@@ -8,6 +8,7 @@ pub mod llama;
 pub mod bert;
 pub mod pcs;
 pub mod correction;
+pub mod ort_session;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

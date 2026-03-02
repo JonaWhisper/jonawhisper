@@ -8,31 +8,38 @@ Référence complète des options ASR (speech-to-text) et LLM (text cleanup) dis
 
 ### Cloud — Compatible OpenAI (intégré, zéro code)
 
-L'app supporte déjà `POST /v1/audio/transcriptions` avec multipart form. Ces providers fonctionnent en renseignant URL + clé API + modèle dans un provider Custom.
+L'app supporte `POST /v1/audio/transcriptions` avec multipart form. Ces providers fonctionnent en renseignant URL + clé API + modèle dans un provider Custom.
 
-| Provider | Modèle | Prix/min | Latence | WER | Free tier | URL de base | Statut |
+| Provider | Modèle | Prix/min | Latence | WER | Free tier | Langues | Statut |
 |---|---|---|---|---|---|---|---|
-| **Groq** | whisper-large-v3-turbo | $0.0007 | <200ms | ~3-4% EN | Non | `https://api.groq.com/openai/v1` | **Supporté** — via provider custom |
-| **Groq** | whisper-large-v3 | $0.0019 | <200ms | ~3% EN | Non | idem | **Supporté** — via provider custom |
-| **Fireworks AI** | whisper-v3-turbo | $0.0009 | <300ms | ~2% LS | Non | `https://api.fireworks.ai/inference/v1` | **Supporté** — via provider custom |
-| **Fireworks AI** | whisper-v3 | $0.0015 | <300ms | ~2% LS | Non | idem | **Supporté** — via provider custom |
-| **Together AI** | openai/whisper-large-v3 | $0.0015 | Sub-sec | ~3% EN | Non | `https://api.together.xyz/v1` | **Supporté** — via provider custom |
-| **OpenAI** | gpt-4o-mini-transcribe | $0.003 | ~320ms | ~2.5% | Non | `https://api.openai.com/v1` | **Supporté** — via provider custom |
-| **OpenAI** | gpt-4o-transcribe | $0.006 | ~320ms | 2.46% | Non | idem | **Supporté** — via provider custom |
+| **Groq** | whisper-large-v3-turbo | $0.0007 | <200ms | ~3-4% EN | Non | 99 | **Supporté** |
+| **Groq** | whisper-large-v3 | $0.0019 | <200ms | ~3% EN | Non | 99 | **Supporté** |
+| **Groq** | distil-whisper | **$0.0003** | <200ms | ~7% EN | Non | EN | **Supporté** |
+| **Fireworks AI** | whisper-v3-turbo | $0.0009 | <300ms | ~2% LS | Non | 99 | **Supporté** |
+| **Fireworks AI** | whisper-v3 | $0.0015 | <300ms | ~2% LS | Non | 99 | **Supporté** |
+| **Fireworks AI** | whisper-v3 streaming | $0.0032 | 300ms stream | ~2% LS | Non | 99 | **Supporté** |
+| **Together AI** | whisper-large-v3 | $0.0015 | Sub-sec | ~3% EN | Non | 50+ | **Supporté** |
+| **Together AI** | whisper-large-v3 streaming | — | 15x OpenAI | ~3% EN | Non | 50+ | **Supporté** |
+| **OpenAI** | gpt-4o-mini-transcribe | $0.003 | ~320ms | ~2.5% | Non | 99+ | **Supporté** |
+| **OpenAI** | gpt-4o-transcribe | $0.006 | ~320ms | 2.46% | Non | 99+ | **Supporté** |
 
-**Recommandation** : Groq whisper-large-v3-turbo — le plus rapide et le moins cher. OpenAI gpt-4o-transcribe pour la meilleure qualité absolue.
+**Recommandation** : Groq whisper-large-v3-turbo — le plus rapide et le moins cher pour du multilingue. Groq distil-whisper = **le moins cher toutes catégories** ($0.02/heure, EN seul). OpenAI gpt-4o-transcribe = meilleure qualité absolue (90% fewer hallucinations vs Whisper v2).
 
 ### Cloud — API propriétaire (nécessite intégration dédiée)
 
-| Provider | Modèle | Prix/min | Latence | Qualité | Difficulté intégration | Statut |
-|---|---|---|---|---|---|---|
-| **Deepgram** | Nova-3 | $0.004 | <300ms | Excellent (audio bruité) | Moyenne — REST simple, format différent | Non intégré — format réponse incompatible OpenAI |
-| **ElevenLabs** | Scribe v2 | $0.006 | 150ms streaming | Bon | Moyenne — REST propriétaire | Non intégré — API propriétaire |
-| **Gladia** | Whisper-Zero | $0.010 | Temps réel | Bon (anti-hallucination) | Moyenne — REST propriétaire | Non intégré — API propriétaire |
-| **AssemblyAI** | Universal-2 | $0.0025 | Secondes (async) | Bon | Moyenne — polling asynchrone | Non intégré — modèle async incompatible temps réel |
-| **Google Cloud** | Chirp 3 | $0.016 | 1-2s | Excellent | Élevée — GCP IAM, service accounts | Non intégré — complexité d'auth trop élevée |
-| **Azure Speech** | Standard | $0.006-0.011 | ~200ms | Excellent | Élevée — subscription Azure, SDK | Non intégré — dépendance SDK Azure |
-| **Amazon Transcribe** | Standard | $0.024 | Secondes (S3) | Bon | Très élevée — S3 + IAM + SDK | Non intégré — architecture S3 inadaptée |
+| Provider | Modèle | Prix/min | Latence | WER | FR | Streaming FR | Intégration | Statut |
+|---|---|---|---|---|---|---|---|---|
+| **Deepgram** | Nova-3 | $0.0043-0.0077 | <300ms | **5.26%** | Oui (codeswitching) | Oui | REST simple | Non intégré |
+| **AssemblyAI** | Universal-2 | $0.0025-0.0045 | Secondes/stream | ~14.5% | Oui | **Oui (6 langues)** | REST + polling | Non intégré |
+| **ElevenLabs** | Scribe v2 | $0.0067-0.008 | <150ms stream | ~93.5% FLEURS | Oui | Oui | REST propriétaire | Non intégré |
+| **Rev.ai** | Reverb Foreign | **$0.005** | <1s | — | Oui | Oui | REST simple | Non intégré |
+| **Gladia** | Whisper-Zero | $0.0102 | Temps réel | — | Oui | Oui | REST propriétaire | Non intégré |
+| **Speechmatics** | Flow API | Sur devis | ~150ms | — | Oui (55+ lang) | Oui | REST/WS | Non intégré |
+| **Google Cloud** | Chirp 3 | $0.016 | 1-2s | — | Oui (100+ lang) | Oui | GCP IAM complexe | Non intégré |
+| **Azure Speech** | Standard | $0.017 | ~200ms | — | Oui (100+ lang) | Oui | SDK Azure | Non intégré |
+| **Amazon Transcribe** | Standard | $0.024 | Secondes | — | Oui (100+ lang) | Oui | S3 + IAM | Non intégré |
+
+**Notes** : Deepgram Nova-3 = meilleur WER cloud (5.26%), optimisé phonétique FR. AssemblyAI = seul provider offrant streaming FR à $0.0025/min. Rev.ai Reverb Foreign = bonne alternative REST simple avec FR.
 
 ### Local / Self-hosted — Serveurs ASR
 
@@ -40,16 +47,17 @@ Pour les utilisateurs qui veulent héberger leur propre serveur ASR.
 
 | Solution | API OpenAI | Mac natif | FR/EN | Install | Performance | Statut |
 |---|---|---|---|---|---|---|
-| **whisper.cpp server** | Oui | Metal + CoreML | Oui (99 langues) | `brew install whisper-cpp` | 27x temps réel (tiny M4) | **Supporté** — via provider custom |
-| **MLX-Audio** | Oui | MLX Apple Silicon | Oui | `pip install mlx-audio` | 10x whisper.cpp sur Mac | **Supporté** — via provider custom |
-| **sherpa-onnx** | Via C API | Oui | Oui (multi-modèles) | Build from source / pip | Très rapide | Non supporté — pas d'API OpenAI |
-| **Speaches** | Oui | Docker (pas Metal) | Oui | Docker one-liner | 4x Whisper original | **Supporté** — via provider custom |
-| **LocalAI** | Oui | Docker | Oui | Docker + config YAML | Variable | **Supporté** — via provider custom |
-| **Parakeet-TDT v3** | Via wrappers | CPU ONNX | Oui (25 langues) | Python/Go wrappers | 3300x temps réel (GPU) | Non supporté — pas d'API OpenAI (modèle intégré nativement) |
-| **OWhisper** | À vérifier | Oui | Oui | Binaire pré-compilé | Streaming VAD | Non vérifié — projet trop jeune |
-| **Vosk** | Non (WebSocket) | Oui | Oui | pip/Docker | Temps réel | Non supporté — API WebSocket incompatible |
+| **whisper.cpp server** | Oui | Metal + CoreML | 99 langues | `brew install whisper-cpp` | 27x RTF (tiny M4) | **Supporté** |
+| **faster-whisper** | Oui (wrapper) | CPU | 99 langues | `pip install faster-whisper` | **4x Whisper** (CTranslate2) | **Supporté** |
+| **MLX-Audio** | Oui | MLX Apple Silicon | 99 langues | `pip install mlx-audio` | 10x whisper.cpp | **Supporté** |
+| **MLX-Whisper** | Oui | MLX Apple Silicon | 99 langues | `pip install mlx-whisper` | 2x Whisper long audio | **Supporté** |
+| **whisper-jax** | Via wrapper | CPU/TPU | 99 langues | `pip install whisper-jax` | **70x Whisper** (JAX) | Non supporté — pas d'API OpenAI native |
+| **sherpa-onnx server** | Via C API | Oui | Multi-modèles | pip/build | Très rapide | Non supporté — pas d'API OpenAI |
+| **Speaches** | Oui | Docker | 99 langues | Docker one-liner | 4x Whisper | **Supporté** |
+| **LocalAI** | Oui | Docker | 99 langues | Docker + config YAML | Variable | **Supporté** |
+| **Vosk** | Non (WebSocket) | Oui | 20+ langues | pip/Docker | Temps réel | Non supporté — API WebSocket incompatible |
 
-### Natif intégré (whisper-rs, dans l'app)
+### Natif intégré — Whisper (whisper-rs, Metal GPU)
 
 Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via whisper-rs + Metal GPU.
 
@@ -60,6 +68,7 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 | **Large V3 Turbo** | `whisper:large-v3-turbo` | 1.6 GB | 2.5 GB | 2.1% | 0.25 | **Recommandé** | **Intégré** |
 | Large V3 Turbo Q8 | `whisper:large-v3-turbo-q8` | 874 MB | 1.3 GB | 2.1% | 0.20 | | **Intégré** |
 | Large V3 Turbo Q5 | `whisper:large-v3-turbo-q5` | 574 MB | 900 MB | 2.3% | 0.15 | | **Intégré** |
+| Large V3 French | `whisper:large-v3-french-distil` | 538 MB | 900 MB | 1.5% | 0.20 | | **Intégré** |
 | Medium | `whisper:medium` | 1.5 GB | 2 GB | 2.7% | 0.35 | | **Intégré** |
 | Medium Q5 | `whisper:medium-q5` | 539 MB | 900 MB | 2.8% | 0.20 | | **Intégré** |
 | Small | `whisper:small` | 466 MB | 750 MB | 3.4% | 0.15 | | **Intégré** |
@@ -67,25 +76,98 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 | Base | `whisper:base` | 142 MB | 300 MB | 5.0% | 0.08 | | **Intégré** |
 | Tiny | `whisper:tiny` | 75 MB | 200 MB | 7.6% | 0.05 | | **Intégré** |
 
-### Modèles ASR non-Whisper (recherche avancée)
+#### Distil-Whisper
 
-Les modèles non-Whisper dominent le Open ASR Leaderboard. Certains sont intégrables via ONNX ou même GGML.
-
-| Modèle | Params | FR | Format | Taille | RAM | Intérêt | Statut |
+| Modèle | Params | Format | Taille | Langues | WER | Vitesse | Statut |
 |---|---|---|---|---|---|---|---|
-| **bofenghuang/whisper-large-v3-french** | 1.5B | Natif FR | GGML | ~538 MB | 900 MB | Meilleur Whisper FR, fine-tuné sur données françaises | **Intégré** (`whisper:large-v3-french-distil`) |
-| **NVIDIA Canary-180M-Flash** | 182M | Oui (4 langues) | ONNX int8 | ~214 MB | 300 MB | Ultra-léger, bat Whisper Medium, CoreML GPU | **Intégré** (`canary:180m-flash-int8`) |
-| **Parakeet-TDT 0.6B v3** | 600M | Oui (25 langues) | ONNX int8 | ~670 MB | 750 MB | Excellent WER, TDT transducer, CoreML GPU | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
-| **Qwen3-ASR 0.6B** | 600M | Oui (30 langues) | Safetensors | ~1.88 GB | 2 GB | Bat Whisper, Accelerate/AMX | **Intégré** (`qwen-asr:0.6b`) |
-| **SenseVoice Small** | 234M | Oui (5 langues : zh/yue/en/ja/ko) | ONNX | ~228 MB | — | Alibaba, très rapide | Écarté — pas de français |
-| **Moonshine** | 27M / 61M | EN seul | ONNX | ~27 / 120 MB | — | Ultra-léger, temps réel sur edge | Écarté — pas de français |
+| **Distil-Whisper Large v3.5** | 756M | ONNX | ~1.5 GB | **EN seul** | 7.08% short / 11.39% long | 1.5x Turbo | Écarté — EN seul |
+| Distil-Whisper Large v3 | 756M | ONNX | ~1.5 GB | EN seul | ~7% | 6.3x Whisper | Écarté — EN seul |
 
-**Écosystème Rust** :
-- **sherpa-onnx** : C API avec bindings Rust, supporte Canary, Parakeet, SenseVoice, Moonshine, Whisper
-- **transcribe-rs** : Crate Rust abstrayant plusieurs backends ASR
-- **canary-rs** : Bindings Rust spécifiques pour NVIDIA Canary
+**Note** : les Distil-Whisper sont EN seul → pas adaptés à notre cas multilingue. Mentionnés pour complétude. Turbo Q8 offre un meilleur compromis taille/qualité/langues.
 
-**Candidat prioritaire** : `bofenghuang/whisper-large-v3-french` — compatible avec notre whisper-rs existant (format GGML), meilleur WER français. **Intégré** comme `whisper:large-v3-french-distil`.
+### Natif intégré — Modèles ASR non-Whisper
+
+#### Modèles intégrés
+
+| Modèle | Params | FR | Format | Taille | RAM | Architecture | Streaming | Runtime | Statut |
+|---|---|---|---|---|---|---|---|---|---|
+| **Whisper Large V3 French** | 1.5B | Natif FR | GGML | 538 MB | 900 MB | Encoder-decoder attention | Non | whisper-rs (Metal) | **Intégré** (`whisper:large-v3-french-distil`) |
+| **Canary-180M-Flash** | 182M | 4 langues | ONNX int8 | 213 MB | 300 MB | FastConformer enc-dec | Non | ort (CoreML) | **Intégré** (`canary:180m-flash-int8`) |
+| **Parakeet-TDT 0.6B v3** | 600M | 25 langues | ONNX int8 | 703 MB | 750 MB | FastConformer + TDT transducer | Non | ort (CoreML) | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
+| **Qwen3-ASR 0.6B** | 600M | 30 langues | Safetensors | 1.88 GB | 2 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:0.6b`) |
+
+#### Candidats intégrables
+
+Modèles avec un chemin d'intégration réaliste (ONNX disponible, safetensors, crate Rust existant) :
+
+| Modèle | Params | FR | Format | Taille | Runtime Rust | Langues | WER | Intérêt | Statut |
+|---|---|---|---|---|---|---|---|---|---|
+| **Qwen3-ASR 1.7B** | 1.7B | Oui | Safetensors | 4.7 GB | `qwen-asr` (Rust pur, AMX) | 30 + dialectes | 1.63% LS | Meilleur WER open-source, streaming, FR natif | **Candidat #1** |
+| **Canary-1B v2** | 978M | Oui | ONNX (community) | ~2 GB | ort (CoreML) | 25 EU | 7.27-8.85% | 25 langues EU, traduction bidirectionnelle | **Candidat #2** |
+| **SenseVoice Small** | 234M | 50+ (focus zh/en) | ONNX int8 | 228 MB | `sensevoice-rs` (Candle) | 50+ | Excellent zh/en | Ultra-rapide (15x Whisper), ONNX + Rust crate | **Candidat #3** |
+| **Moonshine v2 Medium** | 250M | EN seul | ONNX (.ort) | ~500 MB | ort | EN | ~6.65% | 100x Whisper Large, streaming natif | Écarté — EN seul |
+| **Moonshine Tiny** | 27M | EN seul | ONNX (.ort) | 108 MB | ort | EN | ~12.7% | Ultra-compact, <108 MB | Écarté — EN seul |
+| **Voxtral Mini 4B** | 4B | Oui | Safetensors BF16 | 8.87 GB | Burn (Rust) | 13 langues | — | Apache 2.0, streaming, impl Rust existe | Écarté — 8.87 GB trop lourd |
+| **Canary-1B-Flash** | ~1B | 4 langues | .nemo | ~2 GB | Conversion ONNX nécessaire | FR/EN/DE/ES | — | >1000 RTFx, streaming | Non intégré — conversion .nemo→ONNX non triviale |
+| **OWSM-CTC v4 1B** | ~1B | Multi | PyTorch | ~2 GB | Conversion ONNX nécessaire | Multi | — | Encoder-only CTC, ultra-rapide | Non intégré — ESPnet/PyTorch, pas d'ONNX |
+| **IBM Granite Speech 3.3 8B** | 8B | Oui | Safetensors | ~16 GB | Candle (théorique) | Multi | 5.85% | Top leaderboard, Apache 2.0 | Écarté — 16 GB, LLM backbone trop lourd |
+| **Parakeet-TDT 1.1B** | 1.1B | EN seul | .nemo | ~2.2 GB | Pas d'ONNX officiel | EN | 1.39% LS | Meilleur WER EN, RTFx >2000 | Écarté — EN seul, pas d'ONNX |
+
+#### Modèles recherche / non-intégrables
+
+Modèles importants dans l'écosystème mais sans chemin d'intégration pratique :
+
+| Modèle | Params | FR | Raison d'exclusion |
+|---|---|---|---|
+| **Meta MMS 1B** | 1B | Oui (1162 langues) | CC-BY-NC (non-commercial), pas d'ONNX, pas de crate Rust |
+| **Meta SeamlessM4T v2** | 3B | Oui (96 langues) | Trop lourd (3B), PyTorch only, pas d'ONNX |
+| **Google USM** | 2B | Oui (100+ langues) | Propriétaire Google, pas de poids publics |
+| **Apple Foundation Speech** | ~3B | Multi | Propriétaire Apple, intégré iOS/macOS uniquement |
+| **NVIDIA Canary-Qwen 2.5B** | 2.5B | Oui (25 langues) | Top leaderboard (5.63% WER) mais 2.5B = trop lourd natif |
+| **Voxtral 24B** | 24B | Oui | Trop lourd pour local |
+| **GigaAM v3** | 240M | **Russe seul** | Focus russe uniquement, pas de FR |
+| **GLM-ASR-Nano** | 1.5B | **ZH/EN/Cantonais** | Focus chinois, pas de FR |
+| **FunASR Paraformer** | Var. | ZH/EN | Focus chinois, complexe à intégrer |
+| Wav2Vec 2.0 / HuBERT / WavLM | 300M-1B | Via fine-tune | Ancienne génération, nécessite fine-tuning par langue |
+
+### Open ASR Leaderboard — Résumé
+
+Résumé des top modèles du leaderboard HuggingFace (60+ modèles, 18 organisations, 11 datasets) :
+
+| Rang | Modèle | WER moyen | RTFx | Params | Intégrable | Notes |
+|---|---|---|---|---|---|---|
+| 1 | NVIDIA Canary-Qwen 2.5B | 5.63% | 418 | 2.5B | Non (trop lourd) | Top accuracy |
+| 2 | IBM Granite Speech 3.3 8B | 5.85% | — | 8B | Non (trop lourd) | Apache 2.0 |
+| 3 | Deepgram Nova-3 (cloud) | 5.26% | — | Propriétaire | Cloud uniquement | Meilleur WER cloud |
+| — | NVIDIA Parakeet CTC 1.1B | 6.68% | **2794** | 1.1B | Non (EN seul) | SOTA vitesse |
+| — | OpenAI Whisper Large V3 | 6.43% | 69 | 1.55B | **Oui** (intégré) | Référence multilingue |
+| — | Moonshine Medium v2 | 6.65% | ~1200 | 250M | Non (EN seul) | 100x Whisper |
+| — | Qwen3-ASR 1.7B | ~4.5% estimé | — | 1.7B | **Oui** (candidat) | 1.63% LS clean |
+
+**Note** : les meilleurs modèles du leaderboard (Canary-Qwen, Granite) sont trop lourds pour du natif. Les modèles intégrables offrent un bon compromis qualité/taille.
+
+### Écosystème Rust ASR
+
+| Crate | Modèles supportés | Runtime | Licence | Notes |
+|---|---|---|---|---|
+| `whisper-rs` 0.15+ | Whisper (GGML) | whisper.cpp (Metal) | MIT | Production, notre runtime principal |
+| `qwen-asr` | Qwen3-ASR 0.6B/1.7B | Rust pur (AMX/NEON) | Apache 2.0 | Pure Rust, zero deps, streaming |
+| `ort` 2.0.0-rc.11 | Canary, Parakeet, tout ONNX | ONNX Runtime (CoreML) | MIT/Apache | Notre runtime ONNX |
+| `sensevoice-rs` | SenseVoice Small | Candle (Metal) | MIT | 50+ langues, auto-download hf-hub |
+| `parakeet-rs` | Parakeet (ONNX) | ort | MIT | Streaming + punctuation |
+| `sherpa-rs` (sherpa-onnx) | Zipformer, Paraformer, etc. | ort (C bindings) | Apache 2.0 | Zoo de modèles multilingues |
+| `april_asr` | Modèles April | Natif | MIT | Offline streaming minimal |
+| Burn + voxtral-mini-realtime-rs | Voxtral 4B | Burn (Vulkan/Metal) | Apache 2.0 | Communauté, expérimental |
+
+### Roadmap ASR
+
+| Priorité | Action | Effort | Impact |
+|---|---|---|---|
+| **1 — Immédiat** | Intégrer Qwen3-ASR 1.7B (via `qwen-asr` existant) | Très faible | Meilleur WER, 30 langues, streaming |
+| **2 — Court terme** | Évaluer Canary-1B v2 (ONNX community) | Modéré | 25 langues EU, traduction intégrée |
+| **3 — Court terme** | Évaluer SenseVoice Small (`sensevoice-rs`) | Faible | Ultra-rapide, 228 MB, crate Rust |
+| **4 — Optionnel** | Moonshine Tiny pour mode ultra-léger EN | Faible | 108 MB, streaming, EN seul |
+| **5 — Optionnel** | Adapter cloud providers (Deepgram, AssemblyAI streaming FR) | Modéré | Alternatives cloud premium |
 
 ---
 

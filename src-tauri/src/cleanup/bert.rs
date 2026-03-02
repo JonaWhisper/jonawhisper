@@ -41,7 +41,7 @@ impl BertContext {
             .map(|p| p.get())
             .unwrap_or(4);
 
-        let session = crate::ort_session::build_session(n_threads)?
+        let session = crate::engines::ort_session::build_session(n_threads)?
             .commit_from_file(model_path)
             .map_err(|e| format!("Failed to load ONNX model: {e}"))?;
 
