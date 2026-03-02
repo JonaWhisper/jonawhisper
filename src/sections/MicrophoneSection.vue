@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import SpectrumBars from '@/components/SpectrumBars.vue'
 import { Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Mic } from 'lucide-vue-next'
