@@ -87,16 +87,16 @@ const selectedAsrModel = computed(() =>
         >
           <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs">
             <span v-if="selectedAsrModel" class="inline-flex items-center gap-1.5 truncate">
-              <TypeBadge :type="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'" />
               <span class="truncate">{{ selectedAsrModel.label }}</span>
+              <TypeBadge :type="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'" />
             </span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
               <span class="flex items-center gap-1.5">
-                <TypeBadge :type="m.group === 'cloud' ? 'cloud' : 'local'" />
                 {{ m.label }}
                 <Badge v-if="m.recommended" variant="secondary" class="text-[9px] px-1 py-0 bg-emerald-500/10 text-emerald-600 border-transparent font-medium">{{ t('settings.cleanup.recommended') }}</Badge>
+                <TypeBadge :type="m.group === 'cloud' ? 'cloud' : 'local'" class="ml-auto" />
               </span>
             </SelectItem>
           </SelectContent>
