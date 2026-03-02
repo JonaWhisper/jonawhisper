@@ -5,6 +5,8 @@ use candle_nn::{linear, Linear, VarBuilder};
 use candle_transformers::models::xlm_roberta::{Config, XLMRobertaModel};
 use tokenizers::Tokenizer;
 
+use crate::punct_common;
+
 const TOKENIZER_FILENAME: &str = "tokenizer.json";
 const CONFIG_FILENAME: &str = "config.json";
 const TOKENIZER_URL: &str =
@@ -12,13 +14,7 @@ const TOKENIZER_URL: &str =
 const CONFIG_URL: &str =
     "https://huggingface.co/oliverguhr/fullstop-punctuation-multilingual-base/resolve/main/config.json";
 
-/// Punctuation labels predicted by the fullstop-punctuation model.
-/// Index 0 = no punctuation, 1..5 = punctuation characters.
-const PUNCT_LABELS: &[&str] = &["", ".", ",", "?", "-", ":"];
 const NUM_LABELS: usize = 6;
-
-const WINDOW_SIZE: usize = 230;
-const OVERLAP: usize = 5;
 
 /// XLM-RoBERTa with a token classification head (linear on top of hidden states).
 /// Not provided by candle-transformers, so we build it from the base model + Linear.
@@ -74,13 +70,13 @@ impl CandlePunctContext {
         // Ensure tokenizer.json exists alongside the model
         let tokenizer_path = model_dir.join(TOKENIZER_FILENAME);
         if !tokenizer_path.exists() {
-            download_file(TOKENIZER_URL, &tokenizer_path)?;
+            punct_common::download_file(TOKENIZER_URL, &tokenizer_path)?;
         }
 
         // Ensure config.json exists alongside the model
         let config_path = model_dir.join(CONFIG_FILENAME);
         if !config_path.exists() {
-            download_file(CONFIG_URL, &config_path)?;
+            punct_common::download_file(CONFIG_URL, &config_path)?;
         }
 
         // Load config
@@ -141,61 +137,7 @@ impl CandlePunctContext {
 /// Input: text with minimal/no punctuation (e.g. from Whisper).
 /// Output: text with punctuation restored (periods, commas, question marks, etc.).
 pub fn restore_punctuation(ctx: &CandlePunctContext, text: &str) -> Result<String, String> {
-    let words = strip_and_split(text);
-    if words.is_empty() {
-        return Ok(String::new());
-    }
-
-    let mut labels: Vec<usize> = vec![0; words.len()];
-    let mut offset = 0;
-
-    while offset < words.len() {
-        let end = (offset + WINDOW_SIZE).min(words.len());
-        let chunk = &words[offset..end];
-
-        let chunk_labels = infer_chunk(ctx, chunk)?;
-
-        // Merge: skip overlap words for non-first windows
-        let start_word = if offset == 0 { 0 } else { OVERLAP };
-        for (i, &label) in chunk_labels.iter().enumerate() {
-            if i >= start_word {
-                let global_idx = offset + i;
-                if global_idx < words.len() {
-                    labels[global_idx] = label;
-                }
-            }
-        }
-
-        if end >= words.len() {
-            break;
-        }
-        offset += WINDOW_SIZE - OVERLAP;
-    }
-
-    // Reconstruct text with punctuation
-    let mut result = String::new();
-    for (i, word) in words.iter().enumerate() {
-        if i > 0 {
-            result.push(' ');
-        }
-        result.push_str(word);
-        let label = labels[i];
-        if label > 0 && label < PUNCT_LABELS.len() {
-            result.push_str(PUNCT_LABELS[label]);
-        }
-    }
-
-    Ok(result)
-}
-
-/// Strip existing punctuation and split into words.
-fn strip_and_split(text: &str) -> Vec<String> {
-    text.chars()
-        .filter(|c| !matches!(c, '.' | ',' | '?' | ':' | '-' | ';' | '!'))
-        .collect::<String>()
-        .split_whitespace()
-        .map(|s| s.to_string())
-        .collect()
+    punct_common::restore_punctuation_windowed(text, |words| infer_chunk(ctx, words))
 }
 
 /// Run candle inference on a chunk of words, return per-word label indices.
@@ -261,27 +203,4 @@ fn infer_chunk(ctx: &CandlePunctContext, words: &[String]) -> Result<Vec<usize>,
     }
 
     Ok(labels)
-}
-
-/// Download a file from a URL.
-fn download_file(url: &str, path: &Path) -> Result<(), String> {
-    log::info!("Downloading {} to {}", url, path.display());
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory: {e}"))?;
-    }
-    let response = reqwest::blocking::get(url)
-        .map_err(|e| format!("Failed to download {url}: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "Download failed with status {}",
-            response.status()
-        ));
-    }
-    let bytes = response
-        .bytes()
-        .map_err(|e| format!("Failed to read response: {e}"))?;
-    std::fs::write(path, &bytes).map_err(|e| format!("Failed to write file: {e}"))?;
-    log::info!("Downloaded {} ({} bytes)", path.display(), bytes.len());
-    Ok(())
 }

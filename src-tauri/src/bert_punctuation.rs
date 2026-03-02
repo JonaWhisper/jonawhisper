@@ -4,16 +4,11 @@ use ort::session::Session;
 use ort::value::Tensor;
 use tokenizers::Tokenizer;
 
+use crate::punct_common;
+
 const TOKENIZER_FILENAME: &str = "tokenizer.json";
 const TOKENIZER_URL: &str =
     "https://huggingface.co/ldenoue/fullstop-punctuation-multilang-large/resolve/main/tokenizer.json";
-
-/// Punctuation labels predicted by the fullstop-punctuation model.
-/// Index 0 = no punctuation, 1..5 = punctuation characters.
-const PUNCT_LABELS: &[&str] = &["", ".", ",", "?", "-", ":"];
-
-const WINDOW_SIZE: usize = 230;
-const OVERLAP: usize = 5;
 
 /// Cached BERT context: ONNX session + tokenizer, reused across calls.
 pub struct BertContext {
@@ -33,7 +28,7 @@ impl BertContext {
         // Ensure tokenizer exists alongside the model
         let tokenizer_path = model_dir.join(TOKENIZER_FILENAME);
         if !tokenizer_path.exists() {
-            download_tokenizer(&tokenizer_path)?;
+            punct_common::download_file(TOKENIZER_URL, &tokenizer_path)?;
         }
 
         let n_threads = std::thread::available_parallelism()
@@ -73,61 +68,7 @@ impl BertContext {
 /// Input: text with minimal/no punctuation (e.g. from Whisper).
 /// Output: text with punctuation restored (periods, commas, question marks, etc.).
 pub fn restore_punctuation(ctx: &mut BertContext, text: &str) -> Result<String, String> {
-    let words = strip_and_split(text);
-    if words.is_empty() {
-        return Ok(String::new());
-    }
-
-    let mut labels: Vec<usize> = vec![0; words.len()];
-    let mut offset = 0;
-
-    while offset < words.len() {
-        let end = (offset + WINDOW_SIZE).min(words.len());
-        let chunk = &words[offset..end];
-
-        let chunk_labels = infer_chunk(ctx, chunk)?;
-
-        // Merge: skip overlap words for non-first windows
-        let start_word = if offset == 0 { 0 } else { OVERLAP };
-        for (i, &label) in chunk_labels.iter().enumerate() {
-            if i >= start_word {
-                let global_idx = offset + i;
-                if global_idx < words.len() {
-                    labels[global_idx] = label;
-                }
-            }
-        }
-
-        if end >= words.len() {
-            break;
-        }
-        offset += WINDOW_SIZE - OVERLAP;
-    }
-
-    // Reconstruct text with punctuation
-    let mut result = String::new();
-    for (i, word) in words.iter().enumerate() {
-        if i > 0 {
-            result.push(' ');
-        }
-        result.push_str(word);
-        let label = labels[i];
-        if label > 0 && label < PUNCT_LABELS.len() {
-            result.push_str(PUNCT_LABELS[label]);
-        }
-    }
-
-    Ok(result)
-}
-
-/// Strip existing punctuation and split into words.
-fn strip_and_split(text: &str) -> Vec<String> {
-    text.chars()
-        .filter(|c| !matches!(c, '.' | ',' | '?' | ':' | '-' | ';' | '!'))
-        .collect::<String>()
-        .split_whitespace()
-        .map(|s| s.to_string())
-        .collect()
+    punct_common::restore_punctuation_windowed(text, |words| infer_chunk(ctx, words))
 }
 
 /// Run BERT inference on a chunk of words, return per-word label indices.
@@ -191,27 +132,4 @@ fn infer_chunk(ctx: &mut BertContext, words: &[String]) -> Result<Vec<usize>, St
     }
 
     Ok(labels)
-}
-
-/// Download the HuggingFace tokenizer.json file.
-fn download_tokenizer(path: &Path) -> Result<(), String> {
-    log::info!("Downloading BERT tokenizer to {}", path.display());
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory: {e}"))?;
-    }
-    let response = reqwest::blocking::get(TOKENIZER_URL)
-        .map_err(|e| format!("Failed to download tokenizer: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "Tokenizer download failed with status {}",
-            response.status()
-        ));
-    }
-    let bytes = response
-        .bytes()
-        .map_err(|e| format!("Failed to read tokenizer response: {e}"))?;
-    std::fs::write(path, &bytes).map_err(|e| format!("Failed to write tokenizer: {e}"))?;
-    log::info!("Tokenizer downloaded ({} bytes)", bytes.len());
-    Ok(())
 }

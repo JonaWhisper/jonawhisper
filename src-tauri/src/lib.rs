@@ -3,6 +3,7 @@ mod bert_punctuation;
 mod candle_punctuation;
 mod commands;
 mod pcs_punctuation;
+mod punct_common;
 mod engines;
 mod errors;
 mod events;

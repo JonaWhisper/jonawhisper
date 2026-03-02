@@ -4,6 +4,8 @@ use ort::session::Session;
 use ort::value::Tensor;
 use tokenizers::Tokenizer;
 
+use crate::punct_common;
+
 // -- SentencePiece protobuf parsing (prost) --
 
 /// Minimal SentencePiece ModelProto — only the fields we need.
@@ -316,7 +318,7 @@ fn build_tokenizer_from_spe(model_dir: &Path) -> Result<Tokenizer, String> {
     // Download .model if not present
     if !spe_path.exists() {
         log::info!("Downloading SentencePiece model to {}", spe_path.display());
-        download_file(SPE_MODEL_URL, &spe_path)?;
+        punct_common::download_file(SPE_MODEL_URL, &spe_path)?;
     }
 
     // Parse protobuf
@@ -360,22 +362,3 @@ fn build_tokenizer_from_spe(model_dir: &Path) -> Result<Tokenizer, String> {
     Ok(tokenizer)
 }
 
-/// Download a file from URL to a local path.
-fn download_file(url: &str, path: &Path) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create directory: {e}"))?;
-    }
-    let response = reqwest::blocking::get(url)
-        .map_err(|e| format!("Failed to download: {e}"))?;
-    if !response.status().is_success() {
-        return Err(format!("Download failed with status {}", response.status()));
-    }
-    let bytes = response
-        .bytes()
-        .map_err(|e| format!("Failed to read response: {e}"))?;
-    std::fs::write(path, &bytes)
-        .map_err(|e| format!("Failed to write file: {e}"))?;
-    log::info!("Downloaded {} ({} bytes)", path.display(), bytes.len());
-    Ok(())
-}

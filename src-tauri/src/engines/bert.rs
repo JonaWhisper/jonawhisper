@@ -27,6 +27,7 @@ impl ASREngine for BertPunctuationEngine {
                 params: Some(0.56),
                 ram: Some(600_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "de".into(), "it".into()]),
+                runtime: Some("ort".into()),
                 ..Default::default()
             },
             ASRModel {
@@ -43,6 +44,7 @@ impl ASREngine for BertPunctuationEngine {
                 params: Some(0.28),
                 ram: Some(560_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "de".into(), "it".into(), "nl".into()]),
+                runtime: Some("candle".into()),
                 ..Default::default()
             },
         ]

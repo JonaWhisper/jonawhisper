@@ -373,26 +373,36 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             let state_clone = Arc::clone(state);
             let text_for_punct = processed.clone();
             let model_id = cleanup_model_id.clone();
-            let is_pcs = cleanup_model_id.starts_with("pcs-punctuation:");
-            let is_candle = !is_pcs && {
+            let runtime: String = if cleanup_model_id.starts_with("pcs-punctuation:") {
+                "pcs".into()
+            } else {
                 let cat = crate::engines::EngineCatalog::new();
                 cat.model_by_id(&cleanup_model_id)
-                    .map_or(false, |m| m.filename.ends_with(".safetensors"))
+                    .and_then(|m| m.runtime)
+                    .unwrap_or_else(|| "ort".into())
             };
-            let punct_result = if is_pcs {
-                tokio::task::spawn_blocking(move || {
-                    run_pcs_punctuation(&state_clone, &text_for_punct, &model_id)
-                }).await
-            } else if is_candle {
-                tokio::task::spawn_blocking(move || {
-                    run_candle_punctuation(&state_clone, &text_for_punct, &model_id)
-                }).await
-            } else {
-                tokio::task::spawn_blocking(move || {
-                    run_bert_punctuation(&state_clone, &text_for_punct, &model_id)
-                }).await
+            let punct_result = match runtime.as_str() {
+                "pcs" => {
+                    tokio::task::spawn_blocking(move || {
+                        run_pcs_punctuation(&state_clone, &text_for_punct, &model_id)
+                    }).await
+                }
+                "candle" => {
+                    tokio::task::spawn_blocking(move || {
+                        run_candle_punctuation(&state_clone, &text_for_punct, &model_id)
+                    }).await
+                }
+                _ => {
+                    tokio::task::spawn_blocking(move || {
+                        run_bert_punctuation(&state_clone, &text_for_punct, &model_id)
+                    }).await
+                }
             };
-            let engine_name = if is_pcs { "PCS" } else if is_candle { "Candle" } else { "BERT" };
+            let engine_name = match runtime.as_str() {
+                "pcs" => "PCS",
+                "candle" => "Candle",
+                _ => "BERT",
+            };
             match punct_result {
                 Ok(Ok(punctuated)) => {
                     log::info!("{} punctuation: {} → {}", engine_name, processed.len(), punctuated.len());

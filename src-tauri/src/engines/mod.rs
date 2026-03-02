@@ -53,6 +53,9 @@ pub struct ASRModel {
     /// Language codes this specific model excels at (None = inherits from engine).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lang_codes: Option<Vec<String>>,
+    /// Inference runtime for this model (e.g. "ort", "candle").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<String>,
 }
 
 impl ASRModel {
