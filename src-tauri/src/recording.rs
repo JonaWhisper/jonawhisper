@@ -375,63 +375,57 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
 
     // Step 2: cleanup based on selected model
     let mut effective_cleanup_model_id = String::new();
-    if text_cleanup_enabled && !cleanup_model_id.is_empty() {
-        if cleanup_model_id.starts_with("correction:") {
+    let cleanup_kind = if text_cleanup_enabled {
+        crate::engines::CleanupKind::from_model_id(&cleanup_model_id)
+    } else {
+        crate::engines::CleanupKind::None
+    };
+
+    match cleanup_kind {
+        crate::engines::CleanupKind::Correction => {
             // T5 correction (encoder-decoder) — finalize after
             let state_clone = Arc::clone(state);
             let text_for_correction = processed.clone();
             let model_id = cleanup_model_id.clone();
-            let correction_result = tokio::task::spawn_blocking(move || {
+            match tokio::task::spawn_blocking(move || {
                 run_t5_correction(&state_clone, &text_for_correction, &model_id)
-            }).await;
-            match correction_result {
+            }).await {
                 Ok(Ok(corrected)) => {
                     log::info!("T5 correction: {} → {}", processed.len(), corrected.len());
                     processed = corrected;
                     effective_cleanup_model_id = cleanup_model_id.clone();
                 }
-                Ok(Err(e)) => {
-                    log::warn!("T5 correction failed, using preprocessed result: {}", e);
-                }
-                Err(e) => {
-                    log::warn!("T5 correction task panicked: {}", e);
-                }
+                Ok(Err(e)) => log::warn!("T5 correction failed, using preprocessed result: {}", e),
+                Err(e) => log::warn!("T5 correction task panicked: {}", e),
             }
             processed = post_processor::finalize(&processed);
-        } else if cleanup_model_id.starts_with("bert-punctuation:") || cleanup_model_id.starts_with("pcs-punctuation:") {
-            // Punctuation restoration (BERT/candle/PCS) — finalize after
+        }
+        crate::engines::CleanupKind::Punctuation(runtime) => {
+            // Punctuation restoration (BERT/Candle/PCS) — finalize after
             let state_clone = Arc::clone(state);
             let text_for_punct = processed.clone();
             let model_id = cleanup_model_id.clone();
-            let runtime: String = if cleanup_model_id.starts_with("pcs-punctuation:") {
-                "pcs".into()
-            } else {
-                let cat = crate::engines::EngineCatalog::new();
-                cat.model_by_id(&cleanup_model_id)
-                    .and_then(|m| m.runtime)
-                    .unwrap_or_else(|| "ort".into())
+            let engine_name = match runtime {
+                crate::engines::PunctRuntime::Pcs => "PCS",
+                crate::engines::PunctRuntime::BertCandle => "Candle",
+                crate::engines::PunctRuntime::BertOrt => "BERT",
             };
-            let punct_result = match runtime.as_str() {
-                "pcs" => {
+            let punct_result = match runtime {
+                crate::engines::PunctRuntime::Pcs => {
                     tokio::task::spawn_blocking(move || {
                         run_pcs_punctuation(&state_clone, &text_for_punct, &model_id)
                     }).await
                 }
-                "candle" => {
+                crate::engines::PunctRuntime::BertCandle => {
                     tokio::task::spawn_blocking(move || {
                         run_candle_punctuation(&state_clone, &text_for_punct, &model_id)
                     }).await
                 }
-                _ => {
+                crate::engines::PunctRuntime::BertOrt => {
                     tokio::task::spawn_blocking(move || {
                         run_bert_punctuation(&state_clone, &text_for_punct, &model_id)
                     }).await
                 }
-            };
-            let engine_name = match runtime.as_str() {
-                "pcs" => "PCS",
-                "candle" => "Candle",
-                _ => "BERT",
             };
             match punct_result {
                 Ok(Ok(punctuated)) => {
@@ -439,61 +433,62 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     processed = punctuated;
                     effective_cleanup_model_id = cleanup_model_id.clone();
                 }
-                Ok(Err(e)) => {
-                    log::warn!("{} punctuation failed, using preprocessed result: {}", engine_name, e);
-                }
-                Err(e) => {
-                    log::warn!("{} punctuation task panicked: {}", engine_name, e);
-                }
+                Ok(Err(e)) => log::warn!("{} punctuation failed, using preprocessed result: {}", engine_name, e),
+                Err(e) => log::warn!("{} punctuation task panicked: {}", engine_name, e),
             }
             processed = post_processor::finalize(&processed);
-        } else {
-            // LLM cleanup (cloud or local) — finalize before
+        }
+        crate::engines::CleanupKind::LocalLlm => {
+            // Local LLM cleanup — finalize before
             processed = post_processor::finalize(&processed);
-
-            // Auto-scale max_tokens based on input length (1 token ≈ 3 chars),
-            // capped by user's hard cap setting (default 4096)
             let effective_max_tokens = std::cmp::min(
                 llm_max_tokens,
                 std::cmp::max((processed.len() as u32) / 3 + 64, 128),
             );
-
-            let llm_result = if let Some(cloud_provider_id) = cleanup_model_id.strip_prefix("cloud:") {
-                if let Some(provider) = providers.iter().find(|p| p.id == cloud_provider_id) {
-                    crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
-                } else {
-                    log::warn!("Cloud LLM provider '{}' not found", cloud_provider_id);
-                    Err(crate::llm_prompt::LlmError::NotConfigured)
-                }
-            } else {
-                // Local LLM (llama:*)
-                let state_clone = Arc::clone(state);
-                let text_for_llm = processed.clone();
-                let lang_for_llm = lang.clone();
-                let model_id = cleanup_model_id.clone();
-                match tokio::task::spawn_blocking(move || {
-                    run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, effective_max_tokens)
-                }).await {
-                    Ok(result) => result,
-                    Err(e) => Err(crate::llm_prompt::LlmError::Inference(format!("LLM task panicked: {}", e))),
-                }
+            let state_clone = Arc::clone(state);
+            let text_for_llm = processed.clone();
+            let lang_for_llm = lang.clone();
+            let model_id = cleanup_model_id.clone();
+            let llm_result = match tokio::task::spawn_blocking(move || {
+                run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, effective_max_tokens)
+            }).await {
+                Ok(result) => result,
+                Err(e) => Err(crate::llm_prompt::LlmError::Inference(format!("LLM task panicked: {}", e))),
             };
-
             match llm_result {
                 Ok(cleaned) => {
                     log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
                     processed = cleaned;
                     effective_cleanup_model_id = cleanup_model_id.clone();
                 }
-                Err(e) => {
-                    // Always fall back to finalized text — never lose the user's dictation
-                    log::warn!("LLM cleanup failed (fallback to raw): {}", e);
-                }
+                Err(e) => log::warn!("LLM cleanup failed (fallback to raw): {}", e),
             }
         }
-    } else {
-        // No cleanup: just finalize
-        processed = post_processor::finalize(&processed);
+        crate::engines::CleanupKind::CloudLlm(provider_id) => {
+            // Cloud LLM cleanup — finalize before
+            processed = post_processor::finalize(&processed);
+            let effective_max_tokens = std::cmp::min(
+                llm_max_tokens,
+                std::cmp::max((processed.len() as u32) / 3 + 64, 128),
+            );
+            let llm_result = if let Some(provider) = providers.iter().find(|p| p.id == provider_id) {
+                crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
+            } else {
+                log::warn!("Cloud LLM provider '{}' not found", provider_id);
+                Err(crate::llm_prompt::LlmError::NotConfigured)
+            };
+            match llm_result {
+                Ok(cleaned) => {
+                    log::info!("LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                    processed = cleaned;
+                    effective_cleanup_model_id = cleanup_model_id.clone();
+                }
+                Err(e) => log::warn!("LLM cleanup failed (fallback to raw): {}", e),
+            }
+        }
+        crate::engines::CleanupKind::None => {
+            processed = post_processor::finalize(&processed);
+        }
     }
 
     // Check cancel flag before pasting (cancel may arrive during LLM cleanup)
@@ -534,150 +529,83 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     );
 }
 
-// -- BERT punctuation --
+// -- Cleanup model runners --
 
 fn run_bert_punctuation(
     state: &Arc<AppState>,
     text: &str,
-    punctuation_model_id: &str,
+    model_id: &str,
 ) -> Result<String, String> {
-    // Resolve model: use explicit ID or auto-select first downloaded punctuation model
-    let catalog = crate::engines::EngineCatalog::new();
-    let model = if punctuation_model_id.is_empty() {
-        // Auto-select first downloaded punctuation model
-        catalog.all_models().into_iter()
+    // Auto-select first downloaded BERT model if ID is empty
+    let (_, model_path) = if model_id.is_empty() {
+        let catalog = crate::engines::EngineCatalog::new();
+        let model = catalog.all_models().into_iter()
             .find(|m| m.engine_id == "bert-punctuation" && m.is_downloaded())
-            .ok_or_else(|| "No punctuation model downloaded".to_string())?
+            .ok_or_else(|| "No punctuation model downloaded".to_string())?;
+        let path = model.local_path();
+        (model, path)
     } else {
-        catalog.model_by_id(punctuation_model_id)
-            .ok_or_else(|| format!("Punctuation model not found: {}", punctuation_model_id))?
+        crate::engines::resolve_model(model_id)?
     };
-
-    if !model.is_downloaded() {
-        return Err(format!("Punctuation model not downloaded: {}", model.id));
-    }
-
-    let model_path = model.local_path();
-
-    let model_id = model.id.clone();
-    let mut guard = state.inference.bert.get_or_load(&model_id, || {
-        log::info!("Loading BERT punctuation model: {}", model_id);
-        crate::bert_punctuation::BertContext::load(&model_path, &model_id)
+    let mut guard = state.inference.cleanup.bert.get_or_load(model_id, || {
+        crate::bert_punctuation::BertContext::load(&model_path, model_id)
     })?;
-    let ctx = guard.as_mut().unwrap();
-    crate::bert_punctuation::restore_punctuation(ctx, text)
+    crate::bert_punctuation::restore_punctuation(guard.as_mut().unwrap(), text)
 }
-
-// -- Candle punctuation (safetensors models) --
 
 fn run_candle_punctuation(
     state: &Arc<AppState>,
     text: &str,
-    punctuation_model_id: &str,
+    model_id: &str,
 ) -> Result<String, String> {
-    let catalog = crate::engines::EngineCatalog::new();
-    let model = catalog.model_by_id(punctuation_model_id)
-        .ok_or_else(|| format!("Candle punctuation model not found: {}", punctuation_model_id))?;
-
-    if !model.is_downloaded() {
-        return Err(format!("Candle punctuation model not downloaded: {}", model.id));
-    }
-
-    let model_path = model.local_path();
-
-    let model_id = model.id.clone();
-    let guard = state.inference.candle_punct.get_or_load(&model_id, || {
-        log::info!("Loading candle punctuation model: {}", model_id);
-        crate::candle_punctuation::CandlePunctContext::load(&model_path, &model_id)
+    let (_, model_path) = crate::engines::resolve_model(model_id)?;
+    let guard = state.inference.cleanup.candle_punct.get_or_load(model_id, || {
+        crate::candle_punctuation::CandlePunctContext::load(&model_path, model_id)
     })?;
-    let ctx = guard.as_ref().unwrap();
-    crate::candle_punctuation::restore_punctuation(ctx, text)
+    crate::candle_punctuation::restore_punctuation(guard.as_ref().unwrap(), text)
 }
-
-// -- PCS punctuation --
 
 fn run_pcs_punctuation(
     state: &Arc<AppState>,
     text: &str,
-    punctuation_model_id: &str,
+    model_id: &str,
 ) -> Result<String, String> {
-    let catalog = crate::engines::EngineCatalog::new();
-    let model = catalog.model_by_id(punctuation_model_id)
-        .ok_or_else(|| format!("PCS model not found: {}", punctuation_model_id))?;
-
-    if !model.is_downloaded() {
-        return Err(format!("PCS model not downloaded: {}", model.id));
-    }
-
-    let model_path = model.local_path();
-
-    let model_id = model.id.clone();
-    let mut guard = state.inference.pcs.get_or_load(&model_id, || {
-        log::info!("Loading PCS punctuation model: {}", model_id);
-        crate::pcs_punctuation::PcsContext::load(&model_path, &model_id)
+    let (_, model_path) = crate::engines::resolve_model(model_id)?;
+    let mut guard = state.inference.cleanup.pcs.get_or_load(model_id, || {
+        crate::pcs_punctuation::PcsContext::load(&model_path, model_id)
     })?;
-    let ctx = guard.as_mut().unwrap();
-    crate::pcs_punctuation::restore_punctuation_and_case(ctx, text)
+    crate::pcs_punctuation::restore_punctuation_and_case(guard.as_mut().unwrap(), text)
 }
-
-// -- T5 correction --
 
 fn run_t5_correction(
     state: &Arc<AppState>,
     text: &str,
-    correction_model_id: &str,
+    model_id: &str,
 ) -> Result<String, String> {
-    let catalog = crate::engines::EngineCatalog::new();
-    let model = catalog.model_by_id(correction_model_id)
-        .ok_or_else(|| format!("Correction model not found: {}", correction_model_id))?;
-
-    if !model.is_downloaded() {
-        return Err(format!("Correction model not downloaded: {}", model.id));
-    }
-
-    let model_dir = model.local_path();
-
-    let model_id = model.id.clone();
-    let mut guard = state.inference.t5.get_or_load(&model_id, || {
-        log::info!("Loading T5 correction model: {}", model_id);
-        crate::t5_correction::T5Context::load(&model_dir, &model_id)
+    let (_, model_dir) = crate::engines::resolve_model(model_id)?;
+    let mut guard = state.inference.cleanup.t5.get_or_load(model_id, || {
+        crate::t5_correction::T5Context::load(&model_dir, model_id)
     })?;
-    let ctx = guard.as_mut().unwrap();
-    crate::t5_correction::correct(ctx, text)
+    crate::t5_correction::correct(guard.as_mut().unwrap(), text)
 }
-
-// -- Local LLM cleanup --
 
 fn run_local_llm_cleanup(
     state: &Arc<AppState>,
     text: &str,
     language: &str,
-    llm_local_model_id: &str,
+    model_id: &str,
     max_tokens: u32,
 ) -> Result<String, crate::llm_prompt::LlmError> {
     use crate::llm_prompt::LlmError;
-
-    if llm_local_model_id.is_empty() {
+    if model_id.is_empty() {
         return Err(LlmError::NotConfigured);
     }
-
-    // Resolve model path from catalog
-    let catalog = crate::engines::EngineCatalog::new();
-    let model = catalog.model_by_id(llm_local_model_id)
-        .ok_or_else(|| LlmError::Inference(format!("LLM model not found: {}", llm_local_model_id)))?;
-
-    if !model.is_downloaded() {
-        return Err(LlmError::Inference(format!("LLM model not downloaded: {}", llm_local_model_id)));
-    }
-
-    let model_path = model.local_path();
-
-    let guard = state.inference.llm.get_or_load(llm_local_model_id, || {
-        log::info!("Loading local LLM model: {}", llm_local_model_id);
-        crate::llm_local::LlmContext::load(&model_path, llm_local_model_id)
+    let (_, model_path) = crate::engines::resolve_model(model_id)
+        .map_err(|e| LlmError::Inference(e))?;
+    let guard = state.inference.cleanup.llm.get_or_load(model_id, || {
+        crate::llm_local::LlmContext::load(&model_path, model_id)
     })?;
-    let ctx = guard.as_ref().unwrap();
-    crate::llm_local::cleanup_text(ctx, text, language, max_tokens as usize)
+    crate::llm_local::cleanup_text(guard.as_ref().unwrap(), text, language, max_tokens as usize)
 }
 
 // -- VAD helpers --

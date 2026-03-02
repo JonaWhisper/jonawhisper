@@ -69,7 +69,7 @@ pub fn transcribe(
     }
 
     let model_id = model.id.clone();
-    let mut ctx_guard = state.inference.qwen.get_or_load(&model_id, || {
+    let mut ctx_guard = state.inference.asr.qwen.get_or_load(&model_id, || {
         log::info!("Loading Qwen3-ASR model: {}", model_id);
         let dir_str = model_dir.to_string_lossy().to_string();
         let qwen_ctx = qwen_asr::context::QwenCtx::load(&dir_str)

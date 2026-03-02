@@ -129,7 +129,7 @@ pub fn transcribe(
     }
 
     let model_id = model.id.clone();
-    let mut ctx_guard = state.inference.canary.get_or_load(&model_id, || {
+    let mut ctx_guard = state.inference.asr.canary.get_or_load(&model_id, || {
         log::info!("Loading Canary model: {}", model_id);
         CanaryContext::load(&model_dir, &model_id).map_err(EngineError::LaunchFailed)
     })?;

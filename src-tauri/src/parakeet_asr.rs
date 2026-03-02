@@ -106,7 +106,7 @@ pub fn transcribe(
     }
 
     let model_id = model.id.clone();
-    let mut ctx_guard = state.inference.parakeet.get_or_load(&model_id, || {
+    let mut ctx_guard = state.inference.asr.parakeet.get_or_load(&model_id, || {
         log::info!("Loading Parakeet model: {}", model_id);
         ParakeetContext::load(&model_dir, &model_id).map_err(EngineError::LaunchFailed)
     })?;

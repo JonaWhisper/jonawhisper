@@ -161,6 +161,51 @@ pub fn common_languages() -> Vec<Language> {
     ]
 }
 
+// -- Cleanup dispatch --
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PunctRuntime { BertOrt, BertCandle, Pcs }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CleanupKind {
+    Correction,
+    Punctuation(PunctRuntime),
+    LocalLlm,
+    CloudLlm(String),
+    None,
+}
+
+impl CleanupKind {
+    pub fn from_model_id(model_id: &str) -> Self {
+        if model_id.is_empty() { return Self::None; }
+        if let Some(pid) = model_id.strip_prefix("cloud:") { return Self::CloudLlm(pid.into()); }
+        if model_id.starts_with("correction:") { return Self::Correction; }
+        if model_id.starts_with("pcs-punctuation:") { return Self::Punctuation(PunctRuntime::Pcs); }
+        if model_id.starts_with("bert-punctuation:") {
+            let rt = EngineCatalog::new().model_by_id(model_id)
+                .and_then(|m| m.runtime).unwrap_or_else(|| "ort".into());
+            return match rt.as_str() {
+                "candle" => Self::Punctuation(PunctRuntime::BertCandle),
+                _ => Self::Punctuation(PunctRuntime::BertOrt),
+            };
+        }
+        if model_id.starts_with("llama:") { return Self::LocalLlm; }
+        Self::None
+    }
+}
+
+/// Resolve a model ID from the catalog and verify it's downloaded.
+pub fn resolve_model(model_id: &str) -> Result<(ASRModel, std::path::PathBuf), String> {
+    let catalog = EngineCatalog::new();
+    let model = catalog.model_by_id(model_id)
+        .ok_or_else(|| format!("Model not found: {}", model_id))?;
+    if !model.is_downloaded() {
+        return Err(format!("Model not downloaded: {}", model_id));
+    }
+    let path = model.local_path();
+    Ok((model, path))
+}
+
 // -- Catalog --
 
 pub struct EngineCatalog {

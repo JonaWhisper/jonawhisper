@@ -181,7 +181,7 @@ pub fn transcribe_native(
     let gpu_mode = state.settings.lock().unwrap().gpu_mode.clone();
 
     // Load or reuse cached WhisperContext (invalidate if model or gpu_mode changed)
-    let mut ctx_guard = state.inference.whisper.lock();
+    let mut ctx_guard = state.inference.asr.whisper.lock();
     if ctx_guard.as_ref().map_or(true, |w| w.model_id != model.id || w.gpu_mode != gpu_mode) {
         let use_gpu = gpu_mode != "cpu";
         log::info!("Loading whisper model: {} (gpu_mode={})", model.id, gpu_mode);

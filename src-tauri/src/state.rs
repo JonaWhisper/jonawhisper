@@ -46,51 +46,44 @@ impl<T: HasModelId> ContextSlot<T> {
     }
 }
 
-/// All inference contexts, grouped together.
+/// Generate a context group struct with `new()` and `invalidate_all()`.
+macro_rules! context_group {
+    ($name:ident { $($field:ident : $ctx:ty),* $(,)? }) => {
+        pub struct $name { $(pub $field: ContextSlot<$ctx>,)* }
+        impl $name {
+            pub fn new() -> Self { Self { $($field: ContextSlot::empty(),)* } }
+            pub fn invalidate_all(&self) { $(self.$field.invalidate();)* }
+        }
+    };
+}
+
+context_group!(AsrContexts {
+    whisper: crate::engines::whisper::WhisperCtx,
+    canary: crate::canary_asr::CanaryContext,
+    parakeet: crate::parakeet_asr::ParakeetContext,
+    qwen: crate::qwen_asr::QwenContext,
+});
+
+context_group!(CleanupContexts {
+    llm: crate::llm_local::LlmContext,
+    bert: crate::bert_punctuation::BertContext,
+    candle_punct: crate::candle_punctuation::CandlePunctContext,
+    pcs: crate::pcs_punctuation::PcsContext,
+    t5: crate::t5_correction::T5Context,
+});
+
+/// All inference contexts, grouped by ASR and cleanup.
 pub struct InferenceContexts {
-    // ASR
-    pub whisper: ContextSlot<crate::engines::whisper::WhisperCtx>,
-    pub canary: ContextSlot<crate::canary_asr::CanaryContext>,
-    pub parakeet: ContextSlot<crate::parakeet_asr::ParakeetContext>,
-    pub qwen: ContextSlot<crate::qwen_asr::QwenContext>,
-    // Cleanup
-    pub llm: ContextSlot<crate::llm_local::LlmContext>,
-    pub bert: ContextSlot<crate::bert_punctuation::BertContext>,
-    pub candle_punct: ContextSlot<crate::candle_punctuation::CandlePunctContext>,
-    pub pcs: ContextSlot<crate::pcs_punctuation::PcsContext>,
-    pub t5: ContextSlot<crate::t5_correction::T5Context>,
+    pub asr: AsrContexts,
+    pub cleanup: CleanupContexts,
 }
 
 impl InferenceContexts {
     pub fn new() -> Self {
         Self {
-            whisper: ContextSlot::empty(),
-            canary: ContextSlot::empty(),
-            parakeet: ContextSlot::empty(),
-            qwen: ContextSlot::empty(),
-            llm: ContextSlot::empty(),
-            bert: ContextSlot::empty(),
-            candle_punct: ContextSlot::empty(),
-            pcs: ContextSlot::empty(),
-            t5: ContextSlot::empty(),
+            asr: AsrContexts::new(),
+            cleanup: CleanupContexts::new(),
         }
-    }
-
-    /// Invalidate all ASR contexts (when selected_model_id or gpu_mode changes).
-    pub fn invalidate_asr(&self) {
-        self.whisper.invalidate();
-        self.canary.invalidate();
-        self.parakeet.invalidate();
-        self.qwen.invalidate();
-    }
-
-    /// Invalidate all cleanup contexts (when cleanup_model_id changes).
-    pub fn invalidate_cleanup(&self) {
-        self.llm.invalidate();
-        self.bert.invalidate();
-        self.candle_punct.invalidate();
-        self.pcs.invalidate();
-        self.t5.invalidate();
     }
 }
 
