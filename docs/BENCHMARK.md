@@ -53,32 +53,32 @@ Pour les utilisateurs qui veulent héberger leur propre serveur ASR.
 
 Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via whisper-rs + Metal GPU.
 
-| Modèle | ID | Taille | WER | RTF | Recommandé |
-|---|---|---|---|---|---|
-| Large V3 | `whisper:large-v3` | 3.1 GB | 1.8% | 0.50 | |
-| Large V2 | `whisper:large-v2` | 3.09 GB | 1.9% | 0.50 | |
-| **Large V3 Turbo** | `whisper:large-v3-turbo` | 1.6 GB | 2.1% | 0.25 | **Recommandé** |
-| Large V3 Turbo Q8 | `whisper:large-v3-turbo-q8` | 874 MB | 2.1% | 0.20 | |
-| Large V3 Turbo Q5 | `whisper:large-v3-turbo-q5` | 574 MB | 2.3% | 0.15 | |
-| Medium | `whisper:medium` | 1.5 GB | 2.7% | 0.35 | |
-| Medium Q5 | `whisper:medium-q5` | 539 MB | 2.8% | 0.20 | |
-| Small | `whisper:small` | 466 MB | 3.4% | 0.15 | |
-| Small Q5 | `whisper:small-q5` | 190 MB | 3.6% | 0.10 | |
-| Base | `whisper:base` | 142 MB | 5.0% | 0.08 | |
-| Tiny | `whisper:tiny` | 75 MB | 7.6% | 0.05 | |
+| Modèle | ID | Taille | RAM | WER | RTF | Recommandé |
+|---|---|---|---|---|---|---|
+| Large V3 | `whisper:large-v3` | 3.1 GB | 4 GB | 1.8% | 0.50 | |
+| Large V2 | `whisper:large-v2` | 3.09 GB | 4 GB | 1.9% | 0.50 | |
+| **Large V3 Turbo** | `whisper:large-v3-turbo` | 1.6 GB | 2.5 GB | 2.1% | 0.25 | **Recommandé** |
+| Large V3 Turbo Q8 | `whisper:large-v3-turbo-q8` | 874 MB | 1.3 GB | 2.1% | 0.20 | |
+| Large V3 Turbo Q5 | `whisper:large-v3-turbo-q5` | 574 MB | 900 MB | 2.3% | 0.15 | |
+| Medium | `whisper:medium` | 1.5 GB | 2 GB | 2.7% | 0.35 | |
+| Medium Q5 | `whisper:medium-q5` | 539 MB | 900 MB | 2.8% | 0.20 | |
+| Small | `whisper:small` | 466 MB | 750 MB | 3.4% | 0.15 | |
+| Small Q5 | `whisper:small-q5` | 190 MB | 400 MB | 3.6% | 0.10 | |
+| Base | `whisper:base` | 142 MB | 300 MB | 5.0% | 0.08 | |
+| Tiny | `whisper:tiny` | 75 MB | 200 MB | 7.6% | 0.05 | |
 
 ### Modèles ASR non-Whisper (recherche avancée)
 
 Les modèles non-Whisper dominent le Open ASR Leaderboard. Certains sont intégrables via ONNX ou même GGML.
 
-| Modèle | Params | FR | Format | Taille int8 | Intérêt | Intégration Rust | Statut |
+| Modèle | Params | FR | Format | Taille | RAM | Intérêt | Statut |
 |---|---|---|---|---|---|---|---|
-| **bofenghuang/whisper-large-v3-french** | 1.5B | Natif FR | **GGML dispo** | ~3 GB | Meilleur Whisper FR, fine-tuné sur données françaises | Compatible whisper-rs existant ! | **Intégré** (`whisper:large-v3-french-distil`) |
-| **NVIDIA Canary-180M-Flash** | 182M | Oui (4 langues : fr/en/de/es) | ONNX | ~214 MB | Ultra-léger, bat Whisper Medium, WER 1.87% clean | Via ort (canary-rs comme référence) | **Intégré** (`canary:180m-flash-int8`) |
-| **Qwen3-ASR 0.6B** | 0.6B | Oui (30 langues) | Safetensors | ~1.88 GB | Bat Whisper sur benchmarks, Alibaba, Accelerate/AMX | Via `qwen-asr` crate (pure Rust) | **Intégré** (`qwen-asr:0.6b`) |
-| **SenseVoice Small** | 234M | Oui (5 langues : zh/yue/en/ja/ko) | ONNX | ~228 MB | Alibaba, très rapide | Via sherpa-onnx | Pas de français |
-| **Moonshine** | 27M / 61M | EN seul | ONNX | ~27 / 120 MB | Ultra-léger, temps réel sur edge | Via sherpa-onnx | Pas de français |
-| **Parakeet-TDT 0.6B v3** | 0.6B | Oui (25 langues) | ONNX int8 | ~670 MB | Excellent WER, TDT transducer rapide, CoreML GPU | Vendored TDT decoder + ort CoreML | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
+| **bofenghuang/whisper-large-v3-french** | 1.5B | Natif FR | GGML | ~538 MB | 900 MB | Meilleur Whisper FR, fine-tuné sur données françaises | **Intégré** (`whisper:large-v3-french-distil`) |
+| **NVIDIA Canary-180M-Flash** | 182M | Oui (4 langues) | ONNX int8 | ~214 MB | 300 MB | Ultra-léger, bat Whisper Medium, CoreML GPU | **Intégré** (`canary:180m-flash-int8`) |
+| **Parakeet-TDT 0.6B v3** | 600M | Oui (25 langues) | ONNX int8 | ~670 MB | 750 MB | Excellent WER, TDT transducer, CoreML GPU | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
+| **Qwen3-ASR 0.6B** | 600M | Oui (30 langues) | Safetensors | ~1.88 GB | 2 GB | Bat Whisper, Accelerate/AMX | **Intégré** (`qwen-asr:0.6b`) |
+| **SenseVoice Small** | 234M | Oui (5 langues : zh/yue/en/ja/ko) | ONNX | ~228 MB | — | Alibaba, très rapide | Pas de français |
+| **Moonshine** | 27M / 61M | EN seul | ONNX | ~27 / 120 MB | — | Ultra-léger, temps réel sur edge | Pas de français |
 
 **Écosystème Rust** :
 - **sherpa-onnx** : C API avec bindings Rust, supporte Canary, Parakeet, SenseVoice, Moonshine, Whisper
@@ -150,21 +150,21 @@ Ces modèles GGUF tournent directement via llama-cpp-2 sans code supplémentaire
 | **Llama 3.2 3B** | ~1.8 GB | 3B | Partiel | Meta, bat Gemma 2 2.6B | bartowski/Llama-3.2-3B-Instruct-GGUF | **Intégré** |
 | **Ministral 3B** | ~1.8 GB | 3B | Oui | Mistral, bon en FR | bartowski/Ministral-3B-Instruct-GGUF | **Intégré** |
 
-### BERT Punctuation (natif intégré)
+### Ponctuation (natif intégré)
 
-| Modèle | ID | Taille | RAM | Langues | Vitesse |
-|---|---|---|---|---|---|
-| Fullstop Multilang Large INT8 | `bert-punctuation:fullstop-multilang-large` | 562 MB | 600 MB | FR, EN, DE, IT | ~100ms |
+| Modèle | ID | Params | Taille | RAM | Runtime | Langues | Vitesse |
+|---|---|---|---|---|---|---|---|
+| **Fullstop Large INT8** | `bert-punctuation:fullstop-multilang-large` | 560M | 562 MB | 600 MB | ort (CoreML) | FR, EN, DE, IT | ~100ms |
+| Fullstop Base FP32 | `bert-punctuation:fullstop-multilingual-base` | 280M | 1.1 GB | 560 MB | Candle (Metal) | FR, EN, DE, IT, NL | ~80ms |
+| PCS 47 Languages | `pcs-punctuation:47lang` | 230M | 233 MB | 300 MB | ort (CoreML) | 47 langues | ~50ms |
 
 ### Modèles de ponctuation candidats
 
-Alternatives ou compléments au BERT fullstop actuel.
+Alternatives ou compléments aux modèles intégrés.
 
 | Modèle | Architecture | Taille | Langues | ONNX | Intérêt | Statut |
 |---|---|---|---|---|---|---|
-| **1-800-BAD-CODE/punct_cap_seg_47_language** | Transformer 6L d=512 | ~200 MB | 47 langues (FR, EN) | Exportable | Ponctuation + capitalisation + segmentation en un pass. F1=97.39 | **Intégré** (`pcs_punctuation.rs`) |
 | **sherpa-onnx-online-punct-en** | CNN-BiLSTM | **7.1 MB** (int8) | EN | Oui | Ultra-léger, 1/40e la taille de BERT, 2.5x plus rapide | EN seul, intérêt limité |
-| **oliverguhr/fullstop-multilingual-sonar-base** | XLM-RoBERTa Base | ~278 MB | FR, EN, DE, IT, NL | Pas d'ONNX | Version Base, nécessite conversion + hébergement. Coincé entre BERT Large et PCS sans avantage clair | Écarté |
 
 ### Modèles de correction spécialisés (alternative au LLM)
 
