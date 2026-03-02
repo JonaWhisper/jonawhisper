@@ -30,8 +30,8 @@ const keyCaps = computed(() => {
 })
 
 const sideLabels: Record<string, string> = {
-  Right: 'Droit',
-  Left: 'Gauche',
+  Right: 'R',
+  Left: 'L',
 }
 
 let unlistenUpdate: (() => void) | null = null

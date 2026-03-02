@@ -86,8 +86,24 @@ export const useEnginesStore = defineStore('engines', () => {
   }
 
   async function fetchModels() {
-    try { models.value = await invoke('get_models') }
+    try {
+      models.value = await invoke('get_models')
+      validateSelections()
+    }
     catch (e) { console.error('fetchModels failed:', e) }
+  }
+
+  /** Reset selected model IDs if they point to models that no longer exist. */
+  function validateSelections() {
+    const asrIds = new Set(asrModels.value.map(m => m.id))
+    if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
+      const first = asrModels.value[0]
+      settingsStore.setSetting('selected_model_id', first?.id ?? '')
+    }
+    const cleanupIds = new Set(cleanupModels.value.map(m => m.id))
+    if (settingsStore.cleanupModelId && !cleanupIds.has(settingsStore.cleanupModelId)) {
+      settingsStore.setSetting('cleanup_model_id', '')
+    }
   }
 
   async function fetchLanguages() {
