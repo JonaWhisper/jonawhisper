@@ -15,7 +15,8 @@ impl ASREngine for CanaryEngine {
             ASRModel {
                 id: "canary:180m-flash-int8".into(),
                 engine_id: "canary".into(),
-                label: "Canary 180M Flash INT8".into(),
+                label: "Canary Flash".into(),
+                quantization: Some("INT8".into()),
                 filename: "180m-flash-int8".into(), // directory name
                 url: String::new(), // not used for MultiFile
                 size: 213_284_662, // total: encoder + decoder + vocab

@@ -38,6 +38,7 @@ impl ASREngine for PcsPunctuationEngine {
                     "ru".into(), "sk".into(), "sl".into(), "ta".into(), "te".into(),
                     "tr".into(), "zh".into(),
                 ]),
+                quantization: Some("FP32".into()),
                 ..Default::default()
             },
         ]

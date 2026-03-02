@@ -33,6 +33,7 @@ export interface ASRModel {
   params: number | null
   ram: number | null
   lang_codes: string[] | null
+  quantization: string | null
 }
 
 export interface Language {
@@ -68,6 +69,7 @@ export interface CleanupModel {
   params: number | null
   ram: number | null
   lang_codes: string[] | null
+  quantization: string | null
   recommended: boolean
 }
 
@@ -80,6 +82,7 @@ export interface AsrModelOption {
   wer: number | null
   rtf: number | null
   lang_codes: string[] | null
+  quantization: string | null
   recommended: boolean
 }
 

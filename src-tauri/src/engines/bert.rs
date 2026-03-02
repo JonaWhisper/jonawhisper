@@ -16,7 +16,8 @@ impl ASREngine for BertPunctuationEngine {
             ASRModel {
                 id: "bert-punctuation:fullstop-multilang-large".into(),
                 engine_id: "bert-punctuation".into(),
-                label: "Fullstop Multilang Large (INT8)".into(),
+                label: "Fullstop Multilang Large".into(),
+                quantization: Some("INT8".into()),
                 filename: "model_quantized.onnx".into(),
                 url: "https://huggingface.co/ldenoue/fullstop-punctuation-multilang-large/resolve/main/onnx/model_quantized.onnx".into(),
                 size: 562_000_000,
@@ -33,7 +34,8 @@ impl ASREngine for BertPunctuationEngine {
             ASRModel {
                 id: "bert-punctuation:fullstop-multilingual-base".into(),
                 engine_id: "bert-punctuation".into(),
-                label: "Fullstop Multilingual Base (FP32)".into(),
+                label: "Fullstop Multilingual Base".into(),
+                quantization: Some("FP32".into()),
                 filename: "model.safetensors".into(),
                 url: "https://huggingface.co/oliverguhr/fullstop-punctuation-multilingual-base/resolve/main/model.safetensors".into(),
                 size: 1_112_000_000,

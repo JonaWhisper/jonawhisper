@@ -73,6 +73,9 @@ pub struct ASRModel {
     /// Inference runtime for this model (e.g. "ort", "candle").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime: Option<String>,
+    /// Quantization format (e.g. "INT8", "Q5", "Q8", "FP32").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quantization: Option<String>,
 }
 
 impl ASRModel {

@@ -15,7 +15,7 @@ impl ASREngine for QwenEngine {
             ASRModel {
                 id: "qwen-asr:0.6b".into(),
                 engine_id: "qwen-asr".into(),
-                label: "Qwen3-ASR 0.6B".into(),
+                label: "Qwen3 ASR".into(),
                 filename: "0.6b".into(),
                 url: String::new(),
                 size: 1_880_000_000 + 2_780_000 + 1_670_000, // safetensors + vocab + merges
@@ -54,6 +54,7 @@ impl ASREngine for QwenEngine {
                     "el".into(), "fa".into(), "fil".into(), "mk".into(),
                 ]),
                 runtime: Some("accelerate".into()),
+                quantization: Some("BF16".into()),
             },
         ]
     }

@@ -15,7 +15,8 @@ impl ASREngine for ParakeetEngine {
             ASRModel {
                 id: "parakeet:tdt-0.6b-v3-int8".into(),
                 engine_id: "parakeet".into(),
-                label: "Parakeet TDT 0.6B v3 INT8".into(),
+                label: "Parakeet TDT V3".into(),
+                quantization: Some("INT8".into()),
                 filename: "tdt-0.6b-v3-int8".into(),
                 url: String::new(),
                 size: 683_574_784 + 19_078_554 + 96_153, // encoder + decoder + vocab

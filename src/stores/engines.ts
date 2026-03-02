@@ -44,16 +44,16 @@ export const useEnginesStore = defineStore('engines', () => {
   const cleanupModels = computed<CleanupModel[]>(() => {
     const result: CleanupModel[] = []
     for (const m of downloadedPunctuationModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'bert', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
+      result.push({ id: m.id, label: m.label, group: 'bert', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
     }
     for (const m of downloadedCorrectionModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'correction', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
+      result.push({ id: m.id, label: m.label, group: 'correction', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
     }
     for (const m of downloadedLlmModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'llm', params: m.params, ram: m.ram, lang_codes: m.lang_codes, recommended: !!m.recommended })
+      result.push({ id: m.id, label: m.label, group: 'llm', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
     }
     for (const p of providers.value) {
-      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, recommended: false })
+      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, quantization: null, recommended: false })
     }
     return result
   })
@@ -63,12 +63,12 @@ export const useEnginesStore = defineStore('engines', () => {
     for (const m of models.value) {
       if (!asrIds.has(m.engine_id)) continue
       if (isModelAvailable(m)) {
-        result.push({ id: m.id, label: m.label, group: 'local', params: m.params, ram: m.ram, wer: m.wer, rtf: m.rtf, lang_codes: m.lang_codes, recommended: !!m.recommended })
+        result.push({ id: m.id, label: m.label, group: 'local', params: m.params, ram: m.ram, wer: m.wer, rtf: m.rtf, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
       }
     }
     for (const p of providers.value) {
       if (hasAsrSupport(p)) {
-        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, wer: null, rtf: null, lang_codes: null, recommended: false })
+        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, wer: null, rtf: null, lang_codes: null, quantization: null, recommended: false })
       }
     }
     return result

@@ -67,6 +67,7 @@ impl ASREngine for CorrectionEngine {
                     "ko".into(),
                 ]),
                 runtime: Some("candle".into()),
+                quantization: Some("FP32".into()),
                 ..Default::default()
             },
             ASRModel {
@@ -102,6 +103,7 @@ impl ASREngine for CorrectionEngine {
                 ram: Some(1_000_000_000),
                 lang_codes: Some(vec!["fr".into()]),
                 runtime: Some("candle".into()),
+                quantization: Some("FP32".into()),
                 ..Default::default()
             },
             ASRModel {
@@ -137,6 +139,7 @@ impl ASREngine for CorrectionEngine {
                 ram: Some(1_200_000_000),
                 lang_codes: Some(vec!["en".into()]),
                 runtime: Some("candle".into()),
+                quantization: Some("FP32".into()),
                 ..Default::default()
             },
             ASRModel {
@@ -172,6 +175,7 @@ impl ASREngine for CorrectionEngine {
                 ram: Some(3_500_000_000),
                 lang_codes: Some(vec!["en".into()]),
                 runtime: Some("candle".into()),
+                quantization: Some("FP32".into()),
                 ..Default::default()
             },
         ]
