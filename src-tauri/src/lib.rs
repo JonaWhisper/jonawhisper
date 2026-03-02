@@ -1,6 +1,7 @@
 mod audio;
 mod bert_punctuation;
 mod commands;
+mod pcs_punctuation;
 mod engines;
 mod errors;
 mod events;

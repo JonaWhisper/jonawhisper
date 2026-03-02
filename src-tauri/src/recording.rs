@@ -368,24 +368,33 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     // Step 2: cleanup based on selected model
     let mut effective_cleanup_model_id = String::new();
     if text_cleanup_enabled && !cleanup_model_id.is_empty() {
-        if cleanup_model_id.starts_with("bert-punctuation:") {
-            // BERT punctuation restoration (finalize after)
+        if cleanup_model_id.starts_with("bert-punctuation:") || cleanup_model_id.starts_with("pcs-punctuation:") {
+            // Punctuation restoration (BERT or PCS) — finalize after
             let state_clone = Arc::clone(state);
-            let text_for_bert = processed.clone();
+            let text_for_punct = processed.clone();
             let model_id = cleanup_model_id.clone();
-            match tokio::task::spawn_blocking(move || {
-                run_bert_punctuation(&state_clone, &text_for_bert, &model_id)
-            }).await {
+            let is_pcs = cleanup_model_id.starts_with("pcs-punctuation:");
+            let punct_result = if is_pcs {
+                tokio::task::spawn_blocking(move || {
+                    run_pcs_punctuation(&state_clone, &text_for_punct, &model_id)
+                }).await
+            } else {
+                tokio::task::spawn_blocking(move || {
+                    run_bert_punctuation(&state_clone, &text_for_punct, &model_id)
+                }).await
+            };
+            let engine_name = if is_pcs { "PCS" } else { "BERT" };
+            match punct_result {
                 Ok(Ok(punctuated)) => {
-                    log::info!("BERT punctuation: {} → {}", processed.len(), punctuated.len());
+                    log::info!("{} punctuation: {} → {}", engine_name, processed.len(), punctuated.len());
                     processed = punctuated;
                     effective_cleanup_model_id = cleanup_model_id.clone();
                 }
                 Ok(Err(e)) => {
-                    log::warn!("BERT punctuation failed, using preprocessed result: {}", e);
+                    log::warn!("{} punctuation failed, using preprocessed result: {}", engine_name, e);
                 }
                 Err(e) => {
-                    log::warn!("BERT punctuation task panicked: {}", e);
+                    log::warn!("{} punctuation task panicked: {}", engine_name, e);
                 }
             }
             processed = post_processor::finalize(&processed);
@@ -511,6 +520,35 @@ fn run_bert_punctuation(
 
     let ctx = ctx_guard.as_mut().unwrap();
     crate::bert_punctuation::restore_punctuation(ctx, text)
+}
+
+// -- PCS punctuation --
+
+fn run_pcs_punctuation(
+    state: &Arc<AppState>,
+    text: &str,
+    punctuation_model_id: &str,
+) -> Result<String, String> {
+    let catalog = crate::engines::EngineCatalog::new();
+    let model = catalog.model_by_id(punctuation_model_id)
+        .ok_or_else(|| format!("PCS model not found: {}", punctuation_model_id))?;
+
+    if !model.is_downloaded() {
+        return Err(format!("PCS model not downloaded: {}", model.id));
+    }
+
+    let model_path = model.local_path();
+
+    // Load or reuse cached PcsContext
+    let mut ctx_guard = state.pcs_context.lock().unwrap();
+    if ctx_guard.as_ref().map_or(true, |ctx| ctx.model_id() != model.id) {
+        log::info!("Loading PCS punctuation model: {}", model.id);
+        let ctx = crate::pcs_punctuation::PcsContext::load(&model_path, &model.id)?;
+        *ctx_guard = Some(ctx);
+    }
+
+    let ctx = ctx_guard.as_mut().unwrap();
+    crate::pcs_punctuation::restore_punctuation_and_case(ctx, text)
 }
 
 // -- Local LLM cleanup --

@@ -66,6 +66,8 @@ pub struct AppState {
     pub llm_context: Mutex<Option<crate::llm_local::LlmContext>>,
     /// Cached BERT punctuation context. Invalidated when cleanup_model_id changes to a different BERT model.
     pub bert_context: Mutex<Option<crate::bert_punctuation::BertContext>>,
+    /// Cached PCS punctuation context. Invalidated when cleanup_model_id changes to a different PCS model.
+    pub pcs_context: Mutex<Option<crate::pcs_punctuation::PcsContext>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -303,6 +305,7 @@ impl Default for AppState {
             whisper_context: Mutex::new(None),
             llm_context: Mutex::new(None),
             bert_context: Mutex::new(None),
+            pcs_context: Mutex::new(None),
         }
     }
 }

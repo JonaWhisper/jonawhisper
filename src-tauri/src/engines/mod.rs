@@ -3,6 +3,7 @@ pub mod openai_api;
 pub mod downloader;
 pub mod llama;
 pub mod bert;
+pub mod pcs;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -153,6 +154,7 @@ impl EngineCatalog {
             Box::new(whisper::WhisperEngine),
             Box::new(llama::LlamaEngine),
             Box::new(bert::BertPunctuationEngine),
+            Box::new(pcs::PcsPunctuationEngine),
         ];
 
         Self { engines }
