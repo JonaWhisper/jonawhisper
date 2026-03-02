@@ -72,3 +72,55 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
+
+/* Panel sidebar glassmorphism */
+.panel-sidebar {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: hsl(var(--background) / 0.72);
+  border-right: 1px solid hsl(var(--border) / 0.5);
+}
+.dark .panel-sidebar {
+  background: hsl(var(--background) / 0.65);
+}
+
+/* Nav pill (active item highlight) */
+.nav-pill {
+  @apply rounded-md px-2.5 py-1.5 text-sm transition-colors;
+}
+.nav-pill:hover {
+  background: hsl(var(--accent) / 0.6);
+}
+.nav-pill.active {
+  @apply bg-accent text-accent-foreground;
+}
+
+/* Fade transition for section switches */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Status dot in sidebar footer */
+.status-dot {
+  @apply inline-block w-2 h-2 rounded-full;
+}
+.status-dot.idle {
+  @apply bg-emerald-500;
+}
+.status-dot.recording {
+  @apply bg-red-500;
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+.status-dot.transcribing {
+  @apply bg-amber-500;
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

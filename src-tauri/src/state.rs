@@ -261,6 +261,8 @@ pub struct Preferences {
     pub audio_ducking_level: f32,
     #[serde(default = "default_true")]
     pub vad_enabled: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
@@ -274,6 +276,7 @@ fn default_recording_mode() -> String { "push_to_talk".to_string() }
 fn default_gpu_mode() -> String { "auto".to_string() }
 fn default_llm_max_tokens() -> u32 { 4096 }
 fn default_ducking_level() -> f32 { 0.8 }
+fn default_theme() -> String { "system".to_string() }
 
 /// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
 /// or %APPDATA%/WhisperDictate/ (Windows).

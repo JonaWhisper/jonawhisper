@@ -21,6 +21,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const recordingMode = ref('push_to_talk')
   const vadEnabled = ref(true)
   const appLocale = ref('auto')
+  const theme = ref('system')
 
   async function fetchSettings() {
     try {
@@ -42,6 +43,7 @@ export const useSettingsStore = defineStore('settings', () => {
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
       vadEnabled.value = s.vad_enabled ?? true
+      theme.value = s.theme ?? 'system'
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -64,6 +66,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
       case 'audio_ducking_level': return String(audioDuckingLevel.value)
       case 'vad_enabled': return String(vadEnabled.value)
+      case 'theme': return theme.value
       default: return ''
     }
   }
@@ -87,6 +90,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
+      case 'theme': theme.value = value; break
     }
   }
 
@@ -114,7 +118,7 @@ export const useSettingsStore = defineStore('settings', () => {
     textCleanupEnabled, cleanupModelId, llmModel, llmMaxTokens,
     hallucinationFilterEnabled, vadEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
-    hotkey, cancelShortcut, recordingMode, appLocale,
+    hotkey, cancelShortcut, recordingMode, appLocale, theme,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,
     selectModel, selectLanguageAction,
   }

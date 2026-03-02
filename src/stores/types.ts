@@ -155,4 +155,5 @@ export interface SettingsPayload {
   audio_ducking_enabled: boolean
   audio_ducking_level: number
   vad_enabled: boolean
+  theme: string
 }
