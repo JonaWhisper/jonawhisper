@@ -65,11 +65,11 @@ context_group!(AsrContexts {
 });
 
 context_group!(CleanupContexts {
-    llm: crate::llm_local::LlmContext,
-    bert: crate::bert_punctuation::BertContext,
-    candle_punct: crate::candle_punctuation::CandlePunctContext,
-    pcs: crate::pcs_punctuation::PcsContext,
-    t5: crate::t5_correction::T5Context,
+    llm: crate::cleanup::LlmContext,
+    bert: crate::cleanup::BertContext,
+    candle_punct: crate::cleanup::CandlePunctContext,
+    pcs: crate::cleanup::PcsContext,
+    t5: crate::cleanup::T5Context,
 });
 
 /// All inference contexts, grouped by ASR and cleanup.

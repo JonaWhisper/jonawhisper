@@ -5,7 +5,7 @@ use ort::session::Session;
 use ort::value::Tensor;
 
 /// Silero VAD v5 ONNX model, bundled at compile time (~2.3 MB).
-const MODEL_BYTES: &[u8] = include_bytes!("../models/silero_vad.onnx");
+const MODEL_BYTES: &[u8] = include_bytes!("../../models/silero_vad.onnx");
 
 const SAMPLE_RATE: i64 = 16_000;
 const CHUNK_SIZE: usize = 512;

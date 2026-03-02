@@ -8,7 +8,7 @@ use llama_cpp_2::model::params::LlamaModelParams;
 use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 
-use crate::llm_prompt::LlmError;
+use super::llm_prompt::LlmError;
 
 /// Cached LLM context: backend + model, reused across calls.
 pub struct LlmContext {
@@ -53,7 +53,7 @@ impl crate::state::HasModelId for LlmContext {
 /// Clean up transcribed text using a local LLM.
 pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: usize) -> Result<String, LlmError> {
     let messages = vec![
-        LlamaChatMessage::new("system".to_string(), crate::llm_prompt::system_prompt(language))
+        LlamaChatMessage::new("system".to_string(), super::llm_prompt::system_prompt(language))
             .map_err(|e| LlmError::Inference(format!("Failed to create system message: {}", e)))?,
         LlamaChatMessage::new("user".to_string(), text.to_string())
             .map_err(|e| LlmError::Inference(format!("Failed to create user message: {}", e)))?,
@@ -136,5 +136,5 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
         n_cur += 1;
     }
 
-    crate::llm_prompt::sanitize_output(&output, text.len())
+    super::llm_prompt::sanitize_output(&output, text.len())
 }

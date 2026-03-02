@@ -4,7 +4,7 @@ use crate::platform::hotkey;
 use crate::platform::paste;
 use crate::platform;
 use crate::asr;
-use crate::post_processor;
+use crate::cleanup;
 use crate::state::AppState;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -361,10 +361,10 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
 
     // Step 1: preprocess (hallucination filter + dictation commands)
     let mut processed = {
-        let opts = post_processor::PostProcessOptions {
+        let opts = cleanup::post_processor::PostProcessOptions {
             hallucination_filter: hall_filter,
         };
-        post_processor::preprocess(trimmed, &lang, &opts)
+        cleanup::post_processor::preprocess(trimmed, &lang, &opts)
     };
 
     if processed.trim().is_empty() {
@@ -398,7 +398,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 Ok(Err(e)) => log::warn!("T5 correction failed, using preprocessed result: {}", e),
                 Err(e) => log::warn!("T5 correction task panicked: {}", e),
             }
-            processed = post_processor::finalize(&processed);
+            processed = cleanup::post_processor::finalize(&processed);
         }
         crate::engines::CleanupKind::Punctuation(runtime) => {
             // Punctuation restoration (BERT/Candle/PCS) — finalize after
@@ -436,11 +436,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 Ok(Err(e)) => log::warn!("{} punctuation failed, using preprocessed result: {}", engine_name, e),
                 Err(e) => log::warn!("{} punctuation task panicked: {}", engine_name, e),
             }
-            processed = post_processor::finalize(&processed);
+            processed = cleanup::post_processor::finalize(&processed);
         }
         crate::engines::CleanupKind::LocalLlm => {
             // Local LLM cleanup — finalize before
-            processed = post_processor::finalize(&processed);
+            processed = cleanup::post_processor::finalize(&processed);
             let effective_max_tokens = std::cmp::min(
                 llm_max_tokens,
                 std::cmp::max((processed.len() as u32) / 3 + 64, 128),
@@ -453,7 +453,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 run_local_llm_cleanup(&state_clone, &text_for_llm, &lang_for_llm, &model_id, effective_max_tokens)
             }).await {
                 Ok(result) => result,
-                Err(e) => Err(crate::llm_prompt::LlmError::Inference(format!("LLM task panicked: {}", e))),
+                Err(e) => Err(crate::cleanup::LlmError::Inference(format!("LLM task panicked: {}", e))),
             };
             match llm_result {
                 Ok(cleaned) => {
@@ -466,16 +466,16 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         }
         crate::engines::CleanupKind::CloudLlm(provider_id) => {
             // Cloud LLM cleanup — finalize before
-            processed = post_processor::finalize(&processed);
+            processed = cleanup::post_processor::finalize(&processed);
             let effective_max_tokens = std::cmp::min(
                 llm_max_tokens,
                 std::cmp::max((processed.len() as u32) / 3 + 64, 128),
             );
             let llm_result = if let Some(provider) = providers.iter().find(|p| p.id == provider_id) {
-                crate::llm_cleanup::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
+                crate::cleanup::llm_cloud::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
             } else {
                 log::warn!("Cloud LLM provider '{}' not found", provider_id);
-                Err(crate::llm_prompt::LlmError::NotConfigured)
+                Err(crate::cleanup::LlmError::NotConfigured)
             };
             match llm_result {
                 Ok(cleaned) => {
@@ -487,7 +487,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             }
         }
         crate::engines::CleanupKind::None => {
-            processed = post_processor::finalize(&processed);
+            processed = cleanup::post_processor::finalize(&processed);
         }
     }
 
@@ -548,9 +548,9 @@ fn run_bert_punctuation(
         crate::engines::resolve_model(model_id)?
     };
     let mut guard = state.inference.cleanup.bert.get_or_load(model_id, || {
-        crate::bert_punctuation::BertContext::load(&model_path, model_id)
+        crate::cleanup::bert::BertContext::load(&model_path, model_id)
     })?;
-    crate::bert_punctuation::restore_punctuation(guard.as_mut().unwrap(), text)
+    crate::cleanup::bert::restore_punctuation(guard.as_mut().unwrap(), text)
 }
 
 fn run_candle_punctuation(
@@ -560,9 +560,9 @@ fn run_candle_punctuation(
 ) -> Result<String, String> {
     let (_, model_path) = crate::engines::resolve_model(model_id)?;
     let guard = state.inference.cleanup.candle_punct.get_or_load(model_id, || {
-        crate::candle_punctuation::CandlePunctContext::load(&model_path, model_id)
+        crate::cleanup::candle::CandlePunctContext::load(&model_path, model_id)
     })?;
-    crate::candle_punctuation::restore_punctuation(guard.as_ref().unwrap(), text)
+    crate::cleanup::candle::restore_punctuation(guard.as_ref().unwrap(), text)
 }
 
 fn run_pcs_punctuation(
@@ -572,9 +572,9 @@ fn run_pcs_punctuation(
 ) -> Result<String, String> {
     let (_, model_path) = crate::engines::resolve_model(model_id)?;
     let mut guard = state.inference.cleanup.pcs.get_or_load(model_id, || {
-        crate::pcs_punctuation::PcsContext::load(&model_path, model_id)
+        crate::cleanup::pcs::PcsContext::load(&model_path, model_id)
     })?;
-    crate::pcs_punctuation::restore_punctuation_and_case(guard.as_mut().unwrap(), text)
+    crate::cleanup::pcs::restore_punctuation_and_case(guard.as_mut().unwrap(), text)
 }
 
 fn run_t5_correction(
@@ -584,9 +584,9 @@ fn run_t5_correction(
 ) -> Result<String, String> {
     let (_, model_dir) = crate::engines::resolve_model(model_id)?;
     let mut guard = state.inference.cleanup.t5.get_or_load(model_id, || {
-        crate::t5_correction::T5Context::load(&model_dir, model_id)
+        crate::cleanup::t5::T5Context::load(&model_dir, model_id)
     })?;
-    crate::t5_correction::correct(guard.as_mut().unwrap(), text)
+    crate::cleanup::t5::correct(guard.as_mut().unwrap(), text)
 }
 
 fn run_local_llm_cleanup(
@@ -595,17 +595,17 @@ fn run_local_llm_cleanup(
     language: &str,
     model_id: &str,
     max_tokens: u32,
-) -> Result<String, crate::llm_prompt::LlmError> {
-    use crate::llm_prompt::LlmError;
+) -> Result<String, crate::cleanup::LlmError> {
+    use crate::cleanup::LlmError;
     if model_id.is_empty() {
         return Err(LlmError::NotConfigured);
     }
     let (_, model_path) = crate::engines::resolve_model(model_id)
         .map_err(|e| LlmError::Inference(e))?;
     let guard = state.inference.cleanup.llm.get_or_load(model_id, || {
-        crate::llm_local::LlmContext::load(&model_path, model_id)
+        crate::cleanup::llm_local::LlmContext::load(&model_path, model_id)
     })?;
-    crate::llm_local::cleanup_text(guard.as_ref().unwrap(), text, language, max_tokens as usize)
+    crate::cleanup::llm_local::cleanup_text(guard.as_ref().unwrap(), text, language, max_tokens as usize)
 }
 
 // -- VAD helpers --
@@ -625,11 +625,11 @@ fn vad_preprocess(audio_path: &std::path::Path) -> VadResult {
         }
     };
 
-    if !crate::vad::has_speech(&audio) {
+    if !crate::cleanup::vad::has_speech(&audio) {
         return VadResult::NoSpeech;
     }
 
-    let (start, end) = crate::vad::trim_silence(&audio);
+    let (start, end) = crate::cleanup::vad::trim_silence(&audio);
     if start == 0 && end == audio.len() {
         return VadResult::Unchanged;
     }

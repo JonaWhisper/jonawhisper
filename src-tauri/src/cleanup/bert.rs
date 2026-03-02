@@ -4,7 +4,7 @@ use ort::session::Session;
 use ort::value::Tensor;
 use tokenizers::Tokenizer;
 
-use crate::punct_common;
+use super::common;
 
 const TOKENIZER_FILENAME: &str = "tokenizer.json";
 const TOKENIZER_URL: &str =
@@ -34,7 +34,7 @@ impl BertContext {
         // Ensure tokenizer exists alongside the model
         let tokenizer_path = model_dir.join(TOKENIZER_FILENAME);
         if !tokenizer_path.exists() {
-            punct_common::download_file(TOKENIZER_URL, &tokenizer_path)?;
+            common::download_file(TOKENIZER_URL, &tokenizer_path)?;
         }
 
         let n_threads = std::thread::available_parallelism()
@@ -67,7 +67,7 @@ impl BertContext {
 /// Input: text with minimal/no punctuation (e.g. from Whisper).
 /// Output: text with punctuation restored (periods, commas, question marks, etc.).
 pub fn restore_punctuation(ctx: &mut BertContext, text: &str) -> Result<String, String> {
-    punct_common::restore_punctuation_windowed(text, |words| infer_chunk(ctx, words))
+    common::restore_punctuation_windowed(text, |words| infer_chunk(ctx, words))
 }
 
 /// Run BERT inference on a chunk of words, return per-word label indices.

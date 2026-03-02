@@ -1,4 +1,4 @@
-use crate::llm_prompt::{sanitize_output, system_prompt, LlmError};
+use super::llm_prompt::{sanitize_output, system_prompt, LlmError};
 use crate::state::Provider;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;

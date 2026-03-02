@@ -5,7 +5,7 @@ use candle_nn::{linear, Linear, VarBuilder};
 use candle_transformers::models::xlm_roberta::{Config, XLMRobertaModel};
 use tokenizers::Tokenizer;
 
-use crate::punct_common;
+use super::common;
 
 const TOKENIZER_FILENAME: &str = "tokenizer.json";
 const CONFIG_FILENAME: &str = "config.json";
@@ -76,13 +76,13 @@ impl CandlePunctContext {
         // Ensure tokenizer.json exists alongside the model
         let tokenizer_path = model_dir.join(TOKENIZER_FILENAME);
         if !tokenizer_path.exists() {
-            punct_common::download_file(TOKENIZER_URL, &tokenizer_path)?;
+            common::download_file(TOKENIZER_URL, &tokenizer_path)?;
         }
 
         // Ensure config.json exists alongside the model
         let config_path = model_dir.join(CONFIG_FILENAME);
         if !config_path.exists() {
-            punct_common::download_file(CONFIG_URL, &config_path)?;
+            common::download_file(CONFIG_URL, &config_path)?;
         }
 
         // Load config
@@ -139,7 +139,7 @@ impl CandlePunctContext {
 /// Input: text with minimal/no punctuation (e.g. from Whisper).
 /// Output: text with punctuation restored (periods, commas, question marks, etc.).
 pub fn restore_punctuation(ctx: &CandlePunctContext, text: &str) -> Result<String, String> {
-    punct_common::restore_punctuation_windowed(text, |words| infer_chunk(ctx, words))
+    common::restore_punctuation_windowed(text, |words| infer_chunk(ctx, words))
 }
 
 /// Run candle inference on a chunk of words, return per-word label indices.

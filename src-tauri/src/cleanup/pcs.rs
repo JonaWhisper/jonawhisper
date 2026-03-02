@@ -4,7 +4,7 @@ use ort::session::Session;
 use ort::value::Tensor;
 use tokenizers::Tokenizer;
 
-use crate::punct_common;
+use super::common;
 
 // -- SentencePiece protobuf parsing (prost) --
 
@@ -318,7 +318,7 @@ fn build_tokenizer_from_spe(model_dir: &Path) -> Result<Tokenizer, String> {
     // Download .model if not present
     if !spe_path.exists() {
         log::info!("Downloading SentencePiece model to {}", spe_path.display());
-        punct_common::download_file(SPE_MODEL_URL, &spe_path)?;
+        common::download_file(SPE_MODEL_URL, &spe_path)?;
     }
 
     // Parse protobuf

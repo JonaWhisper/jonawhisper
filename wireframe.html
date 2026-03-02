@@ -1370,11 +1370,26 @@ svg.icon-lg { width: 20px; height: 20px; }
               <div class="form-label">Modèle actif</div>
               <div class="form-desc">Modèle utilisé pour la transcription vocale</div>
             </div>
-            <select class="select-mock">
-              <option selected>Canary-1B</option>
-              <option>Parakeet-TDT 0.6B</option>
-              <option>Qwen3-ASR 0.6B</option>
-              <option>Whisper Large v3 (Cloud)</option>
+            <select class="select-mock" id="asrModelSelect">
+              <optgroup label="Intégré">
+                <option value="local" selected>Canary-1B</option>
+                <option value="local">Parakeet-TDT 0.6B</option>
+                <option value="local">Qwen3-ASR 0.6B</option>
+              </optgroup>
+              <optgroup label="Fournisseur">
+                <option value="cloud">OpenAI</option>
+                <option value="cloud">LM Studio</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-row" id="cloudModelRow" style="display:none;">
+            <div>
+              <div class="form-label">Modèle distant</div>
+              <div class="form-desc">Modèle proposé par le fournisseur</div>
+            </div>
+            <select class="select-mock" style="min-width:140px">
+              <option>whisper-1</option>
+              <option selected>whisper-large-v3</option>
             </select>
           </div>
           <div class="form-row">
@@ -1393,8 +1408,7 @@ svg.icon-lg { width: 20px; height: 20px; }
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title">Accélération</div>
+        <div class="card" id="gpuCard">
           <div class="form-row">
             <div>
               <div class="form-label">Mode GPU</div>
@@ -1449,7 +1463,10 @@ svg.icon-lg { width: 20px; height: 20px; }
                 <option>FlanEC Large (EN)</option>
                 <option>Flan-T5 Grammar</option>
               </optgroup>
-              <optgroup label="Reformulation">
+              <optgroup label="Reformulation — Intégré">
+                <option>Phi-3 Mini</option>
+              </optgroup>
+              <optgroup label="Reformulation — Fournisseur">
                 <option>GPT-4o Mini — OpenAI</option>
                 <option>Llama 3 — LM Studio</option>
               </optgroup>
@@ -1870,6 +1887,12 @@ document.querySelectorAll('.edit-provider-btn').forEach(btn => {
 
 document.getElementById('cancelEditWindow').addEventListener('click', () => {
   editWindow.classList.remove('visible');
+});
+
+// ─── ASR Model → show/hide cloud model dropdown ───
+document.getElementById('asrModelSelect').addEventListener('change', function() {
+  const row = document.getElementById('cloudModelRow');
+  row.style.display = this.value === 'cloud' ? 'flex' : 'none';
 });
 
 // ─── Provider Type → show/hide custom fields ───
