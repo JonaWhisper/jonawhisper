@@ -44,7 +44,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
-| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, BERT, Candle, PCS, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, BERT, Candle, PCS, T5, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
 | `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD → transcribe → paste) and background thread spawning. Threads `vad_trimmed` to history. Cancel support during recording and transcription. Uses `PILL_CLOSE_GENERATION` guard to prevent stale pill closes. |
 | `events.rs` | Centralised event name constants to avoid string typos |
@@ -73,7 +73,7 @@ Each speech engine implements the `ASREngine` trait (with `recommended_model_id(
 | `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) — works with OpenAI, local servers, etc. |
 | `downloader.rs` | Streaming HTTP downloads with resume (Range headers), per-model state, 250ms-throttled progress events, HuggingFace repos, ZIP extraction |
 
-Additionally, `bert.rs` and `pcs.rs` provide punctuation-category engines (BERT and PCS). Punctuation engines return empty `supported_languages()` to avoid polluting the ASR language selector — their language support is indicated via `lang_codes` on each model. BERT models declare a `runtime` field (`"ort"` for ONNX, `"candle"` for safetensors) so `recording.rs` can route to the right inference backend.
+Additionally, `bert.rs` and `pcs.rs` provide punctuation-category engines (BERT and PCS), and `correction.rs` provides correction-category engines (T5 models). Punctuation and correction engines return empty `supported_languages()` to avoid polluting the ASR language selector — their language support is indicated via `lang_codes` on each model. BERT models declare a `runtime` field (`"ort"` for ONNX, `"candle"` for safetensors) so `recording.rs` can route to the right inference backend.
 
 The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup, language listing, availability checks, and recommended model selection per language.
 
@@ -94,6 +94,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 | `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime. Cached `BertContext` in `AppState`. Delegates windowing to `punct_common`. |
 | `candle_punctuation.rs` | BERT punctuation restoration via Candle (safetensors, Metal GPU). `XLMRobertaForTokenClassification` built from base model + Linear head. Cached `CandlePunctContext` in `AppState`. Delegates windowing to `punct_common`. |
 | `pcs_punctuation.rs` | PCS punctuation + capitalization + segmentation (47 languages) via ONNX Runtime. SentencePiece Unigram tokenizer parsed from protobuf (`.model`) via `prost`, built into `tokenizers::Tokenizer`, cached as `tokenizer.json`. 4-head model (pre/post punctuation, capitalization, segmentation). Sliding window (128 tokens, 16 overlap). Cached `PcsContext` in `AppState`. |
+| `t5_correction.rs` | T5 encoder-decoder text correction via Candle (Metal GPU). Loads safetensors + config.json + tokenizer.json. Single-pass encoding then autoregressive decoding with KV cache, repeat penalty (1.1), temperature (0.1). Output sanitized (reject empty or >3x input). 4 models: GEC T5 Small (60M, multilingual grammar), T5 Spell FR (220M, French), FlanEC Large (250M, post-ASR), Flan-T5 Grammar (783M). Cached `T5Context` in `AppState`. |
 | `llm_cleanup.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Falls back to raw transcription on error. |
 | `llm_local.rs` | Local LLM text cleanup via llama.cpp with Metal GPU offload. Cached `LlmContext` in `AppState`. |
 | `llm_prompt.rs` | Shared LLM module: `LlmError` enum, `sanitize_output` (think-block stripping), system prompt template |
@@ -200,7 +201,7 @@ Main thread (Tauri + Tokio runtime)
 6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
 7. **VAD check** → if `vad_enabled`, runs Silero VAD: no speech → plays "Basso" sound, discards file. Speech found → trims leading/trailing silence, rewrites WAV.
 8. **Transcription** → `transcriber::transcribe()` on a blocking thread
-9. **Post-processing** → hallucination filter, dictation commands, optional text cleanup (BERT / PCS / local LLM / cloud LLM with autoscale max_tokens), finalize (spacing, capitalization). On any LLM error, falls back to raw transcription.
+9. **Post-processing** → hallucination filter, dictation commands, optional text cleanup (BERT / PCS / T5 correction / local LLM / cloud LLM with autoscale max_tokens), finalize (spacing, capitalization). On any cleanup error, falls back to raw transcription.
 10. **Cancel check** → `transcription_cancelled` flag verified before paste
 11. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
 12. **History** → entry saved to SQLite (with cleanup_model_id, hallucination_filter, vad_trimmed metadata) → frontend notified via event
@@ -209,7 +210,7 @@ Main thread (Tauri + Tokio runtime)
 
 ## Configuration
 
-Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/preferences.json` with a `_version` field tracking the schema version. History lives in `history.db` (SQLite, WAL mode) in the same directory. All model files are stored under `models/` with subdirectories per engine (`whisper/`, `llm/`, `bert/`, `pcs/`).
+Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/preferences.json` with a `_version` field tracking the schema version. History lives in `history.db` (SQLite, WAL mode) in the same directory. All model files are stored under `models/` with subdirectories per engine (`whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `llm/`, `bert/`, `pcs/`, `correction/`).
 
 On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON and the typed `Preferences` struct. To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`.
 

@@ -8,13 +8,13 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 - **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
 - **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible cloud API — unified model selector
 - **9 cloud providers** — preconfigured presets (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) with API key testing and dynamic model discovery
-- **Post-processing** — VAD silence detection (Silero VAD v6, discards silent recordings + trims silence), hallucination filtering, dictation commands, text cleanup via punctuation restoration (BERT or PCS 47-language) or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
+- **Post-processing** — VAD silence detection (Silero VAD v6, discards silent recordings + trims silence), hallucination filtering, dictation commands, text cleanup via punctuation restoration (BERT or PCS 47-language), T5 correction models (grammar, spelling, post-ASR error correction), or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
 - **Bilingual UI** — French and English, auto-detected or manual override
 - **Floating pill** — visual feedback (recording → transcribing), real-time spectrum bars, cancel support during recording or transcription
 - **Audio ducking** — automatically lowers system volume during recording and restores it when done
 - **Mic test** — test your microphone with live spectrum visualization in Settings
 - **Model manager** — parallel model downloads with per-model progress, pause/resume, speed display, and benchmark badges
-- **History badges** — each transcription shows processing details: ASR engine (local/cloud), language, text cleanup method (BERT/LLM/Cloud), hallucination filter status, and VAD silence trimming — with styled tooltips (shadcn-vue)
+- **History badges** — each transcription shows processing details: ASR engine (local/cloud), language, text cleanup method (Punctuation/Correction/LLM/Cloud), hallucination filter status, and VAD silence trimming — with styled tooltips (shadcn-vue)
 - **Paginated history** — backend-driven search (SQLite LIKE) and infinite scroll for fast opening even with thousands of entries
 
 ## Requirements
@@ -70,7 +70,7 @@ On first launch, a setup wizard asks for three macOS permissions:
 - **Qwen3-ASR** — Alibaba's audio LLM, hardware-accelerated via Apple's AMX coprocessor.
 - **OpenAI API** offloads transcription to the cloud (requires internet and an API key). Also works with any OpenAI-compatible server.
 
-Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `llm/`, `bert/`, `pcs/`).
+Models are downloaded and managed from within the app (Model Manager). All models are stored in `~/Library/Application Support/WhisperDictate/models/` (subdirectories: `whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `llm/`, `bert/`, `pcs/`, `correction/`).
 
 ## Usage
 
@@ -101,10 +101,11 @@ Open Settings from the tray menu to configure:
 Optional post-transcription cleanup via a unified model selector:
 - **BERT punctuation** — fast punctuation restoration, 4 languages (ONNX Runtime)
 - **PCS punctuation** — punctuation + capitalization + segmentation, 47 languages (ONNX Runtime, SentencePiece tokenizer)
+- **T5 correction** — encoder-decoder text correction via Candle (Metal GPU). 4 models: GEC T5 Small (60M, multilingual grammar), T5 Spell FR (220M, French spelling), FlanEC Large (250M, post-ASR errors), Flan-T5 Grammar (783M, grammar synthesis)
 - **Local LLM** — full text correction via llama.cpp with Metal GPU (GGUF models)
 - **Cloud LLM** — full text correction via OpenAI-compatible or Anthropic API
 
-Corrects punctuation, capitalization, and transcription artifacts without changing meaning. LLM max tokens auto-scales based on input length, with a configurable hard cap (default 4096, adjustable via slider 128–8192). On any LLM error (timeout, API failure, etc.), the raw transcription is preserved as fallback — text is never lost. Configure in Settings > Post-processing.
+Corrects punctuation, capitalization, spelling, grammar, and transcription artifacts without changing meaning. T5 models offer a middle ground between fast punctuation (BERT/PCS) and full LLM correction — smarter grammar/spelling fixes at lower latency. LLM max tokens auto-scales based on input length, with a configurable hard cap (default 4096, adjustable via slider 128–8192). On any error (timeout, API failure, etc.), the raw transcription is preserved as fallback — text is never lost. Configure in Settings > Post-processing.
 
 ## Tech stack
 
@@ -146,7 +147,7 @@ Corrects punctuation, capitalization, and transcription artifacts without changi
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF, Metal GPU, text cleanup) |
 | [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime + CoreML EP (Canary ASR, Parakeet-TDT ASR, Silero VAD, BERT punctuation, PCS punctuation) |
 | [`qwen-asr`](https://github.com/huanglizhuo/QwenASR) | Qwen3-ASR inference (pure Rust, Accelerate/AMX on Apple Silicon) |
-| [`candle-core`](https://github.com/huggingface/candle) / [`candle-nn`](https://github.com/huggingface/candle) / [`candle-transformers`](https://github.com/huggingface/candle) | Candle ML framework (safetensors BERT punctuation, Metal GPU) |
+| [`candle-core`](https://github.com/huggingface/candle) / [`candle-nn`](https://github.com/huggingface/candle) / [`candle-transformers`](https://github.com/huggingface/candle) | Candle ML framework (safetensors BERT punctuation, T5 correction encoder-decoder, Metal GPU) |
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD (LSTM state, ONNX inputs/outputs) |
 | [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizers (PCS SentencePiece Unigram) |
 | [`prost`](https://github.com/tokio-rs/prost) | Protobuf decoding (SentencePiece `.model` files) |
@@ -263,6 +264,7 @@ src-tauri/               Rust backend
     bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
     candle_punctuation.rs BERT punctuation restoration (Candle, safetensors, Metal GPU)
     pcs_punctuation.rs   PCS punctuation + capitalization + segmentation (ONNX Runtime, 47 languages)
+    t5_correction.rs     T5 encoder-decoder text correction (Candle, Metal GPU, autoregressive decoding)
     tray.rs              Menu bar menu & tray icon states
     pill.rs              Native pill overlay (AppKit NSWindow, SDF rendering)
     menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
