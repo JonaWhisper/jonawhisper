@@ -209,10 +209,9 @@
   font-family: inherit;
 }
 
-.wf-filter-chip.active {
-  background: var(--panel-accent);
-  color: #fff;
-  border-color: var(--panel-accent);
+.wf-filter-chip:hover:not(.border-transparent) {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
 }
 
 /* ─── History items as cards ─── */

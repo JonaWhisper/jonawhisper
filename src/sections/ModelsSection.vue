@@ -15,12 +15,12 @@ const downloads = useDownloadStore()
 type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm'
 const activeFilter = ref<FilterKey>('all')
 
-const filters: { key: FilterKey; label: string; icon: any; color: string }[] = [
-  { key: 'all', label: 'models.filter.all', icon: null, color: '' },
-  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400' },
-  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
-  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+const filters: { key: FilterKey; label: string; icon: any; iconColor: string; activeBg: string; activeText: string }[] = [
+  { key: 'all', label: 'models.filter.all', icon: null, iconColor: '', activeBg: 'bg-neutral-600 dark:bg-neutral-400', activeText: 'text-white dark:text-neutral-900' },
+  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, iconColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-500', activeText: 'text-white' },
+  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, iconColor: 'bg-violet-500/15 text-violet-600 dark:text-violet-400', activeBg: 'bg-violet-500', activeText: 'text-white' },
+  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, iconColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-500', activeText: 'text-white' },
+  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, iconColor: 'bg-teal-500/15 text-teal-600 dark:text-teal-400', activeBg: 'bg-teal-500', activeText: 'text-white' },
 ]
 
 const engineIdsByCategory = computed(() => {
@@ -73,9 +73,17 @@ async function confirmDelete() {
         :key="f.key"
         @click="activeFilter = f.key"
         class="wf-filter-chip inline-flex items-center gap-1.5"
-        :class="{ active: activeFilter === f.key }"
+        :class="[
+          activeFilter === f.key
+            ? [f.activeBg, f.activeText, 'border-transparent']
+            : ''
+        ]"
       >
-        <span v-if="f.icon" class="inline-flex items-center justify-center rounded h-4 w-4" :class="f.color">
+        <span
+          v-if="f.icon"
+          class="inline-flex items-center justify-center rounded h-4 w-4"
+          :class="activeFilter === f.key ? 'bg-white/20 text-white' : f.iconColor"
+        >
           <component :is="f.icon" class="h-2.5 w-2.5" />
         </span>
         {{ t(f.label) }}
