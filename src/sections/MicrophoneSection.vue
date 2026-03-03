@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import SpectrumBars from '@/components/SpectrumBars.vue'
 import { Badge } from '@/components/ui/badge'
-import { Laptop, Usb, Bluetooth, Waves, HardDrive, Zap, Monitor, Mic } from 'lucide-vue-next'
+import { Laptop, Usb, Bluetooth, AudioLines, HardDrive, Zap, Monitor, Mic } from 'lucide-vue-next'
 import type { Component } from 'vue'
 
 const { t } = useI18n()
@@ -28,7 +28,7 @@ let micTestStoppedUnlisten: (() => void) | null = null
 
 const TRANSPORT_ICONS: Record<string, Component> = {
   BuiltIn: Laptop, USB: Usb, Bluetooth: Bluetooth,
-  Virtual: Waves, Aggregate: HardDrive, Thunderbolt: Zap,
+  Virtual: AudioLines, Aggregate: HardDrive, Thunderbolt: Zap,
   HDMI: Monitor, Unknown: Mic,
 }
 function deviceIcon(type: string): Component { return TRANSPORT_ICONS[type] ?? Mic }
