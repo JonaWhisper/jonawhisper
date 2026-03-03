@@ -16,11 +16,11 @@ type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm'
 const activeFilter = ref<FilterKey>('all')
 
 const filters: { key: FilterKey; label: string; icon: any; iconColor: string; activeBg: string; activeText: string }[] = [
-  { key: 'all', label: 'models.filter.all', icon: null, iconColor: '', activeBg: 'bg-neutral-600 dark:bg-neutral-400', activeText: 'text-white dark:text-neutral-900' },
-  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, iconColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-500', activeText: 'text-white' },
-  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, iconColor: 'bg-violet-500/15 text-violet-600 dark:text-violet-400', activeBg: 'bg-violet-500', activeText: 'text-white' },
-  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, iconColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-500', activeText: 'text-white' },
-  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, iconColor: 'bg-teal-500/15 text-teal-600 dark:text-teal-400', activeBg: 'bg-teal-500', activeText: 'text-white' },
+  { key: 'all', label: 'models.filter.all', icon: null, iconColor: '', activeBg: 'bg-neutral-700 dark:bg-neutral-300', activeText: 'text-white dark:text-neutral-900' },
+  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, iconColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-100 dark:bg-blue-900/50', activeText: 'text-blue-700 dark:text-blue-300' },
+  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, iconColor: 'bg-violet-500/15 text-violet-600 dark:text-violet-400', activeBg: 'bg-violet-100 dark:bg-violet-900/50', activeText: 'text-violet-700 dark:text-violet-300' },
+  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, iconColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-100 dark:bg-amber-900/50', activeText: 'text-amber-700 dark:text-amber-300' },
+  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, iconColor: 'bg-teal-500/15 text-teal-600 dark:text-teal-400', activeBg: 'bg-teal-100 dark:bg-teal-900/50', activeText: 'text-teal-700 dark:text-teal-300' },
 ]
 
 const engineIdsByCategory = computed(() => {
@@ -75,14 +75,14 @@ async function confirmDelete() {
         class="wf-filter-chip inline-flex items-center gap-1.5"
         :class="[
           activeFilter === f.key
-            ? [f.activeBg, f.activeText, 'border-transparent']
+            ? [f.activeBg, f.activeText, 'border-transparent', 'ring-1', 'ring-current/20']
             : ''
         ]"
       >
         <span
           v-if="f.icon"
           class="inline-flex items-center justify-center rounded h-4 w-4"
-          :class="activeFilter === f.key ? 'bg-white/20 text-white' : f.iconColor"
+          :class="f.iconColor"
         >
           <component :is="f.icon" class="h-2.5 w-2.5" />
         </span>
