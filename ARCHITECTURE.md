@@ -56,7 +56,7 @@ macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future 
 
 | File | Role |
 |------|------|
-| `hotkey.rs` | Global shortcut via CGEvent tap on its own CFRunLoop thread. Three shortcut kinds: **ModifierOnly** (e.g. Right ⌘), **Combo** (e.g. ⌘R), **Key** (e.g. F13). Also implements capture mode for the shortcut picker. |
+| `hotkey.rs` | Global shortcut via CGEvent tap on its own CFRunLoop thread. Multi-key support: accumulates up to 4 keys during capture, finalizes on first key release. Three shortcut kinds: **ModifierOnly** (e.g. Right ⌘), **Combo** (e.g. ⌘+A), **Key** (e.g. F13). Lock-free packed atomics (`4×u16` in `AtomicU64`) for capture state. `peak_modifiers` (cumulative OR) ensures modifiers aren't lost if released before regular keys. Backward-compatible parsing (new JSON → old JSON → legacy strings). Also implements capture mode for the shortcut picker. |
 | `macos.rs` | Permission checks and requests (microphone via objc2/AVFoundation, input monitoring via CGEventTap probe, accessibility via AXIsProcessTrusted) |
 | `ffi.rs` | Raw C declarations for CoreGraphics and CoreFoundation |
 | `paste.rs` | Writes to clipboard (tauri-plugin-clipboard-manager) then simulates Cmd+V via CGEvent |
@@ -124,22 +124,38 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 
 | View | Route | Description |
 |------|-------|-------------|
+| `Panel.vue` | `/panel` | Main settings panel with sidebar navigation. Hosts all section components. |
 | `SetupWizard.vue` | `/setup` | Two-step wizard: permissions, then initial configuration |
-| `Settings.vue` | `/settings` | Settings panel with sidebar navigation. Unified model selectors for ASR and text cleanup. Refresh buttons with tooltips to re-fetch cloud models. Token hard cap slider (128–8192). |
-| `ModelManager.vue` | `/model-manager` | Engine and model management with download progress |
-| `History.vue` | `/history` | Transcription history grouped by day with backend-driven search (SQLite LIKE) and infinite scroll. Processing badges with shadcn-vue tooltips (ASR, language, cleanup, hallucination filter, VAD). |
+
+### Sections (`sections/`)
+
+| Section | Description |
+|---------|-------------|
+| `RecentsSection.vue` | Transcription history grouped by day with backend-driven search (SQLite LIKE) and infinite scroll. Processing badges with tooltips. Copy toast animation. |
+| `ModelsSection.vue` | Engine and model management with download progress |
+| `TranscriptionSection.vue` | ASR model selector (local + cloud unified), cloud sub-model picker, language, GPU mode with "Recommended" badge |
+| `ProcessingSection.vue` | Post-processing: VAD, hallucination filter, text cleanup (BERT/PCS/T5/LLM unified selector), LLM token cap |
+| `ShortcutsSection.vue` | Hotkey, recording mode (push-to-talk / toggle), cancel shortcut |
+| `MicrophoneSection.vue` | Input device selector with transport type icons, mic test with spectrum + level badge, audio ducking |
+| `ProvidersSection.vue` | Cloud provider management (9 presets + custom) |
+| `PermissionsSection.vue` | macOS permission status (microphone, accessibility, input monitoring) with grant buttons |
+| `GeneralSection.vue` | Appearance (theme), interface language |
 
 ### Key components
 
 | Component | Description |
 |-----------|-------------|
-| `ShortcutCapture.vue` | Press-to-record shortcut input. Invokes capture mode on the backend, listens for capture events. |
-| `SpectrumBars.vue` | Audio spectrum visualization (used in mic test) |
+| `ShortcutCapture.vue` | Press-to-record multi-key shortcut input. Invokes capture mode on the backend, listens for capture events. Displays key caps with localized side labels (Droit/Gauche). |
+| `SpectrumBars.vue` | Audio spectrum visualization (dB scale, used in mic test and pill) |
+| `SegmentedToggle.vue` | Segmented button group with optional badge support |
+| `ModelOption.vue` | Model selector item with label + local/cloud badge |
+| `CloudModelPicker.vue` | Cloud model dropdown with custom input and refresh |
 | `SetupStep2.vue` | Initial configuration form (hotkey, mode, model, language) — embedded in SetupWizard |
 | `ModelCell.vue` | Autonomous model list item — shows progress bar with speed, pause/resume/cancel/delete actions |
 | `DownloadActions.vue` | Download action buttons (pause/resume/cancel) with shadcn-vue tooltips |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges with quality/speed tiers |
-| `ProviderForm.vue` | Cloud provider configuration (9 presets + custom). Test button validates API key and fetches models. Error feedback in a styled alert box. |
+| `TypeBadge.vue` | Colored badge for model type (ASR, punctuation, correction, LLM) |
+| `ProviderForm.vue` | Cloud provider configuration (9 presets + custom). Test button validates API key and fetches models. |
 | `ConfirmDialog.vue` | Reusable confirmation dialog (used for history clear/delete) |
 
 ### State management
@@ -158,7 +174,7 @@ Pinia stores split by domain:
 
 | File | Role |
 |------|------|
-| `utils/shortcut.ts` | Mirrors the Rust `Shortcut` type: parse, format, serialize, key code → label table |
+| `utils/shortcut.ts` | Mirrors the Rust `Shortcut` type: `ShortcutDef` with `key_codes: number[]`, parse (with backward compat for old `key_code` singular format), format key caps with side labels, serialize |
 | `utils/format.ts` | Byte formatting (`formatBytes`, `formatSize`, `formatSpeed`) for model sizes and download speeds |
 
 ## Threading model
@@ -214,4 +230,4 @@ Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/
 
 On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON and the typed `Preferences` struct. To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`.
 
-Shortcut values are stored as JSON objects (`{"key_code":54,"modifiers":1048576,"kind":"ModifierOnly"}`). Legacy string values are automatically parsed for backward compatibility.
+Shortcut values are stored as JSON objects (`{"key_codes":[54],"modifiers":1048576,"kind":"ModifierOnly"}`). Multi-key shortcuts store multiple key codes (up to 4). Legacy formats are automatically parsed for backward compatibility: old JSON (`key_code` singular) and legacy strings (`"right_command"`).

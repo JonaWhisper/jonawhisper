@@ -5,7 +5,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 ## Features
 
 - **Menu bar app** — lives in the system tray, no dock icon
-- **Custom global hotkey** — push-to-talk or toggle mode, any key combination (modifier key, combo like ⌘R, or standalone key like F13)
+- **Custom global hotkey** — push-to-talk or toggle mode, multi-key shortcuts (up to 4 keys: modifier key, combo like ⌘+A, or standalone key like F13)
 - **Native Whisper** — built-in speech recognition via whisper-rs with Metal GPU acceleration, or any OpenAI-compatible cloud API — unified model selector
 - **9 cloud providers** — preconfigured presets (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) with API key testing and dynamic model discovery
 - **Post-processing** — VAD silence detection (Silero VAD v6, discards silent recordings + trims silence), hallucination filtering, dictation commands, text cleanup via punctuation restoration (BERT or PCS 47-language), T5 correction models (grammar, spelling, post-ASR error correction), or LLM (local llama.cpp / cloud) with autoscale max_tokens — resilient fallback to raw text on any error
@@ -89,12 +89,15 @@ Press Escape at any time to cancel:
 
 Open Settings from the tray menu to configure:
 
-- Interface language (Auto / Français / English)
-- Transcription model (local Whisper models + cloud providers in a single selector, GPU mode for local)
-- Post-processing (VAD silence filter, hallucination filter, text cleanup with unified BERT/LLM model selector)
-- Recording mode (push-to-talk / toggle)
-- Hotkey and cancel shortcut
-- Input microphone and audio ducking (reduce system volume while recording)
+- **Recents** — transcription history with search, copy, delete
+- **Models** — download and manage speech recognition and cleanup models
+- **Transcription** — ASR model (local + cloud unified selector), language, GPU acceleration
+- **Processing** — VAD silence filter, hallucination filter, text cleanup (BERT/PCS/T5/LLM)
+- **Shortcuts** — hotkey, recording mode (push-to-talk / toggle), cancel shortcut
+- **Microphone** — input device, mic test with spectrum, audio ducking
+- **Providers** — cloud provider configuration (9 presets + custom)
+- **Permissions** — macOS permission status and grant buttons
+- **General** — appearance (theme), interface language
 
 ### Text cleanup
 
@@ -111,123 +114,15 @@ Corrects punctuation, capitalization, spelling, grammar, and transcription artif
 
 | Layer | Technologies |
 |---|---|
-| Framework | [Tauri 2](https://v2.tauri.app/) |
-| Backend | [Rust](https://www.rust-lang.org/) |
-| Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
-| Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum), CoreAudio FFI (audio ducking) |
-| Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) (Metal GPU), [ort](https://github.com/pykeIO/ort) + CoreML (Canary, Parakeet), [qwen-asr](https://github.com/huanglizhuo/QwenASR) (Accelerate/AMX) |
-| Icons (tray/menu) | SDF (Signed Distance Field) hand-crafted in Rust, rendered as RGBA bitmaps — zero image dependencies, inspired by [Lucide](https://lucide.dev/) |
-| Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap ([CoreGraphics](https://developer.apple.com/documentation/coregraphics) FFI) |
-| Permissions | [objc2](https://github.com/madsmtm/objc2) ([AVFoundation](https://developer.apple.com/documentation/avfoundation), [CoreGraphics](https://developer.apple.com/documentation/coregraphics), [ApplicationServices](https://developer.apple.com/documentation/applicationservices)) |
-| i18n | [vue-i18n](https://vue-i18n.intlify.dev/) (frontend), [rust-i18n](https://github.com/longbridge/rust-i18n) (backend/tray menu) |
-
-## Dependencies
-
-### Backend (Rust crates)
-
-**Core / Framework**
-
-| Crate | Role |
-|-------|------|
-| [`tauri`](https://github.com/tauri-apps/tauri) | App framework (webview, tray, IPC, windows) |
-| [`tauri-plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Clipboard access (paste simulation) |
-| [`serde`](https://github.com/serde-rs/serde) / [`serde_json`](https://github.com/serde-rs/json) | JSON serialization (settings, IPC) |
-| [`tokio`](https://github.com/tokio-rs/tokio) | Async runtime (transcription, downloads) |
-| [`log`](https://github.com/rust-lang/log) / [`env_logger`](https://github.com/rust-cli/env_logger) | Logging |
-| [`thiserror`](https://github.com/dtolnay/thiserror) | Typed error derivation |
-
-**Audio / Transcription**
-
-| Crate | Role |
-|-------|------|
-| [`cpal`](https://github.com/RustAudio/cpal) | Cross-platform audio capture (microphone recording) |
-| [`hound`](https://github.com/ruuda/hound) | WAV file writing |
-| [`rustfft`](https://github.com/ejmahler/RustFFT) | FFT for audio spectrum (visualization) |
-| [`whisper-rs`](https://github.com/tazz4843/whisper-rs) | Native Whisper transcription (GGML, Metal GPU on macOS) |
-| [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF, Metal GPU, text cleanup) |
-| [`ort`](https://github.com/pykeIO/ort) | ONNX Runtime + CoreML EP (Canary ASR, Parakeet-TDT ASR, Silero VAD, BERT punctuation, PCS punctuation) |
-| [`qwen-asr`](https://github.com/huanglizhuo/QwenASR) | Qwen3-ASR inference (pure Rust, Accelerate/AMX on Apple Silicon) |
-| [`candle-core`](https://github.com/huggingface/candle) / [`candle-nn`](https://github.com/huggingface/candle) / [`candle-transformers`](https://github.com/huggingface/candle) | Candle ML framework (safetensors BERT punctuation, T5 correction encoder-decoder, Metal GPU) |
-| [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD (LSTM state, ONNX inputs/outputs) |
-| [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizers (PCS SentencePiece Unigram) |
-| [`prost`](https://github.com/tokio-rs/prost) | Protobuf decoding (SentencePiece `.model` files) |
-| [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Incremental UTF-8 decoding (LLM token-by-token output) |
-
-**Network / IO**
-
-| Crate | Role |
-|-------|------|
-| [`reqwest`](https://github.com/seanmonstar/reqwest) | HTTP client (model downloads, ASR/LLM APIs) |
-| [`futures-util`](https://github.com/rust-lang/futures-rs) | Async utilities (download streams) |
-| [`dirs`](https://github.com/dirs-dev/dirs-rs) | System paths (`~/Library/Application Support/`, etc.) |
-| [`shellexpand`](https://github.com/netvl/shellexpand) | Path expansion (`~`, env variables) |
-| [`rusqlite`](https://github.com/rusqlite/rusqlite) | Embedded SQLite (transcription history, WAL) |
-
-**Concurrency**
-
-| Crate | Role |
-|-------|------|
-| [`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam) | Multi-producer channels (audio thread, hotkey) |
-
-**Text processing / i18n**
-
-| Crate | Role |
-|-------|------|
-| [`regex`](https://github.com/rust-lang/regex) | Transcription post-processing (hallucination filtering) |
-| [`rust-i18n`](https://github.com/longbridge/rust-i18n) | Backend internationalization (tray menus, messages) |
-| [`sys-locale`](https://github.com/1Password/sys-locale) | System locale detection |
-
-**macOS only**
-
-| Crate | Role |
-|-------|------|
-| [`core-graphics`](https://github.com/nickel-org/core-foundation-rs) / [`core-foundation`](https://github.com/nickel-org/core-foundation-rs) | CGEvent tap (hotkey), CGEvent paste (Cmd+V) |
-| [`objc2`](https://github.com/madsmtm/objc2) / [`objc2-foundation`](https://github.com/madsmtm/objc2) / [`objc2-app-kit`](https://github.com/madsmtm/objc2) | Objective-C FFI (mic permissions, NSPasteboard, NSSound, app activation) |
-| [`block2`](https://github.com/madsmtm/objc2) | Objective-C blocks (`requestAccessForMediaType` callback) |
-
-### Frontend (npm)
-
-**App**
-
-| Package | Role |
-|---------|------|
-| [`vue`](https://github.com/vuejs/core) | UI framework |
-| [`vue-router`](https://github.com/vuejs/router) | Routing (settings, model-manager, history, setup) |
-| [`pinia`](https://github.com/vuejs/pinia) | State management |
-| [`vue-i18n`](https://github.com/intlify/vue-i18n) | Internationalization (FR/EN) |
-| [`@tauri-apps/api`](https://github.com/tauri-apps/tauri) | IPC bridge to the Rust backend |
-
-**UI**
-
-| Package | Role |
-|---------|------|
-| [`lucide-vue-next`](https://github.com/lucide-icons/lucide) | Icons (tree-shakeable, ~1500 icons) |
-| [`reka-ui`](https://github.com/unovue/reka-ui) | Headless UI primitives (shadcn-vue foundation) |
-| [`class-variance-authority`](https://github.com/joe-bell/cva) | CSS variants for components (shadcn-vue) |
-| [`clsx`](https://github.com/lukeed/clsx) / [`tailwind-merge`](https://github.com/dcastil/tailwind-merge) | CSS class utilities |
-| [`@vueuse/core`](https://github.com/vueuse/vueuse) | Vue composables (used by shadcn-vue) |
-
-**Styling**
-
-| Package | Role |
-|---------|------|
-| [`tailwindcss`](https://github.com/tailwindlabs/tailwindcss) / [`tailwindcss-animate`](https://github.com/jamiebuilds/tailwindcss-animate) | Utility-first CSS + animations |
-| [`autoprefixer`](https://github.com/postcss/autoprefixer) / [`postcss`](https://github.com/postcss/postcss) | CSS post-processing |
-
-**Tauri plugins (JS bindings)**
-
-| Package | Role |
-|---------|------|
-| [`@tauri-apps/plugin-clipboard-manager`](https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/clipboard-manager) | Clipboard write before paste |
-
-**Dev**
-
-| Package | Role |
-|---------|------|
-| [`@tauri-apps/cli`](https://github.com/tauri-apps/tauri) | Tauri CLI (build, dev) |
-| [`vite`](https://github.com/vitejs/vite) / [`@vitejs/plugin-vue`](https://github.com/vitejs/vite-plugin-vue) | Bundler + Vue SFC plugin |
-| [`typescript`](https://github.com/microsoft/TypeScript) / [`vue-tsc`](https://github.com/vuejs/language-tools) | Type checking |
-| [`@vue/tsconfig`](https://github.com/vuejs/tsconfig) / [`@types/node`](https://github.com/DefinitelyTyped/DefinitelyTyped) | TypeScript config |
+| Backend | Rust |
+| Frontend | Vue 3, TypeScript, Pinia, Tailwind CSS, shadcn-vue |
+| Audio | cpal + hound (recording), rustfft (spectrum), CoreAudio FFI (ducking) |
+| Transcription | whisper-rs (Metal GPU), ort + CoreML (Canary, Parakeet), qwen-asr (Accelerate/AMX) |
+| Text cleanup | candle (BERT punctuation, T5 correction, Metal GPU), ort (PCS punctuation), llama-cpp-2 (local LLM) |
+| Icons | Lucide (frontend), SDF hand-crafted in Rust (tray/menu bitmaps) |
+| Hotkey | Raw CGEvent tap (CoreGraphics FFI), multi-key support |
+| Permissions | objc2 (AVFoundation, CoreGraphics, ApplicationServices) |
+| i18n | vue-i18n (frontend), rust-i18n (backend) |
 
 ## Project structure
 
@@ -235,8 +130,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed architecture guide with da
 
 ```
 src/                     Vue frontend
-  views/                 Pages (Settings, ModelManager, History, SetupWizard)
-  components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, BenchmarkBadges, …)
+  views/                 Pages (Panel, SetupWizard)
+  sections/              Settings panel sections (Recents, Models, Transcription, Processing, Shortcuts, Microphone, Providers, Permissions, General)
+  components/            UI components (ShortcutCapture, SpectrumBars, ModelCell, ModelOption, SegmentedToggle, …)
   stores/                Pinia stores (app, history, settings, engines, downloads)
   config/providers.ts    Cloud provider presets and model filter helpers
   utils/                 Shared utilities (shortcut types, formatting, byte/speed formatters)
@@ -248,33 +144,45 @@ src-tauri/               Rust backend
     state.rs             App state & persistent preferences
     migrations.rs        Versioned preference migrations & model relocation
     recording.rs         Recording state machine & audio thread
-    vad.rs               Voice Activity Detection (Silero VAD v6 via ONNX Runtime)
-    audio.rs             cpal recording & FFT
-    transcriber.rs       Transcription dispatcher (whisper / canary / parakeet / qwen / cloud)
-    canary_asr.rs        NVIDIA Canary ASR (ONNX Runtime + CoreML)
-    parakeet_asr.rs      NVIDIA Parakeet-TDT ASR (vendored TDT decoder, ONNX + CoreML)
-    qwen_asr.rs          Alibaba Qwen3-ASR (qwen-asr crate, Accelerate/AMX)
-    ort_session.rs       Shared ort session builder with CoreML EP (Metal GPU / ANE)
-    mel_features.rs      Mel spectrogram extraction (HTK/Slaney scales, pre-emphasis)
-    post_processor.rs    Text post-processing
-    llm_cleanup.rs       Cloud LLM text cleanup (OpenAI/Anthropic)
-    llm_local.rs         Local LLM text cleanup (llama.cpp)
-    llm_prompt.rs        Shared LLM module (error types, output sanitization, prompt)
-    punct_common.rs      Shared punctuation logic (windowing, labels, download)
-    bert_punctuation.rs  BERT punctuation restoration (ONNX Runtime)
-    candle_punctuation.rs BERT punctuation restoration (Candle, safetensors, Metal GPU)
-    pcs_punctuation.rs   PCS punctuation + capitalization + segmentation (ONNX Runtime, 47 languages)
-    t5_correction.rs     T5 encoder-decoder text correction (Candle, Metal GPU, autoregressive decoding)
-    tray.rs              Menu bar menu & tray icon states
-    pill.rs              Native pill overlay (AppKit NSWindow, SDF rendering)
-    menu_icons.rs        SDF-rendered bitmap icons (tray bar + device menu)
+    audio.rs             cpal recording & FFT spectrum
     events.rs            Centralised event name constants
     errors.rs            App error types
-    engines/             Speech recognition engine adapters
-    platform/            OS-specific code (permissions, hotkey, paste, audio devices, audio ducking)
+    asr/                 ASR inference
+      mod.rs             Transcriber dispatch (cloud + local engine routing)
+      whisper.rs         WhisperCtx + transcribe_native (whisper-rs, Metal GPU)
+      canary.rs          NVIDIA Canary ASR (ONNX Runtime + CoreML)
+      parakeet.rs        NVIDIA Parakeet-TDT ASR (vendored TDT decoder, ONNX + CoreML)
+      qwen.rs            Alibaba Qwen3-ASR (qwen-asr crate, Accelerate/AMX)
+      mel.rs             Mel features (HTK/Slaney scales, pre-emphasis)
+    cleanup/             Text cleanup pipeline
+      mod.rs             Re-exports
+      bert.rs            BERT punctuation (ONNX Runtime)
+      candle.rs          BERT punctuation (Candle, safetensors, Metal GPU)
+      pcs.rs             PCS punctuation + capitalization + segmentation (ONNX, 47 languages)
+      common.rs          Shared punctuation logic (windowing, labels, download)
+      t5.rs              T5 encoder-decoder correction (Candle, Metal GPU)
+      vad.rs             Silero VAD v6 (bundled ONNX model)
+      post_processor.rs  Hallucination filter + dictation commands
+      llm_cloud.rs       Cloud LLM cleanup (OpenAI/Anthropic API)
+      llm_local.rs       Local LLM cleanup (llama.cpp, Metal GPU)
+      llm_prompt.rs      LLM prompt templates + sanitization
+    engines/             Engine catalog + registration (no inference logic)
+      mod.rs             ASREngine trait, EngineCatalog, model lookup
+      downloader.rs      Model download/delete/partial management
+      ort_session.rs     Shared ort session builder with CoreML EP
+      whisper.rs         Whisper model catalog
+      canary.rs, parakeet.rs, qwen.rs, bert.rs, pcs.rs, correction.rs, llama.rs, openai_api.rs
+    platform/            OS-specific code (macOS FFI)
+      hotkey.rs          Multi-key shortcuts, CGEvent tap, capture mode
+      macos.rs           Permission checks & requests
+      paste.rs           Clipboard + Cmd+V paste simulation
+      audio_devices.rs   CoreAudio device enumeration
+      audio_ducking.rs   System volume ducking during recording
+      ffi.rs             Raw C declarations
+    ui/                  Native UI
+      tray.rs            System tray icon, context menu, pill lifecycle
+      pill.rs            Native pill overlay (AppKit NSWindow, SDF rendering)
+      menu_icons.rs      SDF-rendered bitmap icons (tray bar + device menu)
 build.sh                 Build + codesign + package script
 ```
 
-## License
-
-Private project.
