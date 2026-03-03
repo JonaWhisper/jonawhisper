@@ -20,12 +20,36 @@ fi
 BUNDLE_DIR="$TARGET_DIR/bundle"
 APP_PATH="$BUNDLE_DIR/macos/${APP_NAME}.app"
 
+# ── Signing identity ──────────────────────────────────────
+# Auto-detect signing identity for Tauri (if not already set)
+if [ -z "${APPLE_SIGNING_IDENTITY:-}" ]; then
+    DETECTED=$(security find-identity -v -p codesigning 2>/dev/null \
+        | grep -v "^$" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
+    if [ -n "$DETECTED" ] && [[ "$DETECTED" != *"0 valid identities"* ]]; then
+        export APPLE_SIGNING_IDENTITY="$DETECTED"
+    fi
+fi
+
 # ── Build ──────────────────────────────────────────────────
 echo ""
 echo "=== Building ${APP_NAME} (Tauri ${MODE_LABEL}) ==="
 
 # Ensure deployment target matches Tauri config (needed by whisper-rs-sys cmake)
-export MACOSX_DEPLOYMENT_TARGET="13.0"
+export MACOSX_DEPLOYMENT_TARGET="14.0"
+# Force ARM arch for ggml (Xcode 16+ Clang is strict on i8mm inlining)
+export GGML_CPU_ARM_ARCH="armv8.2-a+dotprod"
+
+if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+    echo "  Signing identity: $APPLE_SIGNING_IDENTITY"
+else
+    echo "  No signing certificate found (ad-hoc signing)"
+fi
+
+if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_PASSWORD:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+    echo "  Notarization credentials found"
+else
+    echo "  Notarization skipped (set APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID to enable)"
+fi
 
 cd "$SCRIPT_DIR"
 npx tauri build --bundles app $TAURI_FLAGS
@@ -33,25 +57,6 @@ npx tauri build --bundles app $TAURI_FLAGS
 if [ ! -d "$APP_PATH" ]; then
     echo "ERROR: App bundle not found at $APP_PATH"
     exit 1
-fi
-
-# ── Code Signing ───────────────────────────────────────────
-echo ""
-echo "=== Code signing ==="
-
-IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep -v "^$" | head -1 | sed 's/.*"\(.*\)"/\1/' || true)
-
-if [ -n "$IDENTITY" ] && [[ "$IDENTITY" != *"0 valid identities"* ]]; then
-    echo "  Signing with: $IDENTITY"
-    codesign --force --deep --sign "$IDENTITY" \
-        --entitlements "$SCRIPT_DIR/src-tauri/entitlements.plist" \
-        "$APP_PATH" 2>/dev/null || \
-    codesign --force --deep --sign "$IDENTITY" "$APP_PATH"
-    echo "  Signed with developer certificate (stable identity)"
-else
-    echo "  No developer certificate found, using ad-hoc signing"
-    codesign --force --deep --sign - "$APP_PATH"
-    echo "  ⚠ Ad-hoc signed: permissions must be re-granted after each rebuild"
 fi
 
 # ── Distribution ───────────────────────────────────────────

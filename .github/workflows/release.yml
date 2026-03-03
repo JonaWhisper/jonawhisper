@@ -105,10 +105,17 @@ jobs:
     name: Build macOS (aarch64)
     needs: prepare
     if: ${{ inputs.dry_run == false }}
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 60
     env:
-      MACOSX_DEPLOYMENT_TARGET: "13.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      GGML_CPU_ARM_ARCH: "armv8.2-a+dotprod"
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -132,9 +139,6 @@ jobs:
 
       - name: Build Tauri app
         run: npx tauri build --bundles app,dmg
-
-      - name: Ad-hoc codesign
-        run: codesign --force --deep --sign - "src-tauri/target/release/bundle/macos/JonaWhisper.app"
 
       - name: Package artifacts
         run: |

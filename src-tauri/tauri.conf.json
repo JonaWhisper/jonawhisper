@@ -28,8 +28,11 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "13.0",
-      "frameworks": []
+      "minimumSystemVersion": "14.0",
+      "frameworks": [],
+      "signingIdentity": null,
+      "hardenedRuntime": true,
+      "entitlements": "./entitlements.plist"
     }
   },
   "plugins": {
