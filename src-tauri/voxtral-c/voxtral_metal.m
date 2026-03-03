@@ -435,7 +435,9 @@ static int init_shaders(void) {
                  encoding:NSUTF8StringEncoding];
 
         MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+#if defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 150000
         options.mathMode = MTLMathModeFast;
+#endif
 
         g_shader_library = [g_device newLibraryWithSource:shaderSource
                                                   options:options

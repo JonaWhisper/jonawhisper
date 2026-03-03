@@ -105,7 +105,7 @@ jobs:
     name: Build macOS (aarch64)
     needs: prepare
     if: ${{ inputs.dry_run == false }}
-    runs-on: macos-15
+    runs-on: macos-14
     timeout-minutes: 60
     env:
       MACOSX_DEPLOYMENT_TARGET: "13.0"
