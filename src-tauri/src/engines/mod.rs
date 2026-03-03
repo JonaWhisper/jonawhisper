@@ -2,6 +2,7 @@ pub mod whisper;
 pub mod canary;
 pub mod parakeet;
 pub mod qwen;
+pub mod voxtral;
 pub mod openai_api;
 pub mod downloader;
 pub mod llama;
@@ -223,6 +224,7 @@ impl EngineCatalog {
             Box::new(canary::CanaryEngine),
             Box::new(parakeet::ParakeetEngine),
             Box::new(qwen::QwenEngine),
+            Box::new(voxtral::VoxtralEngine),
             Box::new(llama::LlamaEngine),
             Box::new(bert::BertPunctuationEngine),
             Box::new(pcs::PcsPunctuationEngine),

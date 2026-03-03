@@ -62,6 +62,7 @@ context_group!(AsrContexts {
     canary: crate::asr::CanaryContext,
     parakeet: crate::asr::ParakeetContext,
     qwen: crate::asr::QwenContext,
+    voxtral: crate::asr::VoxtralContext,
 });
 
 context_group!(CleanupContexts {

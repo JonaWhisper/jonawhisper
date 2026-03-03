@@ -6851,6 +6851,7 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
+ "cc",
  "core-foundation 0.10.1",
  "core-graphics",
  "cpal",

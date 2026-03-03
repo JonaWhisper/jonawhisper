@@ -2,11 +2,13 @@ pub mod canary;
 pub mod mel;
 pub mod parakeet;
 pub mod qwen;
+pub mod voxtral;
 pub mod whisper;
 
 pub use canary::CanaryContext;
 pub use parakeet::ParakeetContext;
 pub use qwen::QwenContext;
+pub use voxtral::VoxtralContext;
 pub use whisper::WhisperCtx;
 
 use crate::engines::{openai_api, EngineCatalog, EngineError};
@@ -52,6 +54,7 @@ pub fn transcribe(
         "canary" => canary::transcribe(state, &model, audio_path, &language),
         "parakeet" => parakeet::transcribe(state, &model, audio_path, &language),
         "qwen-asr" => qwen::transcribe(state, &model, audio_path, &language),
+        "voxtral" => voxtral::transcribe(state, &model, audio_path, &language),
         _ => Err(EngineError::LaunchFailed(format!("Unknown engine: {}", model.engine_id))),
     }
 }

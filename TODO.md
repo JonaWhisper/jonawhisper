@@ -20,12 +20,9 @@
 ## Intégrations Cloud & Modèles
 
 - [ ] **Intégration Deepgram Nova-3** — API propriétaire mais simple (REST, audio brut en body, ~80 lignes Rust). Meilleure qualité sur audio bruité. Voir `docs/CLOUD-INTEGRATION.md`.
-- [ ] **Intégration Voxtral (Mistral)** — Famille de modèles ASR Mistral, 13 langues. Plusieurs options :
-  - **Cloud** : API Mistral (Voxtral Mini Transcribe 2, endpoint `/audio/transcriptions`). Ajout comme preset provider.
-  - **Local via voxtral.c** : [antirez/voxtral.c](https://github.com/antirez/voxtral.c) — inférence pure C, zero dépendances, bindings Rust possibles (même approche que whisper-rs). Voxtral Realtime 4B (~8GB RAM) ou Mini 3B (~6GB).
-  - **Local via vLLM** : serveur Python local, compatible OpenAI API → utilisable directement comme provider custom.
-  - **Local via Transformers** : `transformers >= 5.2.0`, support natif `VoxtralForConditionalGeneration`.
-  - Scores : WER moyen 8.72% (13 langues), EN 4.90%, FR 6.42% à 480ms de latence. Correct mais en dessous de Parakeet-TDT (3-5% EN). Avantage : realtime streaming.
+- [x] **Intégration Voxtral local (voxtral.c)** — **Done.** Voxtral Realtime 4B via [antirez/voxtral.c](https://github.com/antirez/voxtral.c) vendoré dans `src-tauri/voxtral-c/`. Pure C + Metal GPU, compilé via `cc` dans `build.rs`. API batch `vox_transcribe_audio()`. Modèle BF16 ~8.9 GB (3 fichiers HuggingFace). 13 langues, auto-détection. Voir `asr/voxtral.rs`, `engines/voxtral.rs`.
+- [ ] **Voxtral : vérifier si un crate Rust existe** — Surveiller régulièrement si un crate Rust wrappant voxtral.c est publié sur crates.io (comme whisper-rs pour whisper.cpp). Si oui, migrer du vendoring vers le crate pour simplifier la maintenance.
+- [ ] **Intégration Voxtral Cloud (Mistral API)** — API Mistral (Voxtral Mini Transcribe 2, endpoint `/audio/transcriptions`). Ajout comme preset provider. Scores : WER moyen 8.72% (13 langues), EN 4.90%, FR 6.42%.
 - [x] **Évaluer modèles de correction spécialisés** — **Done.** Évaluation complète dans `docs/BENCHMARK.md`. Métadonnées (params, RAM, langues, recommended) intégrées dans le sélecteur cleanup de Settings.
 - [x] **Implémenter PCS Punctuation (47 langues)** — **Done.** Moteur `1-800-BAD-CODE/punct_cap_seg_47_language` (233 MB ONNX, 4 têtes : ponctuation, capitalisation, segmentation). Tokenizer SentencePiece parsé en Rust via `prost` (protobuf). Voir `cleanup/pcs.rs`, `engines/pcs.rs`.
 - [x] **Intégrer modèles T5 de correction post-ASR** — **Done.** 4 modèles T5 (GEC T5 Small 60M multilingue, T5 Spell FR 220M, FlanEC Large 250M, Flan-T5 Grammar 783M). Inférence encoder-decoder via `candle-transformers` (Metal GPU, KV cache, décodage autorégressif). Nouvelle catégorie `Correction` (badge ambre). Voir `cleanup/t5.rs`, `engines/correction.rs`.
