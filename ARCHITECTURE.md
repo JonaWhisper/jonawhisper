@@ -44,7 +44,7 @@ WhisperDictate is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend re
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
-| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, BERT, Candle, PCS, T5, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
+| `state.rs` | `AppState` with fine-grained mutexes: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, Canary, Parakeet, Qwen, Voxtral, BERT, Candle, PCS, T5, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
 | `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD → transcribe → paste) and background thread spawning. Threads `vad_trimmed` to history. Cancel support during recording and transcription. Uses `PILL_CLOSE_GENERATION` guard to prevent stale pill closes. |
 | `events.rs` | Centralised event name constants to avoid string typos |
@@ -70,6 +70,7 @@ Each speech engine implements the `ASREngine` trait (with `recommended_model_id(
 | File | Role |
 |------|------|
 | `whisper.rs` | Native Whisper via whisper-rs with Metal GPU acceleration. GGML models, cached context in `AppState`. |
+| `voxtral.rs` | Voxtral Realtime 4B via vendored voxtral.c (pure C + Metal GPU). BF16 model ~8.9 GB, 13 languages with auto-detection. |
 | `openai_api.rs` | Any OpenAI-compatible API (reqwest HTTP) — works with OpenAI, local servers, etc. |
 | `downloader.rs` | Streaming HTTP downloads with resume (Range headers), per-model state, 250ms-throttled progress events, HuggingFace repos, ZIP extraction |
 
@@ -88,7 +89,7 @@ The `EngineCatalog` in `mod.rs` aggregates all engines and provides model lookup
 
 | File | Role |
 |------|------|
-| `transcriber.rs` | Thin dispatcher: routes to cloud API or native Whisper based on `selected_model_id` prefix. Runs on `spawn_blocking`. |
+| `transcriber.rs` | Thin dispatcher: routes to cloud API or native engine (Whisper, Canary, Parakeet, Qwen, Voxtral) based on `selected_model_id` prefix. Runs on `spawn_blocking`. |
 | `post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (spacing, capitalization) |
 | `punct_common.rs` | Shared punctuation logic: labels, windowed inference (`restore_punctuation_windowed`), `strip_and_split`, `download_file`. Used by BERT, Candle, and PCS modules. |
 | `bert_punctuation.rs` | BERT punctuation restoration via ONNX Runtime. Cached `BertContext` in `AppState`. Delegates windowing to `punct_common`. |
@@ -226,7 +227,7 @@ Main thread (Tauri + Tokio runtime)
 
 ## Configuration
 
-Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/preferences.json` with a `_version` field tracking the schema version. History lives in `history.db` (SQLite, WAL mode) in the same directory. All model files are stored under `models/` with subdirectories per engine (`whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `llm/`, `bert/`, `pcs/`, `correction/`).
+Preferences are stored as JSON in `~/Library/Application Support/WhisperDictate/preferences.json` with a `_version` field tracking the schema version. History lives in `history.db` (SQLite, WAL mode) in the same directory. All model files are stored under `models/` with subdirectories per engine (`whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `voxtral/`, `llm/`, `bert/`, `pcs/`, `correction/`).
 
 On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON and the typed `Preferences` struct. To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`.
 

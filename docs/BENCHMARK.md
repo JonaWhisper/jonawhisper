@@ -95,6 +95,22 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 | **Canary-180M-Flash** | 182M | 4 langues | ONNX int8 | 213 MB | 300 MB | FastConformer enc-dec | Non | ort (CoreML) | **Intégré** (`canary:180m-flash-int8`) |
 | **Parakeet-TDT 0.6B v3** | 600M | 25 langues | ONNX int8 | 703 MB | 750 MB | FastConformer + TDT transducer | Non | ort (CoreML) | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
 | **Qwen3-ASR 0.6B** | 600M | 30 langues | Safetensors | 1.88 GB | 2 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:0.6b`) |
+| **Voxtral Realtime 4B** | 4.4B | 13 langues | Safetensors BF16 | 8.9 GB | ~10 GB | Mimi encoder + LLM decoder | Oui (voxtral.c) | voxtral.c vendoré (Metal) | **Intégré** (`voxtral:mini-4b-realtime`) |
+
+#### Voxtral — Benchmarks (WER moyen FLEURS + MCV + MLS)
+
+D'après le benchmark Mistral (chart officiel), WER moyen sur 6 langues :
+
+| Langue | Voxtral Small 24B | Voxtral Mini 3B (Transcribe) | Voxtral Mini (local) | Whisper large-v3 |
+|---|---|---|---|---|
+| Spanish | ~3.2% | ~3.6% | ~4.5% | ~4.2% |
+| German | ~4.2% | ~4.7% | ~5.9% | ~5.8% |
+| French | ~4.8% | ~5.3% | ~5.3% | ~5.6% |
+| Italian | ~5.1% | ~5.4% | ~6.6% | ~6.3% |
+| Portuguese | ~5.4% | ~5.1% | ~6.4% | ~6.3% |
+| Dutch | ~6.1% | ~6.4% | ~7.4% | ~6.9% |
+
+**Note** : le Realtime 4B (intégré) n'apparaît pas dans ce benchmark — c'est un modèle streaming antérieur aux Mini 3B / Small 24B. Les Mini 3B et Small 24B utilisent une architecture différente (Pixtral multimodal) non compatible avec voxtral.c. Seul le Realtime 4B fonctionne avec le moteur voxtral.c actuel.
 
 #### Candidats intégrables
 
@@ -107,7 +123,7 @@ Modèles avec un chemin d'intégration réaliste (ONNX disponible, safetensors, 
 | **SenseVoice Small** | 234M | 50+ (focus zh/en) | ONNX int8 | 228 MB | `sensevoice-rs` (Candle) | 50+ | Excellent zh/en | Ultra-rapide (15x Whisper), ONNX + Rust crate | **Candidat #3** |
 | **Moonshine v2 Medium** | 250M | EN seul | ONNX (.ort) | ~500 MB | ort | EN | ~6.65% | 100x Whisper Large, streaming natif | Écarté — EN seul |
 | **Moonshine Tiny** | 27M | EN seul | ONNX (.ort) | 108 MB | ort | EN | ~12.7% | Ultra-compact, <108 MB | Écarté — EN seul |
-| **Voxtral Mini 4B** | 4B | Oui | Safetensors BF16 | 8.87 GB | Burn (Rust) | 13 langues | — | Apache 2.0, streaming, impl Rust existe | Écarté — 8.87 GB trop lourd |
+| ~~Voxtral Mini 4B~~ | 4B | Oui | Safetensors BF16 | 8.87 GB | voxtral.c (C, Metal) | 13 langues | — | **✓ Intégré** via voxtral.c vendoré | **Intégré** (`voxtral:mini-4b-realtime`) |
 | **Canary-1B-Flash** | ~1B | 4 langues | .nemo | ~2 GB | Conversion ONNX nécessaire | FR/EN/DE/ES | — | >1000 RTFx, streaming | Non intégré — conversion .nemo→ONNX non triviale |
 | **OWSM-CTC v4 1B** | ~1B | Multi | PyTorch | ~2 GB | Conversion ONNX nécessaire | Multi | — | Encoder-only CTC, ultra-rapide | Non intégré — ESPnet/PyTorch, pas d'ONNX |
 | **IBM Granite Speech 3.3 8B** | 8B | Oui | Safetensors | ~16 GB | Candle (théorique) | Multi | 5.85% | Top leaderboard, Apache 2.0 | Écarté — 16 GB, LLM backbone trop lourd |
@@ -124,7 +140,8 @@ Modèles importants dans l'écosystème mais sans chemin d'intégration pratique
 | **Google USM** | 2B | Oui (100+ langues) | Propriétaire Google, pas de poids publics |
 | **Apple Foundation Speech** | ~3B | Multi | Propriétaire Apple, intégré iOS/macOS uniquement |
 | **NVIDIA Canary-Qwen 2.5B** | 2.5B | Oui (25 langues) | Top leaderboard (5.63% WER) mais 2.5B = trop lourd natif |
-| **Voxtral 24B** | 24B | Oui | Trop lourd pour local |
+| **Voxtral Small 24B** | 24B | Oui | Architecture Pixtral (pas voxtral.c), trop lourd pour local |
+| **Voxtral Mini 3B** | 3B | Oui | Architecture Pixtral (pas voxtral.c), pas de runtime Rust compatible |
 | **GigaAM v3** | 240M | **Russe seul** | Focus russe uniquement, pas de FR |
 | **GLM-ASR-Nano** | 1.5B | **ZH/EN/Cantonais** | Focus chinois, pas de FR |
 | **FunASR Paraformer** | Var. | ZH/EN | Focus chinois, complexe à intégrer |
@@ -154,10 +171,11 @@ Résumé des top modèles du leaderboard HuggingFace (60+ modèles, 18 organisat
 | `qwen-asr` | Qwen3-ASR 0.6B/1.7B | Rust pur (AMX/NEON) | Apache 2.0 | Pure Rust, zero deps, streaming |
 | `ort` 2.0.0-rc.11 | Canary, Parakeet, tout ONNX | ONNX Runtime (CoreML) | MIT/Apache | Notre runtime ONNX |
 | `sensevoice-rs` | SenseVoice Small | Candle (Metal) | MIT | 50+ langues, auto-download hf-hub |
+| **voxtral.c** (vendoré) | Voxtral Realtime 4B | C pur + Metal GPU | MIT | **✓ Intégré**, 13 langues, ~8.9 GB BF16 |
 | `parakeet-rs` | Parakeet (ONNX) | ort | MIT | Streaming + punctuation |
 | `sherpa-rs` (sherpa-onnx) | Zipformer, Paraformer, etc. | ort (C bindings) | Apache 2.0 | Zoo de modèles multilingues |
 | `april_asr` | Modèles April | Natif | MIT | Offline streaming minimal |
-| Burn + voxtral-mini-realtime-rs | Voxtral 4B | Burn (Vulkan/Metal) | Apache 2.0 | Communauté, expérimental |
+| Burn + voxtral-mini-realtime-rs | Voxtral 4B | Burn (Vulkan/Metal) | Apache 2.0 | Communauté, expérimental (non utilisé — on utilise voxtral.c directement) |
 
 ### Roadmap ASR
 
@@ -428,7 +446,7 @@ Le paper **"When De-noising Hurts"** (arXiv:2512.17562, déc 2025) est souvent c
 **Ce que le paper ne teste PAS** :
 - Denoising pour **améliorer la VAD** (pré-traitement des boundaries, pas envoi direct à ASR)
 - Denoising pour le **playback** (qualité d'écoute dans l'historique)
-- **Canary-180M / Parakeet-TDT / Qwen3-ASR** (modèles récents hors étude)
+- **Canary-180M / Parakeet-TDT / Qwen3-ASR / Voxtral** (modèles récents hors étude)
 - L'approche **hybride** : dénoisé pour VAD, original pour ASR
 
 **Quand le denoising aide** : VAD boundaries en environnement bruité, playback historique, SNR extrême (<5 dB).
