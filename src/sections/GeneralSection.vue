@@ -81,11 +81,6 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
       <div class="text-center">
         <div class="wf-about-icon">W</div>
         <div class="text-base font-bold">WhisperDictate</div>
-        <div class="text-xs text-muted-foreground mt-0.5">Tauri v2 — Rust + Vue</div>
-        <div class="mt-3 flex gap-4 justify-center">
-          <a class="text-xs text-[var(--panel-accent)] hover:underline cursor-pointer">GitHub</a>
-          <a class="text-xs text-[var(--panel-accent)] hover:underline cursor-pointer">Licence MIT</a>
-        </div>
       </div>
     </div>
   </div>
