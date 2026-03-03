@@ -45,9 +45,9 @@ JonaWhisper is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend rende
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag. 12 modules: asr, audio, cleanup, commands, engines, errors, events, migrations, platform, recording, state, ui. |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
-| `state.rs` | `AppState` with fine-grained mutexes via `context_group!` macro: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, Canary, Parakeet, Qwen, Voxtral, BERT, Candle, PCS, T5, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. |
+| `state.rs` | `AppState` with fine-grained mutexes via `context_group!` macro: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, Canary, Parakeet, Qwen, Voxtral, BERT, Candle, PCS, T5, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. Keyring helpers (`keyring_store`, `keyring_load`, `keyring_delete`) manage API keys in the OS keychain. `Provider::validate_url()` enforces HTTPS on Custom providers (unless `allow_insecure`). |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD → transcribe → cleanup → paste) and background thread spawning. Threads `vad_trimmed` to history. Cancel support during recording and transcription. Uses `PILL_CLOSE_GENERATION` guard to prevent stale pill closes. |
-| `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). |
+| `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). Current version: 4 (v4 migrates plaintext API keys to OS keychain). |
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. Also provides `read_wav_f32()` shared WAV reader. |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
@@ -80,7 +80,7 @@ Text post-processing pipeline: VAD, punctuation, correction, LLM cleanup.
 | `cleanup/pcs.rs` | PCS punctuation + capitalization + segmentation (47 languages) via ONNX Runtime. SentencePiece Unigram tokenizer parsed from protobuf via `prost`, cached as `tokenizer.json`. 4-head model, sliding window (128 tokens, 16 overlap). |
 | `cleanup/t5.rs` | T5 encoder-decoder text correction via Candle (Metal GPU). Autoregressive decoding with KV cache, repeat penalty (1.1), temperature (0.1). 4 models: GEC T5 Small (60M), T5 Spell FR (220M), FlanEC Large (250M), Flan-T5 Grammar (783M). |
 | `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (spacing, capitalization) |
-| `cleanup/llm_cloud.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Falls back to raw transcription on error. |
+| `cleanup/llm_cloud.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). HTTPS validated via `Provider::validate_url()`. Falls back to raw transcription on error. |
 | `cleanup/llm_local.rs` | Local LLM text cleanup via llama.cpp with Metal GPU offload. Cached `LlmContext` in `AppState`. |
 | `cleanup/llm_prompt.rs` | Shared LLM module: `LlmError` enum, `sanitize_output` (think-block stripping), system prompt template |
 
@@ -108,7 +108,7 @@ Each speech engine implements the `ASREngine` trait (with `recommended_model_id(
 | `engines/parakeet.rs` | Parakeet-TDT model catalog |
 | `engines/qwen.rs` | Qwen3-ASR model catalog |
 | `engines/voxtral.rs` | Voxtral model catalog |
-| `engines/openai_api.rs` | OpenAI-compatible cloud API engine |
+| `engines/openai_api.rs` | OpenAI-compatible cloud API engine (60s timeout, HTTPS validated) |
 | `engines/bert.rs` | BERT punctuation model catalog |
 | `engines/pcs.rs` | PCS punctuation model catalog |
 | `engines/correction.rs` | T5 correction model catalog |
@@ -177,7 +177,7 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 | `DownloadActions.vue` | Download action buttons (pause/resume/cancel) with shadcn-vue tooltips |
 | `BenchmarkBadges.vue` | WER/RTF benchmark colored badges with quality/speed tiers |
 | `TypeBadge.vue` | Colored badge for model type (ASR, punctuation, correction, LLM) |
-| `ProviderForm.vue` | Cloud provider configuration (9 presets + custom). Test button validates API key and fetches models. |
+| `ProviderForm.vue` | Cloud provider configuration (9 presets + custom). Test button validates API key and fetches models. API key field starts empty when editing (backend keeps existing key if empty). `allow_insecure` toggle for Custom providers. |
 | `ConfirmDialog.vue` | Reusable confirmation dialog (used for history clear/delete) |
 
 ### State management
@@ -263,3 +263,13 @@ Preferences are stored as JSON in `~/Library/Application Support/JonaWhisper/pre
 On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON and the typed `Preferences` struct. To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`.
 
 Shortcut values are stored as JSON objects (`{"key_codes":[54],"modifiers":1048576,"kind":"ModifierOnly"}`). Multi-key shortcuts store multiple key codes (up to 4). Legacy formats are automatically parsed for backward compatibility: old JSON (`key_code` singular) and legacy strings (`"right_command"`).
+
+## Security
+
+**API key storage**: Provider API keys are stored in the macOS Keychain via the `keyring` v3 crate (service `"JonaWhisper"`, username `"provider:<id>"`). Keys are never written to `preferences.json` — the `api_key` field is cleared before saving to disk, and populated from keyring on load. Migration v4 automatically moves any existing plaintext keys to the keychain on first run. The `get_providers` IPC command returns masked keys (`"••••abcd"`) to the frontend — the real key never reaches the webview.
+
+**HTTPS enforcement**: Custom provider URLs are validated via `Provider::validate_url()`. HTTP URLs are rejected unless the per-provider `allow_insecure` flag is set. Known providers (OpenAI, Anthropic, etc.) always use hardcoded HTTPS URLs.
+
+**CSP**: Content Security Policy is enabled in `tauri.conf.json` to restrict the webview to `'self'` for scripts, `'self' 'unsafe-inline'` for styles, and `'self' data: blob:` for images.
+
+**IPC surface**: `withGlobalTauri` is disabled — `window.__TAURI__` is not exposed. All HTTP clients have explicit timeouts (30s for commands, 60s for audio uploads, 30s for LLM).

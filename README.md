@@ -2,7 +2,7 @@
 
 Local-first voice-to-text dictation for macOS. Runs in the menu bar, records audio via a global hotkey, transcribes with your choice of speech recognition engine, and pastes the result into the active application.
 
-All processing happens on your machine — no data leaves your Mac unless you choose a cloud provider.
+All processing happens on your machine — no data leaves your Mac unless you choose a cloud provider. Cloud API keys are stored in the macOS Keychain, never in plaintext files.
 
 ![CI](https://github.com/jplot/dictate-macos/actions/workflows/ci.yml/badge.svg)
 

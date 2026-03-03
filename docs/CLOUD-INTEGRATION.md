@@ -16,11 +16,15 @@ L'app supporte deux formats :
 - **OpenAI-compatible** `POST /v1/chat/completions` → Groq, Cerebras, Mistral, Google Gemini, Together, Fireworks, SambaNova, OpenRouter, DeepSeek
 - **Anthropic Messages** `POST /v1/messages` → Claude Haiku/Sonnet
 
-### Manque : presets provider
+### Presets provider — Done
 
-L'utilisateur doit actuellement configurer manuellement URL + clé + modèle. L'ajout de **presets préconfigurés** simplifierait énormément l'onboarding.
+9 presets préconfigurés (OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic) avec URLs et modèles pré-remplis. L'utilisateur n'a qu'à entrer sa clé API. Voir `src/config/providers.ts`.
 
-**Priorité : HAUTE** — C'est la fonctionnalité la plus impactante pour l'expérience cloud. Zéro changement backend, juste des presets frontend avec les bonnes URLs/modèles pré-remplis.
+### Sécurité des clés API
+
+Les clés API sont stockées dans le **Keychain macOS** (crate `keyring` v3), jamais dans `preferences.json`. Le champ `api_key` est vidé avant écriture sur disque et repopulé depuis le keychain au chargement. Les réponses IPC `get_providers` retournent des clés masquées (`"••••abcd"`).
+
+**Custom providers** : les URLs HTTP sont rejetées par défaut. Le toggle `allow_insecure` par provider autorise HTTP pour les serveurs locaux (Ollama, whisper.cpp, etc.).
 
 ---
 
@@ -147,9 +151,9 @@ Nécessite d'uploader l'audio d'abord, puis polling du résultat.
 
 ## Plan d'action recommandé
 
-### Phase 1 — Presets provider (priorité haute, effort faible)
+### Phase 1 — Presets provider — Done
 
-Ajouter des presets préconfigurés dans l'UI pour les providers OpenAI-compatible. Aucun changement backend, juste du frontend :
+~~Ajouter des presets préconfigurés dans l'UI pour les providers OpenAI-compatible.~~ Implémenté avec 9 presets. Frontend uniquement :
 
 **ASR Cloud** :
 - Groq → URL `https://api.groq.com/openai/v1`, modèle `whisper-large-v3-turbo`
@@ -180,7 +184,7 @@ Seulement si demandé par les utilisateurs. ElevenLabs serait le plus simple à 
 
 | Action | Priorité | Effort | Impact |
 |---|---|---|---|
-| **Presets provider** | Haute | Faible (frontend seul) | Gros — simplifie l'onboarding cloud |
+| ~~**Presets provider**~~ | ~~Haute~~ | ~~Faible~~ | **Done** — 9 presets implémentés |
 | **Deepgram Nova-3** | Moyenne | Moyen (~80 lignes Rust) | Moyen — qualité audio bruité |
 | **ElevenLabs** | Basse | Faible (~30 lignes) | Faible — peu de différenciation |
 | **Gladia** | Basse | Moyen (async polling) | Faible — anti-hallucination déjà couvert |
