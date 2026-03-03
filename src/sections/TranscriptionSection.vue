@@ -91,6 +91,7 @@ const selectedAsrModel = computed(() =>
               :location="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'"
               compact
             />
+            <span v-else class="text-muted-foreground">{{ t('settings.shortcut.cancel.none') }}</span>
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="m in engines.asrModels" :key="m.id" :value="m.id">
@@ -151,7 +152,7 @@ const selectedAsrModel = computed(() =>
         <SegmentedToggle
           :model-value="settings.gpuMode"
           :options="[
-            { value: 'auto', label: t('settings.transcription.gpuMode.auto') },
+            { value: 'auto', label: t('settings.transcription.gpuMode.auto'), badge: t('settings.cleanup.recommended') },
             { value: 'gpu', label: t('settings.transcription.gpuMode.gpu') },
             { value: 'cpu', label: t('settings.transcription.gpuMode.cpu') },
           ]"

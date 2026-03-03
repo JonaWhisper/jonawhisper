@@ -1,7 +1,7 @@
 <script setup lang="ts">
 defineProps<{
   modelValue: string
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; badge?: string }[]
   block?: boolean
 }>()
 
@@ -29,6 +29,11 @@ const emit = defineEmits<{
       @click="emit('update:modelValue', option.value)"
     >
       {{ option.label }}
+      <span
+        v-if="option.badge"
+        class="ml-1 rounded px-1 py-px text-[10px] font-medium opacity-60"
+        :class="modelValue === option.value ? 'bg-background/40' : 'bg-foreground/10'"
+      >{{ option.badge }}</span>
     </button>
   </div>
 </template>

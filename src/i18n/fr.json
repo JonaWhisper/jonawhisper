@@ -74,7 +74,7 @@
   "settings.transcription.model": "Modèle",
   "settings.transcription.language": "Langue",
   "settings.transcription.gpuMode": "Accélération",
-  "settings.transcription.gpuMode.auto": "Auto (recommandé)",
+  "settings.transcription.gpuMode.auto": "Auto",
   "settings.transcription.gpuMode.gpu": "GPU",
   "settings.transcription.gpuMode.cpu": "CPU",
   "settings.transcription.noModels": "Aucun mod\u00e8le",
