@@ -36,8 +36,8 @@ echo "=== Building ${APP_NAME} (Tauri ${MODE_LABEL}) ==="
 
 # Ensure deployment target matches Tauri config (needed by whisper-rs-sys cmake)
 export MACOSX_DEPLOYMENT_TARGET="14.0"
-# Force ARM arch for ggml (Xcode 16+ Clang is strict on i8mm inlining)
-export GGML_CPU_ARM_ARCH="armv8.2-a+dotprod"
+# Fix ggml i8mm inlining error on Clang 16+ (Xcode 16+)
+export CMAKE_TOOLCHAIN_FILE="$SCRIPT_DIR/src-tauri/cmake/arm-ggml-fix.cmake"
 
 if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
     echo "  Signing identity: $APPLE_SIGNING_IDENTITY"

@@ -109,7 +109,7 @@ jobs:
     timeout-minutes: 60
     env:
       MACOSX_DEPLOYMENT_TARGET: "14.0"
-      GGML_CPU_ARM_ARCH: "armv8.2-a+dotprod"
+      CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/src-tauri/cmake/arm-ggml-fix.cmake
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
