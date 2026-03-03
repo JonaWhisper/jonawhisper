@@ -28,3 +28,6 @@ build/
 
 # Rust build artifacts
 src-tauri/target/
+
+# Histoire
+.histoire/

@@ -46,6 +46,10 @@ All panel-specific styling uses **inline Tailwind utilities** referencing panel 
 
 ### Card container
 
+| Light | Dark |
+|---|---|
+| ![Card light](screenshots/pattern-card-light.png) | ![Card dark](screenshots/pattern-card-dark.png) |
+
 ```html
 <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
   <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">HEADING</div>
@@ -54,6 +58,10 @@ All panel-specific styling uses **inline Tailwind utilities** referencing panel 
 ```
 
 ### Form row (label + control)
+
+| Light | Dark |
+|---|---|
+| ![Form rows light](screenshots/pattern-form-rows-light.png) | ![Form rows dark](screenshots/pattern-form-rows-dark.png) |
 
 ```html
 <!-- First row: no top border -->
@@ -72,11 +80,19 @@ All panel-specific styling uses **inline Tailwind utilities** referencing panel 
 
 ### History entry card
 
+| Light | Dark |
+|---|---|
+| ![History item light](screenshots/pattern-history-item-light.png) | ![History item dark](screenshots/pattern-history-item-dark.png) |
+
 ```html
 <div class="flex items-start gap-2.5 p-[10px_12px] bg-panel-card-bg border-[0.5px] border-panel-card-border rounded-[10px] mb-1.5 transition-shadow duration-150 hover:shadow-panel-card group">
 ```
 
 ### Filter chip (Models)
+
+| Light | Dark |
+|---|---|
+| ![Filter chips light](screenshots/pattern-filter-chips-light.png) | ![Filter chips dark](screenshots/pattern-filter-chips-dark.png) |
 
 ```html
 <button class="px-3 py-1 rounded-[14px] text-xs cursor-pointer border-[0.5px] border-border transition-all duration-150 font-[inherit] inline-flex items-center gap-1.5"
@@ -87,17 +103,29 @@ Active colors use `*-500/10` opacity (e.g. `bg-blue-500/10`) — not `*-100` pal
 
 ### Provider row
 
+| Light | Dark |
+|---|---|
+| ![Provider row light](screenshots/pattern-provider-row-light.png) | ![Provider row dark](screenshots/pattern-provider-row-dark.png) |
+
 ```html
 <div class="flex items-center gap-3 py-2.5 [&+&]:border-t-[0.5px] [&+&]:border-panel-divider">
 ```
 
 ### About icon
 
+| Light | Dark |
+|---|---|
+| ![About icon light](screenshots/pattern-about-icon-light.png) | ![About icon dark](screenshots/pattern-about-icon-dark.png) |
+
 ```html
 <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">
 ```
 
 ### Day group (hover to reveal delete)
+
+| Light | Dark |
+|---|---|
+| ![Day group light](screenshots/pattern-day-group-light.png) | ![Day group dark](screenshots/pattern-day-group-dark.png) |
 
 ```html
 <div class="group/day">
@@ -129,6 +157,10 @@ The main panel uses inline Tailwind utilities for the three layout zones:
 
 ### Section title
 
+| Light | Dark |
+|---|---|
+| ![Section title light](screenshots/pattern-section-title-light.png) | ![Section title dark](screenshots/pattern-section-title-dark.png) |
+
 Every section starts with:
 
 ```html
@@ -136,6 +168,10 @@ Every section starts with:
 ```
 
 ### Nav pills (sidebar items)
+
+| Light | Dark |
+|---|---|
+| ![Nav pills light](screenshots/pattern-nav-pills-light.png) | ![Nav pills dark](screenshots/pattern-nav-pills-dark.png) |
 
 ```html
 <button class="rounded-lg px-2.5 py-1.5 text-sm transition-all border border-transparent hover:bg-sidebar-hover-bg w-full text-left"
@@ -146,6 +182,10 @@ Every section starts with:
 ```
 
 ### Status dot (sidebar footer)
+
+| Light | Dark |
+|---|---|
+| ![Status dots light](screenshots/pattern-status-dots-light.png) | ![Status dots dark](screenshots/pattern-status-dots-dark.png) |
 
 ```html
 <span class="inline-block w-2 h-2 rounded-full"
