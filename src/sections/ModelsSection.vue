@@ -6,6 +6,7 @@ import { useDownloadStore } from '@/stores/downloads'
 import type { ASRModel } from '@/stores/types'
 import ModelCell from '@/components/ModelCell.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { AudioLines, Type, SpellCheck, MessageSquare } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const engines = useEnginesStore()
@@ -14,12 +15,12 @@ const downloads = useDownloadStore()
 type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm'
 const activeFilter = ref<FilterKey>('all')
 
-const filters: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'models.filter.all' },
-  { key: 'asr', label: 'models.filter.asr' },
-  { key: 'punctuation', label: 'models.filter.punctuation' },
-  { key: 'correction', label: 'models.filter.correction' },
-  { key: 'llm', label: 'models.filter.llm' },
+const filters: { key: FilterKey; label: string; icon: any; color: string }[] = [
+  { key: 'all', label: 'models.filter.all', icon: null, color: '' },
+  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
+  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400' },
+  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, color: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
+  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
 ]
 
 const engineIdsByCategory = computed(() => {
@@ -71,9 +72,12 @@ async function confirmDelete() {
         v-for="f in filters"
         :key="f.key"
         @click="activeFilter = f.key"
-        class="wf-filter-chip"
+        class="wf-filter-chip inline-flex items-center gap-1.5"
         :class="{ active: activeFilter === f.key }"
       >
+        <span v-if="f.icon" class="inline-flex items-center justify-center rounded h-4 w-4" :class="f.color">
+          <component :is="f.icon" class="h-2.5 w-2.5" />
+        </span>
         {{ t(f.label) }}
       </button>
     </div>
