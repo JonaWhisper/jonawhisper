@@ -59,6 +59,7 @@ export interface Provider {
   kind: ProviderKind
   url: string
   api_key: string
+  allow_insecure: boolean
   cached_models: string[]
 }
 

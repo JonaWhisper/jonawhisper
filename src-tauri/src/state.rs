@@ -205,6 +205,81 @@ impl Provider {
     pub fn base_url(&self) -> &str {
         self.kind.base_url().unwrap_or_else(|| self.url.trim_end_matches('/'))
     }
+
+    /// Validate the provider URL scheme. Returns Err if Custom provider uses HTTP
+    /// without `allow_insecure` enabled. Known providers always use HTTPS.
+    pub fn validate_url(&self) -> Result<(), String> {
+        if self.kind != ProviderKind::Custom {
+            return Ok(());
+        }
+        let url = self.base_url();
+        if url.starts_with("http://") && !self.allow_insecure {
+            return Err("HTTP is not allowed for custom providers. Enable 'Allow insecure connection' to use HTTP.".to_string());
+        }
+        Ok(())
+    }
+
+    /// Return a masked version of the API key for display (e.g. "••••abcd").
+    pub fn masked_api_key(&self) -> String {
+        if self.api_key.is_empty() {
+            return String::new();
+        }
+        if self.api_key.len() > 4 {
+            format!("\u{2022}\u{2022}\u{2022}\u{2022}{}", &self.api_key[self.api_key.len() - 4..])
+        } else {
+            "\u{2022}\u{2022}\u{2022}\u{2022}".to_string()
+        }
+    }
+}
+
+// -- Keyring helpers --
+
+const KEYRING_SERVICE: &str = "JonaWhisper";
+
+fn keyring_user(provider_id: &str) -> String {
+    format!("provider:{}", provider_id)
+}
+
+/// Store an API key in the OS keychain.
+pub fn keyring_store(provider_id: &str, api_key: &str) {
+    if api_key.is_empty() {
+        return;
+    }
+    match keyring::Entry::new(KEYRING_SERVICE, &keyring_user(provider_id)) {
+        Ok(entry) => {
+            if let Err(e) = entry.set_password(api_key) {
+                log::error!("keyring: failed to store key for {}: {}", provider_id, e);
+            }
+        }
+        Err(e) => log::error!("keyring: failed to create entry for {}: {}", provider_id, e),
+    }
+}
+
+/// Load an API key from the OS keychain. Returns empty string on failure.
+pub fn keyring_load(provider_id: &str) -> String {
+    match keyring::Entry::new(KEYRING_SERVICE, &keyring_user(provider_id)) {
+        Ok(entry) => entry.get_password().unwrap_or_default(),
+        Err(e) => {
+            log::warn!("keyring: failed to create entry for {}: {}", provider_id, e);
+            String::new()
+        }
+    }
+}
+
+/// Delete an API key from the OS keychain.
+pub fn keyring_delete(provider_id: &str) {
+    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, &keyring_user(provider_id)) {
+        let _ = entry.delete_credential();
+    }
+}
+
+/// Populate empty api_key fields from the OS keychain.
+fn load_api_keys_from_keyring(providers: &mut [Provider]) {
+    for provider in providers.iter_mut() {
+        if provider.api_key.is_empty() {
+            provider.api_key = keyring_load(&provider.id);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,7 +288,10 @@ pub struct Provider {
     pub name: String,
     pub kind: ProviderKind,
     pub url: String,
+    #[serde(default)]
     pub api_key: String,
+    #[serde(default)]
+    pub allow_insecure: bool,
     #[serde(default)]
     pub cached_models: Vec<String>,
 }
@@ -315,6 +393,9 @@ impl Preferences {
             log::info!("Migration complete: {} providers", prefs.providers.len());
         }
 
+        // Populate API keys from OS keychain (keys are no longer stored in JSON)
+        load_api_keys_from_keyring(&mut prefs.providers);
+
         prefs
     }
 
@@ -323,7 +404,12 @@ impl Preferences {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        if let Ok(data) = serde_json::to_string_pretty(self) {
+        // Clone and strip API keys — they live in the OS keychain, not on disk
+        let mut prefs_for_disk = self.clone();
+        for provider in &mut prefs_for_disk.providers {
+            provider.api_key.clear();
+        }
+        if let Ok(data) = serde_json::to_string_pretty(&prefs_for_disk) {
             match std::fs::write(&path, &data) {
                 Ok(()) => log::info!("save_preferences: written to {}", path.display()),
                 Err(e) => log::error!("save_preferences: FAILED to write {}: {}", path.display(), e),

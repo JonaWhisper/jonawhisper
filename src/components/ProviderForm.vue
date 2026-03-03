@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, CheckCircle2, XCircle } from 'lucide-vue-next'
+import { Switch } from '@/components/ui/switch'
+import { Loader2, CheckCircle2, XCircle, ShieldAlert } from 'lucide-vue-next'
 
 const props = defineProps<{
   provider?: Provider
@@ -32,7 +33,8 @@ const isEditing = computed(() => !!props.provider)
 const kind = ref<ProviderKind>(props.provider?.kind ?? 'Custom')
 const name = ref(props.provider?.name ?? '')
 const url = ref(props.provider?.url ?? '')
-const apiKey = ref(props.provider?.api_key ?? '')
+const apiKey = ref('')
+const allowInsecure = ref(props.provider?.allow_insecure ?? false)
 const errors = ref<Record<string, string>>({})
 
 // Test state
@@ -41,7 +43,8 @@ const testMessage = ref('')
 const fetchedModels = ref<string[]>(props.provider?.cached_models ?? [])
 
 const showUrl = computed(() => kind.value === 'Custom')
-const canTest = computed(() => apiKey.value.trim().length > 0)
+const canTest = computed(() => apiKey.value.trim().length > 0 || isEditing.value)
+const showInsecureToggle = computed(() => kind.value === 'Custom')
 
 watch(kind, (newKind) => {
   if (isEditing.value) return
@@ -82,6 +85,7 @@ async function testConnection() {
     kind: kind.value,
     url: url.value.trim(),
     api_key: apiKey.value.trim(),
+    allow_insecure: allowInsecure.value,
     cached_models: [],
   }
 
@@ -108,6 +112,7 @@ function save() {
     kind: kind.value,
     url: url.value.trim(),
     api_key: apiKey.value.trim(),
+    allow_insecure: allowInsecure.value,
     cached_models: fetchedModels.value,
   }
 
@@ -149,7 +154,7 @@ function save() {
     <div class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.apiKey') }}</Label>
       <div class="flex gap-2">
-        <Input v-model="apiKey" type="password" placeholder="sk-..." class="h-9 text-sm flex-1" />
+        <Input v-model="apiKey" type="password" :placeholder="isEditing ? t('provider.apiKeyKeep') : 'sk-...'" class="h-9 text-sm flex-1" />
         <Button
           variant="outline"
           size="sm"
@@ -170,6 +175,18 @@ function save() {
         <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
         <span>{{ testMessage }}</span>
       </div>
+    </div>
+
+    <!-- Allow insecure (HTTP) — only for Custom providers -->
+    <div v-if="showInsecureToggle" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+      <div class="flex items-start gap-2 min-w-0">
+        <ShieldAlert class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+        <div class="min-w-0">
+          <div class="text-xs font-medium">{{ t('provider.allowInsecure') }}</div>
+          <div class="text-[11px] text-muted-foreground">{{ t('provider.allowInsecureDesc') }}</div>
+        </div>
+      </div>
+      <Switch :checked="allowInsecure" @update:checked="allowInsecure = $event" />
     </div>
 
     <div class="flex justify-end gap-2 pt-2">

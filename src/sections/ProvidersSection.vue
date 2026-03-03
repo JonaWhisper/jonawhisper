@@ -118,7 +118,7 @@ const kindGradients: Record<string, string> = {
             <Badge variant="secondary" class="text-[9px] px-1 py-0 shrink-0">{{ provider.kind }}</Badge>
           </div>
           <div class="text-[11px] text-muted-foreground truncate">
-            {{ provider.api_key ? '••••' + provider.api_key.slice(-4) : '' }}
+            {{ provider.api_key || '' }}
           </div>
         </div>
         <div class="flex gap-1 shrink-0">

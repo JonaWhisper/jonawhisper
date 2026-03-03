@@ -2,7 +2,7 @@ use serde_json::Value;
 use crate::state::{config_dir, default_model_id, Provider, ProviderKind, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 3;
+const CURRENT_VERSION: u32 = 4;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
@@ -10,6 +10,7 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (1, "Unify providers and cleanup settings", migrate_v1),
     (2, "Centralize model storage", migrate_v2),
     (3, "Update llm_max_tokens default to 4096", migrate_v3),
+    (4, "Migrate API keys to OS keychain", migrate_v4),
 ];
 
 /// Rename data directory from WhisperDictate → JonaWhisper.
@@ -80,6 +81,7 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         kind: ProviderKind::Custom,
                         url: url.to_string(),
                         api_key: api_key.to_string(),
+                        allow_insecure: false,
                         cached_models: Vec::new(),
                     });
                     // Migrate ASR model to settings
@@ -122,6 +124,7 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         kind,
                         url: api_url.to_string(),
                         api_key: api_key.to_string(),
+                        allow_insecure: false,
                         cached_models: Vec::new(),
                     });
                     prefs.llm_provider_id = id;
@@ -296,6 +299,25 @@ fn migrate_v3(_raw: &mut Value, prefs: &mut Preferences) {
     if prefs.llm_max_tokens <= 256 {
         log::info!("Migration v3: updating llm_max_tokens from {} to 4096", prefs.llm_max_tokens);
         prefs.llm_max_tokens = 4096;
+    }
+}
+
+/// v4: Migrate plaintext API keys from preferences.json into the OS keychain.
+/// After this migration, api_key fields are cleared from JSON and stored in keyring.
+fn migrate_v4(_raw: &mut Value, prefs: &mut Preferences) {
+    use crate::state::keyring_store;
+
+    let mut migrated = 0;
+    for provider in &mut prefs.providers {
+        if !provider.api_key.is_empty() {
+            keyring_store(&provider.id, &provider.api_key);
+            migrated += 1;
+            // Don't clear here — the runtime struct still needs the key.
+            // save() will strip api_key from JSON automatically.
+        }
+    }
+    if migrated > 0 {
+        log::info!("Migration v4: migrated {} API key(s) to OS keychain", migrated);
     }
 }
 

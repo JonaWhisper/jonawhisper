@@ -80,6 +80,7 @@ pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model
     if provider.url.is_empty() || model.is_empty() {
         return Err(LlmError::NotConfigured);
     }
+    provider.validate_url().map_err(LlmError::Http)?;
 
     let raw = if provider.kind.is_anthropic_format() {
         call_anthropic(text, language, provider, model, max_tokens).await?

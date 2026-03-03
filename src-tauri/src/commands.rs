@@ -10,7 +10,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 use tauri::{AppHandle, Emitter, Manager};
 
-static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+});
 
 /// Build the local-only engine catalog.
 fn catalog() -> EngineCatalog {
@@ -179,7 +184,7 @@ pub fn set_setting(
 ) {
     use crate::platform::hotkey;
 
-    log::info!("set_setting: key={}, value={}", key, value);
+    log::info!("set_setting: key={}", key);
     {
         let mut s = state.settings.lock().unwrap();
         match key.as_str() {
@@ -296,6 +301,8 @@ pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) {
 
 #[tauri::command]
 pub fn add_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    // Store API key in OS keychain, not in preferences file
+    crate::state::keyring_store(&provider.id, &provider.api_key);
     state.settings.lock().unwrap().providers.push(provider);
     state.save_preferences();
     let _ = app.emit(crate::events::SETTINGS_CHANGED, "providers");
@@ -303,15 +310,23 @@ pub fn add_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>>, 
 
 #[tauri::command]
 pub fn remove_provider(id: String, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    crate::state::keyring_delete(&id);
     state.settings.lock().unwrap().providers.retain(|p| p.id != id);
     state.save_preferences();
     let _ = app.emit(crate::events::SETTINGS_CHANGED, "providers");
 }
 
 #[tauri::command]
-pub fn update_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+pub fn update_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
     let mut s = state.settings.lock().unwrap();
     if let Some(existing) = s.providers.iter_mut().find(|p| p.id == provider.id) {
+        if provider.api_key.is_empty() {
+            // Empty api_key from frontend means "keep existing key"
+            provider.api_key = existing.api_key.clone();
+        } else {
+            // New key provided — update keychain
+            crate::state::keyring_store(&provider.id, &provider.api_key);
+        }
         *existing = provider;
     }
     drop(s);
@@ -321,21 +336,37 @@ pub fn update_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>
 
 #[tauri::command]
 pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
-    state.settings.lock().unwrap().providers.clone()
+    let providers = state.settings.lock().unwrap().providers.clone();
+    providers.into_iter().map(|mut p| {
+        p.api_key = p.masked_api_key();
+        p
+    }).collect()
 }
 
 #[tauri::command]
-pub async fn fetch_provider_models(provider: Provider) -> Result<Vec<String>, String> {
+pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, String> {
+    provider.validate_url().map_err(|e| e.to_string())?;
+
+    // If api_key is empty (editing mode), use the stored key
+    let api_key = if provider.api_key.is_empty() || provider.api_key.starts_with('\u{2022}') {
+        state.settings.lock().unwrap().providers.iter()
+            .find(|p| p.id == provider.id)
+            .map(|p| p.api_key.clone())
+            .unwrap_or_default()
+    } else {
+        provider.api_key.clone()
+    };
+
     let url = format!("{}/models", provider.base_url());
 
     let mut req = HTTP_CLIENT.get(&url);
-    if !provider.api_key.is_empty() {
+    if !api_key.is_empty() {
         if provider.kind.is_anthropic_format() {
             req = req
-                .header("x-api-key", &provider.api_key)
+                .header("x-api-key", &api_key)
                 .header("anthropic-version", "2023-06-01");
         } else {
-            req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+            req = req.header("Authorization", format!("Bearer {}", api_key));
         }
     }
 

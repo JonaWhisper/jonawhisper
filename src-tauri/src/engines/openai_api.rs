@@ -3,8 +3,12 @@ use crate::state::Provider;
 use std::path::Path;
 use std::sync::LazyLock;
 
-static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> =
-    LazyLock::new(reqwest::blocking::Client::new);
+static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+});
 
 pub fn transcribe(
     provider: &Provider,
@@ -12,6 +16,7 @@ pub fn transcribe(
     audio_path: &Path,
     language: &str,
 ) -> Result<String, EngineError> {
+    provider.validate_url().map_err(EngineError::ApiError)?;
     let client = &*BLOCKING_CLIENT;
 
     let file_bytes = std::fs::read(audio_path)
