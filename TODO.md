@@ -49,7 +49,7 @@
 
 - [x] **CI/CD GitHub Actions** — **Done.** CI léger (typecheck + cargo check) sur push/PR. Release workflow (workflow_dispatch) : bump version → git-cliff changelog → tag → Tauri build → draft GitHub release. Voir `.github/workflows/ci.yml`, `.github/workflows/release.yml`.
 - [x] **CHANGELOG.md** — **Done.** Généré automatiquement par git-cliff via `cliff.toml`. Conventional Commits adoptés (voir `CONTRIBUTING.md`).
-- [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
+- [x] **Script de test visuel + screenshots** — **Done.** Histoire stories (`src/stories/UIPatterns.story.vue`) avec 10 variants UI. Playwright capture (`src/stories/capture.ts`) génère 20 screenshots (light + dark) intégrés dans `docs/UI_GUIDELINES.md`. Scripts : `npm run story:dev`, `npm run story:screenshots`.
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
 ## Audits récurrents

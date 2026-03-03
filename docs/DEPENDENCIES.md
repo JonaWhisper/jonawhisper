@@ -131,6 +131,9 @@ Every dependency has a reason. This document explains **what** each one does and
 | [`@tauri-apps/cli`](https://github.com/tauri-apps/tauri) | Tauri CLI | `tauri dev`, `tauri build`. Manages Rust + frontend builds |
 | [`vite`](https://github.com/vitejs/vite) / [`@vitejs/plugin-vue`](https://github.com/vitejs/vite-plugin-vue) | Bundler | Sub-second HMR, native ESM. Standard for Vue 3 + Tauri |
 | [`typescript`](https://github.com/microsoft/TypeScript) / [`vue-tsc`](https://github.com/vuejs/language-tools) | Type checking | Full type safety. `vue-tsc` for single-file component checking |
+| [`histoire`](https://github.com/histoire-dev/histoire) / [`@histoire/plugin-vue`](https://github.com/histoire-dev/histoire) | Component stories | Visual catalog of UI patterns (cards, form rows, nav pills, etc.). Stories in `src/stories/`, screenshots generated via Playwright |
+| [`playwright`](https://github.com/microsoft/playwright) | Browser automation | Automated screenshot capture of Histoire stories (light + dark mode) for `docs/UI_GUIDELINES.md` |
+| [`tsx`](https://github.com/privatenumber/tsx) | TypeScript execution | Runs the `src/stories/capture.ts` screenshot script directly |
 
 ---
 

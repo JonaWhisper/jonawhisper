@@ -199,6 +199,16 @@ Pinia stores split by domain:
 | `utils/shortcut.ts` | Mirrors the Rust `Shortcut` type: `ShortcutDef` with `key_codes: number[]`, parse (with backward compat for old `key_code` singular format), format key caps with side labels, serialize |
 | `utils/format.ts` | Byte formatting (`formatBytes`, `formatSize`, `formatSpeed`) for model sizes and download speeds |
 
+### Stories (`stories/`)
+
+Visual catalog of UI patterns using [Histoire](https://histoire.dev/).
+
+| File | Role |
+|------|------|
+| `stories/setup.ts` | Histoire setup — provides Pinia, vue-i18n, and global CSS |
+| `stories/UIPatterns.story.vue` | 10 variants: Card, Form Rows, Section Title, Filter Chips, History Item, Nav Pills, Status Dots, Provider Row, About Icon, Day Group |
+| `stories/capture.ts` | Playwright script — launches Histoire, captures light + dark screenshots of each variant into `docs/screenshots/` |
+
 ## Threading model
 
 The app uses six long-lived threads:

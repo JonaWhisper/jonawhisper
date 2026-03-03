@@ -42,7 +42,22 @@ Key directories:
 | `src-tauri/src/engines/` | Engine catalog, model downloads |
 | `src-tauri/src/platform/` | macOS-specific code (hotkeys, permissions, paste) |
 | `src-tauri/src/ui/` | Native UI (tray, pill overlay, SDF icons) |
-| `docs/` | Pipeline docs, benchmarks |
+| `src/stories/` | Histoire stories + Playwright capture script |
+| `docs/` | Pipeline docs, benchmarks, screenshots |
+
+## UI stories
+
+The project uses [Histoire](https://histoire.dev/) to catalog UI patterns visually.
+
+```bash
+# Browse stories interactively
+npm run story:dev
+
+# Regenerate screenshots for docs/UI_GUIDELINES.md
+npm run story:screenshots
+```
+
+Stories live in `src/stories/`. When modifying a UI pattern in `docs/UI_GUIDELINES.md`, update the corresponding story variant and regenerate screenshots.
 
 ## Pull requests
 
