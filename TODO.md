@@ -47,8 +47,8 @@
 
 ## Technique / Infra
 
-- [ ] **CI/CD GitHub Actions** — Pipeline automatique : bump de version → tag → build macOS (.app/.dmg) + Windows → release GitHub avec changelog auto-généré
-- [ ] **CHANGELOG.md** — Fichier changelog versionné dans le repo
+- [x] **CI/CD GitHub Actions** — **Done.** CI léger (typecheck + cargo check) sur push/PR. Release workflow (workflow_dispatch) : bump version → git-cliff changelog → tag → Tauri build → draft GitHub release. Voir `.github/workflows/ci.yml`, `.github/workflows/release.yml`.
+- [x] **CHANGELOG.md** — **Done.** Généré automatiquement par git-cliff via `cliff.toml`. Conventional Commits adoptés (voir `CONTRIBUTING.md`).
 - [ ] **Script de test visuel + screenshots** — Flows de test automatisés (pill, settings, etc.) avec capture de screenshots
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 

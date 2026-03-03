@@ -1,5 +1,56 @@
 # Contributing to WhisperDictate
 
+## Prerequisites
+
+- macOS 13.0+ (Apple Silicon recommended)
+- [Rust](https://www.rust-lang.org/tools/install) (stable)
+- [Node.js](https://nodejs.org/) 24+
+- Xcode Command Line Tools: `xcode-select --install`
+
+## Development setup
+
+```bash
+# Clone the repo
+git clone https://github.com/jplot/dictate-macos.git
+cd dictate-macos
+
+# Install frontend dependencies
+npm install
+
+# Start dev mode (Vite hot reload + Rust auto-rebuild)
+npm run tauri dev
+```
+
+For a release build:
+
+```bash
+./build.sh
+open build/WhisperDictate.app
+```
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full module map, threading model, and data flows.
+
+Key directories:
+
+| Directory | Contents |
+|-----------|----------|
+| `src/` | Vue 3 frontend (views, sections, components, stores) |
+| `src-tauri/src/asr/` | ASR inference (whisper, canary, parakeet, qwen, voxtral) |
+| `src-tauri/src/cleanup/` | Text cleanup (punctuation, correction, VAD, LLM) |
+| `src-tauri/src/engines/` | Engine catalog, model downloads |
+| `src-tauri/src/platform/` | macOS-specific code (hotkeys, permissions, paste) |
+| `src-tauri/src/ui/` | Native UI (tray, pill overlay, SDF icons) |
+| `docs/` | Pipeline docs, benchmarks |
+
+## Pull requests
+
+1. Create a feature branch from `main`
+2. Make your changes with commits following the convention below
+3. Run checks locally: `npx vue-tsc -b --noEmit` and `cd src-tauri && cargo check --release`
+4. Open a PR against `main` with a clear description
+
 ## Commit Convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/). Every commit message must follow this format:
