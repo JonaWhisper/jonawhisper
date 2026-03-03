@@ -171,6 +171,8 @@ Models are downloaded and managed from within the app. All models are stored in 
 | Permissions | [objc2](https://github.com/madsmtm/objc2) (AVFoundation, CoreGraphics, ApplicationServices) |
 | i18n | [vue-i18n](https://vue-i18n.intlify.dev/) (frontend), [rust-i18n](https://github.com/longbridge/rust-i18n) (backend) |
 
+See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full dependency list with rationale for each choice.
+
 ## Project structure
 
 ```
