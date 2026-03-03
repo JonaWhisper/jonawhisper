@@ -88,9 +88,9 @@ function onInput(event: Event) {
     </TooltipProvider>
   </div>
   <!-- Custom model input (shown below when "Custom" selected from dropdown) -->
-  <div v-if="modelOptions.length > 0 && isCustom" class="wf-form-row">
+  <div v-if="modelOptions.length > 0 && isCustom" class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
     <div>
-      <div class="wf-form-label">{{ t('settings.cloudAsr.customPlaceholder') }}</div>
+      <div class="text-[13px] text-foreground">{{ t('settings.cloudAsr.customPlaceholder') }}</div>
     </div>
     <Input
       :value="modelValue"

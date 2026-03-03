@@ -82,14 +82,14 @@ function onMaxTokensSliderCommit(v: number[]) {
 
 <template>
   <div>
-    <div class="section-title">{{ t('panel.processing') }}</div>
+    <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.processing') }}</div>
 
     <!-- Pre-processing card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.postProcessing.vad') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.postProcessing.vad') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.postProcessing.vad') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.vad') }}</div>
         </div>
         <Switch
           :model-value="settings.vadEnabled"
@@ -99,13 +99,13 @@ function onMaxTokensSliderCommit(v: number[]) {
     </div>
 
     <!-- Post-processing card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.postProcessing.textCleanup') }}</div>
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.postProcessing.textCleanup') }}</div>
 
       <!-- Hallucination filter -->
-      <div class="wf-form-row">
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.postProcessing.hallucinations') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.hallucinations') }}</div>
         </div>
         <Switch
           :model-value="settings.hallucinationFilterEnabled"
@@ -114,9 +114,9 @@ function onMaxTokensSliderCommit(v: number[]) {
       </div>
 
       <!-- Unified cleanup dropdown with optgroups -->
-      <div class="wf-form-row">
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>
-          <div class="wf-form-label">{{ t('settings.postProcessing.textCleanup') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.textCleanup') }}</div>
         </div>
         <Select
           :model-value="unifiedCleanupValue"
@@ -151,11 +151,11 @@ function onMaxTokensSliderCommit(v: number[]) {
 
     <!-- Cloud LLM sub-settings -->
     <template v-if="settings.textCleanupEnabled && engines.isCloudLlm && llmSelectedProvider">
-      <div class="wf-card">
-        <div class="wf-card-title">{{ t('settings.llm.model') }}</div>
-        <div class="wf-form-row">
+      <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.llm.model') }}</div>
+        <div class="flex items-center justify-between py-2 gap-3">
           <div>
-            <div class="wf-form-label">{{ t('settings.llm.model') }}</div>
+            <div class="text-[13px] text-foreground">{{ t('settings.llm.model') }}</div>
           </div>
           <CloudModelPicker
             :model-options="llmModelOptions"
@@ -165,9 +165,9 @@ function onMaxTokensSliderCommit(v: number[]) {
             @refresh="refreshLlmModels"
           />
         </div>
-        <div class="wf-form-row">
+        <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
           <div>
-            <div class="wf-form-label">{{ t('settings.llm.maxTokens') }}</div>
+            <div class="text-[13px] text-foreground">{{ t('settings.llm.maxTokens') }}</div>
           </div>
           <div class="flex items-center gap-2">
             <Slider
@@ -187,11 +187,11 @@ function onMaxTokensSliderCommit(v: number[]) {
 
     <!-- Local LLM sub-settings (token cap only) -->
     <template v-if="settings.textCleanupEnabled && engines.isLocalLlm">
-      <div class="wf-card">
-        <div class="wf-card-title">{{ t('settings.llm.maxTokens') }}</div>
-        <div class="wf-form-row">
+      <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.llm.maxTokens') }}</div>
+        <div class="flex items-center justify-between py-2 gap-3">
           <div>
-            <div class="wf-form-label">{{ t('settings.llm.maxTokens') }}</div>
+            <div class="text-[13px] text-foreground">{{ t('settings.llm.maxTokens') }}</div>
           </div>
           <div class="flex items-center gap-2">
             <Slider

@@ -51,7 +51,7 @@ onMounted(async () => {
 <template>
   <div class="flex h-full min-w-0 select-none">
     <!-- Sidebar -->
-    <div class="panel-sidebar w-44 min-w-[10rem] flex flex-col flex-shrink-0">
+    <div class="backdrop-blur-[20px] backdrop-saturate-[1.8] bg-[hsl(var(--background)/0.72)] dark:bg-[hsl(var(--background)/0.65)] border-r-[0.5px] border-[hsl(var(--border)/0.5)] w-44 min-w-[10rem] flex flex-col flex-shrink-0">
       <!-- Drag region -->
       <div class="h-9 shrink-0 flex items-center px-2" data-tauri-drag-region />
 
@@ -61,31 +61,38 @@ onMounted(async () => {
           v-for="section in sections"
           :key="section.id"
           @click="activeSection = section.id"
-          class="nav-pill w-full text-left"
-          :class="{ active: activeSection === section.id }"
+          class="rounded-lg px-2.5 py-1.5 text-sm transition-all border border-transparent hover:bg-sidebar-hover-bg w-full text-left"
+          :class="activeSection === section.id ? 'bg-sidebar-active-bg border-sidebar-active-border font-medium' : ''"
         >
           <div class="flex items-center gap-2">
-            <component :is="section.icon" class="nav-icon w-[18px] h-[18px] flex-shrink-0" />
+            <component :is="section.icon" class="w-[18px] h-[18px] flex-shrink-0" :class="activeSection === section.id ? 'opacity-100 text-panel-accent' : 'opacity-70'" />
             <span class="text-[13px] truncate">{{ t(section.label) }}</span>
           </div>
         </button>
       </nav>
 
       <!-- Status indicator -->
-      <div class="px-2.5 py-2 border-t" style="border-color: var(--panel-divider);">
+      <div class="px-2.5 py-2 border-t border-panel-divider">
         <div class="flex items-center gap-1.5">
-          <span class="status-dot" :class="statusClass()" />
+          <span
+            class="inline-block w-2 h-2 rounded-full"
+            :class="{
+              'bg-emerald-500': statusClass() === 'idle',
+              'bg-red-500 animate-status-pulse': statusClass() === 'recording',
+              'bg-amber-500 animate-status-pulse': statusClass() === 'transcribing',
+            }"
+          />
           <span class="text-[11px] text-muted-foreground">{{ statusLabel() }}</span>
         </div>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="panel-content flex-1 min-w-0 flex flex-col overflow-hidden">
+    <div class="bg-[linear-gradient(160deg,var(--panel-bg-start),var(--panel-bg-end))] flex-1 min-w-0 flex flex-col overflow-hidden">
       <!-- Drag region for content area -->
       <div class="h-9 shrink-0" data-tauri-drag-region />
 
-      <div class="panel-content-body flex-1 overflow-y-auto px-5 pb-5">
+      <div class="flex-1 overflow-y-auto px-5 pb-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-panel-scrollbar [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-track]:bg-transparent">
         <Transition name="fade" mode="out-in">
           <RecentsSection v-if="activeSection === 'recents'" key="recents" />
           <ModelsSection v-else-if="activeSection === 'models'" key="models" />

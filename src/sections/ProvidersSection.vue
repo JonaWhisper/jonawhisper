@@ -79,15 +79,12 @@ const kindGradients: Record<string, string> = {
   <div>
     <!-- Header: title + add button -->
     <div class="flex items-center justify-between mb-4">
-      <div class="section-title" style="margin-bottom: 0;">{{ t('panel.providers') }}</div>
+      <div class="text-[20px] font-bold tracking-[-0.02em]">{{ t('panel.providers') }}</div>
       <TooltipProvider :delay-duration="300">
         <Tooltip>
           <TooltipTrigger as-child>
             <button
-              class="w-7 h-7 flex items-center justify-center rounded-md border-none cursor-pointer transition-colors"
-              style="background: var(--sidebar-hover-bg); color: hsl(var(--muted-foreground));"
-              @mouseenter="($event.currentTarget as HTMLElement).style.color = 'hsl(var(--foreground))'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.color = 'hsl(var(--muted-foreground))'"
+              class="w-7 h-7 flex items-center justify-center rounded-md border-none cursor-pointer transition-colors bg-sidebar-hover-bg text-muted-foreground hover:text-foreground"
               @click="openAddDialog"
             >
               <Plus class="w-4 h-4" />
@@ -99,8 +96,8 @@ const kindGradients: Record<string, string> = {
     </div>
 
     <!-- Provider card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.providers.add') }}</div>
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.providers.add') }}</div>
 
       <!-- Empty state -->
       <div v-if="engines.providers.length === 0" class="text-xs text-muted-foreground py-2">
@@ -108,7 +105,7 @@ const kindGradients: Record<string, string> = {
       </div>
 
       <!-- Provider rows -->
-      <div v-for="provider in engines.providers" :key="provider.id" class="wf-provider-row">
+      <div v-for="provider in engines.providers" :key="provider.id" class="flex items-center gap-3 py-2.5 [&+&]:border-t-[0.5px] [&+&]:border-panel-divider">
         <div
           class="flex items-center justify-center w-8 h-8 rounded-lg text-white text-base font-bold shrink-0"
           :style="{ background: kindGradients[provider.kind] ?? kindGradients.Custom }"

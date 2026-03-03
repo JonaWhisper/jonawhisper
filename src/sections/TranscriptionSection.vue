@@ -68,16 +68,16 @@ const selectedAsrModel = computed(() =>
 
 <template>
   <div>
-    <div class="section-title">{{ t('panel.transcription') }}</div>
+    <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.transcription') }}</div>
 
     <!-- Speech recognition card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.transcription.model') }}</div>
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.transcription.model') }}</div>
 
       <!-- Model selector row -->
-      <div class="wf-form-row">
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.transcription.model') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.transcription.model') }}</div>
         </div>
         <Select
           v-if="engines.asrModels.length > 0"
@@ -110,9 +110,9 @@ const selectedAsrModel = computed(() =>
 
       <!-- Cloud ASR sub-settings (model + refresh) -->
       <template v-if="engines.isCloudAsr && asrSelectedProvider">
-        <div class="wf-form-row">
+        <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
           <div>
-            <div class="wf-form-label">{{ t('settings.cloudAsr.model') }}</div>
+            <div class="text-[13px] text-foreground">{{ t('settings.cloudAsr.model') }}</div>
           </div>
           <CloudModelPicker
             :model-options="asrModelOptions"
@@ -125,9 +125,9 @@ const selectedAsrModel = computed(() =>
       </template>
 
       <!-- Language -->
-      <div class="wf-form-row">
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>
-          <div class="wf-form-label">{{ t('settings.transcription.language') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.transcription.language') }}</div>
         </div>
         <Select :model-value="settings.selectedLanguage" @update:model-value="onLanguageChange">
           <SelectTrigger class="w-auto min-w-[120px] h-8 text-xs">
@@ -143,11 +143,11 @@ const selectedAsrModel = computed(() =>
     </div>
 
     <!-- GPU Acceleration card (grayed when cloud ASR) -->
-    <div class="wf-card" :class="{ 'opacity-35 pointer-events-none': engines.isCloudAsr }">
-      <div class="wf-card-title">{{ t('settings.transcription.gpuMode') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5" :class="{ 'opacity-35 pointer-events-none': engines.isCloudAsr }">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.transcription.gpuMode') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.transcription.gpuMode') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.transcription.gpuMode') }}</div>
         </div>
         <SegmentedToggle
           :model-value="settings.gpuMode"

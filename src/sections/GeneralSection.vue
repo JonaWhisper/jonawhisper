@@ -31,14 +31,14 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
 
 <template>
   <div>
-    <div class="section-title">{{ t('panel.general') }}</div>
+    <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.general') }}</div>
 
     <!-- Appearance card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('general.appearance') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.appearance') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('general.appearance') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('general.appearance') }}</div>
         </div>
         <SegmentedToggle
           :model-value="settings.theme"
@@ -53,11 +53,11 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- Interface language card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('general.interfaceLanguage') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.interfaceLanguage') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('general.interfaceLanguage') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('general.interfaceLanguage') }}</div>
         </div>
         <Select :model-value="settings.appLocale" @update:model-value="onLocaleChange">
           <SelectTrigger class="w-auto min-w-[130px] h-8 text-xs">
@@ -77,9 +77,9 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- About card -->
-    <div class="wf-card" style="padding: 20px;">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-5 mb-2.5">
       <div class="text-center">
-        <div class="wf-about-icon">J</div>
+        <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">J</div>
         <div class="text-base font-bold">JonaWhisper</div>
       </div>
     </div>

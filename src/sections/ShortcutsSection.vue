@@ -22,14 +22,14 @@ async function onCancelShortcutChange(value: string) {
 
 <template>
   <div>
-    <div class="section-title">{{ t('panel.shortcuts') }}</div>
+    <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.shortcuts') }}</div>
 
     <!-- Recording mode card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.shortcut.mode') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.shortcut.mode') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.shortcut.mode') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.shortcut.mode') }}</div>
         </div>
         <SegmentedToggle
           :model-value="settings.recordingMode"
@@ -43,20 +43,20 @@ async function onCancelShortcutChange(value: string) {
     </div>
 
     <!-- Keyboard shortcuts card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.shortcut.record') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.shortcut.record') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.shortcut.record') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.shortcut.record') }}</div>
         </div>
         <ShortcutCapture
           :model-value="settings.hotkey"
           @update:model-value="onHotkeyChange"
         />
       </div>
-      <div class="wf-form-row">
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>
-          <div class="wf-form-label">{{ t('settings.shortcut.cancel') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.shortcut.cancel') }}</div>
         </div>
         <ShortcutCapture
           :model-value="settings.cancelShortcut"

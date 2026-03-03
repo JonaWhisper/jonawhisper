@@ -161,7 +161,7 @@ async function doClearAll() {
   <div class="flex flex-col h-full">
     <!-- Header: title + clear all -->
     <div class="flex items-center justify-between mb-0">
-      <div class="section-title" style="margin-bottom: 0;">{{ t('panel.recents') }}</div>
+      <div class="text-[20px] font-bold tracking-[-0.02em]">{{ t('panel.recents') }}</div>
       <Button
         v-if="historyStore.history.length > 0"
         variant="destructive"
@@ -197,13 +197,13 @@ async function doClearAll() {
 
       <!-- Timeline -->
       <div v-else class="space-y-3.5">
-        <div v-for="group in groupedHistory" :key="group.dayTimestamp" class="wf-day-group">
+        <div v-for="group in groupedHistory" :key="group.dayTimestamp" class="group/day">
           <div class="flex items-center justify-between mb-1.5">
             <span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
               {{ group.label }}
             </span>
             <button
-              class="wf-day-delete text-[11px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded cursor-pointer"
+              class="opacity-0 group-hover/day:opacity-100 transition-opacity duration-150 text-[11px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded cursor-pointer"
               @click="confirmDeleteDay(group.dayTimestamp)"
             >
               {{ t('history.deleteDay') }}
@@ -215,7 +215,7 @@ async function doClearAll() {
             <div
               v-for="entry in group.entries"
               :key="entry.timestamp"
-              class="wf-history-item group"
+              class="flex items-start gap-2.5 p-[10px_12px] bg-panel-card-bg border-[0.5px] border-panel-card-border rounded-[10px] mb-1.5 transition-shadow duration-150 hover:shadow-panel-card group"
             >
               <span class="text-[11px] text-muted-foreground mt-0.5 shrink-0 tabular-nums min-w-[38px]">
                 {{ formatTime(entry.timestamp) }}

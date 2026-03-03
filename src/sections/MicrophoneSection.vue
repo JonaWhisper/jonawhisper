@@ -128,14 +128,14 @@ onUnmounted(() => {
 
 <template>
   <div>
-    <div class="section-title">{{ t('panel.microphone') }}</div>
+    <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.microphone') }}</div>
 
     <!-- Input device card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.microphone') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.microphone') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div class="min-w-0 flex-1">
-          <div class="wf-form-label">{{ t('settings.microphone') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.microphone') }}</div>
         </div>
         <Select
           :model-value="selectedDeviceUid"
@@ -166,8 +166,8 @@ onUnmounted(() => {
     </div>
 
     <!-- Mic test card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.microphone.test') }}</div>
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.microphone.test') }}</div>
       <div class="flex flex-col items-center gap-2.5">
         <div class="w-full flex justify-center">
           <SpectrumBars :spectrum="testSpectrum" size="md" />
@@ -194,11 +194,11 @@ onUnmounted(() => {
     </div>
 
     <!-- Audio ducking card -->
-    <div class="wf-card">
-      <div class="wf-card-title">{{ t('settings.microphone.ducking') }}</div>
-      <div class="wf-form-row">
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.microphone.ducking') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
         <div>
-          <div class="wf-form-label">{{ t('settings.microphone.ducking') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.microphone.ducking') }}</div>
         </div>
         <Switch
           :model-value="settings.audioDuckingEnabled"
@@ -207,11 +207,11 @@ onUnmounted(() => {
       </div>
       <!-- Slider always visible, grayed when toggle off -->
       <div
-        class="wf-form-row"
+        class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider"
         :class="{ 'opacity-35 pointer-events-none': !settings.audioDuckingEnabled }"
       >
         <div>
-          <div class="wf-form-label">{{ t('settings.microphone.duckingLevel') }}</div>
+          <div class="text-[13px] text-foreground">{{ t('settings.microphone.duckingLevel') }}</div>
         </div>
         <div class="flex items-center gap-2">
           <Slider

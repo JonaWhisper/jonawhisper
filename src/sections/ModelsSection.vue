@@ -17,10 +17,10 @@ const activeFilter = ref<FilterKey>('all')
 
 const filters: { key: FilterKey; label: string; icon: any; iconColor: string; activeBg: string; activeText: string }[] = [
   { key: 'all', label: 'models.filter.all', icon: null, iconColor: '', activeBg: 'bg-neutral-700 dark:bg-neutral-300', activeText: 'text-white dark:text-neutral-900' },
-  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, iconColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-100 dark:bg-blue-900/50', activeText: 'text-blue-700 dark:text-blue-300' },
-  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, iconColor: 'bg-violet-500/15 text-violet-600 dark:text-violet-400', activeBg: 'bg-violet-100 dark:bg-violet-900/50', activeText: 'text-violet-700 dark:text-violet-300' },
-  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, iconColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-100 dark:bg-amber-900/50', activeText: 'text-amber-700 dark:text-amber-300' },
-  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, iconColor: 'bg-teal-500/15 text-teal-600 dark:text-teal-400', activeBg: 'bg-teal-100 dark:bg-teal-900/50', activeText: 'text-teal-700 dark:text-teal-300' },
+  { key: 'asr', label: 'models.filter.asr', icon: AudioLines, iconColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400', activeBg: 'bg-blue-500/10 dark:bg-blue-900/50', activeText: 'text-blue-700 dark:text-blue-300' },
+  { key: 'punctuation', label: 'models.filter.punctuation', icon: Type, iconColor: 'bg-violet-500/15 text-violet-600 dark:text-violet-400', activeBg: 'bg-violet-500/10 dark:bg-violet-900/50', activeText: 'text-violet-700 dark:text-violet-300' },
+  { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, iconColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-500/10 dark:bg-amber-900/50', activeText: 'text-amber-700 dark:text-amber-300' },
+  { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, iconColor: 'bg-teal-500/15 text-teal-600 dark:text-teal-400', activeBg: 'bg-teal-500/10 dark:bg-teal-900/50', activeText: 'text-teal-700 dark:text-teal-300' },
 ]
 
 const engineIdsByCategory = computed(() => {
@@ -64,7 +64,7 @@ async function confirmDelete() {
 
 <template>
   <div>
-    <div class="section-title">{{ t('panel.models') }}</div>
+    <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.models') }}</div>
 
     <!-- Filter chips -->
     <div class="flex flex-wrap gap-1 mb-3.5">
@@ -72,11 +72,11 @@ async function confirmDelete() {
         v-for="f in filters"
         :key="f.key"
         @click="activeFilter = f.key"
-        class="wf-filter-chip inline-flex items-center gap-1.5"
+        class="px-3 py-1 rounded-[14px] text-xs cursor-pointer border-[0.5px] border-border transition-all duration-150 font-[inherit] inline-flex items-center gap-1.5"
         :class="[
           activeFilter === f.key
             ? [f.activeBg, f.activeText, 'border-transparent', 'ring-1', 'ring-current/20']
-            : ''
+            : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         ]"
       >
         <span

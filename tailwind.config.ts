@@ -48,12 +48,36 @@ export default {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
-  			}
+  			},
+  			panel: {
+  				'card-bg': 'var(--panel-card-bg)',
+  				'card-border': 'var(--panel-card-border)',
+  				divider: 'var(--panel-divider)',
+  				accent: 'var(--panel-accent)',
+  				scrollbar: 'var(--panel-scrollbar-thumb)',
+  			},
+  			sidebar: {
+  				'active-bg': 'var(--sidebar-active-bg)',
+  				'active-border': 'var(--sidebar-active-border)',
+  				'hover-bg': 'var(--sidebar-hover-bg)',
+  			},
+  		},
+  		boxShadow: {
+  			'panel-card': 'var(--panel-card-shadow)',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		animation: {
+  			'status-pulse': 'status-pulse 1.2s ease-in-out infinite',
+  		},
+  		keyframes: {
+  			'status-pulse': {
+  				'0%, 100%': { opacity: '1', transform: 'scale(1)' },
+  				'50%': { opacity: '0.5', transform: 'scale(0.85)' },
+  			},
   		}
   	}
   },
