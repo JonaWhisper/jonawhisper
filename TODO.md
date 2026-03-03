@@ -1,4 +1,4 @@
-# WhisperDictate — TODO
+# JonaWhisper — TODO
 
 ## Bugs
 

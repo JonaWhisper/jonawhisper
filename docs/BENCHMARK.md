@@ -1,6 +1,6 @@
 # Benchmark ASR & LLM — Mars 2026
 
-Référence complète des options ASR (speech-to-text) et LLM (text cleanup) disponibles pour WhisperDictate. Couvre le cloud, le self-hosted, et le natif intégré.
+Référence complète des options ASR (speech-to-text) et LLM (text cleanup) disponibles pour JonaWhisper. Couvre le cloud, le self-hosted, et le natif intégré.
 
 ---
 

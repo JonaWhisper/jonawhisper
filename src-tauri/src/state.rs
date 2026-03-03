@@ -88,7 +88,7 @@ impl InferenceContexts {
     }
 }
 
-const APP_DIR_NAME: &str = "WhisperDictate";
+const APP_DIR_NAME: &str = "JonaWhisper";
 const PREFS_FILE: &str = "preferences.json";
 const HISTORY_DB: &str = "history.db";
 const HISTORY_JSON_LEGACY: &str = "history.json";
@@ -279,15 +279,15 @@ fn default_llm_max_tokens() -> u32 { 4096 }
 fn default_ducking_level() -> f32 { 0.8 }
 fn default_theme() -> String { "system".to_string() }
 
-/// Config directory: ~/Library/Application Support/WhisperDictate/ (macOS)
-/// or %APPDATA%/WhisperDictate/ (Windows).
+/// Config directory: ~/Library/Application Support/JonaWhisper/ (macOS)
+/// or %APPDATA%/JonaWhisper/ (Windows).
 pub fn config_dir() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| dirs::home_dir().unwrap_or_default())
         .join(APP_DIR_NAME)
 }
 
-/// Model storage: ~/Library/Application Support/WhisperDictate/models/
+/// Model storage: ~/Library/Application Support/JonaWhisper/models/
 pub fn models_dir() -> PathBuf {
     config_dir().join("models")
 }
@@ -298,6 +298,9 @@ fn prefs_path() -> PathBuf {
 
 impl Preferences {
     pub fn load() -> Self {
+        // Rename WhisperDictate/ → JonaWhisper/ before reading config
+        crate::migrations::migrate_data_directory();
+
         let path = prefs_path();
         let data = match std::fs::read_to_string(&path) {
             Ok(d) => d,

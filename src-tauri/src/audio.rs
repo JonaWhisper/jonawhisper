@@ -124,7 +124,7 @@ impl AudioRecorder {
         // Create WAV file — always write 16kHz mono for Whisper
         let tmp_dir = std::env::temp_dir();
         let filename = format!(
-            "whisper_dictate_{}.wav",
+            "jona_whisper_{}.wav",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()

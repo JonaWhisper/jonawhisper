@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    whisper_dictate_lib::run()
+    jona_whisper_lib::run()
 }

@@ -6,12 +6,12 @@
     "patterns": ["panel.*", "settings.locale.*", "models.filter.*"]
   },
   "common.cancel": "Annuler",
-  "app.name": "WhisperDictate",
+  "app.name": "JonaWhisper",
   "menu.microphone": "Microphone",
   "menu.setup": "Configuration\u2026",
   "menu.noDevices": "Aucun p\u00e9riph\u00e9rique d'entr\u00e9e",
   "menu.quit": "Quitter",
-  "setup.title": "Configuration de WhisperDictate",
+  "setup.title": "Configuration de JonaWhisper",
   "setup.subtitle": "Accordez les autorisations nécessaires pour démarrer.",
   "setup.microphone": "Microphone",
   "setup.microphone.desc": "Nécessaire pour enregistrer l'audio à transcrire.",
@@ -150,5 +150,5 @@
   "models.filter.correction": "Correction",
   "models.filter.llm": "Reformulation",
   "menu.panel": "R\u00e9glages\u2026",
-  "window.panel": "WhisperDictate"
+  "window.panel": "JonaWhisper"
 }

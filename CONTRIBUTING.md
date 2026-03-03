@@ -1,4 +1,4 @@
-# Contributing to WhisperDictate
+# Contributing to JonaWhisper
 
 ## Prerequisites
 
@@ -25,7 +25,7 @@ For a release build:
 
 ```bash
 ./build.sh
-open build/WhisperDictate.app
+open build/JonaWhisper.app
 ```
 
 ## Architecture

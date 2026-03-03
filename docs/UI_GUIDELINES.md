@@ -1,6 +1,6 @@
 # UI Guidelines
 
-Conventions for building and maintaining the WhisperDictate interface. Follow these rules when adding or modifying any view or component.
+Conventions for building and maintaining the JonaWhisper interface. Follow these rules when adding or modifying any view or component.
 
 ## Design system
 

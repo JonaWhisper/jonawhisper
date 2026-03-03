@@ -1,7 +1,7 @@
 //! NVIDIA Canary ASR inference via ONNX Runtime (ort).
 //!
 //! Pipeline: WAV → mel spectrogram → encoder → autoregressive decoder → text.
-//! Based on canary-rs (github.com/mmende/canary-rs) patterns, adapted for WhisperDictate.
+//! Based on canary-rs (github.com/mmende/canary-rs) patterns, adapted for JonaWhisper.
 
 use crate::engines::{ASRModel, EngineError};
 use crate::state::AppState;

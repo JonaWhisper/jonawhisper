@@ -718,7 +718,7 @@ pub fn cleanup_orphan_audio_files() {
         let cutoff = std::time::SystemTime::now() - Duration::from_secs(ORPHAN_CLEANUP_SECS);
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("whisper_dictate_") && name.ends_with(".wav") {
+            if (name.starts_with("jona_whisper_") || name.starts_with("whisper_dictate_")) && name.ends_with(".wav") {
                 if let Ok(metadata) = entry.metadata() {
                     if let Ok(modified) = metadata.modified() {
                         if modified < cutoff {

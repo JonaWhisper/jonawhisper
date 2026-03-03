@@ -12,6 +12,30 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (3, "Update llm_max_tokens default to 4096", migrate_v3),
 ];
 
+/// Rename data directory from WhisperDictate → JonaWhisper.
+/// Must run before Preferences::load() since config_dir() now points to JonaWhisper/.
+pub fn migrate_data_directory() {
+    let base = match dirs::config_dir() {
+        Some(d) => d,
+        None => return,
+    };
+    let old_dir = base.join("WhisperDictate");
+    let new_dir = base.join("JonaWhisper");
+
+    if !old_dir.exists() || !old_dir.is_dir() {
+        return;
+    }
+    if new_dir.exists() {
+        log::info!("Data dir migration: both WhisperDictate/ and JonaWhisper/ exist, keeping JonaWhisper/");
+        return;
+    }
+
+    match std::fs::rename(&old_dir, &new_dir) {
+        Ok(()) => log::info!("Data dir migration: renamed {} → {}", old_dir.display(), new_dir.display()),
+        Err(e) => log::warn!("Data dir migration: failed to rename {} → {}: {}", old_dir.display(), new_dir.display(), e),
+    }
+}
+
 /// Run all pending migrations. Returns true if any migration was applied (needs save).
 pub fn run(raw: &mut Value, prefs: &mut Preferences) -> bool {
     let version = raw.get("_version")
@@ -274,3 +298,4 @@ fn migrate_v3(_raw: &mut Value, prefs: &mut Preferences) {
         prefs.llm_max_tokens = 4096;
     }
 }
+

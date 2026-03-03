@@ -134,7 +134,7 @@ jobs:
         run: npx tauri build --bundles app,dmg
 
       - name: Ad-hoc codesign
-        run: codesign --force --deep --sign - "src-tauri/target/release/bundle/macos/WhisperDictate.app"
+        run: codesign --force --deep --sign - "src-tauri/target/release/bundle/macos/JonaWhisper.app"
 
       - name: Package artifacts
         run: |
@@ -142,20 +142,20 @@ jobs:
 
           # Rename DMG
           mv src-tauri/target/release/bundle/dmg/*.dmg \
-            "WhisperDictate_${VERSION}_macos_aarch64.dmg"
+            "JonaWhisper_${VERSION}_macos_aarch64.dmg"
 
           # Create ZIP of .app
           ditto -c -k --sequesterRsrc --keepParent \
-            "src-tauri/target/release/bundle/macos/WhisperDictate.app" \
-            "WhisperDictate_${VERSION}_macos_aarch64.app.zip"
+            "src-tauri/target/release/bundle/macos/JonaWhisper.app" \
+            "JonaWhisper_${VERSION}_macos_aarch64.app.zip"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-aarch64
           path: |
-            WhisperDictate_*.dmg
-            WhisperDictate_*.app.zip
+            JonaWhisper_*.dmg
+            JonaWhisper_*.app.zip
 
   # ───────────────────────────────────────────────
   # Job 3: Build Windows (disabled)
@@ -194,9 +194,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
-          name: WhisperDictate v${{ needs.prepare.outputs.version }}
+          name: JonaWhisper v${{ needs.prepare.outputs.version }}
           body_path: CHANGES.md
           draft: true
           files: |
-            artifacts/WhisperDictate_*.dmg
-            artifacts/WhisperDictate_*.app.zip
+            artifacts/JonaWhisper_*.dmg
+            artifacts/JonaWhisper_*.app.zip

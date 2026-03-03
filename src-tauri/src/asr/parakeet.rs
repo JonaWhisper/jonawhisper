@@ -1,7 +1,7 @@
 //! NVIDIA Parakeet-TDT ASR inference via ONNX Runtime (ort).
 //!
 //! Pipeline: WAV → mel spectrogram (Slaney, pre-emphasis) → encoder → TDT decoder → text.
-//! Vendored from parakeet-rs TDT subset, adapted for WhisperDictate with CoreML EP.
+//! Vendored from parakeet-rs TDT subset, adapted for JonaWhisper with CoreML EP.
 
 use crate::engines::{ASRModel, EngineError};
 use crate::state::AppState;

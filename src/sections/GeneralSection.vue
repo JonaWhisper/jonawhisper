@@ -79,8 +79,8 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     <!-- About card -->
     <div class="wf-card" style="padding: 20px;">
       <div class="text-center">
-        <div class="wf-about-icon">W</div>
-        <div class="text-base font-bold">WhisperDictate</div>
+        <div class="wf-about-icon">J</div>
+        <div class="text-base font-bold">JonaWhisper</div>
       </div>
     </div>
   </div>

@@ -1,6 +1,6 @@
 # Intégration Cloud — Analyse et Priorités
 
-Analyse des APIs cloud à intégrer dans WhisperDictate, au-delà de ce qui fonctionne déjà (OpenAI-compatible + Anthropic).
+Analyse des APIs cloud à intégrer dans JonaWhisper, au-delà de ce qui fonctionne déjà (OpenAI-compatible + Anthropic).
 
 ## Ce qui fonctionne déjà
 

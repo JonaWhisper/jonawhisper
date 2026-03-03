@@ -67,7 +67,7 @@ Pipeline hybride proposé :
 
 **Upgrade ciblé** : Silero v6.2 est un drop-in (+16% précision sur bruit réel, voix enfants/étouffées). CoreML pré-converti disponible.
 
-**Alternative légère** : `earshot` (pyke.io, même équipe que `ort`) — 75 KB, Rust pur, no_std, ~20x plus rapide. À évaluer sur audio réel WhisperDictate.
+**Alternative légère** : `earshot` (pyke.io, même équipe que `ort`) — 75 KB, Rust pur, no_std, ~20x plus rapide. À évaluer sur audio réel JonaWhisper.
 
 **Fonctionnalités VAD** :
 1. **Discard silence** : si aucun segment de parole détecté → son Basso + pas de transcription

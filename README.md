@@ -1,4 +1,4 @@
-# WhisperDictate
+# JonaWhisper
 
 Local-first voice-to-text dictation for macOS. Runs in the menu bar, records audio via a global hotkey, transcribes with your choice of speech recognition engine, and pastes the result into the active application.
 
@@ -113,10 +113,10 @@ See [docs/TEXT-PIPELINE.md](docs/TEXT-PIPELINE.md) for the full architecture.
 ```bash
 npm install
 ./build.sh
-open build/WhisperDictate.app
+open build/JonaWhisper.app
 ```
 
-The build script produces `build/WhisperDictate.app` and `build/WhisperDictate.dmg`. If a Developer certificate is available, the app is code-signed with entitlements for stable TCC entries.
+The build script produces `build/JonaWhisper.app` and `build/JonaWhisper.dmg`. If a Developer certificate is available, the app is code-signed with entitlements for stable TCC entries.
 
 For a debug build:
 
@@ -154,7 +154,7 @@ On first launch, a setup wizard asks for three macOS permissions:
 
 **Settings**: Open from the tray menu to configure language, ASR model, text cleanup, hotkey, microphone, and cloud providers.
 
-Models are downloaded and managed from within the app. All models are stored in `~/Library/Application Support/WhisperDictate/models/`.
+Models are downloaded and managed from within the app. All models are stored in `~/Library/Application Support/JonaWhisper/models/`.
 
 ## Tech stack
 

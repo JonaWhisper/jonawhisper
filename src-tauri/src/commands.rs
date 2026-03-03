@@ -395,7 +395,7 @@ pub fn start_monitoring(
         crate::ui::tray::open_window_with_min(
             &app,
             "panel",
-            "WhisperDictate",
+            "JonaWhisper",
             "/panel",
             750.0,
             550.0,

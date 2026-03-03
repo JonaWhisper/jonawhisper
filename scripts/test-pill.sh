@@ -11,7 +11,7 @@
 ROUNDS=${1:-3}
 
 echo "Starting pill simulation with $ROUNDS rounds..."
-echo "Make sure WhisperDictate is running."
+echo "Make sure JonaWhisper is running."
 echo ""
 
 # Use osascript to send the command via the app's JavaScript context

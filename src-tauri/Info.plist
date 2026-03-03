@@ -5,8 +5,8 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>WhisperDictate needs microphone access to record audio for transcription.</string>
+    <string>JonaWhisper needs microphone access to record audio for transcription.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>WhisperDictate needs accessibility access to simulate keyboard shortcuts for pasting transcribed text.</string>
+    <string>JonaWhisper needs accessibility access to simulate keyboard shortcuts for pasting transcribed text.</string>
 </dict>
 </plist>

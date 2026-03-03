@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_NAME="WhisperDictate"
-BUNDLE_ID="com.local.whisper-dictate"
+APP_NAME="JonaWhisper"
+BUNDLE_ID="com.local.jona-whisper"
 DIST_DIR="$SCRIPT_DIR/build"
 
 # Debug or release mode

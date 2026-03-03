@@ -125,7 +125,7 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
     let menu = Menu::with_items(
         app,
         &[
-            &MenuItem::with_id(app, "title", "WhisperDictate", false, None::<&str>)?,
+            &MenuItem::with_id(app, "title", "JonaWhisper", false, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &mic_submenu,
             &PredefinedMenuItem::separator(app)?,

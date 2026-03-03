@@ -1,12 +1,12 @@
 [package]
-name = "whisper-dictate"
+name = "jona-whisper"
 version = "0.1.0"
-description = "WhisperDictate - Voice-to-text dictation"
+description = "JonaWhisper - Voice-to-text dictation"
 authors = ["Jonathan"]
 edition = "2021"
 
 [lib]
-name = "whisper_dictate_lib"
+name = "jona_whisper_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
