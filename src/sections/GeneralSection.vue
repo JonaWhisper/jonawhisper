@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
+import { getVersion } from '@tauri-apps/api/app'
 import { useSettingsStore } from '@/stores/settings'
 import { i18n } from '@/main'
 import {
@@ -10,6 +12,11 @@ import SegmentedToggle from '@/components/SegmentedToggle.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
+const appVersion = ref('')
+
+onMounted(async () => {
+  appVersion.value = await getVersion()
+})
 
 const localeOptions = [
   { value: 'auto', label: 'settings.locale.auto' },
@@ -81,6 +88,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
       <div class="text-center">
         <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">J</div>
         <div class="text-base font-bold">JonaWhisper</div>
+        <div v-if="appVersion" class="text-xs text-muted-foreground mt-0.5">v{{ appVersion }}</div>
       </div>
     </div>
   </div>
