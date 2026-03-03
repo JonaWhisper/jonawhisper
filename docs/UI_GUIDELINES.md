@@ -4,7 +4,7 @@ Conventions for building and maintaining the JonaWhisper interface. Follow these
 
 ## Design system
 
-The app uses a **glassmorphism** design language inspired by native macOS panels: translucent card backgrounds, subtle blurs, thin borders, and soft shadows. Components come from **shadcn-vue** (reka-ui primitives), styled with **Tailwind CSS** for utilities and **custom CSS classes** (`.wf-*`) for the panel-specific visual layer.
+The app uses a **glassmorphism** design language inspired by native macOS panels: translucent card backgrounds, subtle blurs, thin borders, and soft shadows. Components come from **shadcn-vue** (reka-ui primitives), styled exclusively with **Tailwind CSS** utilities. Panel design tokens are CSS custom properties (defined in `main.css`) registered as Tailwind theme extensions in `tailwind.config.ts`.
 
 Colors are CSS custom properties defined in `src/assets/main.css`. Dark mode is automatic (`prefers-color-scheme`) with full variable overrides.
 
@@ -24,7 +24,7 @@ Two layers of tokens:
 | `border` | All borders |
 | `input` | Input/select borders |
 
-**Panel (CSS custom properties)** — used in `.wf-*` classes:
+**Panel (CSS custom properties)** — registered as Tailwind `panel.*` / `sidebar.*` colors and `shadow-panel-card`:
 
 | Variable | Light | Dark |
 |---|---|---|
@@ -40,160 +40,123 @@ Two layers of tokens:
 
 Exception: the native pill overlay (`ui/pill.rs`) renders via RGBA buffer where CSS variables aren't available.
 
-## Custom CSS classes
+## Tailwind utility patterns
 
-All panel-specific styling lives in `main.css` as `.wf-*` classes. **Use these instead of ad-hoc Tailwind combinations** for cards, forms, and list items.
+All panel-specific styling uses **inline Tailwind utilities** referencing panel tokens from `tailwind.config.ts`. No custom CSS classes — keep everything in templates.
 
-### `.wf-card` — Card container
-
-```css
-background: var(--panel-card-bg);          /* translucent */
-backdrop-filter: blur(8px);                /* glassmorphism */
-border: 0.5px solid var(--panel-card-border);
-border-radius: 12px;
-box-shadow: var(--panel-card-shadow);
-padding: 14px 16px;
-margin-bottom: 10px;
-```
+### Card container
 
 ```html
-<div class="wf-card">
-  <div class="wf-card-title">SECTION HEADING</div>
+<div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+  <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">HEADING</div>
   <!-- content -->
 </div>
 ```
 
-### `.wf-card-title` — Card section heading
-
-```css
-font-size: 11px; font-weight: 600;
-text-transform: uppercase; letter-spacing: 0.04em;
-color: hsl(var(--muted-foreground));
-margin-bottom: 10px;
-```
-
-### `.wf-form-row` — Form label + control row
-
-```css
-display: flex; align-items: center; justify-content: space-between;
-padding: 8px 0; gap: 12px;
-/* Adjacent rows get a 0.5px divider via + combinator */
-```
+### Form row (label + control)
 
 ```html
-<div class="wf-form-row">
+<!-- First row: no top border -->
+<div class="flex items-center justify-between py-2 gap-3">
   <div>
-    <div class="wf-form-label">Label text</div>
-    <div class="wf-form-desc">Optional description</div>
+    <div class="text-[13px] text-foreground">Label</div>
+    <div class="text-[11px] text-muted-foreground mt-px">Optional description</div>
   </div>
-  <Select ...><!-- control --></Select>
+  <Select .../>
+</div>
+<!-- Subsequent rows: explicit top divider -->
+<div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
+  ...
 </div>
 ```
 
-### `.wf-form-label` / `.wf-form-desc`
+### History entry card
 
-| Class | Size | Color |
-|---|---|---|
-| `.wf-form-label` | 13px | `foreground` |
-| `.wf-form-desc` | 11px | `muted-foreground` |
-
-### `.wf-history-item` — History entry card
-
-```css
-display: flex; align-items: flex-start; gap: 10px;
-padding: 10px 12px;
-background: var(--panel-card-bg);          /* same glassmorphism */
-border: 0.5px solid var(--panel-card-border);
-border-radius: 10px;
-margin-bottom: 6px;
-/* hover: box-shadow: var(--panel-card-shadow) */
+```html
+<div class="flex items-start gap-2.5 p-[10px_12px] bg-panel-card-bg border-[0.5px] border-panel-card-border rounded-[10px] mb-1.5 transition-shadow duration-150 hover:shadow-panel-card group">
 ```
 
-### `.wf-filter-chip` — Model filter pill
+### Filter chip (Models)
 
-```css
-padding: 4px 12px; border-radius: 14px; font-size: 12px;
-border: 0.5px solid hsl(var(--border));
-background: hsl(var(--muted));
-/* Active state: add ring-1 ring-current/20 + category color via Tailwind */
+```html
+<button class="px-3 py-1 rounded-[14px] text-xs cursor-pointer border-[0.5px] border-border transition-all duration-150 font-[inherit] inline-flex items-center gap-1.5"
+  :class="[active ? [activeBg, activeText, 'border-transparent', 'ring-1', 'ring-current/20'] : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground']">
 ```
 
-### `.wf-provider-row` — Provider list entry
+Active colors use `*-500/10` opacity (e.g. `bg-blue-500/10`) — not `*-100` palette which is too strong in light mode.
 
-```css
-display: flex; align-items: center; gap: 12px; padding: 10px 0;
-/* Adjacent rows get a 0.5px divider */
+### Provider row
+
+```html
+<div class="flex items-center gap-3 py-2.5 [&+&]:border-t-[0.5px] [&+&]:border-panel-divider">
 ```
 
-### `.wf-about-icon` — App icon in General section
+### About icon
 
-```css
-width: 48px; height: 48px; border-radius: 12px;
-background: linear-gradient(135deg, var(--panel-accent), #5856d6);
-/* centered white text */
+```html
+<div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">
+```
+
+### Day group (hover to reveal delete)
+
+```html
+<div class="group/day">
+  <button class="opacity-0 group-hover/day:opacity-100 transition-opacity duration-150">Delete</button>
+</div>
 ```
 
 ## Layout
 
 ### Panel (sidebar + content)
 
-The main panel uses three layout classes:
+The main panel uses inline Tailwind utilities for the three layout zones:
 
 ```html
 <div class="flex h-full select-none">
-  <div class="panel-sidebar w-48 min-w-[10rem] overflow-y-auto flex-shrink-0">
-    <!-- nav-pill items -->
+  <!-- Sidebar: glassmorphism blur + translucent bg -->
+  <div class="backdrop-blur-[20px] backdrop-saturate-[1.8] bg-[hsl(var(--background)/0.72)] dark:bg-[hsl(var(--background)/0.65)] border-r-[0.5px] border-[hsl(var(--border)/0.5)] w-44 min-w-[10rem] flex flex-col flex-shrink-0">
+    <!-- nav items -->
   </div>
-  <div class="panel-content flex-1 min-w-0">
-    <div class="panel-content-body overflow-y-auto p-5">
+  <!-- Content: gradient background -->
+  <div class="bg-[linear-gradient(160deg,var(--panel-bg-start),var(--panel-bg-end))] flex-1 min-w-0 flex flex-col overflow-hidden">
+    <!-- Scrollable body with custom scrollbar -->
+    <div class="flex-1 overflow-y-auto px-5 pb-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-panel-scrollbar [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-track]:bg-transparent">
       <!-- section content -->
     </div>
   </div>
 </div>
 ```
 
-| Class | Effect |
-|---|---|
-| `.panel-sidebar` | `backdrop-filter: blur(20px)`, translucent background, thin right border |
-| `.panel-content` | Gradient background (`--panel-bg-start` → `--panel-bg-end`) |
-| `.panel-content-body` | Custom thin scrollbar (6px, rounded thumb) |
-
 ### Section title
 
 Every section starts with:
 
 ```html
-<div class="section-title">{{ t('panel.sectionName') }}</div>
-```
-
-```css
-/* .section-title */
-font-size: 20px; font-weight: 700;
-letter-spacing: -0.02em; margin-bottom: 16px;
+<div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.sectionName') }}</div>
 ```
 
 ### Nav pills (sidebar items)
 
 ```html
-<button class="nav-pill" :class="{ active: isActive }">
-  <Icon class="nav-icon w-4 h-4" />
+<button class="rounded-lg px-2.5 py-1.5 text-sm transition-all border border-transparent hover:bg-sidebar-hover-bg w-full text-left"
+  :class="isActive ? 'bg-sidebar-active-bg border-sidebar-active-border font-medium' : ''">
+  <Icon class="w-[18px] h-[18px]" :class="isActive ? 'opacity-100 text-panel-accent' : 'opacity-70'" />
   <span>Label</span>
 </button>
-```
-
-```css
-/* .nav-pill */
-@apply rounded-lg px-2.5 py-1.5 text-sm;
-/* .nav-pill.active → blue accent bg + border, font-weight: 500, icon turns --panel-accent */
 ```
 
 ### Status dot (sidebar footer)
 
 ```html
-<span class="status-dot" :class="status" />
+<span class="inline-block w-2 h-2 rounded-full"
+  :class="{
+    'bg-emerald-500': status === 'idle',
+    'bg-red-500 animate-status-pulse': status === 'recording',
+    'bg-amber-500 animate-status-pulse': status === 'transcribing',
+  }" />
 ```
 
-Classes: `.idle` (emerald), `.recording` (red + pulse), `.transcribing` (amber + pulse).
+`animate-status-pulse` is registered in `tailwind.config.ts` (1.2s ease-in-out infinite).
 
 ### Header + scrollable content
 
@@ -270,17 +233,17 @@ Do NOT use `font-medium` on the active state — it shifts the divider.
 
 ### Selects
 
-Default height: **`h-8 text-xs`** inside `.wf-form-row`. Search input: `h-8` with icon overlay.
+Default height: **`h-8 text-xs`** inside form rows. Search input: `h-8` with icon overlay.
 
 **Important**: always `max-h-[45vh]` on `SelectContent` — Tauri webview is a hard physical boundary, fixed `max-h-96` can overflow when dropdown flips upward.
 
 ### Switches
 
-Always inside a `.wf-form-row`:
+Always inside a form row:
 
 ```html
-<div class="wf-form-row">
-  <div class="wf-form-label">{{ t('...') }}</div>
+<div class="flex items-center justify-between py-2 gap-3">
+  <div class="text-[13px] text-foreground">{{ t('...') }}</div>
   <Switch :model-value="value" @update:model-value="onChange" />
 </div>
 ```
@@ -360,14 +323,14 @@ Use shadcn-vue `Tooltip` with `delay-duration="300"` everywhere instead of nativ
 
 ## Typography
 
-| Style | Definition | Usage |
+| Style | Tailwind classes | Usage |
 |---|---|---|
-| Section title | `.section-title` (20px, bold, -0.02em tracking) | Panel section headings |
-| Card heading | `.wf-card-title` (11px, semibold, uppercase, 0.04em tracking) | Card section labels |
-| Form label | `.wf-form-label` (13px, foreground) | Setting labels |
-| Form description | `.wf-form-desc` (11px, muted-foreground) | Setting descriptions |
+| Section title | `text-[20px] font-bold tracking-[-0.02em] mb-4` | Panel section headings |
+| Card heading | `text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5` | Card section labels |
+| Form label | `text-[13px] text-foreground` | Setting labels |
+| Form description | `text-[11px] text-muted-foreground mt-px` | Setting descriptions |
 | Wizard title | `text-lg font-bold` | Setup wizard `<h1>` |
-| Nav item | `text-sm` (via `.nav-pill`) | Sidebar items |
+| Nav item | `text-sm` (via nav pill pattern) | Sidebar items |
 | Body text | `text-sm` | General content |
 | Metadata | `text-xs text-muted-foreground` | Timestamps, secondary info |
 | Sub-metadata | `text-[11px] text-muted-foreground` | Model sizes in dense lists |
@@ -415,7 +378,7 @@ Four sizes:
 2. **`select-none`** on all interactive view roots — native app feel
 3. **Don't call `fetchAudioDevices()` on mount** — triggers macOS mic permission dialog
 4. **Semantic colors only** — never hardcode hex/rgb in templates
-5. **Use `.wf-*` classes for cards and forms** — not ad-hoc Tailwind combinations
+5. **Use the Tailwind utility patterns above for cards and forms** — keep styling consistent across sections
 6. **No `font-medium` on toggle active states** — shifts the divider
 7. **Adjust window sizes when changing padding** — SetupWizard has fixed sizes (420x450 step 1, 680x540 step 2)
 8. **Scrollable content needs `pb-5`** — bottom padding so content doesn't clip
