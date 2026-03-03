@@ -48,6 +48,7 @@
 ## Technique / Infra
 
 - [x] **CI/CD GitHub Actions** — **Done.** CI léger (typecheck + cargo check) sur push/PR. Release workflow (workflow_dispatch) : bump version → git-cliff changelog → tag → Tauri build → draft GitHub release. Voir `.github/workflows/ci.yml`, `.github/workflows/release.yml`.
+- [x] **Audit sécurité + hardening** — **Done.** API keys migrées de `preferences.json` vers le keychain macOS (`keyring` v3). Toggle `allow_insecure` par provider Custom (pour API locales HTTP). CSP activée, `withGlobalTauri: false`, timeouts HTTP, clés masquées dans l'IPC. Migration v4.
 - [x] **CHANGELOG.md** — **Done.** Généré automatiquement par git-cliff via `cliff.toml`. Conventional Commits adoptés (voir `CONTRIBUTING.md`).
 - [x] **Script de test visuel + screenshots** — **Done.** Histoire stories (`src/stories/UIPatterns.story.vue`) avec 10 variants UI. Playwright capture (`src/stories/capture.ts`) génère 20 screenshots (light + dark) intégrés dans `docs/UI_GUIDELINES.md`. Scripts : `npm run story:dev`, `npm run story:screenshots`.
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)

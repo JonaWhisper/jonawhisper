@@ -61,6 +61,12 @@ Every dependency has a reason. This document explains **what** each one does and
 |-------|------|--------------|
 | [`crossbeam-channel`](https://github.com/crossbeam-rs/crossbeam) | MPMC channels | Audio thread, hotkey events, spectrum data. Bounded channels with `select!`. Faster than `std::sync::mpsc`, supports multiple consumers |
 
+### Security
+
+| Crate | Role | Why this one |
+|-------|------|--------------|
+| [`keyring`](https://github.com/hwchen/keyring-rs) | OS keychain (API key storage) | macOS Keychain + Windows Credential Manager. 3-line API (`Entry::new/set_password/get_password`). Cross-platform. Replaces plaintext JSON storage |
+
 ### Text Processing / i18n
 
 | Crate | Role | Why this one |
