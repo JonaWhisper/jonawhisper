@@ -31,8 +31,8 @@ const emit = defineEmits<{
       {{ option.label }}
       <span
         v-if="option.badge"
-        class="ml-1 rounded px-1 py-px text-[10px] font-medium opacity-60"
-        :class="modelValue === option.value ? 'bg-background/40' : 'bg-foreground/10'"
+        class="ml-1 rounded px-1 py-px text-[10px] font-medium text-green-600 dark:text-green-400"
+        :class="modelValue === option.value ? 'bg-green-500/15' : 'bg-green-500/10'"
       >{{ option.badge }}</span>
     </button>
   </div>
