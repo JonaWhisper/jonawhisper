@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useHistoryStore } from '@/stores/history'
 import { useEnginesStore } from '@/stores/engines'
 import { parseCloudId } from '@/stores/types'
@@ -31,32 +32,23 @@ watch(searchQuery, () => {
   }, 250)
 })
 
-// Infinite scroll via IntersectionObserver
-const sentinel = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
-
 onMounted(() => {
-  observer = new IntersectionObserver((entries) => {
-    if (entries[0]?.isIntersecting && historyStore.hasMore) {
-      historyStore.loadMore()
-    }
-  }, { threshold: 0 })
+  if (historyStore.history.length === 0) {
+    historyStore.fetchHistory()
+  }
 })
 
-watch(sentinel, (el, oldEl) => {
-  if (oldEl && observer) observer.unobserve(oldEl)
-  if (el && observer) observer.observe(el)
-})
-
-onUnmounted(() => {
-  observer?.disconnect()
-})
+// -- Grouping + flattening --
 
 interface DayGroup {
   label: string
   dayTimestamp: number
   entries: HistoryEntry[]
 }
+
+type FlatItem =
+  | { kind: 'day-header'; label: string; dayTimestamp: number }
+  | { kind: 'entry'; entry: HistoryEntry }
 
 const groupedHistory = computed<DayGroup[]>(() => {
   const groups = new Map<string, DayGroup>()
@@ -87,6 +79,40 @@ const groupedHistory = computed<DayGroup[]>(() => {
   }
   return Array.from(groups.values())
 })
+
+const flatItems = computed<FlatItem[]>(() => {
+  const items: FlatItem[] = []
+  for (const group of groupedHistory.value) {
+    items.push({ kind: 'day-header', label: group.label, dayTimestamp: group.dayTimestamp })
+    for (const entry of group.entries) {
+      items.push({ kind: 'entry', entry })
+    }
+  }
+  return items
+})
+
+// -- Virtual scroll --
+
+const scrollEl = ref<HTMLElement | null>(null)
+
+const virtualizer = useVirtualizer(computed(() => ({
+  count: flatItems.value.length,
+  getScrollElement: () => scrollEl.value,
+  estimateSize: (index: number) => flatItems.value[index]?.kind === 'day-header' ? 32 : 80,
+  overscan: 5,
+})))
+
+// Infinite scroll: detect when near bottom
+function onScroll() {
+  const el = scrollEl.value
+  if (!el || !historyStore.hasMore) return
+  const { scrollTop, scrollHeight, clientHeight } = el
+  if (scrollHeight - scrollTop - clientHeight < 200) {
+    historyStore.loadMore()
+  }
+}
+
+// -- Helpers --
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -155,6 +181,14 @@ async function doClearAll() {
   showClearAllConfirm.value = false
   await historyStore.clearHistoryAction()
 }
+
+function entryAt(index: number): HistoryEntry {
+  return (flatItems.value[index] as { kind: 'entry'; entry: HistoryEntry }).entry
+}
+
+function headerAt(index: number) {
+  return flatItems.value[index] as { kind: 'day-header'; label: string; dayTimestamp: number }
+}
 </script>
 
 <template>
@@ -195,107 +229,113 @@ async function doClearAll() {
         {{ t('history.emptySearch', [searchQuery]) }}
       </div>
 
-      <!-- Timeline -->
-      <div v-else class="space-y-3.5">
-        <div v-for="group in groupedHistory" :key="group.dayTimestamp" class="group/day">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-              {{ group.label }}
-            </span>
-            <button
-              class="opacity-0 group-hover/day:opacity-100 transition-opacity duration-150 text-[11px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded cursor-pointer"
-              @click="confirmDeleteDay(group.dayTimestamp)"
-            >
-              {{ t('history.deleteDay') }}
-            </button>
-          </div>
+      <!-- Virtual-scrolled timeline -->
+      <div v-else ref="scrollEl" class="h-full overflow-auto" @scroll="onScroll">
+        <div :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }">
+          <div
+            v-for="vItem in virtualizer.getVirtualItems()"
+            :key="vItem.index"
+            :data-index="vItem.index"
+            :ref="(el) => virtualizer.measureElement(el as Element)"
+            :style="{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vItem.start}px)` }"
+          >
+            <!-- Day header -->
+            <template v-if="flatItems[vItem.index]!.kind === 'day-header'">
+              <div class="flex items-center justify-between mb-1.5 group/day" :class="{ 'mt-3.5': vItem.index > 0 }">
+                <span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  {{ headerAt(vItem.index).label }}
+                </span>
+                <button
+                  class="opacity-0 group-hover/day:opacity-100 transition-opacity duration-150 text-[11px] text-muted-foreground hover:text-destructive px-1.5 py-0.5 rounded cursor-pointer"
+                  @click="confirmDeleteDay(headerAt(vItem.index).dayTimestamp)"
+                >
+                  {{ t('history.deleteDay') }}
+                </button>
+              </div>
+            </template>
 
-          <!-- History items as individual cards -->
-          <div class="space-y-1.5">
-            <div
-              v-for="entry in group.entries"
-              :key="entry.timestamp"
-              class="flex items-start gap-2.5 p-[10px_12px] bg-panel-card-bg border-[0.5px] border-panel-card-border rounded-[10px] mb-1.5 transition-shadow duration-150 hover:shadow-panel-card group"
-            >
-              <span class="text-[11px] text-muted-foreground mt-0.5 shrink-0 tabular-nums min-w-[38px]">
-                {{ formatTime(entry.timestamp) }}
-              </span>
-              <div class="flex-1 min-w-0">
-                <p class="text-[13px] leading-snug line-clamp-2 mb-1">{{ entry.text }}</p>
-                <TooltipProvider v-if="entry.model_id" :delay-duration="300">
-                  <div class="flex flex-wrap gap-1">
+            <!-- Entry card -->
+            <template v-else>
+              <div
+                class="flex items-start gap-2.5 p-[10px_12px] bg-panel-card-bg border-[0.5px] border-panel-card-border rounded-[10px] mb-1.5 transition-shadow duration-150 hover:shadow-panel-card group"
+              >
+                <span class="text-[11px] text-muted-foreground mt-0.5 shrink-0 tabular-nums min-w-[38px]">
+                  {{ formatTime(entryAt(vItem.index).timestamp) }}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-[13px] leading-snug line-clamp-2 mb-1">{{ entryAt(vItem.index).text }}</p>
+                  <TooltipProvider v-if="entryAt(vItem.index).model_id" :delay-duration="300">
+                    <div class="flex flex-wrap gap-1">
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <TypeBadge :type="isCloudAsr(entryAt(vItem.index).model_id) ? 'cloud' : 'local'">
+                            {{ formatAsrLabel(entryAt(vItem.index).model_id) }}
+                          </TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.asr') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).language">
+                        <TooltipTrigger as-child>
+                          <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
+                            {{ entryAt(vItem.index).language }}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.language') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).vad_trimmed">
+                        <TooltipTrigger as-child>
+                          <TypeBadge type="vad">VAD</TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.vad') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).cleanup_model_id">
+                        <TooltipTrigger as-child>
+                          <TypeBadge :type="cleanupBadgeType(entryAt(vItem.index).cleanup_model_id)">
+                            {{ formatCleanupLabel(entryAt(vItem.index).cleanup_model_id) }}
+                          </TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.cleanup') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).hallucination_filter">
+                        <TooltipTrigger as-child>
+                          <TypeBadge type="hallucination" />
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.hallucination') }}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
+                </div>
+                <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
+                  <TooltipProvider :delay-duration="300">
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <TypeBadge :type="isCloudAsr(entry.model_id) ? 'cloud' : 'local'">
-                          {{ formatAsrLabel(entry.model_id) }}
-                        </TypeBadge>
+                        <button class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="copyEntry(entryAt(vItem.index))">
+                          <Check v-if="copiedTimestamp === entryAt(vItem.index).timestamp" class="h-3.5 w-3.5 text-green-600" />
+                          <Copy v-else class="h-3.5 w-3.5" />
+                          <Transition name="copied-toast">
+                            <span
+                              v-if="copiedTimestamp === entryAt(vItem.index).timestamp"
+                              class="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-600 text-white whitespace-nowrap pointer-events-none"
+                            >{{ t('history.copy') }}</span>
+                          </Transition>
+                        </button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.asr') }}</TooltipContent>
+                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.copy') }}</TooltipContent>
                     </Tooltip>
-                    <Tooltip v-if="entry.language">
+                    <Tooltip>
                       <TooltipTrigger as-child>
-                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
-                          {{ entry.language }}
-                        </span>
+                        <button class="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted/50" @click="deleteEntry(entryAt(vItem.index))">
+                          <Trash2 class="h-3.5 w-3.5" />
+                        </button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.language') }}</TooltipContent>
+                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.delete') }}</TooltipContent>
                     </Tooltip>
-                    <Tooltip v-if="entry.vad_trimmed">
-                      <TooltipTrigger as-child>
-                        <TypeBadge type="vad">VAD</TypeBadge>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.vad') }}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip v-if="entry.cleanup_model_id">
-                      <TooltipTrigger as-child>
-                        <TypeBadge :type="cleanupBadgeType(entry.cleanup_model_id)">
-                          {{ formatCleanupLabel(entry.cleanup_model_id) }}
-                        </TypeBadge>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.cleanup') }}</TooltipContent>
-                    </Tooltip>
-                    <Tooltip v-if="entry.hallucination_filter">
-                      <TooltipTrigger as-child>
-                        <TypeBadge type="hallucination" />
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.hallucination') }}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </TooltipProvider>
+                  </TooltipProvider>
+                </div>
               </div>
-              <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
-                <TooltipProvider :delay-duration="300">
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <button class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="copyEntry(entry)">
-                        <Check v-if="copiedTimestamp === entry.timestamp" class="h-3.5 w-3.5 text-green-600" />
-                        <Copy v-else class="h-3.5 w-3.5" />
-                        <Transition name="copied-toast">
-                          <span
-                            v-if="copiedTimestamp === entry.timestamp"
-                            class="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-600 text-white whitespace-nowrap pointer-events-none"
-                          >{{ t('history.copy') }}</span>
-                        </Transition>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.copy') }}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <button class="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted/50" @click="deleteEntry(entry)">
-                        <Trash2 class="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" :side-offset="4">{{ t('history.delete') }}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            </div>
+            </template>
           </div>
         </div>
-
-        <!-- Sentinel for infinite scroll -->
-        <div ref="sentinel" class="h-1" />
       </div>
     </div>
 
