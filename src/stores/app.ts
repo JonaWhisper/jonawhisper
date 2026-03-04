@@ -106,11 +106,7 @@ export const useAppStore = defineStore('app', () => {
       settingsStore.fetchSettings(),
       enginesStore.fetchEngines(),
       enginesStore.fetchModels(),
-      enginesStore.fetchLanguages(),
-      enginesStore.fetchPermissions(),
-      historyStore.fetchHistory(),
       enginesStore.fetchProviders(),
-      enginesStore.fetchAudioDevices(),
     ])
   }
 

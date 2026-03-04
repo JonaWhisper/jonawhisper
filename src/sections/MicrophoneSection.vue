@@ -107,6 +107,9 @@ async function stopMicTest() {
 }
 
 onMounted(async () => {
+  if (engines.audioDevices.length === 0) {
+    engines.fetchAudioDevices()
+  }
   micTestStoppedUnlisten = await listen('mic-test-stopped', () => {
     isTesting.value = false
     testSpectrum.value = new Array(12).fill(0)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
@@ -63,6 +63,12 @@ async function onAsrCloudModelChange(value: string) {
 const selectedAsrModel = computed(() =>
   engines.asrModels.find(m => m.id === settings.selectedModelId) ?? null
 )
+
+onMounted(() => {
+  if (engines.languages.length === 0) {
+    engines.fetchLanguages()
+  }
+})
 
 </script>
 
