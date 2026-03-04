@@ -600,6 +600,20 @@ fn run_event_tap(
                 "CGEvent tap disabled (type={}), will re-enable",
                 event_type
             );
+            // Safety: if recording was active, we may have missed the KeyUp.
+            // Send a KeyUp now to prevent the mic from staying active forever.
+            unsafe {
+                let state = &*(user_info as *const TapState);
+                if state.rec_held.swap(false, Ordering::SeqCst) {
+                    log::warn!("Tap disabled while recording held — sending safety KeyUp");
+                    let _ = state.event_tx.send(HotkeyEvent::KeyUp);
+                }
+                // Clear pressed key tracking (events during disable are lost)
+                state.pressed_keys_packed.store(0, Ordering::SeqCst);
+                state.pressed_key_count.store(0, Ordering::SeqCst);
+                state.pressed_mod_keys_packed.store(0, Ordering::SeqCst);
+                state.pressed_mod_key_count.store(0, Ordering::SeqCst);
+            }
             return event;
         }
 
@@ -961,9 +975,9 @@ fn run_event_tap(
         use std::os::raw::c_void;
 
         let tap = ffi::CGEventTapCreate(
-            1,
-            0,
-            0,
+            1,  // kCGHIDEventTap
+            0,  // kCGHeadInsertEventTap
+            1,  // kCGEventTapOptionListenOnly — less prone to timeout disable
             event_mask,
             callback,
             state_ptr as *mut c_void,
@@ -991,6 +1005,39 @@ fn run_event_tap(
         loop {
             ffi::CFRunLoopRunInMode(ffi::kCFRunLoopDefaultMode, 0.5, false);
             ffi::CGEventTapEnable(tap, true);
+
+            // -- Safety watchdog --
+            // If rec_held is true but the modifier/key is no longer physically pressed,
+            // we missed a KeyUp (tap disabled, Secure Input, etc.). Send safety KeyUp.
+            if state.rec_held.load(Ordering::SeqCst) {
+                let rec = state.load_rec_shortcut();
+                let current_flags =
+                    ffi::CGEventSourceFlagsState(1) & CG_MASK_ALL_MODIFIERS;
+                let key_still_held = match rec.kind {
+                    ShortcutKind::ModifierOnly => {
+                        (current_flags & rec.modifiers) == rec.modifiers
+                    }
+                    ShortcutKind::Combo => {
+                        // For combos, at minimum the modifiers must still be held
+                        (current_flags & rec.modifiers) == rec.modifiers
+                    }
+                    // For Key-only shortcuts, we can't poll key state easily —
+                    // rely on tap-disabled handler only
+                    ShortcutKind::Key => true,
+                };
+                if !key_still_held {
+                    log::warn!(
+                        "Watchdog: rec_held but modifier no longer pressed (flags=0x{:x}), sending safety KeyUp",
+                        current_flags
+                    );
+                    state.rec_held.store(false, Ordering::SeqCst);
+                    state.pressed_keys_packed.store(0, Ordering::SeqCst);
+                    state.pressed_key_count.store(0, Ordering::SeqCst);
+                    state.pressed_mod_keys_packed.store(0, Ordering::SeqCst);
+                    state.pressed_mod_key_count.store(0, Ordering::SeqCst);
+                    let _ = state.event_tx.send(HotkeyEvent::KeyUp);
+                }
+            }
 
             while let Ok(update) = update_rx.try_recv() {
                 match update {

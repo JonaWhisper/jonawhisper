@@ -26,6 +26,10 @@ extern "C" {
     pub fn CGEventGetIntegerValueField(event: *mut c_void, field: u32) -> i64;
 
     pub fn CGEventGetFlags(event: *mut c_void) -> u64;
+
+    /// Returns the current modifier flags from a given event source state.
+    /// stateID: 0 = private, 1 = combined session, 2 = HID system
+    pub fn CGEventSourceFlagsState(stateID: u32) -> u64;
 }
 
 #[link(name = "CoreFoundation", kind = "framework")]

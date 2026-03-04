@@ -224,7 +224,10 @@ impl AudioRecorder {
     }
 
     pub fn stop_recording(&mut self) -> Option<PathBuf> {
-        // Drop the stream first to stop recording
+        // Pause then drop the stream to ensure CoreAudio releases the device
+        if let Some(ref stream) = self.stream {
+            let _ = stream.pause();
+        }
         self.stream = None;
 
         // Finalize the WAV writer

@@ -870,6 +870,9 @@ pub fn spawn_spectrum_emitter(
             state.runtime.lock().unwrap().is_recording = false;
             stream_error.store(false, Ordering::SeqCst);
 
+            // Actually stop the cpal stream — without this the mic stays active
+            let _ = cmd_tx.send(AudioCmd::StopRecording);
+
             platform::play_sound("Basso");
             let _ = app.emit(crate::events::RECORDING_STOPPED, ());
             show_error_then_close(&app);
