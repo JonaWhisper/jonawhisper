@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useEnginesStore } from '@/stores/engines'
 import { useDownloadStore } from '@/stores/downloads'
 import type { ASRModel } from '@/stores/types'
@@ -60,10 +61,20 @@ async function confirmDelete() {
     await downloads.deleteModel(target.id)
   }
 }
+
+// Virtual scroll
+const scrollEl = ref<HTMLElement | null>(null)
+
+const virtualizer = useVirtualizer(computed(() => ({
+  count: filteredModels.value.length,
+  getScrollElement: () => scrollEl.value,
+  estimateSize: () => 68,
+  overscan: 5,
+})))
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col h-full">
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.models') }}</div>
 
     <!-- Filter chips -->
@@ -90,18 +101,27 @@ async function confirmDelete() {
       </button>
     </div>
 
-    <!-- Model list -->
-    <div class="space-y-1.5">
-      <ModelCell
-        v-for="model in filteredModels"
-        :key="model.id"
-        :model="model"
-        @download="handleDownload"
-        @delete="handleDeleteRequest"
-      />
+    <!-- Model list (virtual scroll) -->
+    <div v-if="filteredModels.length > 0" ref="scrollEl" class="flex-1 min-h-0 overflow-y-auto">
+      <div :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }">
+        <div
+          v-for="vItem in virtualizer.getVirtualItems()"
+          :key="filteredModels[vItem.index]!.id"
+          :data-index="vItem.index"
+          :ref="(el) => virtualizer.measureElement(el as Element)"
+          :style="{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vItem.start}px)` }"
+          class="pb-1.5"
+        >
+          <ModelCell
+            :model="filteredModels[vItem.index]!"
+            @download="handleDownload"
+            @delete="handleDeleteRequest"
+          />
+        </div>
+      </div>
     </div>
 
-    <div v-if="filteredModels.length === 0" class="text-muted-foreground text-sm py-8 text-center">
+    <div v-else class="text-muted-foreground text-sm py-8 text-center">
       {{ t('modelManager.noModels') }}
     </div>
 
