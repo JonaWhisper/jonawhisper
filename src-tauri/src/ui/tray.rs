@@ -134,6 +134,8 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
             #[cfg(debug_assertions)]
             &MenuItem::with_id(app, "test_pill", "Test Pill States", true, None::<&str>)?,
             #[cfg(debug_assertions)]
+            &MenuItem::with_id(app, "open_setup", "Setup Wizard", true, None::<&str>)?,
+            #[cfg(debug_assertions)]
             &PredefinedMenuItem::separator(app)?,
             &quit_item,
         ],
@@ -403,6 +405,9 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     tauri::async_runtime::spawn(async move {
                         crate::commands::simulate_pill_test(app_clone, Some(3)).await;
                     });
+                }
+                "open_setup" => {
+                    open_fixed_window(app, "setup", &t!("window.setup"), "/setup", 420.0, 450.0);
                 }
                 _ => {
                     // Handle prefixed selections: device_*
