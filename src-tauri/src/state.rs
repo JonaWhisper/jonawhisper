@@ -528,21 +528,33 @@ impl AppState {
         }
     }
 
-    pub fn get_history(&self, query: &str, limit: u32, offset: u32) -> Vec<HistoryEntry> {
+    pub fn get_history(&self, query: &str, limit: u32, cursor: Option<u64>) -> Vec<HistoryEntry> {
         let db = self.history_db.lock().unwrap();
-        let (sql, params): (&str, Vec<Box<dyn rusqlite::types::ToSql>>) = if query.is_empty() {
-            (
-                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history ORDER BY timestamp DESC LIMIT ?1 OFFSET ?2",
-                vec![Box::new(limit), Box::new(offset)],
-            )
-        } else {
-            let pattern = format!("%{}%", query);
-            (
-                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2 OFFSET ?3",
-                vec![Box::new(pattern), Box::new(limit), Box::new(offset)],
-            )
+        let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match (query.is_empty(), cursor) {
+            (true, None) => (
+                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history ORDER BY timestamp DESC LIMIT ?1".into(),
+                vec![Box::new(limit)],
+            ),
+            (true, Some(c)) => (
+                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE timestamp < ?1 ORDER BY timestamp DESC LIMIT ?2".into(),
+                vec![Box::new(c), Box::new(limit)],
+            ),
+            (false, None) => {
+                let pattern = format!("%{}%", query);
+                (
+                    "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2".into(),
+                    vec![Box::new(pattern), Box::new(limit)],
+                )
+            }
+            (false, Some(c)) => {
+                let pattern = format!("%{}%", query);
+                (
+                    "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3".into(),
+                    vec![Box::new(pattern), Box::new(c), Box::new(limit)],
+                )
+            }
         };
-        let mut stmt = db.prepare(sql).unwrap();
+        let mut stmt = db.prepare(&sql).unwrap();
         let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         stmt.query_map(params_refs.as_slice(), |row| {
             Ok(HistoryEntry {

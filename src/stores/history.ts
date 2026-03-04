@@ -18,12 +18,13 @@ export const useHistoryStore = defineStore('history', () => {
 
   async function fetchHistory(searchQuery = '', append = false) {
     try {
-      const offset = append ? history.value.length : 0
       if (!append) query.value = searchQuery
+      const last = history.value[history.value.length - 1]
+      const cursor = append && last ? last.timestamp : null
       const page = await invoke<HistoryPage>('get_history', {
         query: query.value,
         limit: PAGE_SIZE,
-        offset,
+        cursor,
       })
       if (append) {
         history.value.push(...page.entries)
