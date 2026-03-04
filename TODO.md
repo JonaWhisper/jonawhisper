@@ -4,6 +4,7 @@
 
 - [ ] **CGEvent Unicode typing** — Remplacer le clipboard+Cmd+V par `CGEventKeyboardSetUnicodeString` pour taper le texte directement
 - [ ] **Tray menu se ferme au premier clic après lancement** — Bug upstream `tray-icon` (manque `acceptsFirstMouse:` sur TrayTarget NSView). Issue ouverte : tray-icon#251. Workaround actuel (menu attaché après build) est le meilleur disponible. Fix = PR upstream ou fork.
+- [ ] **Spectre plat/gris\u00e9 pendant l'enregistrement (intermittent)** — Parfois le spectre reste plat et gris\u00e9 pendant qu'on parle, alors que l'audio s'enregistre et transcrit correctement. Le flow audio fonctionne (la pill affiche bien l'\u00e9tat recording, la transcription aboutit). Suspect\u00e9 : race condition dans le flux de donn\u00e9es spectre entre le callback cpal, le mutex `AudioRecorder.spectrum`, la commande `GetSpectrum` et l'\u00e9metteur 30fps. Difficile \u00e0 reproduire \u2014 surveiller et investiguer quand le cas se pr\u00e9sente.
 
 ## Fonctionnalités
 

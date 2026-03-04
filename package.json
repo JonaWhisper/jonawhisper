@@ -2,6 +2,7 @@
   "name": "jona-whisper",
   "private": true,
   "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +14,7 @@
     "story:screenshots": "npx tsx src/stories/capture.ts"
   },
   "dependencies": {
+    "@tanstack/vue-virtual": "^3.13.19",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-clipboard-manager": "^2",
     "@vueuse/core": "^14.2.1",

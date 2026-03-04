@@ -3,6 +3,7 @@ name = "jona-whisper"
 version = "0.1.0"
 description = "JonaWhisper - Voice-to-text dictation"
 authors = ["Jonathan"]
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 [lib]
@@ -58,6 +59,10 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
 objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSSound", "NSApplication", "NSRunningApplication"] }
 block2 = "0.6"
+
+[profile.release]
+strip = true
+lto = "thin"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = "0.15"
