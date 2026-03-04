@@ -103,7 +103,7 @@ See [docs/TEXT-PIPELINE.md](docs/TEXT-PIPELINE.md) for the full architecture.
 
 ## Requirements
 
-- macOS 13.0+ (Apple Silicon recommended)
+- macOS 14.0+ (Apple Silicon)
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - [Node.js](https://nodejs.org/) 24+
 - Xcode Command Line Tools (`xcode-select --install`)
@@ -116,7 +116,7 @@ npm install
 open build/JonaWhisper.app
 ```
 
-The build script produces `build/JonaWhisper.app` and `build/JonaWhisper.dmg`. If a Developer certificate is available, the app is code-signed with entitlements for stable TCC entries.
+The build script produces `build/JonaWhisper.app` and `build/JonaWhisper.dmg`. Tauri handles code signing automatically — if a Developer certificate is available (via `APPLE_SIGNING_IDENTITY`), the app is signed with hardened runtime and entitlements. Notarization is supported via `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` environment variables.
 
 For a debug build:
 
@@ -200,7 +200,7 @@ docs/                      Technical documentation
   AUDIO-PIPELINE.md        Audio preprocessing architecture & roadmap
   TEXT-PIPELINE.md         Text postprocessing architecture & roadmap
   BENCHMARK.md             Full benchmark data (ASR, LLM, punctuation, correction)
-build.sh                   Build + codesign + package script
+build.sh                   Build + package script (signing handled by Tauri)
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture guide with data flows, threading model, and module responsibilities.

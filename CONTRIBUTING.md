@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- macOS 13.0+ (Apple Silicon recommended)
+- macOS 14.0+ (Apple Silicon)
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - [Node.js](https://nodejs.org/) 24+
 - Xcode Command Line Tools: `xcode-select --install`
