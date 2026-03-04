@@ -133,8 +133,9 @@ onUnmounted(() => {
   font-size: 13px;
   color: hsl(var(--foreground));
   cursor: pointer;
-  width: 200px;
-  height: 32px;
+  min-width: 200px;
+  width: 100%;
+  height: 36px;
   justify-content: center;
   transition: all 0.2s;
 }
