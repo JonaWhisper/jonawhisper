@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '@/stores/app'
 import { useEnginesStore } from '@/stores/engines'
 import { Button } from '@/components/ui/button'
@@ -49,7 +50,8 @@ async function grant(kind: string) {
   await enginesStore.requestPermission(kind)
 }
 
-function goToStep2() {
+async function goToStep2() {
+  await invoke('enable_monitoring')
   step.value = 2
 }
 

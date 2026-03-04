@@ -76,6 +76,7 @@ pub fn run() {
             commands::get_app_state,
             commands::start_mic_test,
             commands::stop_mic_test,
+            commands::enable_monitoring,
             commands::start_shortcut_capture,
             commands::stop_shortcut_capture,
             commands::simulate_pill_test,

@@ -440,6 +440,16 @@ pub fn get_app_state(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Valu
     state.to_frontend_json()
 }
 
+/// Enable the hotkey event tap without closing the setup window.
+/// Called when permissions are granted so that shortcut capture works in setup step 2.
+#[tauri::command]
+pub fn enable_monitoring(enabled: tauri::State<'_, Arc<AtomicBool>>) {
+    if !enabled.load(Ordering::SeqCst) {
+        enabled.store(true, Ordering::SeqCst);
+        log::info!("Monitoring enabled (pre-start)");
+    }
+}
+
 // -- Shortcut capture --
 
 #[tauri::command]
