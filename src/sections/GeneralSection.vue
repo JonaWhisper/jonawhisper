@@ -89,6 +89,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
         <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">J</div>
         <div class="text-base font-bold">JonaWhisper</div>
         <div v-if="appVersion" class="text-xs text-muted-foreground mt-0.5">v{{ appVersion }}</div>
+        <div class="text-[10px] text-muted-foreground/60 mt-1">GPL-3.0</div>
       </div>
     </div>
   </div>
