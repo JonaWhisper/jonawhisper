@@ -52,6 +52,14 @@ else
 fi
 
 cd "$SCRIPT_DIR"
+
+# Auto-install/update npm dependencies if needed
+if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
+    echo "  Installing npm dependencies..."
+    npm install --prefer-offline
+    touch node_modules
+fi
+
 npx tauri build --bundles app $TAURI_FLAGS
 
 if [ ! -d "$APP_PATH" ]; then
