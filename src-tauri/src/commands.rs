@@ -78,7 +78,7 @@ pub async fn download_model_cmd(
         .model_by_id(&id)
         .ok_or_else(|| AppError::Other(format!("Model not found: {}", id)))?;
 
-    let result = downloader::download_model(app.clone(), Arc::clone(&state), model).await;
+    let result = downloader::download_model(app.clone(), Arc::clone(&state.download), model).await;
     let _ = app.emit(events::MODELS_CHANGED, ());
     Ok(result)
 }

@@ -3,7 +3,7 @@ use super::*;
 pub struct PcsPunctuationEngine;
 
 fn storage_dir() -> String {
-    crate::state::models_dir().join("pcs").to_string_lossy().to_string()
+    jona_types::models_dir().join("pcs").to_string_lossy().to_string()
 }
 
 impl ASREngine for PcsPunctuationEngine {

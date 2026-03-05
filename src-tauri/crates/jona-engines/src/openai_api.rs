@@ -1,5 +1,5 @@
 use super::EngineError;
-use crate::state::Provider;
+use jona_types::Provider;
 use std::path::Path;
 use std::sync::LazyLock;
 

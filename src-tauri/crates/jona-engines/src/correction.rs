@@ -3,7 +3,7 @@ use super::*;
 pub struct CorrectionEngine;
 
 fn storage_dir() -> String {
-    crate::state::models_dir()
+    jona_types::models_dir()
         .join("correction")
         .to_string_lossy()
         .to_string()

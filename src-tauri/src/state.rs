@@ -2,7 +2,7 @@
 pub use jona_types::*;
 
 use rusqlite::Connection;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 // -- Context groups (reference asr/cleanup types from this crate) --
 
@@ -41,7 +41,7 @@ impl InferenceContexts {
 
 pub struct AppState {
     pub runtime: Mutex<RuntimeState>,
-    pub download: Mutex<DownloadState>,
+    pub download: Arc<Mutex<DownloadState>>,
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
     pub tray_menu: Mutex<Option<crate::ui::tray::TrayMenuState>>,
@@ -125,7 +125,7 @@ impl Default for AppState {
         let prefs = load_preferences();
         Self {
             runtime: Mutex::new(RuntimeState::default()),
-            download: Mutex::new(DownloadState::default()),
+            download: Arc::new(Mutex::new(DownloadState::default())),
             settings: Mutex::new(prefs),
             history_db: Mutex::new(open_history_db()),
             tray_menu: Mutex::new(None),

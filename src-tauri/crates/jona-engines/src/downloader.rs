@@ -1,17 +1,19 @@
 use super::{ASRModel, DownloadFile, DownloadType};
-use crate::state::{ActiveDownload, AppState};
+use jona_types::{ActiveDownload, DownloadState};
 use futures_util::StreamExt;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{AppHandle, Emitter};
 
 static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
+pub const DOWNLOAD_PROGRESS_EVENT: &str = "download-progress";
+
 fn pending_download_path() -> PathBuf {
-    crate::state::config_dir().join(".pending-download")
+    jona_types::config_dir().join(".pending-download")
 }
 
 /// Stable partial file path for a model (deterministic, survives app restart).
@@ -88,7 +90,7 @@ pub fn delete_partial(model: &ASRModel) {
 
 pub async fn download_model(
     app: AppHandle,
-    state: Arc<AppState>,
+    download_state: Arc<Mutex<DownloadState>>,
     model: ASRModel,
 ) -> bool {
     // Write pending state
@@ -105,7 +107,7 @@ pub async fn download_model(
     let cancel_flag = Arc::new(AtomicBool::new(false));
     let delete_flag = Arc::new(AtomicBool::new(false));
     {
-        let mut dl = state.download.lock().unwrap();
+        let mut dl = download_state.lock().unwrap();
         dl.active.insert(model.id.clone(), ActiveDownload {
             progress: initial_progress,
             cancel_requested: cancel_flag.clone(),
@@ -113,7 +115,7 @@ pub async fn download_model(
         });
     }
 
-    let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+    let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
         "model_id": model.id,
         "progress": initial_progress,
     }));
@@ -121,10 +123,10 @@ pub async fn download_model(
     let success = match &model.download_type {
         DownloadType::RemoteAPI | DownloadType::System => true,
         DownloadType::SingleFile => {
-            download_single_file(&app, &state, &model, &cancel_flag).await
+            download_single_file(&app, &download_state, &model, &cancel_flag).await
         }
         DownloadType::MultiFile { files } => {
-            download_multi_file(&app, &state, &model, files, &cancel_flag).await
+            download_multi_file(&app, &download_state, &model, files, &cancel_flag).await
         }
     };
 
@@ -147,7 +149,7 @@ pub async fn download_model(
     clear_pending_state(&model);
     // Remove this download from the HashMap
     {
-        let mut dl = state.download.lock().unwrap();
+        let mut dl = download_state.lock().unwrap();
         dl.active.remove(&model.id);
     }
 
@@ -156,7 +158,7 @@ pub async fn download_model(
 
 async fn download_single_file(
     app: &AppHandle,
-    state: &AppState,
+    download_state: &Mutex<DownloadState>,
     model: &ASRModel,
     cancel_flag: &std::sync::atomic::AtomicBool,
 ) -> bool {
@@ -191,7 +193,7 @@ async fn download_single_file(
     if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
         log::warn!("Server returned 416 for {}, deleting partial and retrying", model.id);
         let _ = fs::remove_file(&tmp_path);
-        return Box::pin(download_single_file(app, state, model, cancel_flag)).await;
+        return Box::pin(download_single_file(app, download_state, model, cancel_flag)).await;
     }
 
     // 206 = partial content (resume accepted), 200 = full file (server ignores Range)
@@ -228,13 +230,13 @@ async fn download_single_file(
     };
 
     // Emit helper — sends progress + size + speed
-    let emit_progress = |app: &AppHandle, state: &AppState, model_id: &str,
+    let emit_progress = |app: &AppHandle, download_state: &Mutex<DownloadState>, model_id: &str,
                          downloaded: u64, total: u64, speed: u64| {
         let progress = if total > 0 { downloaded as f64 / total as f64 } else { 0.0 };
-        if let Some(entry) = state.download.lock().unwrap().active.get_mut(model_id) {
+        if let Some(entry) = download_state.lock().unwrap().active.get_mut(model_id) {
             entry.progress = progress;
         }
-        let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+        let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
             "model_id": model_id,
             "progress": progress,
             "downloaded": downloaded,
@@ -245,7 +247,7 @@ async fn download_single_file(
 
     // Emit initial progress if resuming
     if resumed && total_size > 0 {
-        emit_progress(app, state, &model.id, downloaded, total_size, 0);
+        emit_progress(app, download_state, &model.id, downloaded, total_size, 0);
     }
 
     // Throttle: emit at most every 250ms
@@ -272,7 +274,7 @@ async fn download_single_file(
                         let speed = if elapsed.as_secs_f64() > 0.0 {
                             ((downloaded - last_emit_bytes) as f64 / elapsed.as_secs_f64()) as u64
                         } else { 0 };
-                        emit_progress(app, state, &model.id, downloaded, total_size, speed);
+                        emit_progress(app, download_state, &model.id, downloaded, total_size, speed);
                         last_emit_time = now;
                         last_emit_bytes = downloaded;
                     }
@@ -321,7 +323,7 @@ async fn download_single_file(
 /// Writes a `.complete` marker (from `model.download_marker`) when all files are done.
 async fn download_multi_file(
     app: &AppHandle,
-    state: &AppState,
+    download_state: &Mutex<DownloadState>,
     model: &ASRModel,
     files: &[DownloadFile],
     cancel_flag: &AtomicBool,
@@ -332,13 +334,13 @@ async fn download_multi_file(
     let total_size: u64 = files.iter().map(|f| f.size).sum();
 
     // Emit helper for overall multi-file progress
-    let emit_multi_progress = |app: &AppHandle, state: &AppState, model_id: &str,
+    let emit_multi_progress = |app: &AppHandle, download_state: &Mutex<DownloadState>, model_id: &str,
                                 overall_downloaded: u64, total: u64, speed: u64| {
         let progress = if total > 0 { overall_downloaded as f64 / total as f64 } else { 0.0 };
-        if let Some(entry) = state.download.lock().unwrap().active.get_mut(model_id) {
+        if let Some(entry) = download_state.lock().unwrap().active.get_mut(model_id) {
             entry.progress = progress;
         }
-        let _ = app.emit(crate::events::DOWNLOAD_PROGRESS, serde_json::json!({
+        let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
             "model_id": model_id,
             "progress": progress,
             "downloaded": overall_downloaded,
@@ -356,7 +358,7 @@ async fn download_multi_file(
         // Skip already-completed files
         if dest_path.exists() {
             cumulative_completed += df.size;
-            emit_multi_progress(app, state, &model.id, cumulative_completed, total_size, 0);
+            emit_multi_progress(app, download_state, &model.id, cumulative_completed, total_size, 0);
             continue;
         }
 
@@ -384,7 +386,7 @@ async fn download_multi_file(
             log::warn!("Server returned 416 for {}, restarting", df.filename);
             let _ = fs::remove_file(&tmp_path);
             // Retry this file by recursing (rare case)
-            return Box::pin(download_multi_file(app, state, model, files, cancel_flag)).await;
+            return Box::pin(download_multi_file(app, download_state, model, files, cancel_flag)).await;
         }
 
         let (resumed, file_total) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
@@ -415,7 +417,7 @@ async fn download_multi_file(
         };
 
         // Emit initial progress
-        emit_multi_progress(app, state, &model.id, cumulative_completed + file_downloaded, total_size, 0);
+        emit_multi_progress(app, download_state, &model.id, cumulative_completed + file_downloaded, total_size, 0);
 
         let mut last_emit_time = std::time::Instant::now();
         let mut last_emit_bytes = cumulative_completed + file_downloaded;
@@ -441,7 +443,7 @@ async fn download_multi_file(
                         let speed = if elapsed.as_secs_f64() > 0.0 {
                             ((overall - last_emit_bytes) as f64 / elapsed.as_secs_f64()) as u64
                         } else { 0 };
-                        emit_multi_progress(app, state, &model.id, overall, total_size, speed);
+                        emit_multi_progress(app, download_state, &model.id, overall, total_size, speed);
                         last_emit_time = now;
                         last_emit_bytes = overall;
                     }
@@ -480,7 +482,7 @@ async fn download_multi_file(
     }
 
     // Final 100% progress
-    emit_multi_progress(app, state, &model.id, total_size, total_size, 0);
+    emit_multi_progress(app, download_state, &model.id, total_size, total_size, 0);
     log::info!("All {} files downloaded for {}", files.len(), model.id);
     true
 }

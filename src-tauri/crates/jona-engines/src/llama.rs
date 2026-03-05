@@ -3,7 +3,7 @@ use super::*;
 pub struct LlamaEngine;
 
 fn storage_dir() -> String {
-    crate::state::models_dir().join("llm").to_string_lossy().to_string()
+    jona_types::models_dir().join("llm").to_string_lossy().to_string()
 }
 
 impl ASREngine for LlamaEngine {

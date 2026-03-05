@@ -3,7 +3,7 @@ use super::*;
 pub struct VoxtralEngine;
 
 fn storage_dir() -> String {
-    crate::state::models_dir().join("voxtral").to_string_lossy().to_string()
+    jona_types::models_dir().join("voxtral").to_string_lossy().to_string()
 }
 
 const HF_BASE: &str = "https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602/resolve/main/";
