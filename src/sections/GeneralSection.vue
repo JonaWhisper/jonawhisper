@@ -17,6 +17,7 @@ const appVersion = ref('')
 
 // "disabled" | "requires_approval" | "enabled"
 const launchAtLoginStatus = ref<string>('disabled')
+const launchAtLoginError = ref<string>('')
 
 const launchAtLoginEnabled = computed(() => launchAtLoginStatus.value !== 'disabled')
 
@@ -26,9 +27,11 @@ onMounted(async () => {
 })
 
 async function onLaunchAtLoginChange(checked: boolean) {
+  launchAtLoginError.value = ''
   try {
     launchAtLoginStatus.value = await invoke<string>('set_launch_at_login', { enabled: checked })
   } catch (e) {
+    launchAtLoginError.value = String(e)
     console.error('set_launch_at_login error:', e)
   }
 }
@@ -61,9 +64,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
       <div class="flex items-center justify-between py-2 gap-3">
         <div class="flex-1 min-w-0">
           <div class="text-[13px] text-foreground">{{ t('general.launchAtLogin.desc') }}</div>
-          <div v-if="launchAtLoginStatus === 'requires_approval'" class="text-[11px] text-amber-500 mt-0.5">
-            {{ t('general.launchAtLogin.requiresApproval') }}
-          </div>
+          <div v-if="launchAtLoginError" class="text-[11px] text-red-500 mt-0.5">{{ launchAtLoginError }}</div>
         </div>
         <Switch :checked="launchAtLoginEnabled" @update:checked="onLaunchAtLoginChange" />
       </div>
