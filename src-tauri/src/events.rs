@@ -9,8 +9,7 @@ pub const TRANSCRIPTION_STARTED: &str = "transcription-started";
 pub const TRANSCRIPTION_COMPLETE: &str = "transcription-complete";
 pub const TRANSCRIPTION_CANCELLED: &str = "transcription-cancelled";
 
-// Model downloads
-pub const DOWNLOAD_PROGRESS: &str = "download-progress";
+// Model downloads (now in jona_engines::downloader::DOWNLOAD_PROGRESS_EVENT)
 
 // Settings & permissions
 pub const SETTINGS_CHANGED: &str = "settings-changed";
