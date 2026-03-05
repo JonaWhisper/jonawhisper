@@ -2758,6 +2758,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engines"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "jona-types",
+ "log",
+ "ort",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "tauri",
+ "tokio",
+]
+
+[[package]]
+name = "jona-platform"
+version = "0.1.0"
+dependencies = [
+ "block2",
+ "core-foundation 0.10.1",
+ "core-graphics",
+ "crossbeam-channel",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin-clipboard-manager",
+]
+
+[[package]]
+name = "jona-types"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "keyring",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jona-whisper"
 version = "0.1.0"
 dependencies = [
@@ -2775,6 +2820,9 @@ dependencies = [
  "env_logger",
  "futures-util",
  "hound",
+ "jona-engines",
+ "jona-platform",
+ "jona-types",
  "keyring",
  "llama-cpp-2",
  "log",
