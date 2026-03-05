@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/jona-types", "crates/jona-platform", "crates/jona-engines"]
+
 [package]
 name = "jona-whisper"
 version = "0.1.0"
@@ -15,6 +18,10 @@ tauri-build = { version = "2", features = [] }
 cc = "1"
 
 [dependencies]
+jona-types = { path = "crates/jona-types" }
+jona-platform = { path = "crates/jona-platform" }
+jona-engines = { path = "crates/jona-engines" }
+
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 
 tauri-plugin-clipboard-manager = "2"

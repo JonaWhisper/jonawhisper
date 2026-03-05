@@ -1,0 +1,20 @@
+[package]
+name = "jona-platform"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+crossbeam-channel = "0.5.15"
+log = "0.4"
+tauri = { version = "2" }
+tauri-plugin-clipboard-manager = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+core-foundation = "0.10"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSSound", "NSApplication", "NSRunningApplication"] }
+block2 = "0.6"
