@@ -45,7 +45,7 @@ JonaWhisper is a Tauri v2 app: a Rust backend paired with a Vue 3 frontend rende
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag. 12 modules: asr, audio, cleanup, commands, engines, errors, events, migrations, platform, recording, state, ui. |
 | `commands.rs` | All `#[tauri::command]` handlers — thin wrappers that delegate to other modules. Includes `fetch_provider_models` for dynamic model discovery from cloud APIs. |
-| `state.rs` | `AppState` with fine-grained mutexes via `context_group!` macro: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, Canary, Parakeet, Qwen, Voxtral, BERT, Candle, PCS, T5, LLM). History queries are paginated (`LIMIT`/`OFFSET`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. Keyring helpers (`keyring_store`, `keyring_load`, `keyring_delete`) manage API keys in the OS keychain. `Provider::validate_url()` enforces HTTPS on Custom providers (unless `allow_insecure`). |
+| `state.rs` | `AppState` with fine-grained mutexes via `context_group!` macro: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts (Whisper, Canary, Parakeet, Qwen, Voxtral, BERT, Candle, PCS, T5, LLM). History queries use cursor-based pagination (`WHERE timestamp < ?cursor … LIMIT`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. Keyring helpers (`keyring_store`, `keyring_load`, `keyring_delete`) manage API keys in the OS keychain. `Provider::validate_url()` enforces HTTPS on Custom providers (unless `allow_insecure`). |
 | `recording.rs` | Recording lifecycle (start → stop → enqueue → VAD → transcribe → cleanup → paste) and background thread spawning. Threads `vad_trimmed` to history. Cancel support during recording and transcription. Uses `PILL_CLOSE_GENERATION` guard to prevent stale pill closes. |
 | `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). Current version: 4 (v4 migrates plaintext API keys to OS keychain). |
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. Also provides `read_wav_f32()` shared WAV reader. |
@@ -153,15 +153,15 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 
 | Section | Description |
 |---------|-------------|
-| `RecentsSection.vue` | Transcription history grouped by day with backend-driven search (SQLite LIKE) and infinite scroll. Processing badges with tooltips. Copy toast animation. |
-| `ModelsSection.vue` | Engine and model management with download progress |
+| `RecentsSection.vue` | Transcription history grouped by day with backend-driven search (SQLite LIKE), cursor-based pagination, virtual scroll (`@tanstack/vue-virtual`), and infinite scroll. Processing badges with tooltips. Copy toast animation. |
+| `ModelsSection.vue` | Engine and model management with download progress, virtual scroll (`@tanstack/vue-virtual`) |
 | `TranscriptionSection.vue` | ASR model selector (local + cloud unified), cloud sub-model picker, language, GPU mode with "Recommended" badge |
 | `ProcessingSection.vue` | Post-processing: VAD, hallucination filter, text cleanup (BERT/PCS/T5/LLM unified selector), LLM token cap |
 | `ShortcutsSection.vue` | Hotkey, recording mode (push-to-talk / toggle), cancel shortcut |
 | `MicrophoneSection.vue` | Input device selector with transport type icons, mic test with spectrum + level badge, audio ducking |
 | `ProvidersSection.vue` | Cloud provider management (9 presets + custom) |
 | `PermissionsSection.vue` | macOS permission status (microphone, accessibility, input monitoring) with grant buttons |
-| `GeneralSection.vue` | Appearance (theme), interface language |
+| `GeneralSection.vue` | Appearance (theme), interface language, About card (version, GPL-3.0 license) |
 
 ### Key components
 
@@ -187,7 +187,7 @@ Pinia stores split by domain:
 | Store | Role |
 |-------|------|
 | `app.ts` | Runtime state, event listeners, initialization |
-| `history.ts` | Paginated history with backend-driven search and infinite scroll |
+| `history.ts` | Cursor-based paginated history with backend-driven search and infinite scroll |
 | `settings.ts` | User preferences |
 | `engines.ts` | Engine catalog, providers, models |
 | `downloads.ts` | Active downloads map (model ID → progress/speed/stopping), parallel downloads, optimistic pause transitions |
