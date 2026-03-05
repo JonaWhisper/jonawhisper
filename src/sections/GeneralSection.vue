@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
@@ -8,15 +8,30 @@ import { i18n } from '@/main'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
 const appVersion = ref('')
 
+// "disabled" | "requires_approval" | "enabled"
+const launchAtLoginStatus = ref<string>('disabled')
+
+const launchAtLoginEnabled = computed(() => launchAtLoginStatus.value !== 'disabled')
+
 onMounted(async () => {
   appVersion.value = await getVersion()
+  launchAtLoginStatus.value = await invoke<string>('get_launch_at_login_status')
 })
+
+async function onLaunchAtLoginChange(checked: boolean) {
+  try {
+    launchAtLoginStatus.value = await invoke<string>('set_launch_at_login', { enabled: checked })
+  } catch (e) {
+    console.error('set_launch_at_login error:', e)
+  }
+}
 
 const localeOptions = [
   { value: 'auto', label: 'settings.locale.auto' },
@@ -39,6 +54,20 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
 <template>
   <div>
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.general') }}</div>
+
+    <!-- Launch at Login card -->
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.launchAtLogin') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="text-[13px] text-foreground">{{ t('general.launchAtLogin.desc') }}</div>
+          <div v-if="launchAtLoginStatus === 'requires_approval'" class="text-[11px] text-amber-500 mt-0.5">
+            {{ t('general.launchAtLogin.requiresApproval') }}
+          </div>
+        </div>
+        <Switch :checked="launchAtLoginEnabled" @update:checked="onLaunchAtLoginChange" />
+      </div>
+    </div>
 
     <!-- Appearance card -->
     <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">

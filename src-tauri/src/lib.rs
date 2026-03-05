@@ -81,6 +81,8 @@ pub fn run() {
             commands::stop_shortcut_capture,
             commands::simulate_pill_test,
             commands::get_system_locale,
+            commands::get_launch_at_login_status,
+            commands::set_launch_at_login,
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]

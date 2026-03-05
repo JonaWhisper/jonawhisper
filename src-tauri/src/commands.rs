@@ -246,6 +246,18 @@ pub fn set_setting(
     let _ = app.emit(crate::events::SETTINGS_CHANGED, &key);
 }
 
+// -- Launch at Login --
+
+#[tauri::command]
+pub fn get_launch_at_login_status() -> String {
+    platform::get_launch_at_login_status().to_string()
+}
+
+#[tauri::command]
+pub fn set_launch_at_login(enabled: bool) -> Result<String, String> {
+    platform::set_launch_at_login(enabled).map(|s| s.to_string())
+}
+
 // -- Mic Test --
 
 #[tauri::command]

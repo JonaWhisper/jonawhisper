@@ -215,3 +215,75 @@ pub fn play_sound(name: &str) {
         .arg(format!("/System/Library/Sounds/{}.aiff", name))
         .spawn();
 }
+
+// -- Launch at Login (SMAppService, macOS 13+) --
+//
+// SMAppServiceStatus values:
+//   0 = NotRegistered
+//   1 = Enabled        (registered and approved by user)
+//   2 = RequiresApproval (registered, awaiting user approval in Login Items)
+//   3 = NotFound
+//
+// No special entitlements required. The app just needs to be code-signed.
+// When first registered, macOS 13+ may require the user to approve it in
+// System Settings > General > Login Items.
+
+/// Returns the current SMAppService status as a string: "enabled", "requires_approval", or "disabled".
+pub fn get_launch_at_login_status() -> &'static str {
+    use objc2::msg_send;
+    use objc2::runtime::AnyClass;
+
+    let Some(cls) = AnyClass::get(c"SMAppService") else {
+        log::warn!("SMAppService class not found — ServiceManagement not loaded?");
+        return "disabled";
+    };
+
+    // SAFETY: SMAppService is an ObjC class from ServiceManagement.framework.
+    // +mainAppService returns an autoreleased SMAppService* (non-null).
+    // -status returns SMAppServiceStatus (NSInteger).
+    let status: i64 = unsafe {
+        let service: *mut objc2::runtime::AnyObject = msg_send![cls, mainAppService];
+        msg_send![service, status]
+    };
+
+    match status {
+        1 => "enabled",
+        2 => "requires_approval",
+        _ => "disabled",
+    }
+}
+
+/// Register or unregister the app as a login item via SMAppService.
+/// Returns Ok(status) where status is "enabled", "requires_approval", or "disabled".
+pub fn set_launch_at_login(enabled: bool) -> Result<&'static str, String> {
+    use objc2::msg_send;
+    use objc2::runtime::{AnyClass, Bool};
+
+    let Some(cls) = AnyClass::get(c"SMAppService") else {
+        return Err("SMAppService not available on this system".to_string());
+    };
+
+    // SAFETY: SMAppService ObjC calls. We pass null for NSError** since we don't need the
+    // error object — the return Bool is sufficient to detect failure, and we re-query status after.
+    unsafe {
+        let service: *mut objc2::runtime::AnyObject = msg_send![cls, mainAppService];
+
+        if enabled {
+            let mut error: *mut objc2::runtime::AnyObject = std::ptr::null_mut();
+            let success: Bool = msg_send![service, registerAndReturnError: &mut error];
+            if !success.as_bool() {
+                log::warn!("SMAppService registerAndReturnError failed");
+                // Not a hard error — RequiresApproval still sets status correctly
+            }
+        } else {
+            let mut error: *mut objc2::runtime::AnyObject = std::ptr::null_mut();
+            let success: Bool = msg_send![service, unregisterAndReturnError: &mut error];
+            if !success.as_bool() {
+                log::warn!("SMAppService unregisterAndReturnError failed");
+                return Err("Failed to unregister login item".to_string());
+            }
+        }
+    }
+
+    Ok(get_launch_at_login_status())
+}

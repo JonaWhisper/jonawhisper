@@ -89,6 +89,14 @@ pub mod stub {
     }
 
     pub fn play_sound(_name: &str) {}
+
+    pub fn get_launch_at_login_status() -> &'static str {
+        "disabled"
+    }
+
+    pub fn set_launch_at_login(_enabled: bool) -> Result<&'static str, String> {
+        Err("Launch at login not supported on this platform".to_string())
+    }
 }
 
 #[cfg(not(target_os = "macos"))]

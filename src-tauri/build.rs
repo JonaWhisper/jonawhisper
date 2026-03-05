@@ -2,6 +2,7 @@ fn main() {
     #[cfg(target_os = "macos")]
     {
         println!("cargo:rustc-link-lib=framework=AVFoundation");
+        println!("cargo:rustc-link-lib=framework=ServiceManagement");
 
         // whisper-rs Metal code uses @available() which emits __isPlatformVersionAtLeast.
         // This symbol lives in the clang compiler runtime — link it explicitly.
