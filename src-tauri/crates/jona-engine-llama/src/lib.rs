@@ -1,6 +1,10 @@
+mod inference;
+
 use jona_types::{
     ASREngine, ASRModel, DownloadType, EngineCategory, Language, common_languages,
 };
+
+pub use inference::{LlmContext, cleanup_text};
 
 pub struct LlamaEngine;
 

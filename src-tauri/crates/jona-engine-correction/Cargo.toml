@@ -6,3 +6,9 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 jona-types = { path = "../jona-types" }
+candle-core = { version = "0.9", features = ["metal", "accelerate"] }
+candle-nn = { version = "0.9", features = ["metal", "accelerate"] }
+candle-transformers = { version = "0.9", features = ["metal", "accelerate"] }
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+serde_json = "1"
+log = "0.4"

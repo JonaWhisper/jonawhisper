@@ -2,6 +2,8 @@ pub mod downloader;
 pub mod ort_session;
 pub mod mel;
 pub mod audio;
+pub mod common;
+pub mod llm_prompt;
 
 // Re-export engine types from jona-types for backward compatibility
 pub use jona_types::{

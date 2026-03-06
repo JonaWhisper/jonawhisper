@@ -1,4 +1,8 @@
+mod inference;
+
 use jona_types::{ASREngine, ASRModel, DownloadType, EngineCategory, Language};
+
+pub use inference::{PcsContext, restore_punctuation_and_case};
 
 pub struct PcsPunctuationEngine;
 

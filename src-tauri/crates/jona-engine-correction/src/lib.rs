@@ -1,6 +1,10 @@
+mod inference;
+
 use jona_types::{
     ASREngine, ASRModel, DownloadFile, DownloadType, EngineCategory, Language,
 };
+
+pub use inference::{T5Context, correct};
 
 pub struct CorrectionEngine;
 

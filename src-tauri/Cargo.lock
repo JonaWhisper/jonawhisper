@@ -2761,7 +2761,15 @@ dependencies = [
 name = "jona-engine-bert"
 version = "0.1.0"
 dependencies = [
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
+ "jona-engines",
  "jona-types",
+ "log",
+ "ort",
+ "serde_json",
+ "tokenizers",
 ]
 
 [[package]]
@@ -2779,14 +2787,24 @@ dependencies = [
 name = "jona-engine-correction"
 version = "0.1.0"
 dependencies = [
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
  "jona-types",
+ "log",
+ "serde_json",
+ "tokenizers",
 ]
 
 [[package]]
 name = "jona-engine-llama"
 version = "0.1.0"
 dependencies = [
+ "encoding_rs",
+ "jona-engines",
  "jona-types",
+ "llama-cpp-2",
+ "log",
 ]
 
 [[package]]
@@ -2804,7 +2822,12 @@ dependencies = [
 name = "jona-engine-pcs"
 version = "0.1.0"
 dependencies = [
+ "jona-engines",
  "jona-types",
+ "log",
+ "ort",
+ "prost",
+ "tokenizers",
 ]
 
 [[package]]
