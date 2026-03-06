@@ -63,8 +63,11 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
   <div>
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.general') }}</div>
 
-    <!-- Launch at Login card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <!-- Launch at Login card (hidden when not signed with Developer ID) -->
+    <div
+      v-if="launchAtLoginStatus !== 'unavailable'"
+      class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5"
+    >
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.launchAtLogin') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div class="flex-1 min-w-0">

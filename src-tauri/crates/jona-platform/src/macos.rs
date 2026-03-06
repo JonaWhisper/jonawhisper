@@ -219,16 +219,42 @@ pub fn play_sound(name: &str) {
 // -- Launch at Login (SMAppService) --
 //
 // Uses the native macOS SMAppService API (macOS 13+) for proper BTM integration.
-// Requires a notarized Developer ID cert to fully activate ("enabled" status).
-// In dev builds (Apple Development cert), register() succeeds but status stays
-// "notRegistered" — this is expected and acceptable.
+// Requires a Developer ID Application certificate (+ notarisation) to function.
+// With Apple Development cert, register() no-ops and status stays notRegistered.
+//
+// We detect this at runtime by inspecting the code signature of the running binary
+// via `codesign -dv --verbose=2`. If the Authority chain contains "Developer ID
+// Application", the feature is available. Result is cached in a OnceLock.
 //
 // Status values returned to the frontend:
-//   "enabled"           → registered and active (requires_approval also maps to this for the switch)
+//   "unavailable"       → not signed with Developer ID (dev build), option hidden
+//   "enabled"           → registered and active
 //   "requires_approval" → registered, user must approve in System Settings > Login Items
 //   "disabled"          → not registered
 
+static IS_DEVELOPER_ID: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+fn is_developer_id_signed() -> bool {
+    *IS_DEVELOPER_ID.get_or_init(|| {
+        let Ok(exe) = std::env::current_exe() else { return false };
+        let Ok(output) = std::process::Command::new("codesign")
+            .args(["-dv", "--verbose=2", exe.to_str().unwrap_or("")])
+            .output()
+        else {
+            return false;
+        };
+        // codesign writes signing info to stderr
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let result = stderr.contains("Developer ID Application");
+        log::info!("Launch at login available (Developer ID signed): {}", result);
+        result
+    })
+}
+
 pub fn get_launch_at_login_status() -> &'static str {
+    if !is_developer_id_signed() {
+        return "unavailable";
+    }
     use smappservice_rs::{AppService, ServiceStatus, ServiceType};
     let svc = AppService::new(ServiceType::MainApp);
     match svc.status() {
@@ -239,6 +265,9 @@ pub fn get_launch_at_login_status() -> &'static str {
 }
 
 pub fn set_launch_at_login(enabled: bool) -> Result<&'static str, String> {
+    if !is_developer_id_signed() {
+        return Err("Launch at login requires a Developer ID certificate".to_string());
+    }
     use smappservice_rs::{AppService, ServiceType};
     let svc = AppService::new(ServiceType::MainApp);
     if enabled {
