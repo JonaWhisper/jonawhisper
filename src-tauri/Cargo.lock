@@ -2758,6 +2758,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-canary"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "jona-engines",
+ "jona-types",
+ "log",
+ "ort",
+]
+
+[[package]]
+name = "jona-engine-parakeet"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "jona-engines",
+ "jona-types",
+ "log",
+ "ort",
+]
+
+[[package]]
+name = "jona-engine-qwen"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "jona-types",
+ "log",
+ "qwen-asr",
+]
+
+[[package]]
 name = "jona-engine-whisper"
 version = "0.1.0"
 dependencies = [
@@ -2777,6 +2809,7 @@ dependencies = [
  "log",
  "ort",
  "reqwest 0.12.28",
+ "rustfft",
  "serde",
  "serde_json",
  "shellexpand",
@@ -2847,6 +2880,9 @@ dependencies = [
  "env_logger",
  "futures-util",
  "hound",
+ "jona-engine-canary",
+ "jona-engine-parakeet",
+ "jona-engine-qwen",
  "jona-engine-whisper",
  "jona-engines",
  "jona-platform",
@@ -2861,7 +2897,6 @@ dependencies = [
  "objc2-foundation",
  "ort",
  "prost",
- "qwen-asr",
  "regex",
  "reqwest 0.12.28",
  "rusqlite",

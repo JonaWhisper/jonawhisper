@@ -37,6 +37,9 @@ pub fn run() {
     // Initialize the engine catalog with external engine crates
     engines::EngineCatalog::init(vec![
         Box::new(jona_engine_whisper::WhisperEngine),
+        Box::new(jona_engine_qwen::QwenEngine),
+        Box::new(jona_engine_canary::CanaryEngine),
+        Box::new(jona_engine_parakeet::ParakeetEngine),
     ]);
 
     recording::cleanup_orphan_audio_files();

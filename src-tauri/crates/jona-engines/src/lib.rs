@@ -1,6 +1,3 @@
-pub mod canary;
-pub mod parakeet;
-pub mod qwen;
 pub mod voxtral;
 pub mod downloader;
 pub mod llama;
@@ -8,6 +5,7 @@ pub mod bert;
 pub mod pcs;
 pub mod correction;
 pub mod ort_session;
+pub mod mel;
 pub mod audio;
 
 // Re-export engine types from jona-types for backward compatibility
@@ -89,10 +87,7 @@ impl EngineCatalog {
         let mut engines: Vec<Box<dyn ASREngine>> = extra;
         // Internal engines (not yet extracted into their own crates)
         engines.extend([
-            Box::new(canary::CanaryEngine) as Box<dyn ASREngine>,
-            Box::new(parakeet::ParakeetEngine),
-            Box::new(qwen::QwenEngine),
-            Box::new(voxtral::VoxtralEngine),
+            Box::new(voxtral::VoxtralEngine) as Box<dyn ASREngine>,
             Box::new(llama::LlamaEngine),
             Box::new(bert::BertPunctuationEngine),
             Box::new(pcs::PcsPunctuationEngine),

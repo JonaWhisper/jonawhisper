@@ -1,0 +1,11 @@
+[package]
+name = "jona-engine-qwen"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+jona-types = { path = "../jona-types" }
+qwen-asr = "0.3"
+hound = "3.5"
+log = "0.4"

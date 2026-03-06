@@ -1,5 +1,4 @@
 pub mod canary;
-pub mod mel;
 pub mod parakeet;
 pub mod qwen;
 pub mod voxtral;

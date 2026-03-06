@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/jona-types", "crates/jona-platform", "crates/jona-engines", "crates/jona-provider", "crates/jona-engine-whisper"]
+members = ["crates/jona-types", "crates/jona-platform", "crates/jona-engines", "crates/jona-provider", "crates/jona-engine-whisper", "crates/jona-engine-qwen", "crates/jona-engine-canary", "crates/jona-engine-parakeet"]
 
 [package]
 name = "jona-whisper"
@@ -23,6 +23,9 @@ jona-platform = { path = "crates/jona-platform" }
 jona-engines = { path = "crates/jona-engines" }
 jona-provider = { path = "crates/jona-provider" }
 jona-engine-whisper = { path = "crates/jona-engine-whisper" }
+jona-engine-qwen = { path = "crates/jona-engine-qwen" }
+jona-engine-canary = { path = "crates/jona-engine-canary" }
+jona-engine-parakeet = { path = "crates/jona-engine-parakeet" }
 
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 
@@ -56,7 +59,6 @@ prost = "0.13"
 candle-core = { version = "0.9", features = ["metal", "accelerate"] }
 candle-nn = { version = "0.9", features = ["metal", "accelerate"] }
 candle-transformers = { version = "0.9", features = ["metal", "accelerate"] }
-qwen-asr = "0.3"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }
