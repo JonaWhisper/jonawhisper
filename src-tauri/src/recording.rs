@@ -470,7 +470,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             processed = cleanup::post_processor::finalize(&processed);
             let effective_max_tokens = effective_llm_tokens(processed.len(), llm_max_tokens);
             let llm_result = if let Some(provider) = providers.iter().find(|p| p.id == provider_id) {
-                crate::cleanup::llm_cloud::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
+                if !provider.has_llm() {
+                    log::warn!("Cloud provider '{}' does not support LLM", provider.name);
+                    Err(crate::cleanup::LlmError::NotConfigured)
+                } else {
+                    crate::cleanup::llm_cloud::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
+                }
             } else {
                 log::warn!("Cloud LLM provider '{}' not found", provider_id);
                 Err(crate::cleanup::LlmError::NotConfigured)

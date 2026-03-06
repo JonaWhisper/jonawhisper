@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { hasAsrSupport } from '@/config/providers'
+import { hasAsrSupport, hasLlmSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
 import { isModelAvailable, parseCloudId } from './types'
 import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport, CleanupModel, AsrModelOption } from './types'
@@ -53,7 +53,9 @@ export const useEnginesStore = defineStore('engines', () => {
       result.push({ id: m.id, label: m.label, group: 'llm', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
     }
     for (const p of providers.value) {
-      result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, quantization: null, recommended: false })
+      if (hasLlmSupport(p)) {
+        result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, quantization: null, recommended: false })
+      }
     }
     return result
   })

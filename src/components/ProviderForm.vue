@@ -35,6 +35,8 @@ const name = ref(props.provider?.name ?? '')
 const url = ref(props.provider?.url ?? '')
 const apiKey = ref('')
 const allowInsecure = ref(props.provider?.allow_insecure ?? false)
+const supportsAsr = ref(props.provider?.supports_asr ?? true)
+const supportsLlm = ref(props.provider?.supports_llm ?? true)
 const errors = ref<Record<string, string>>({})
 
 // Test state
@@ -45,6 +47,7 @@ const fetchedModels = ref<string[]>(props.provider?.cached_models ?? [])
 const showUrl = computed(() => kind.value === 'Custom')
 const canTest = computed(() => apiKey.value.trim().length > 0 || isEditing.value)
 const showInsecureToggle = computed(() => kind.value === 'Custom')
+const showCapabilities = computed(() => kind.value === 'Custom')
 
 watch(kind, (newKind) => {
   if (isEditing.value) return
@@ -56,10 +59,12 @@ watch(kind, (newKind) => {
     name.value = ''
     url.value = ''
   }
-  // Reset test state on kind change
+  // Reset test state and capabilities on kind change
   testStatus.value = 'idle'
   testMessage.value = ''
   fetchedModels.value = []
+  supportsAsr.value = true
+  supportsLlm.value = true
 })
 
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -87,6 +92,8 @@ async function testConnection() {
     api_key: apiKey.value.trim(),
     allow_insecure: allowInsecure.value,
     cached_models: [],
+    supports_asr: supportsAsr.value,
+    supports_llm: supportsLlm.value,
   }
 
   try {
@@ -106,6 +113,7 @@ async function testConnection() {
 function save() {
   if (!validate()) return
 
+  const isCustom = kind.value === 'Custom'
   const provider: Provider = {
     id: props.provider?.id ?? `provider-${kind.value.toLowerCase()}-${Date.now()}`,
     name: name.value.trim(),
@@ -114,6 +122,8 @@ function save() {
     api_key: apiKey.value.trim(),
     allow_insecure: allowInsecure.value,
     cached_models: fetchedModels.value,
+    supports_asr: isCustom ? supportsAsr.value : true,
+    supports_llm: isCustom ? supportsLlm.value : true,
   }
 
   emit('save', provider)
@@ -174,6 +184,21 @@ function save() {
       <div v-if="testStatus === 'error'" class="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
         <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
         <span>{{ testMessage }}</span>
+      </div>
+    </div>
+
+    <!-- Capabilities — only for Custom providers -->
+    <div v-if="showCapabilities" class="space-y-2">
+      <Label class="text-xs text-muted-foreground">{{ t('provider.capabilities') }}</Label>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <Switch :checked="supportsAsr" @update:checked="supportsAsr = $event" />
+          {{ t('provider.capabilities.asr') }}
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <Switch :checked="supportsLlm" @update:checked="supportsLlm = $event" />
+          {{ t('provider.capabilities.llm') }}
+        </label>
       </div>
     </div>
 

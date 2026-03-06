@@ -35,6 +35,11 @@ pub fn transcribe(
             .ok_or_else(|| EngineError::ApiError(
                 format!("ASR provider '{}' not found", provider_id)
             ))?;
+        if !provider.has_asr() {
+            return Err(EngineError::ApiError(
+                format!("Provider '{}' does not support ASR transcription", provider.name)
+            ));
+        }
         return openai_api::transcribe(provider, &asr_cloud_model, audio_path, &language);
     }
 

@@ -61,13 +61,14 @@ export const PROVIDER_PRESETS: Partial<Record<ProviderKind, ProviderPreset>> = {
 /** Ordered list of preset entries for UI dropdowns (Custom excluded — handled separately) */
 export const PRESET_ENTRIES = Object.entries(PROVIDER_PRESETS) as [ProviderKind, ProviderPreset][]
 
-/** Check if a provider has ASR models available (from cache or preset) */
+/** Check if a provider supports ASR (resolved by backend) */
 export function hasAsrSupport(provider: Provider): boolean {
-  if (provider.kind === 'Custom') return true
-  if (provider.cached_models.length > 0) {
-    return provider.cached_models.some(isAsrModel)
-  }
-  return (PROVIDER_PRESETS[provider.kind]?.asrModels?.length ?? 0) > 0
+  return provider.supports_asr
+}
+
+/** Check if a provider supports LLM (resolved by backend) */
+export function hasLlmSupport(provider: Provider): boolean {
+  return provider.supports_llm
 }
 
 /** Heuristic: model ID looks like an ASR/transcription model */

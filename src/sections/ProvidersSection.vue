@@ -115,7 +115,8 @@ const kindGradients: Record<string, string> = {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-1.5">
             <span class="text-[13px] font-semibold truncate">{{ provider.name }}</span>
-            <Badge variant="secondary" class="text-[9px] px-1 py-0 shrink-0">{{ provider.kind }}</Badge>
+            <Badge v-if="provider.supports_asr" variant="outline" class="text-[9px] px-1 py-0 shrink-0">ASR</Badge>
+            <Badge v-if="provider.supports_llm" variant="outline" class="text-[9px] px-1 py-0 shrink-0">LLM</Badge>
           </div>
           <div class="text-[11px] text-muted-foreground truncate">
             {{ provider.api_key || '' }}

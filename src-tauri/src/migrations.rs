@@ -2,7 +2,7 @@ use serde_json::Value;
 use crate::state::{config_dir, default_model_id, Provider, ProviderKind, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 4;
+const CURRENT_VERSION: u32 = 5;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
@@ -11,6 +11,7 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (2, "Centralize model storage", migrate_v2),
     (3, "Update llm_max_tokens default to 4096", migrate_v3),
     (4, "Migrate API keys to OS keychain", migrate_v4),
+    (5, "Add provider capability flags", migrate_v5),
 ];
 
 /// Rename data directory from WhisperDictate → JonaWhisper.
@@ -83,6 +84,8 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         api_key: api_key.to_string(),
                         allow_insecure: false,
                         cached_models: Vec::new(),
+                        supports_asr: true,
+                        supports_llm: true,
                     });
                     // Migrate ASR model to settings
                     if !model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
@@ -126,6 +129,8 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         api_key: api_key.to_string(),
                         allow_insecure: false,
                         cached_models: Vec::new(),
+                        supports_asr: kind.supports_asr(),
+                        supports_llm: kind.supports_llm(),
                     });
                     prefs.llm_provider_id = id;
                 }
@@ -319,5 +324,14 @@ fn migrate_v4(_raw: &mut Value, prefs: &mut Preferences) {
     if migrated > 0 {
         log::info!("Migration v4: migrated {} API key(s) to OS keychain", migrated);
     }
+}
+
+/// v5: Populate provider capability flags (supports_asr/supports_llm).
+fn migrate_v5(_raw: &mut Value, prefs: &mut Preferences) {
+    for provider in &mut prefs.providers {
+        provider.supports_asr = provider.has_asr();
+        provider.supports_llm = provider.has_llm();
+    }
+    log::info!("Migration v5: set capability flags for {} provider(s)", prefs.providers.len());
 }
 

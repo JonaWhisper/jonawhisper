@@ -201,6 +201,17 @@ impl ProviderKind {
         }
     }
 
+    /// Whether this provider kind supports ASR (audio transcription).
+    pub fn supports_asr(&self) -> bool {
+        matches!(self, Self::OpenAI | Self::Groq | Self::Fireworks | Self::Together | Self::Custom)
+    }
+
+    /// Whether this provider kind supports LLM (chat completions).
+    pub fn supports_llm(&self) -> bool {
+        matches!(self, Self::OpenAI | Self::Anthropic | Self::Groq | Self::Cerebras
+            | Self::Gemini | Self::Mistral | Self::Together | Self::DeepSeek | Self::Custom)
+    }
+
     /// Canonical base URL for known providers (includes version path).
     /// Returns None for Custom — use provider.url instead.
     pub fn base_url(&self) -> Option<&'static str> {
@@ -231,9 +242,25 @@ pub struct Provider {
     pub allow_insecure: bool,
     #[serde(default)]
     pub cached_models: Vec<String>,
+    #[serde(default = "default_true")]
+    pub supports_asr: bool,
+    #[serde(default = "default_true")]
+    pub supports_llm: bool,
 }
 
 impl Provider {
+    /// Whether this provider supports ASR transcription.
+    /// Known providers: derived from kind. Custom: uses explicit field.
+    pub fn has_asr(&self) -> bool {
+        if self.kind == ProviderKind::Custom { self.supports_asr } else { self.kind.supports_asr() }
+    }
+
+    /// Whether this provider supports LLM chat completions.
+    /// Known providers: derived from kind. Custom: uses explicit field.
+    pub fn has_llm(&self) -> bool {
+        if self.kind == ProviderKind::Custom { self.supports_llm } else { self.kind.supports_llm() }
+    }
+
     /// Resolved base URL: preset URL for known providers, stored URL for Custom.
     pub fn base_url(&self) -> &str {
         self.kind.base_url().unwrap_or_else(|| self.url.trim_end_matches('/'))

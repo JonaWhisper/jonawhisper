@@ -61,6 +61,8 @@ export interface Provider {
   api_key: string
   allow_insecure: boolean
   cached_models: string[]
+  supports_asr: boolean
+  supports_llm: boolean
 }
 
 export interface CleanupModel {

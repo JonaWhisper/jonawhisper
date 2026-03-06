@@ -338,6 +338,9 @@ pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
     let providers = state.settings.lock().unwrap().providers.clone();
     providers.into_iter().map(|mut p| {
         p.api_key = p.masked_api_key();
+        // Resolve capabilities for frontend (known providers derive from kind)
+        p.supports_asr = p.has_asr();
+        p.supports_llm = p.has_llm();
         p
     }).collect()
 }
