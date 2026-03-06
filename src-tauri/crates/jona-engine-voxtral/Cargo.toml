@@ -1,0 +1,13 @@
+[package]
+name = "jona-engine-voxtral"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+jona-types = { path = "../jona-types" }
+hound = "3.5"
+log = "0.4"
+
+[build-dependencies]
+cc = "1"

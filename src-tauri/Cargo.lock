@@ -2790,6 +2790,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-voxtral"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "hound",
+ "jona-types",
+ "log",
+]
+
+[[package]]
 name = "jona-engine-whisper"
 version = "0.1.0"
 dependencies = [
@@ -2870,7 +2880,6 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
- "cc",
  "core-foundation 0.10.1",
  "core-graphics",
  "cpal",
@@ -2883,6 +2892,7 @@ dependencies = [
  "jona-engine-canary",
  "jona-engine-parakeet",
  "jona-engine-qwen",
+ "jona-engine-voxtral",
  "jona-engine-whisper",
  "jona-engines",
  "jona-platform",

@@ -1,4 +1,3 @@
-pub mod voxtral;
 pub mod downloader;
 pub mod llama;
 pub mod bert;
@@ -87,8 +86,7 @@ impl EngineCatalog {
         let mut engines: Vec<Box<dyn ASREngine>> = extra;
         // Internal engines (not yet extracted into their own crates)
         engines.extend([
-            Box::new(voxtral::VoxtralEngine) as Box<dyn ASREngine>,
-            Box::new(llama::LlamaEngine),
+            Box::new(llama::LlamaEngine) as Box<dyn ASREngine>,
             Box::new(bert::BertPunctuationEngine),
             Box::new(pcs::PcsPunctuationEngine),
             Box::new(correction::CorrectionEngine),

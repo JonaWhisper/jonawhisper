@@ -40,6 +40,7 @@ pub fn run() {
         Box::new(jona_engine_qwen::QwenEngine),
         Box::new(jona_engine_canary::CanaryEngine),
         Box::new(jona_engine_parakeet::ParakeetEngine),
+        Box::new(jona_engine_voxtral::VoxtralEngine),
     ]);
 
     recording::cleanup_orphan_audio_files();
