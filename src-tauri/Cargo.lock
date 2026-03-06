@@ -2758,10 +2758,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-whisper"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "jona-types",
+ "log",
+ "whisper-rs",
+]
+
+[[package]]
 name = "jona-engines"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "hound",
  "jona-types",
  "log",
  "ort",
@@ -2814,6 +2825,8 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
+ "shellexpand",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2834,6 +2847,7 @@ dependencies = [
  "env_logger",
  "futures-util",
  "hound",
+ "jona-engine-whisper",
  "jona-engines",
  "jona-platform",
  "jona-provider",
@@ -2863,7 +2877,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokenizers",
  "tokio",
- "whisper-rs",
 ]
 
 [[package]]

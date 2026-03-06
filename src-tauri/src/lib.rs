@@ -33,6 +33,12 @@ pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::Ho
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::init();
+
+    // Initialize the engine catalog with external engine crates
+    engines::EngineCatalog::init(vec![
+        Box::new(jona_engine_whisper::WhisperEngine),
+    ]);
+
     recording::cleanup_orphan_audio_files();
 
     let app_state = Arc::new(AppState::default());

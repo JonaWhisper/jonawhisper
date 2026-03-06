@@ -1,4 +1,119 @@
-use super::*;
+use jona_types::{
+    ASREngine, ASRModel, DownloadType, EngineError, Language, GpuMode, HasModelId,
+    common_languages,
+};
+use std::path::Path;
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+// -- Audio utility (inline, avoids dependency on jona-engines) --
+
+fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
+    let reader = hound::WavReader::open(path)
+        .map_err(|e| EngineError::LaunchFailed(format!("Failed to open WAV: {}", e)))?;
+    let spec = reader.spec();
+    let channels = spec.channels as usize;
+    let samples_f32: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Int => {
+            let bits = spec.bits_per_sample;
+            let max_val = (1u32 << (bits - 1)) as f32;
+            reader.into_samples::<i32>()
+                .filter_map(|s| s.ok())
+                .map(|s| s as f32 / max_val)
+                .collect()
+        }
+        hound::SampleFormat::Float => {
+            reader.into_samples::<f32>()
+                .filter_map(|s| s.ok())
+                .collect()
+        }
+    };
+    if channels > 1 {
+        Ok(samples_f32.chunks(channels).map(|c| c.iter().sum::<f32>() / channels as f32).collect())
+    } else {
+        Ok(samples_f32)
+    }
+}
+
+fn inference_threads() -> usize {
+    std::thread::available_parallelism().map(|p| p.get()).unwrap_or(4)
+}
+
+// -- Context (cached model state) --
+
+/// Wrapper around `whisper_rs::WhisperContext` carrying model_id + gpu_mode for cache invalidation.
+pub struct WhisperCtx {
+    pub context: WhisperContext,
+    pub model_id: String,
+    pub gpu_mode: GpuMode,
+}
+
+impl HasModelId for WhisperCtx {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+}
+
+// -- Inference --
+
+/// Load a Whisper model into a context.
+pub fn load(model_id: &str, model_path: &Path, gpu_mode: GpuMode) -> Result<WhisperCtx, EngineError> {
+    let use_gpu = gpu_mode != GpuMode::Cpu;
+    log::info!("Loading whisper model: {} (gpu_mode={:?})", model_id, gpu_mode);
+    let mut ctx_params = WhisperContextParameters::default();
+    ctx_params.use_gpu(use_gpu);
+    ctx_params.flash_attn(true);
+    let wctx = WhisperContext::new_with_params(
+        &model_path.to_string_lossy(),
+        ctx_params,
+    ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
+    log::info!("Whisper model loaded: {} (gpu={})", model_id, use_gpu);
+    Ok(WhisperCtx {
+        context: wctx,
+        model_id: model_id.to_string(),
+        gpu_mode,
+    })
+}
+
+/// Transcribe an audio file using a loaded WhisperCtx.
+pub fn transcribe(ctx: &WhisperCtx, audio_path: &Path, language: &str) -> Result<String, EngineError> {
+    let mut wstate = ctx.context.create_state()
+        .map_err(|e| EngineError::LaunchFailed(format!("Failed to create whisper state: {}", e)))?;
+
+    let samples = read_wav_f32(audio_path)?;
+
+    let n_threads = inference_threads() as i32;
+    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_n_threads(n_threads);
+    params.set_translate(false);
+    params.set_print_special(false);
+    params.set_print_progress(false);
+    params.set_print_realtime(false);
+    params.set_print_timestamps(false);
+    params.set_no_timestamps(true);
+
+    if language != "auto" {
+        params.set_language(Some(language));
+    } else {
+        params.set_detect_language(true);
+    }
+
+    wstate.full(params, &samples)
+        .map_err(|e| EngineError::LaunchFailed(format!("Whisper transcription failed: {}", e)))?;
+
+    let mut text = String::new();
+    let n_segments = wstate.full_n_segments();
+    for i in 0..n_segments {
+        if let Some(segment) = wstate.get_segment(i) {
+            if let Ok(s) = segment.to_str() {
+                text.push_str(s);
+            }
+        }
+    }
+
+    Ok(text.trim().to_string())
+}
+
+// -- Engine (catalogue) --
 
 pub struct WhisperEngine;
 
@@ -11,7 +126,6 @@ impl ASREngine for WhisperEngine {
     fn display_name(&self) -> &str { "Whisper" }
 
     fn models(&self) -> Vec<ASRModel> {
-        // Sorted by WER ascending (best quality first)
         vec![
             ASRModel {
                 id: "whisper:large-v3".into(), engine_id: "whisper".into(),

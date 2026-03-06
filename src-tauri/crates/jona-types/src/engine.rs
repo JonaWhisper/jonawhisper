@@ -1,0 +1,155 @@
+//! Core engine types, traits, and errors shared by all engine crates.
+
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+// -- Engine category --
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EngineCategory {
+    ASR,
+    LLM,
+    Punctuation,
+    Correction,
+}
+
+// -- Download type --
+
+/// Describes a single file within a multi-file download.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadFile {
+    pub filename: String,
+    pub url: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum DownloadType {
+    #[default]
+    SingleFile,
+    /// Multiple files downloaded into a directory. Model `filename` is the directory name.
+    /// Uses `download_marker` (e.g. ".complete") to track completion.
+    MultiFile { files: Vec<DownloadFile> },
+    RemoteAPI,
+    System,
+}
+
+// -- Model --
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ASRModel {
+    pub id: String,
+    pub engine_id: String,
+    pub label: String,
+    pub filename: String,
+    pub url: String,
+    pub size: u64,
+    pub storage_dir: String,
+    pub download_type: DownloadType,
+    pub download_marker: Option<String>,
+    pub wer: Option<f32>,
+    pub rtf: Option<f32>,
+    #[serde(default)]
+    pub recommended: bool,
+    /// Number of parameters in billions (for LLM models).
+    pub params: Option<f32>,
+    /// Estimated RAM usage in bytes when loaded.
+    pub ram: Option<u64>,
+    /// Language codes this specific model excels at (None = inherits from engine).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lang_codes: Option<Vec<String>>,
+    /// Inference runtime for this model (e.g. "ort", "candle").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<String>,
+    /// Quantization format (e.g. "INT8", "Q5", "Q8", "FP32").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quantization: Option<String>,
+}
+
+impl ASRModel {
+    pub fn local_path(&self) -> PathBuf {
+        let expanded = shellexpand::tilde(&self.storage_dir);
+        PathBuf::from(expanded.as_ref()).join(&self.filename)
+    }
+
+    pub fn is_downloaded(&self) -> bool {
+        match &self.download_type {
+            DownloadType::RemoteAPI | DownloadType::System => true,
+            _ => {
+                let path = self.local_path();
+                if let Some(marker) = &self.download_marker {
+                    path.join(marker).exists()
+                } else {
+                    path.exists()
+                }
+            }
+        }
+    }
+}
+
+// -- Language --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Language {
+    pub code: String,
+    pub label: String,
+}
+
+// -- Engine trait --
+
+pub trait ASREngine: Send + Sync {
+    fn engine_id(&self) -> &str;
+    fn display_name(&self) -> &str;
+    fn category(&self) -> EngineCategory { EngineCategory::ASR }
+    fn models(&self) -> Vec<ASRModel>;
+    fn supported_languages(&self) -> Vec<Language>;
+    fn description(&self) -> &str;
+    fn recommended_model_id(&self, _language: &str) -> Option<String> {
+        self.models().into_iter().find(|m| m.recommended).map(|m| m.id)
+    }
+}
+
+// -- Engine info (serializable for frontend) --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EngineInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub category: EngineCategory,
+    pub available: bool,
+    pub supported_language_codes: Vec<String>,
+}
+
+// -- Errors --
+
+#[derive(Debug, thiserror::Error)]
+pub enum EngineError {
+    #[error("Model not found at {0}")]
+    ModelNotFound(String),
+    #[error("Failed to launch: {0}")]
+    LaunchFailed(String),
+    #[error("API error: {0}")]
+    ApiError(String),
+}
+
+impl Serialize for EngineError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+// -- Common languages --
+
+pub fn common_languages() -> Vec<Language> {
+    vec![
+        Language { code: "auto".into(), label: "Auto".into() },
+        Language { code: "fr".into(), label: "Français".into() },
+        Language { code: "en".into(), label: "English".into() },
+        Language { code: "es".into(), label: "Español".into() },
+        Language { code: "de".into(), label: "Deutsch".into() },
+    ]
+}
