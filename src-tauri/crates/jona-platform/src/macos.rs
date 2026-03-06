@@ -216,94 +216,37 @@ pub fn play_sound(name: &str) {
         .spawn();
 }
 
-// -- Launch at Login (LaunchAgent plist) --
+// -- Launch at Login (SMAppService) --
 //
-// SMAppService.mainApp silently no-ops without a notarized Developer ID cert
-// (confirmed on macOS 15+/Darwin 25). We use the standard LaunchAgent plist
-// approach instead — used by Figma, JetBrains, Steam, etc.
+// Uses the native macOS SMAppService API (macOS 13+) for proper BTM integration.
+// Requires a notarized Developer ID cert to fully activate ("enabled" status).
+// In dev builds (Apple Development cert), register() succeeds but status stays
+// "notRegistered" — this is expected and acceptable.
 //
-// Plist at ~/Library/LaunchAgents/com.local.jona-whisper.plist with RunAtLoad=true.
-// Points to the current binary path — for a stable login item, install to /Applications.
-// Appears in System Settings > General > Login Items > "Allow in the Background".
-//
-// IMPORTANT: Must call `launchctl bootstrap`/`bootout` alongside plist write/delete.
-// Without bootout, macOS BTM (Background Task Manager) recreates the plist after deletion.
+// Status values returned to the frontend:
+//   "enabled"           → registered and active (requires_approval also maps to this for the switch)
+//   "requires_approval" → registered, user must approve in System Settings > Login Items
+//   "disabled"          → not registered
 
-const LAUNCH_AGENT_LABEL: &str = "com.local.jona-whisper";
-
-fn launch_agent_plist_path() -> std::path::PathBuf {
-    let home = std::env::var("HOME").unwrap_or_default();
-    std::path::PathBuf::from(home)
-        .join(format!("Library/LaunchAgents/{}.plist", LAUNCH_AGENT_LABEL))
-}
-
-fn current_uid() -> u32 {
-    // SAFETY: getuid() is a POSIX function, always safe to call.
-    unsafe {
-        extern "C" { fn getuid() -> u32; }
-        getuid()
-    }
-}
-
-/// Returns "enabled" if the LaunchAgent plist exists, "disabled" otherwise.
 pub fn get_launch_at_login_status() -> &'static str {
-    if launch_agent_plist_path().exists() { "enabled" } else { "disabled" }
+    use smappservice_rs::{AppService, ServiceStatus, ServiceType};
+    let svc = AppService::new(ServiceType::MainApp);
+    match svc.status() {
+        ServiceStatus::Enabled => "enabled",
+        ServiceStatus::RequiresApproval => "requires_approval",
+        _ => "disabled",
+    }
 }
 
-/// Write or remove the LaunchAgent plist to enable/disable launch at login.
-/// Uses launchctl bootstrap/bootout so BTM properly tracks the agent.
 pub fn set_launch_at_login(enabled: bool) -> Result<&'static str, String> {
-    let plist_path = launch_agent_plist_path();
-    let uid = current_uid();
-    let session = format!("gui/{}", uid);
-
+    use smappservice_rs::{AppService, ServiceType};
+    let svc = AppService::new(ServiceType::MainApp);
     if enabled {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let exe_str = exe.to_string_lossy();
-
-        let content = format!(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
-             <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \
-             \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
-             <plist version=\"1.0\">\n\
-             <dict>\n\
-             \t<key>Label</key>\n\
-             \t<string>{label}</string>\n\
-             \t<key>Program</key>\n\
-             \t<string>{exe}</string>\n\
-             \t<key>RunAtLoad</key>\n\
-             \t<true/>\n\
-             \t<key>KeepAlive</key>\n\
-             \t<false/>\n\
-             </dict>\n\
-             </plist>\n",
-            label = LAUNCH_AGENT_LABEL,
-            exe = exe_str
-        );
-
-        if let Some(parent) = plist_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        std::fs::write(&plist_path, &content).map_err(|e| e.to_string())?;
-
-        // Register with launchd so BTM tracks it (idempotent if already loaded).
-        let _ = std::process::Command::new("launchctl")
-            .args(["bootstrap", &session, plist_path.to_str().unwrap_or("")])
-            .output();
-
-        log::info!("LaunchAgent enabled: {} → {}", plist_path.display(), exe_str);
+        svc.register().map_err(|e| e.to_string())?;
+        log::info!("SMAppService: registered main app as login item");
     } else {
-        // Deregister from launchd/BTM first — prevents BTM from recreating the plist.
-        let service = format!("{}/{}", session, LAUNCH_AGENT_LABEL);
-        let _ = std::process::Command::new("launchctl")
-            .args(["bootout", &service])
-            .output();
-
-        if plist_path.exists() {
-            std::fs::remove_file(&plist_path).map_err(|e| e.to_string())?;
-        }
-        log::info!("LaunchAgent disabled: {}", plist_path.display());
+        svc.unregister().map_err(|e| e.to_string())?;
+        log::info!("SMAppService: unregistered main app login item");
     }
-
     Ok(get_launch_at_login_status())
 }

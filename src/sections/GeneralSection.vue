@@ -69,6 +69,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
       <div class="flex items-center justify-between py-2 gap-3">
         <div class="flex-1 min-w-0">
           <div class="text-[13px] text-foreground">{{ t('general.launchAtLogin.desc') }}</div>
+          <div v-if="launchAtLoginStatus === 'requires_approval'" class="text-[11px] text-amber-500 mt-0.5">{{ t('general.launchAtLogin.requiresApproval') }}</div>
           <div v-if="launchAtLoginError" class="text-[11px] text-red-500 mt-0.5">{{ launchAtLoginError }}</div>
         </div>
         <Switch :model-value="launchAtLoginEnabled" :disabled="launchAtLoginPending" @update:model-value="onLaunchAtLoginChange" />
