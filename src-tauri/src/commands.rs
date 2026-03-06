@@ -349,56 +349,19 @@ pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
 pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, String> {
     provider.validate_url().map_err(|e| e.to_string())?;
 
-    // If api_key is empty (editing mode), use the stored key
-    let api_key = if provider.api_key.is_empty() || provider.api_key.starts_with('\u{2022}') {
-        state.settings.lock().unwrap().providers.iter()
+    // If api_key is masked (editing mode), use the stored key
+    let mut resolved = provider.clone();
+    if resolved.api_key.is_empty() || resolved.api_key.starts_with('\u{2022}') {
+        resolved.api_key = state.settings.lock().unwrap().providers.iter()
             .find(|p| p.id == provider.id)
             .map(|p| p.api_key.clone())
-            .unwrap_or_default()
-    } else {
-        provider.api_key.clone()
-    };
-
-    let url = format!("{}/models", provider.base_url());
-
-    let mut req = crate::http::CLIENT.get(&url);
-    if !api_key.is_empty() {
-        if provider.kind.is_anthropic_format() {
-            req = req
-                .header("x-api-key", &api_key)
-                .header("anthropic-version", "2023-06-01");
-        } else {
-            req = req.header("Authorization", format!("Bearer {}", api_key));
-        }
+            .unwrap_or_default();
     }
 
-    let response = req.send().await.map_err(|e| e.to_string())?;
-
-    if !response.status().is_success() {
-        let status = response.status();
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!("HTTP {}: {}", status, body));
-    }
-
-    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
-
-    // Parse model IDs: handle {data:[...]} (OpenAI-compatible) and bare [...] (some providers)
-    let models_array = json.get("data").and_then(|d| d.as_array())
-        .or_else(|| json.as_array());
-
-    let ids: Vec<String> = models_array
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    if ids.is_empty() {
-        return Err("No models found in response".to_string());
-    }
-
-    Ok(ids)
+    jona_provider::backend(resolved.kind)
+        .list_models(&resolved)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // -- App lifecycle --

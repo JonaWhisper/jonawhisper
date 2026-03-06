@@ -2794,6 +2794,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-provider"
+version = "0.1.0"
+dependencies = [
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "jona-types"
 version = "0.1.0"
 dependencies = [
@@ -2824,6 +2836,7 @@ dependencies = [
  "hound",
  "jona-engines",
  "jona-platform",
+ "jona-provider",
  "jona-types",
  "keyring",
  "llama-cpp-2",

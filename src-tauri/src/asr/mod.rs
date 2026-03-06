@@ -11,7 +11,7 @@ pub use qwen::QwenContext;
 pub use voxtral::VoxtralContext;
 pub use whisper::WhisperCtx;
 
-use crate::engines::{openai_api, EngineCatalog, EngineError};
+use crate::engines::{EngineCatalog, EngineError};
 use crate::state::AppState;
 use std::path::Path;
 
@@ -40,7 +40,9 @@ pub fn transcribe(
                 format!("Provider '{}' does not support ASR transcription", provider.name)
             ));
         }
-        return openai_api::transcribe(provider, &asr_cloud_model, audio_path, &language);
+        return jona_provider::backend(provider.kind)
+            .transcribe(provider, &asr_cloud_model, audio_path, &language)
+            .map_err(|e| EngineError::ApiError(e.to_string()));
     }
 
     // Local engine dispatch

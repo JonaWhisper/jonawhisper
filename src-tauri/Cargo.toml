@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/jona-types", "crates/jona-platform", "crates/jona-engines"]
+members = ["crates/jona-types", "crates/jona-platform", "crates/jona-engines", "crates/jona-provider"]
 
 [package]
 name = "jona-whisper"
@@ -21,6 +21,7 @@ cc = "1"
 jona-types = { path = "crates/jona-types" }
 jona-platform = { path = "crates/jona-platform" }
 jona-engines = { path = "crates/jona-engines" }
+jona-provider = { path = "crates/jona-provider" }
 
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 

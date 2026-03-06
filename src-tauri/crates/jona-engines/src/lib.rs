@@ -3,7 +3,6 @@ pub mod canary;
 pub mod parakeet;
 pub mod qwen;
 pub mod voxtral;
-pub mod openai_api;
 pub mod downloader;
 pub mod llama;
 pub mod bert;
