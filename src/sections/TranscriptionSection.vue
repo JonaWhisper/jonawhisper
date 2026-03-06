@@ -56,7 +56,6 @@ async function refreshAsrModels() {
 }
 
 async function onAsrCloudModelChange(value: string) {
-  settings.asrCloudModel = value
   await settings.setSetting('asr_cloud_model', value)
 }
 

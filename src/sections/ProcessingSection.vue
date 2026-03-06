@@ -67,7 +67,6 @@ async function refreshLlmModels() {
 }
 
 async function onLlmModelChange(value: string) {
-  settings.llmModel = value
   await settings.setSetting('llm_model', value)
 }
 

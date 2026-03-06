@@ -253,7 +253,8 @@ impl EngineCatalog {
     }
 
     pub fn model_by_id(&self, id: &str) -> Option<ASRModel> {
-        self.all_models().into_iter().find(|m| m.id == id)
+        self.engines.iter()
+            .find_map(|e| e.models().into_iter().find(|m| m.id == id))
     }
 
     pub fn downloaded_models(&self) -> Vec<ASRModel> {

@@ -62,7 +62,7 @@ pub fn run() {
             commands::request_permission,
             commands::start_monitoring,
             commands::get_history,
-            commands::search_history,
+
             commands::delete_history_entry,
             commands::delete_history_day,
             commands::clear_history,

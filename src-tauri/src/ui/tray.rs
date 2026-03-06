@@ -3,12 +3,18 @@ use crate::platform::audio_devices;
 use crate::state::AppState;
 use rust_i18n::t;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use tauri::{
     image::Image,
     menu::{IconMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::TrayIconBuilder,
     AppHandle, Manager, WebviewUrl, WebviewWindowBuilder,
 };
+
+// Cached tray icons (static bitmaps, computed once)
+static IDLE_ICON: LazyLock<Image<'static>> = LazyLock::new(render_idle_icon);
+static RECORDING_ICON: LazyLock<Image<'static>> = LazyLock::new(render_recording_icon);
+static TRANSCRIBING_ICON: LazyLock<Image<'static>> = LazyLock::new(render_transcribing_icon);
 
 /// Holds references to menu items for incremental updates.
 pub struct TrayMenuState {
@@ -254,17 +260,17 @@ pub fn set_tray_state(app: &AppHandle, state: &str) {
 
     match state {
         "recording" => {
-            let _ = tray.set_icon(Some(make_recording_icon()));
+            let _ = tray.set_icon(Some(RECORDING_ICON.clone()));
             let _ = tray.set_icon_as_template(true);
             let _ = tray.set_tooltip(Some(&t!("pill.recording")));
         }
         "transcribing" => {
-            let _ = tray.set_icon(Some(make_transcribing_icon()));
+            let _ = tray.set_icon(Some(TRANSCRIBING_ICON.clone()));
             let _ = tray.set_icon_as_template(true);
             let _ = tray.set_tooltip(Some(&t!("pill.transcribing")));
         }
         _ => {
-            let _ = tray.set_icon(Some(make_idle_icon()));
+            let _ = tray.set_icon(Some(IDLE_ICON.clone()));
             let _ = tray.set_icon_as_template(true);
             let _ = tray.set_tooltip(Some(&t!("app.name")));
         }
@@ -274,7 +280,7 @@ pub fn set_tray_state(app: &AppHandle, state: &str) {
 // -- Tray bar icons (44×44, Lucide-inspired SDF) --
 
 /// Idle state: simple microphone (Lucide mic.svg), 44×44 RGBA template.
-fn make_idle_icon() -> Image<'static> {
+fn render_idle_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
     let lw = 2.2_f32;
@@ -309,7 +315,7 @@ fn make_idle_icon() -> Image<'static> {
 }
 
 /// Recording state: audio bars (Lucide audio-lines.svg), 44×44 RGBA template.
-fn make_recording_icon() -> Image<'static> {
+fn render_recording_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
     let lw = 2.4_f32;
@@ -349,7 +355,7 @@ fn make_recording_icon() -> Image<'static> {
 }
 
 /// Transcribing state: speech bubble with text lines (Lucide message-square-text.svg), 44×44 RGBA template.
-fn make_transcribing_icon() -> Image<'static> {
+fn render_transcribing_icon() -> Image<'static> {
     let s = TRAY_ICON_SIZE as usize;
     let mut rgba = vec![0u8; s * s * 4];
     let lw = 2.2_f32;
@@ -390,7 +396,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let menu_state = build_initial_menu(app)?;
 
     let _tray = TrayIconBuilder::with_id("main")
-        .icon(make_idle_icon())
+        .icon(IDLE_ICON.clone())
         .icon_as_template(true)
         .tooltip(&t!("app.name"))
         .on_menu_event(move |app, event| {

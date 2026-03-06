@@ -290,11 +290,6 @@ pub fn get_history(query: String, limit: u32, cursor: Option<u64>, state: tauri:
 }
 
 #[tauri::command]
-pub fn search_history(query: String, limit: u32, cursor: Option<u64>, state: tauri::State<'_, Arc<AppState>>) -> HistoryPage {
-    get_history(query, limit, cursor, state)
-}
-
-#[tauri::command]
 pub fn delete_history_entry(timestamp: u64, state: tauri::State<'_, Arc<AppState>>) {
     state.delete_history_entry(timestamp);
 }

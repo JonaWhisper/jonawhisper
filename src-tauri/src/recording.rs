@@ -345,10 +345,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
+    let (model_id, lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
          llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
+            s.selected_model_id.clone(),
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
             s.text_cleanup_enabled,
@@ -441,10 +442,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         crate::engines::CleanupKind::LocalLlm => {
             // Local LLM cleanup — finalize before
             processed = cleanup::post_processor::finalize(&processed);
-            let effective_max_tokens = std::cmp::min(
-                llm_max_tokens,
-                std::cmp::max((processed.len() as u32) / 3 + 64, 128),
-            );
+            let effective_max_tokens = effective_llm_tokens(processed.len(), llm_max_tokens);
             let state_clone = Arc::clone(state);
             let text_for_llm = processed.clone();
             let lang_for_llm = lang.clone();
@@ -467,10 +465,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         crate::engines::CleanupKind::CloudLlm(provider_id) => {
             // Cloud LLM cleanup — finalize before
             processed = cleanup::post_processor::finalize(&processed);
-            let effective_max_tokens = std::cmp::min(
-                llm_max_tokens,
-                std::cmp::max((processed.len() as u32) / 3 + 64, 128),
-            );
+            let effective_max_tokens = effective_llm_tokens(processed.len(), llm_max_tokens);
             let llm_result = if let Some(provider) = providers.iter().find(|p| p.id == provider_id) {
                 crate::cleanup::llm_cloud::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
             } else {
@@ -511,11 +506,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     })
     .await;
     state.runtime.lock().unwrap().last_paste_had_content = true;
-    let (model_id, language) = {
-        let s = state.settings.lock().unwrap();
-        (s.selected_model_id.clone(), s.selected_language.clone())
-    };
-    state.add_history(processed.clone(), model_id, language, effective_cleanup_model_id.clone(), hall_filter, vad_trimmed);
+    state.add_history(processed.clone(), model_id, lang.clone(), effective_cleanup_model_id.clone(), hall_filter, vad_trimmed);
     platform::play_sound("Glass");
 
     let _ = app.emit(
@@ -527,6 +518,10 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             "vad_trimmed": vad_trimmed,
         }),
     );
+}
+
+fn effective_llm_tokens(text_len: usize, max: u32) -> u32 {
+    std::cmp::min(max, std::cmp::max((text_len as u32) / 3 + 64, 128))
 }
 
 // -- Cleanup model runners --
@@ -625,22 +620,20 @@ fn vad_preprocess(audio_path: &std::path::Path) -> VadResult {
         }
     };
 
-    if !crate::cleanup::vad::has_speech(&audio) {
-        return VadResult::NoSpeech;
+    match crate::cleanup::vad::analyze(&audio) {
+        crate::cleanup::vad::VadAnalysis::NoSpeech => VadResult::NoSpeech,
+        crate::cleanup::vad::VadAnalysis::Speech { start, end } => {
+            if start == 0 && end == audio.len() {
+                return VadResult::Unchanged;
+            }
+            let trimmed = &audio[start..end];
+            if let Err(e) = write_wav_f32(audio_path, trimmed) {
+                log::warn!("VAD: failed to write trimmed WAV, using original: {}", e);
+                return VadResult::Unchanged;
+            }
+            VadResult::Trimmed
+        }
     }
-
-    let (start, end) = crate::cleanup::vad::trim_silence(&audio);
-    if start == 0 && end == audio.len() {
-        return VadResult::Unchanged;
-    }
-
-    let trimmed = &audio[start..end];
-    if let Err(e) = write_wav_f32(audio_path, trimmed) {
-        log::warn!("VAD: failed to write trimmed WAV, using original: {}", e);
-        return VadResult::Unchanged;
-    }
-
-    VadResult::Trimmed
 }
 
 fn write_wav_f32(path: &std::path::Path, samples: &[f32]) -> Result<(), String> {

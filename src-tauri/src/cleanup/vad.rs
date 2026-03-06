@@ -120,42 +120,27 @@ fn forward_chunk(vad: &mut VadState, chunk: &[f32]) -> Result<f32, String> {
     Ok(prob)
 }
 
-/// Returns true if speech is detected in the audio.
-/// Falls back to true on error (never lose the dictation).
-pub fn has_speech(audio: &[f32]) -> bool {
-    match detect_speech(audio) {
-        Ok(found) => found,
+/// Result of a single-pass VAD analysis.
+pub enum VadAnalysis {
+    /// No speech detected anywhere.
+    NoSpeech,
+    /// Speech found; (start, end) sample indices with one-chunk margin.
+    Speech { start: usize, end: usize },
+}
+
+/// Analyze audio in a single pass: detect speech presence AND find bounds.
+/// Falls back to full range on error (never lose the dictation).
+pub fn analyze(audio: &[f32]) -> VadAnalysis {
+    match analyze_inner(audio) {
+        Ok(result) => result,
         Err(e) => {
-            log::warn!("VAD has_speech error, assuming speech present: {e}");
-            true
+            log::warn!("VAD analyze error, assuming full speech: {e}");
+            VadAnalysis::Speech { start: 0, end: audio.len() }
         }
     }
 }
 
-fn detect_speech(audio: &[f32]) -> Result<bool, String> {
-    with_vad(|vad| {
-        for chunk in audio.chunks(CHUNK_SIZE) {
-            if forward_chunk(vad, chunk)? > DEFAULT_THRESHOLD {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    })
-}
-
-/// Returns (start, end) sample indices of the speech region, with one-chunk margin.
-/// Falls back to (0, len) on error.
-pub fn trim_silence(audio: &[f32]) -> (usize, usize) {
-    match find_speech_bounds(audio) {
-        Ok(bounds) => bounds,
-        Err(e) => {
-            log::warn!("VAD trim_silence error, using full audio: {e}");
-            (0, audio.len())
-        }
-    }
-}
-
-fn find_speech_bounds(audio: &[f32]) -> Result<(usize, usize), String> {
+fn analyze_inner(audio: &[f32]) -> Result<VadAnalysis, String> {
     with_vad(|vad| {
         let mut first_speech: Option<usize> = None;
         let mut last_speech: Option<usize> = None;
@@ -171,13 +156,11 @@ fn find_speech_bounds(audio: &[f32]) -> Result<(usize, usize), String> {
 
         match (first_speech, last_speech) {
             (Some(first), Some(last)) => {
-                // One-chunk margin on each side to avoid cutting words
                 let start = first.saturating_sub(1) * CHUNK_SIZE;
                 let end = ((last + 2) * CHUNK_SIZE).min(audio.len());
-                Ok((start, end))
+                Ok(VadAnalysis::Speech { start, end })
             }
-            // No speech found — return full range
-            _ => Ok((0, audio.len())),
+            _ => Ok(VadAnalysis::NoSpeech),
         }
     })
 }
