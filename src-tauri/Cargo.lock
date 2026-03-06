@@ -2758,6 +2758,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-bert"
+version = "0.1.0"
+dependencies = [
+ "jona-types",
+]
+
+[[package]]
 name = "jona-engine-canary"
 version = "0.1.0"
 dependencies = [
@@ -2769,6 +2776,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-correction"
+version = "0.1.0"
+dependencies = [
+ "jona-types",
+]
+
+[[package]]
+name = "jona-engine-llama"
+version = "0.1.0"
+dependencies = [
+ "jona-types",
+]
+
+[[package]]
 name = "jona-engine-parakeet"
 version = "0.1.0"
 dependencies = [
@@ -2777,6 +2798,13 @@ dependencies = [
  "jona-types",
  "log",
  "ort",
+]
+
+[[package]]
+name = "jona-engine-pcs"
+version = "0.1.0"
+dependencies = [
+ "jona-types",
 ]
 
 [[package]]
@@ -2889,8 +2917,12 @@ dependencies = [
  "env_logger",
  "futures-util",
  "hound",
+ "jona-engine-bert",
  "jona-engine-canary",
+ "jona-engine-correction",
+ "jona-engine-llama",
  "jona-engine-parakeet",
+ "jona-engine-pcs",
  "jona-engine-qwen",
  "jona-engine-voxtral",
  "jona-engine-whisper",

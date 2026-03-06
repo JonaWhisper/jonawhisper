@@ -1,8 +1,4 @@
 pub mod downloader;
-pub mod llama;
-pub mod bert;
-pub mod pcs;
-pub mod correction;
 pub mod ort_session;
 pub mod mel;
 pub mod audio;
@@ -76,21 +72,13 @@ impl EngineCatalog {
         CATALOG.get().expect("EngineCatalog not initialized — call EngineCatalog::init() at startup")
     }
 
-    /// Initialize the global catalog with external engine crates + internal engines.
+    /// Initialize the global catalog with all engine crates.
     /// Must be called once at app startup. Returns `false` if already initialized.
-    pub fn init(extra: Vec<Box<dyn ASREngine>>) -> bool {
-        CATALOG.set(Self::build(extra)).is_ok()
+    pub fn init(engines: Vec<Box<dyn ASREngine>>) -> bool {
+        CATALOG.set(Self::build(engines)).is_ok()
     }
 
-    fn build(extra: Vec<Box<dyn ASREngine>>) -> Self {
-        let mut engines: Vec<Box<dyn ASREngine>> = extra;
-        // Internal engines (not yet extracted into their own crates)
-        engines.extend([
-            Box::new(llama::LlamaEngine) as Box<dyn ASREngine>,
-            Box::new(bert::BertPunctuationEngine),
-            Box::new(pcs::PcsPunctuationEngine),
-            Box::new(correction::CorrectionEngine),
-        ]);
+    fn build(engines: Vec<Box<dyn ASREngine>>) -> Self {
         Self { engines }
     }
 

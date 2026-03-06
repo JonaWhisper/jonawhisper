@@ -1,4 +1,4 @@
-use super::*;
+use jona_types::{ASREngine, ASRModel, DownloadType, EngineCategory, Language};
 
 pub struct BertPunctuationEngine;
 
@@ -53,8 +53,6 @@ impl ASREngine for BertPunctuationEngine {
     }
 
     fn supported_languages(&self) -> Vec<Language> {
-        // Don't pollute the global language selector — it's for ASR, not punctuation.
-        // BERT language support is indicated via lang_codes on each model.
         vec![]
     }
 

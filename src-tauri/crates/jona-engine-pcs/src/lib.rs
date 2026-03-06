@@ -1,4 +1,4 @@
-use super::*;
+use jona_types::{ASREngine, ASRModel, DownloadType, EngineCategory, Language};
 
 pub struct PcsPunctuationEngine;
 
@@ -45,8 +45,6 @@ impl ASREngine for PcsPunctuationEngine {
     }
 
     fn supported_languages(&self) -> Vec<Language> {
-        // Don't pollute the global language selector — it's for ASR, not punctuation.
-        // PCS language support is indicated via lang_codes on each model.
         vec![]
     }
 

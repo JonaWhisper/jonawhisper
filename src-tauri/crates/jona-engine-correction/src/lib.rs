@@ -1,24 +1,17 @@
-use super::*;
+use jona_types::{
+    ASREngine, ASRModel, DownloadFile, DownloadType, EngineCategory, Language,
+};
 
 pub struct CorrectionEngine;
 
 fn storage_dir() -> String {
-    jona_types::models_dir()
-        .join("correction")
-        .to_string_lossy()
-        .to_string()
+    jona_types::models_dir().join("correction").to_string_lossy().to_string()
 }
 
 impl ASREngine for CorrectionEngine {
-    fn engine_id(&self) -> &str {
-        "correction"
-    }
-    fn display_name(&self) -> &str {
-        "T5 Correction"
-    }
-    fn category(&self) -> EngineCategory {
-        EngineCategory::Correction
-    }
+    fn engine_id(&self) -> &str { "correction" }
+    fn display_name(&self) -> &str { "T5 Correction" }
+    fn category(&self) -> EngineCategory { EngineCategory::Correction }
 
     fn models(&self) -> Vec<ASRModel> {
         vec![
@@ -54,17 +47,8 @@ impl ASREngine for CorrectionEngine {
                 params: Some(0.06),
                 ram: Some(350_000_000),
                 lang_codes: Some(vec![
-                    "en".into(),
-                    "de".into(),
-                    "fr".into(),
-                    "es".into(),
-                    "it".into(),
-                    "pt".into(),
-                    "nl".into(),
-                    "ru".into(),
-                    "zh".into(),
-                    "ja".into(),
-                    "ko".into(),
+                    "en".into(), "de".into(), "fr".into(), "es".into(), "it".into(),
+                    "pt".into(), "nl".into(), "ru".into(), "zh".into(), "ja".into(), "ko".into(),
                 ]),
                 runtime: Some("candle".into()),
                 quantization: Some("FP32".into()),

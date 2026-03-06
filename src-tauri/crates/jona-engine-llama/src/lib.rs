@@ -1,4 +1,6 @@
-use super::*;
+use jona_types::{
+    ASREngine, ASRModel, DownloadType, EngineCategory, Language, common_languages,
+};
 
 pub struct LlamaEngine;
 
@@ -20,8 +22,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/Qwen_Qwen3-0.6B-GGUF/resolve/main/Qwen_Qwen3-0.6B-Q4_K_M.gguf".into(),
                 size: 484_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(0.6),
-                ram: Some(600_000_000),
+                params: Some(0.6), ram: Some(600_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -33,8 +34,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/google_gemma-3-1b-it-GGUF/resolve/main/google_gemma-3-1b-it-Q4_K_M.gguf".into(),
                 size: 806_058_496, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(1.0),
-                ram: Some(1_000_000_000),
+                params: Some(1.0), ram: Some(1_000_000_000),
                 lang_codes: Some(vec!["en".into(), "fr".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -46,8 +46,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf".into(),
                 size: 808_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(1.0),
-                ram: Some(1_000_000_000),
+                params: Some(1.0), ram: Some(1_000_000_000),
                 lang_codes: Some(vec!["en".into(), "es".into(), "de".into(), "fr".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -59,8 +58,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q4_K_M.gguf".into(),
                 size: 1_055_609_824, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(1.7),
-                ram: Some(1_300_000_000),
+                params: Some(1.7), ram: Some(1_300_000_000),
                 lang_codes: Some(vec!["en".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -73,8 +71,7 @@ impl ASREngine for LlamaEngine {
                 size: 1_282_439_584, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 recommended: true,
-                params: Some(1.7),
-                ram: Some(1_500_000_000),
+                params: Some(1.7), ram: Some(1_500_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -86,8 +83,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/HuggingFaceTB_SmolLM3-3B-GGUF/resolve/main/HuggingFaceTB_SmolLM3-3B-Q4_K_M.gguf".into(),
                 size: 1_920_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(3.0),
-                ram: Some(2_300_000_000),
+                params: Some(3.0), ram: Some(2_300_000_000),
                 lang_codes: Some(vec!["en".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -99,8 +95,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf".into(),
                 size: 2_020_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(3.0),
-                ram: Some(2_500_000_000),
+                params: Some(3.0), ram: Some(2_500_000_000),
                 lang_codes: Some(vec!["en".into(), "es".into(), "de".into(), "fr".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -112,8 +107,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/mistralai_Ministral-3-3B-Instruct-2512-GGUF/resolve/main/mistralai_Ministral-3-3B-Instruct-2512-Q4_K_M.gguf".into(),
                 size: 2_150_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(3.0),
-                ram: Some(2_500_000_000),
+                params: Some(3.0), ram: Some(2_500_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -125,8 +119,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf".into(),
                 size: 2_490_000_000, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(4.0),
-                ram: Some(3_000_000_000),
+                params: Some(4.0), ram: Some(3_000_000_000),
                 lang_codes: Some(vec!["en".into(), "fr".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -138,8 +131,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf".into(),
                 size: 2_491_874_688, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(3.8),
-                ram: Some(3_000_000_000),
+                params: Some(3.8), ram: Some(3_000_000_000),
                 lang_codes: Some(vec!["en".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -151,8 +143,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/Qwen_Qwen3-4B-GGUF/resolve/main/Qwen_Qwen3-4B-Q4_K_M.gguf".into(),
                 size: 2_497_280_960, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                params: Some(4.0),
-                ram: Some(3_000_000_000),
+                params: Some(4.0), ram: Some(3_000_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
