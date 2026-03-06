@@ -91,6 +91,17 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
 
+            // Panel window is pre-created hidden (tauri.conf.json) — intercept close → hide
+            if let Some(win) = app.get_webview_window("panel") {
+                let win2 = win.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win2.hide();
+                    }
+                });
+            }
+
             ui::tray::setup_tray(app.handle())?;
 
             // Audio thread (cpal::Stream is not Send)

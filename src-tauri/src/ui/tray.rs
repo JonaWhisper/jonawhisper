@@ -51,33 +51,12 @@ pub fn open_fixed_window(app: &AppHandle, label: &str, title: &str, url: &str, w
     }
 }
 
-pub fn open_window_with_min(
-    app: &AppHandle,
-    label: &str,
-    title: &str,
-    url: &str,
-    width: f64,
-    height: f64,
-    min_size: Option<(f64, f64)>,
-) {
-    if let Some(window) = app.get_webview_window(label) {
+/// Show the panel window (pre-created hidden at startup via tauri.conf.json).
+pub fn show_panel(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("panel") {
+        let _ = window.show();
         activate_app();
         let _ = window.set_focus();
-        return;
-    }
-
-    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
-        .title(title)
-        .inner_size(width, height)
-        .resizable(true);
-
-    if let Some((min_w, min_h)) = min_size {
-        builder = builder.min_inner_size(min_w, min_h);
-    }
-
-    if let Ok(win) = builder.build() {
-        activate_app();
-        let _ = win.set_focus();
     }
 }
 
@@ -404,7 +383,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             match id {
                 "quit" => app.exit(0),
                 "panel" => {
-                    open_window_with_min(app, "panel", &t!("window.panel"), "/panel", 750.0, 550.0, Some((680.0, 450.0)));
+                    show_panel(app);
                 }
                 "test_pill" => {
                     let app_clone = app.clone();

@@ -141,9 +141,6 @@ pub fn request_permission(kind: String, app: AppHandle) -> bool {
 #[tauri::command]
 pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     let s = state.settings.lock().unwrap();
-    log::info!("get_settings: hallucination_filter={}, text_cleanup_enabled={}, cleanup_model_id={}",
-        s.hallucination_filter_enabled, s.text_cleanup_enabled, s.cleanup_model_id,
-    );
     serde_json::json!({
         "app_locale": s.app_locale,
         "hallucination_filter_enabled": s.hallucination_filter_enabled,
@@ -425,15 +422,7 @@ pub fn start_monitoring(
             .is_some_and(|m| m.is_downloaded());
 
     if !model_ready {
-        crate::ui::tray::open_window_with_min(
-            &app,
-            "panel",
-            "JonaWhisper",
-            "/panel",
-            750.0,
-            550.0,
-            Some((680.0, 450.0)),
-        );
+        crate::ui::tray::show_panel(&app);
     }
 }
 

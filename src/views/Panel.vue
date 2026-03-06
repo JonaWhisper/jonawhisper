@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
 import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2 } from 'lucide-vue-next'
-import RecentsSection from '@/sections/RecentsSection.vue'
-import ModelsSection from '@/sections/ModelsSection.vue'
-import TranscriptionSection from '@/sections/TranscriptionSection.vue'
-import ProcessingSection from '@/sections/ProcessingSection.vue'
-import ShortcutsSection from '@/sections/ShortcutsSection.vue'
-import MicrophoneSection from '@/sections/MicrophoneSection.vue'
-import ProvidersSection from '@/sections/ProvidersSection.vue'
-import PermissionsSection from '@/sections/PermissionsSection.vue'
-import GeneralSection from '@/sections/GeneralSection.vue'
+
+// Lazy-load sections — only the active one is loaded
+const RecentsSection = defineAsyncComponent(() => import('@/sections/RecentsSection.vue'))
+const ModelsSection = defineAsyncComponent(() => import('@/sections/ModelsSection.vue'))
+const TranscriptionSection = defineAsyncComponent(() => import('@/sections/TranscriptionSection.vue'))
+const ProcessingSection = defineAsyncComponent(() => import('@/sections/ProcessingSection.vue'))
+const ShortcutsSection = defineAsyncComponent(() => import('@/sections/ShortcutsSection.vue'))
+const MicrophoneSection = defineAsyncComponent(() => import('@/sections/MicrophoneSection.vue'))
+const ProvidersSection = defineAsyncComponent(() => import('@/sections/ProvidersSection.vue'))
+const PermissionsSection = defineAsyncComponent(() => import('@/sections/PermissionsSection.vue'))
+const GeneralSection = defineAsyncComponent(() => import('@/sections/GeneralSection.vue'))
 
 const { t } = useI18n()
 const store = useAppStore()
