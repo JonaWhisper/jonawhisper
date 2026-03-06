@@ -7,19 +7,12 @@ use crate::platform;
 use crate::state::{AppState, HistoryEntry, Provider};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
-static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
-});
-
-/// Build the local-only engine catalog.
-fn catalog() -> EngineCatalog {
-    EngineCatalog::new()
+/// Access the global engine catalog singleton.
+fn catalog() -> &'static EngineCatalog {
+    EngineCatalog::global()
 }
 
 // -- Locale --
@@ -196,7 +189,7 @@ pub fn set_setting(
             "hallucination_filter_enabled" => s.hallucination_filter_enabled = value == "true",
             "hotkey" => s.hotkey_option = value.clone(),
             "cancel_shortcut" => s.cancel_shortcut = value.clone(),
-            "recording_mode" => s.recording_mode = value.clone(),
+            "recording_mode" => s.recording_mode = crate::state::RecordingMode::parse(&value),
             "selected_input_device_uid" => {
                 s.selected_input_device_uid = if value.is_empty() { None } else { Some(value.clone()) };
             }
@@ -207,7 +200,7 @@ pub fn set_setting(
             "llm_provider_id" => s.llm_provider_id = value.clone(),
             "llm_model" => s.llm_model = value.clone(),
             "asr_cloud_model" => s.asr_cloud_model = value.clone(),
-            "gpu_mode" => s.gpu_mode = value.clone(),
+            "gpu_mode" => s.gpu_mode = crate::state::GpuMode::parse(&value),
             "llm_max_tokens" => s.llm_max_tokens = value.parse::<u32>().unwrap_or(256),
             "audio_ducking_enabled" => s.audio_ducking_enabled = value == "true",
             "audio_ducking_level" => s.audio_ducking_level = value.parse().unwrap_or(0.8),
@@ -264,12 +257,14 @@ pub fn set_launch_at_login(enabled: bool) -> Result<String, String> {
 pub fn start_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
     let device_uid = state.settings.lock().unwrap().selected_input_device_uid.clone();
     state.runtime.lock().unwrap().mic_testing = true;
+    state.audio_flags.set_mic_testing(true);
     let _ = sender.0.send(crate::recording::AudioCmd::StartMicTest { device_uid });
 }
 
 #[tauri::command]
 pub fn stop_mic_test(state: tauri::State<'_, Arc<AppState>>, sender: tauri::State<'_, crate::recording::MicTestSender>) {
     state.runtime.lock().unwrap().mic_testing = false;
+    state.audio_flags.set_mic_testing(false);
     let _ = sender.0.send(crate::recording::AudioCmd::StopMicTest);
 }
 
@@ -366,7 +361,7 @@ pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, A
 
     let url = format!("{}/models", provider.base_url());
 
-    let mut req = HTTP_CLIENT.get(&url);
+    let mut req = crate::http::CLIENT.get(&url);
     if !api_key.is_empty() {
         if provider.kind.is_anthropic_format() {
             req = req

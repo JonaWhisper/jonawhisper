@@ -13,6 +13,10 @@ pub mod ort_session;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::LazyLock;
+
+/// Global engine catalog singleton (stateless, immutable).
+static CATALOG: LazyLock<EngineCatalog> = LazyLock::new(EngineCatalog::build);
 
 // -- Engine category --
 
@@ -187,7 +191,7 @@ impl CleanupKind {
         if model_id.starts_with("correction:") { return Self::Correction; }
         if model_id.starts_with("pcs-punctuation:") { return Self::Punctuation(PunctRuntime::Pcs); }
         if model_id.starts_with("bert-punctuation:") {
-            let rt = EngineCatalog::new().model_by_id(model_id)
+            let rt = EngineCatalog::global().model_by_id(model_id)
                 .and_then(|m| m.runtime).unwrap_or_else(|| "ort".into());
             return match rt.as_str() {
                 "candle" => Self::Punctuation(PunctRuntime::BertCandle),
@@ -201,7 +205,7 @@ impl CleanupKind {
 
 /// Resolve a model ID from the catalog and verify it's downloaded.
 pub fn resolve_model(model_id: &str) -> Result<(ASRModel, std::path::PathBuf), String> {
-    let catalog = EngineCatalog::new();
+    let catalog = EngineCatalog::global();
     let model = catalog.model_by_id(model_id)
         .ok_or_else(|| format!("Model not found: {}", model_id))?;
     if !model.is_downloaded() {
@@ -218,7 +222,12 @@ pub struct EngineCatalog {
 }
 
 impl EngineCatalog {
-    pub fn new() -> Self {
+    /// Access the global singleton catalog.
+    pub fn global() -> &'static Self {
+        &CATALOG
+    }
+
+    fn build() -> Self {
         let engines: Vec<Box<dyn ASREngine>> = vec![
             Box::new(whisper::WhisperEngine),
             Box::new(canary::CanaryEngine),

@@ -75,7 +75,71 @@ pub struct HistoryEntry {
     pub vad_trimmed: bool,
 }
 
+// -- Typed settings enums --
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingMode {
+    #[default]
+    PushToTalk,
+    Toggle,
+}
+
+impl RecordingMode {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "toggle" => Self::Toggle,
+            _ => Self::PushToTalk,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GpuMode {
+    #[default]
+    Auto,
+    Gpu,
+    Cpu,
+}
+
+impl GpuMode {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "gpu" => Self::Gpu,
+            "cpu" => Self::Cpu,
+            _ => Self::Auto,
+        }
+    }
+}
+
 // -- Grouped state --
+
+/// Atomic flags for hot-path polling (avoids locking RuntimeState).
+#[derive(Default)]
+pub struct AudioFlags {
+    recording: AtomicBool,
+    mic_testing: AtomicBool,
+}
+
+impl AudioFlags {
+    pub fn is_active(&self) -> bool {
+        self.recording.load(std::sync::atomic::Ordering::Relaxed)
+            || self.mic_testing.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    pub fn set_recording(&self, v: bool) {
+        self.recording.store(v, std::sync::atomic::Ordering::Relaxed);
+    }
+    pub fn is_recording(&self) -> bool {
+        self.recording.load(std::sync::atomic::Ordering::Relaxed)
+    }
+    pub fn set_mic_testing(&self, v: bool) {
+        self.mic_testing.store(v, std::sync::atomic::Ordering::Relaxed);
+    }
+    pub fn is_mic_testing(&self) -> bool {
+        self.mic_testing.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
 
 /// Volatile runtime state (recording lifecycle, queue).
 #[derive(Default)]
@@ -298,8 +362,8 @@ pub struct Preferences {
     pub hallucination_filter_enabled: bool,
     #[serde(default = "default_cancel_shortcut")]
     pub cancel_shortcut: String,
-    #[serde(default = "default_recording_mode")]
-    pub recording_mode: String,
+    #[serde(default)]
+    pub recording_mode: RecordingMode,
     #[serde(default)]
     pub text_cleanup_enabled: bool,
     /// Model ID for cleanup: "bert-punctuation:*", "llama:*", or "cloud"
@@ -311,8 +375,8 @@ pub struct Preferences {
     pub llm_model: String,
     #[serde(default = "default_asr_cloud_model")]
     pub asr_cloud_model: String,
-    #[serde(default = "default_gpu_mode")]
-    pub gpu_mode: String,
+    #[serde(default)]
+    pub gpu_mode: GpuMode,
     #[serde(default = "default_llm_max_tokens")]
     pub llm_max_tokens: u32,
     #[serde(default)]
@@ -332,8 +396,6 @@ fn default_hotkey() -> String { "right_command".to_string() }
 fn default_auto() -> String { "auto".to_string() }
 fn default_cancel_shortcut() -> String { "escape".to_string() }
 fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
-fn default_recording_mode() -> String { "push_to_talk".to_string() }
-fn default_gpu_mode() -> String { "auto".to_string() }
 fn default_llm_max_tokens() -> u32 { 4096 }
 fn default_ducking_level() -> f32 { 0.8 }
 fn default_theme() -> String { "system".to_string() }

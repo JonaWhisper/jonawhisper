@@ -1,5 +1,5 @@
 use crate::engines::{ASRModel, EngineError};
-use crate::state::{AppState, HasModelId};
+use crate::state::{AppState, GpuMode, HasModelId};
 use std::path::Path;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
@@ -7,7 +7,7 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 pub struct WhisperCtx {
     pub context: WhisperContext,
     pub model_id: String,
-    pub gpu_mode: String,
+    pub gpu_mode: GpuMode,
 }
 
 impl HasModelId for WhisperCtx {
@@ -29,13 +29,13 @@ pub fn transcribe_native(
     }
 
     let model_path_str = model_path.to_string_lossy().to_string();
-    let gpu_mode = state.settings.lock().unwrap().gpu_mode.clone();
+    let gpu_mode = state.settings.lock().unwrap().gpu_mode;
 
     // Load or reuse cached WhisperContext (invalidate if model or gpu_mode changed)
     let mut ctx_guard = state.inference.asr.whisper.lock();
     if ctx_guard.as_ref().map_or(true, |w| w.model_id != model.id || w.gpu_mode != gpu_mode) {
-        let use_gpu = gpu_mode != "cpu";
-        log::info!("Loading whisper model: {} (gpu_mode={})", model.id, gpu_mode);
+        let use_gpu = gpu_mode != GpuMode::Cpu;
+        log::info!("Loading whisper model: {} (gpu_mode={:?})", model.id, gpu_mode);
         let mut ctx_params = WhisperContextParameters::default();
         ctx_params.use_gpu(use_gpu);
         ctx_params.flash_attn(true);
@@ -46,7 +46,7 @@ pub fn transcribe_native(
         *ctx_guard = Some(WhisperCtx {
             context: wctx,
             model_id: model.id.clone(),
-            gpu_mode: gpu_mode.clone(),
+            gpu_mode,
         });
         log::info!("Whisper model loaded: {} (gpu={})", model.id, use_gpu);
     }
@@ -61,9 +61,7 @@ pub fn transcribe_native(
     let audio = crate::audio::read_wav_f32(audio_path)?;
 
     // Configure transcription parameters
-    let n_threads = std::thread::available_parallelism()
-        .map(|p| p.get() as i32)
-        .unwrap_or(4);
+    let n_threads = crate::engines::ort_session::inference_threads() as i32;
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
     params.set_n_threads(n_threads);
     params.set_translate(false);

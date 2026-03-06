@@ -5,6 +5,7 @@ mod commands;
 mod engines;
 mod errors;
 mod events;
+mod http;
 mod migrations;
 mod platform;
 mod recording;

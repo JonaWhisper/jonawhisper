@@ -1,14 +1,6 @@
 use super::llm_prompt::{sanitize_output, system_prompt, LlmError};
 use crate::state::Provider;
 use serde::{Deserialize, Serialize};
-use std::sync::LazyLock;
-
-static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
-});
 
 #[derive(Serialize)]
 struct ChatMessage {
@@ -104,7 +96,7 @@ async fn call_openai_compatible(text: &str, language: &str, provider: &Provider,
         max_tokens,
     };
 
-    let mut req = HTTP_CLIENT.post(&url).json(&request);
+    let mut req = crate::http::CLIENT.post(&url).json(&request);
     if !provider.api_key.is_empty() {
         req = req.header("Authorization", format!("Bearer {}", provider.api_key));
     }
@@ -137,7 +129,7 @@ async fn call_anthropic(text: &str, language: &str, provider: &Provider, model: 
         }],
     };
 
-    let mut req = HTTP_CLIENT
+    let mut req = crate::http::CLIENT
         .post(&url)
         .header("anthropic-version", "2023-06-01")
         .json(&request);

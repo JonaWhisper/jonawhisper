@@ -80,9 +80,7 @@ impl PcsContext {
         let eos_id = *vocab.get("</s>").ok_or("EOS token </s> not found in vocab")? as i64;
         log::info!("PCS tokenizer: BOS={}, EOS={}, vocab_size={}", bos_id, eos_id, vocab.len());
 
-        let n_threads = std::thread::available_parallelism()
-            .map(|p| p.get())
-            .unwrap_or(4);
+        let n_threads = crate::engines::ort_session::inference_threads();
 
         let session = crate::engines::ort_session::build_session(n_threads)?
             .commit_from_file(model_path)

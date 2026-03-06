@@ -58,10 +58,12 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         // Cancel mic test if running
         if rt.mic_testing {
             rt.mic_testing = false;
+            state.audio_flags.set_mic_testing(false);
             let _ = rec.audio_tx.send(AudioCmd::StopMicTest);
             let _ = app.emit(crate::events::MIC_TEST_STOPPED, ());
         }
         rt.is_recording = true;
+        state.audio_flags.set_recording(true);
         rt.transcription_cancelled = false;
     }
     rec.key_down_time = Some(Instant::now());
@@ -100,6 +102,7 @@ pub fn stop_recording_and_enqueue(
             return;
         }
         rt.is_recording = false;
+        state.audio_flags.set_recording(false);
     }
 
     // Restore BEFORE stopping stream: on BT, the mic stream keeps HFP active,
@@ -533,7 +536,7 @@ fn run_bert_punctuation(
 ) -> Result<String, String> {
     // Auto-select first downloaded BERT model if ID is empty
     let (_, model_path) = if model_id.is_empty() {
-        let catalog = crate::engines::EngineCatalog::new();
+        let catalog = crate::engines::EngineCatalog::global();
         let model = catalog.all_models().into_iter()
             .find(|m| m.engine_id == "bert-punctuation" && m.is_downloaded())
             .ok_or_else(|| "No punctuation model downloaded".to_string())?;
@@ -674,6 +677,7 @@ fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingS
             return;
         }
         rt.is_recording = false;
+        state.audio_flags.set_recording(false);
     }
 
     // Restore BEFORE stopping stream (same rationale as stop_recording_and_enqueue)
@@ -787,18 +791,18 @@ pub fn spawn_hotkey_handler(
     std::thread::spawn(move || loop {
         match hotkey_rx.recv() {
             Ok(hotkey::HotkeyEvent::KeyDown) => {
-                let mode = state.settings.lock().unwrap().recording_mode.clone();
+                let mode = state.settings.lock().unwrap().recording_mode;
                 let is_recording = state.runtime.lock().unwrap().is_recording;
                 let mut rec = rec_state.lock().unwrap();
-                if mode == "toggle" && is_recording {
+                if mode == crate::state::RecordingMode::Toggle && is_recording {
                     stop_recording_and_enqueue(&app, &state, &mut rec);
                 } else {
                     start_recording(&app, &state, &mut rec);
                 }
             }
             Ok(hotkey::HotkeyEvent::KeyUp) => {
-                let mode = state.settings.lock().unwrap().recording_mode.clone();
-                if mode != "toggle" {
+                let mode = state.settings.lock().unwrap().recording_mode;
+                if mode != crate::state::RecordingMode::Toggle {
                     let mut rec = rec_state.lock().unwrap();
                     stop_recording_and_enqueue(&app, &state, &mut rec);
                 }
@@ -848,19 +852,19 @@ pub fn spawn_spectrum_emitter(
 ) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
-        let rt = state.runtime.lock().unwrap();
-        let is_recording = rt.is_recording;
-        let is_mic_testing = rt.mic_testing;
-        drop(rt);
 
-        if !is_recording && !is_mic_testing {
+        // Fast lock-free check — avoids mutex contention when idle
+        if !state.audio_flags.is_active() {
             continue;
         }
+
+        let is_mic_testing = state.audio_flags.is_mic_testing();
 
         // Detect audio stream error (e.g. device disconnected)
         if stream_error.load(Ordering::SeqCst) {
             log::warn!("Audio stream error detected (device disconnected?), forcing stop");
             state.runtime.lock().unwrap().is_recording = false;
+            state.audio_flags.set_recording(false);
             stream_error.store(false, Ordering::SeqCst);
 
             // Actually stop the cpal stream — without this the mic stays active

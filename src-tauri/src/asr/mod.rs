@@ -39,7 +39,7 @@ pub fn transcribe(
     }
 
     // Local engine dispatch
-    let catalog = EngineCatalog::new();
+    let catalog = EngineCatalog::global();
 
     let model = catalog.model_by_id(&model_id)
         .ok_or_else(|| EngineError::ModelNotFound(model_id.clone()))?;

@@ -58,9 +58,7 @@ impl ParakeetContext {
             return Err(format!("Vocab not found: {}", vocab_path.display()));
         }
 
-        let n_threads = std::thread::available_parallelism()
-            .map(|p| (p.get() / 2).max(1))
-            .unwrap_or(4);
+        let n_threads = (crate::engines::ort_session::inference_threads() / 2).max(1);
 
         log::info!("Loading Parakeet encoder: {}", encoder_path.display());
         let encoder = crate::engines::ort_session::build_session(n_threads)?

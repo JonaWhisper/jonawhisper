@@ -73,9 +73,7 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
     let max_gen_tokens = max_tokens;
 
     // Create context for this generation
-    let n_threads = std::thread::available_parallelism()
-        .map(|p| p.get() as i32)
-        .unwrap_or(4);
+    let n_threads = crate::engines::ort_session::inference_threads() as i32;
 
     let ctx_size = (n_prompt_tokens + max_gen_tokens + 64) as u32;
     let ctx_params = LlamaContextParams::default()

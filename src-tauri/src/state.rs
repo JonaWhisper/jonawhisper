@@ -48,6 +48,8 @@ pub struct AppState {
     /// Cached inference contexts (ASR + cleanup models). Each slot is lazy-loaded and
     /// invalidated when the corresponding model selection changes.
     pub inference: InferenceContexts,
+    /// Lock-free flags for spectrum emitter hot path.
+    pub audio_flags: AudioFlags,
 }
 
 fn open_history_db() -> Connection {
@@ -130,6 +132,7 @@ impl Default for AppState {
             history_db: Mutex::new(open_history_db()),
             tray_menu: Mutex::new(None),
             inference: InferenceContexts::new(),
+            audio_flags: AudioFlags::default(),
         }
     }
 }

@@ -6,6 +6,13 @@
 use ort::session::Session;
 use ort::session::builder::SessionBuilder;
 
+/// Number of threads for inference. Returns all available cores (fallback: 4).
+pub fn inference_threads() -> usize {
+    std::thread::available_parallelism()
+        .map(|p| p.get())
+        .unwrap_or(4)
+}
+
 /// Build an ort SessionBuilder with CoreML on macOS, CPU fallback elsewhere.
 pub fn build_session(n_threads: usize) -> Result<SessionBuilder, String> {
     let builder = Session::builder()
