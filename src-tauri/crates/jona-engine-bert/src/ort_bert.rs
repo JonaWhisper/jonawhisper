@@ -14,19 +14,12 @@ const TOKENIZER_URL: &str =
 pub struct BertContext {
     session: Session,
     tokenizer: Tokenizer,
-    model_id: String,
-}
-
-impl jona_types::HasModelId for BertContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
 }
 
 impl BertContext {
     /// Load an ONNX punctuation model and its tokenizer from disk.
     /// The tokenizer is auto-downloaded if not present alongside the model.
-    pub fn load(model_path: &Path, model_id: &str) -> Result<Self, String> {
+    pub fn load(model_path: &Path) -> Result<Self, String> {
         let model_dir = model_path
             .parent()
             .ok_or_else(|| "Invalid model path".to_string())?;
@@ -47,15 +40,13 @@ impl BertContext {
             .map_err(|e| format!("Failed to load tokenizer: {e}"))?;
 
         log::info!(
-            "BERT punctuation model loaded: {} ({})",
-            model_id,
+            "BERT punctuation model loaded: {}",
             model_path.display()
         );
 
         Ok(Self {
             session,
             tokenizer,
-            model_id: model_id.to_string(),
         })
     }
 }

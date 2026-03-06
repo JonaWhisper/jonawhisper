@@ -209,13 +209,9 @@ pub fn set_setting(
             }
         }
     }
-    // Invalidate cached ASR contexts when model or GPU mode changes
-    if key == "selected_model_id" || key == "gpu_mode" {
-        state.inference.asr.invalidate_all();
-    }
-    // Invalidate all cleanup contexts when cleanup model changes
-    if key == "cleanup_model_id" {
-        state.inference.cleanup.invalidate_all();
+    // Invalidate cached contexts when model or GPU mode changes
+    if key == "selected_model_id" || key == "gpu_mode" || key == "cleanup_model_id" {
+        state.contexts.invalidate_all();
     }
     // Send hotkey updates outside the settings lock
     match key.as_str() {

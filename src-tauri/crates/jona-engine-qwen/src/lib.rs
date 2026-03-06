@@ -1,6 +1,8 @@
 use jona_types::{
-    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, HasModelId, Language,
+    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
+    GpuMode, Language,
 };
+use std::any::Any;
 use std::path::Path;
 
 // -- Audio utility (inline, avoids dependency on jona-engines) --
@@ -76,20 +78,13 @@ fn lang_code_to_name(code: &str) -> Option<&'static str> {
 /// Cached Qwen3-ASR inference context.
 pub struct QwenContext {
     ctx: qwen_asr::context::QwenCtx,
-    pub model_id: String,
-}
-
-impl HasModelId for QwenContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
 }
 
 // -- Inference --
 
 /// Load a Qwen3-ASR model into a context.
-pub fn load(model_id: &str, model_dir: &Path) -> Result<QwenContext, EngineError> {
-    log::info!("Loading Qwen3-ASR model: {}", model_id);
+pub fn load(model_dir: &Path) -> Result<QwenContext, EngineError> {
+    log::info!("Loading Qwen3-ASR model: {}", model_dir.display());
     let dir_str = model_dir.to_string_lossy().to_string();
     let qwen_ctx = qwen_asr::context::QwenCtx::load(&dir_str)
         .ok_or_else(|| EngineError::LaunchFailed(
@@ -98,7 +93,6 @@ pub fn load(model_id: &str, model_dir: &Path) -> Result<QwenContext, EngineError
     log::info!("Qwen3-ASR loaded, optimizations: {:?}", qwen_asr::optimization_flags());
     Ok(QwenContext {
         ctx: qwen_ctx,
-        model_id: model_id.to_string(),
     })
 }
 
@@ -228,4 +222,23 @@ impl ASREngine for QwenEngine {
     fn description(&self) -> &str {
         "Alibaba Qwen3-ASR encoder-decoder LLM. 30 languages, Apple Accelerate (AMX) acceleration."
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = load(&model.local_path())?;
+        Ok(Box::new(ctx))
+    }
+
+    fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_mut::<QwenContext>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid qwen context".into()))?;
+        transcribe(ctx, audio_path, language)
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(QwenEngine) }
 }

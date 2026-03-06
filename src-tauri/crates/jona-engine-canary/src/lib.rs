@@ -1,8 +1,10 @@
 use jona_types::{
-    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, HasModelId, Language,
+    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
+    GpuMode, Language,
 };
 use ort::session::Session;
 use ort::value::Tensor;
+use std::any::Any;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -49,13 +51,6 @@ pub struct CanaryContext {
     vocab: Vec<String>,
     token_to_id: HashMap<String, i64>,
     is_sentencepiece: bool,
-    pub model_id: String,
-}
-
-impl HasModelId for CanaryContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
 }
 
 impl CanaryContext {
@@ -91,7 +86,7 @@ impl CanaryContext {
 // -- Loading --
 
 /// Load Canary encoder + decoder sessions and vocabulary from a model directory.
-pub fn load(model_dir: &Path, model_id: &str) -> Result<CanaryContext, EngineError> {
+pub fn load(model_dir: &Path) -> Result<CanaryContext, EngineError> {
     let encoder_path = model_dir.join("encoder-model.int8.onnx");
     let decoder_path = model_dir.join("decoder-model.int8.onnx");
     let vocab_path = model_dir.join("vocab.txt");
@@ -138,7 +133,6 @@ pub fn load(model_dir: &Path, model_id: &str) -> Result<CanaryContext, EngineErr
         vocab,
         token_to_id,
         is_sentencepiece,
-        model_id: model_id.to_string(),
     })
 }
 
@@ -458,4 +452,23 @@ impl ASREngine for CanaryEngine {
     fn description(&self) -> &str {
         "NVIDIA Canary encoder-decoder ASR. Ultra-light (182M params), beats Whisper Medium quality."
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = load(&model.local_path())?;
+        Ok(Box::new(ctx))
+    }
+
+    fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_mut::<CanaryContext>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid canary context".into()))?;
+        transcribe(ctx, audio_path, language)
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(CanaryEngine) }
 }

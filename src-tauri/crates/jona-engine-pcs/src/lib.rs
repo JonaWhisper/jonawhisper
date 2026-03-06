@@ -1,6 +1,10 @@
 mod inference;
 
-use jona_types::{ASREngine, ASRModel, DownloadType, EngineCategory, Language};
+use jona_types::{
+    ASREngine, ASRModel, DownloadType, EngineCategory, EngineError, EngineRegistration,
+    GpuMode, Language,
+};
+use std::any::Any;
 
 pub use inference::{PcsContext, restore_punctuation_and_case};
 
@@ -55,4 +59,25 @@ impl ASREngine for PcsPunctuationEngine {
     fn description(&self) -> &str {
         "Punctuation, capitalization & segmentation for 47 languages. Smaller and more accurate than BERT."
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = PcsContext::load(&model.local_path())
+            .map_err(EngineError::LaunchFailed)?;
+        Ok(Box::new(ctx))
+    }
+
+    fn cleanup(&self, ctx: &mut dyn Any, text: &str, _language: &str, _max_tokens: usize)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_mut::<PcsContext>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid PCS context".into()))?;
+        restore_punctuation_and_case(ctx, text)
+            .map_err(|e| EngineError::LaunchFailed(e))
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(PcsPunctuationEngine) }
 }

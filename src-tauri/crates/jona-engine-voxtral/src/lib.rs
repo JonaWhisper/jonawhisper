@@ -1,6 +1,8 @@
 use jona_types::{
-    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, HasModelId, Language,
+    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
+    GpuMode, Language,
 };
+use std::any::Any;
 use std::ffi::{c_char, c_int, c_void, CStr};
 use std::path::Path;
 
@@ -53,10 +55,9 @@ extern "C" {
 /// Cached Voxtral inference context wrapping the C voxtral library.
 pub struct VoxtralContext {
     ctx: *mut VoxCtx,
-    pub model_id: String,
 }
 
-unsafe impl Send for VoxtralContext {} // protected by ContextSlot Mutex
+unsafe impl Send for VoxtralContext {} // protected by ContextMap Mutex
 
 impl Drop for VoxtralContext {
     fn drop(&mut self) {
@@ -66,16 +67,10 @@ impl Drop for VoxtralContext {
     }
 }
 
-impl HasModelId for VoxtralContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
-}
-
 // -- Loading --
 
 /// Load a Voxtral model from a directory.
-pub fn load(model_id: &str, model_dir: &Path) -> Result<VoxtralContext, EngineError> {
+pub fn load(model_dir: &Path) -> Result<VoxtralContext, EngineError> {
     log::info!("Loading Voxtral model from: {}", model_dir.display());
 
     // Initialize Metal GPU acceleration
@@ -100,7 +95,6 @@ pub fn load(model_id: &str, model_dir: &Path) -> Result<VoxtralContext, EngineEr
     log::info!("Voxtral model loaded successfully");
     Ok(VoxtralContext {
         ctx,
-        model_id: model_id.to_string(),
     })
 }
 
@@ -209,4 +203,23 @@ impl ASREngine for VoxtralEngine {
     fn description(&self) -> &str {
         "Mistral Voxtral Realtime 4B. 13 languages, Metal GPU acceleration."
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = load(&model.local_path())?;
+        Ok(Box::new(ctx))
+    }
+
+    fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_mut::<VoxtralContext>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid voxtral context".into()))?;
+        transcribe(ctx, audio_path, language)
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(VoxtralEngine) }
 }

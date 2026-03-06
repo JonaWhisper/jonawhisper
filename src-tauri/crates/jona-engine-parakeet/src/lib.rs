@@ -1,8 +1,10 @@
 use jona_types::{
-    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, HasModelId, Language,
+    ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
+    GpuMode, Language,
 };
 use ort::session::Session;
 use ort::value::Tensor;
+use std::any::Any;
 use std::path::Path;
 
 // -- Audio utility (inline) --
@@ -50,19 +52,12 @@ pub struct ParakeetContext {
     decoder_joint: Session,
     vocab: Vec<String>,
     vocab_size: usize,
-    pub model_id: String,
-}
-
-impl HasModelId for ParakeetContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
 }
 
 // -- Loading --
 
 /// Load Parakeet encoder + decoder sessions and vocabulary from a model directory.
-pub fn load(model_dir: &Path, model_id: &str) -> Result<ParakeetContext, EngineError> {
+pub fn load(model_dir: &Path) -> Result<ParakeetContext, EngineError> {
     let encoder_path = find_file(model_dir, &[
         "encoder-model.int8.onnx",
         "encoder-model.onnx",
@@ -116,7 +111,6 @@ pub fn load(model_dir: &Path, model_id: &str) -> Result<ParakeetContext, EngineE
         decoder_joint,
         vocab,
         vocab_size,
-        model_id: model_id.to_string(),
     })
 }
 
@@ -441,4 +435,23 @@ impl ASREngine for ParakeetEngine {
     fn description(&self) -> &str {
         "NVIDIA Parakeet TDT transducer ASR. 25 European languages with auto-detection, excellent quality."
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = load(&model.local_path())?;
+        Ok(Box::new(ctx))
+    }
+
+    fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_mut::<ParakeetContext>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid parakeet context".into()))?;
+        transcribe(ctx, audio_path, language)
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(ParakeetEngine) }
 }

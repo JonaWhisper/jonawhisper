@@ -11,12 +11,11 @@ pub struct T5Context {
     tokenizer: Tokenizer,
     device: Device,
     config: t5::Config,
-    model_id: String,
 }
 
 impl T5Context {
     /// Load a T5 correction model from a directory containing model.safetensors, config.json, tokenizer.json.
-    pub fn load(model_dir: &Path, model_id: &str) -> Result<Self, String> {
+    pub fn load(model_dir: &Path) -> Result<Self, String> {
         let config_path = model_dir.join("config.json");
         let tokenizer_path = model_dir.join("tokenizer.json");
         let model_path = model_dir.join("model.safetensors");
@@ -48,8 +47,7 @@ impl T5Context {
             .map_err(|e| format!("Failed to load tokenizer: {e}"))?;
 
         log::info!(
-            "T5 correction model loaded: {} ({})",
-            model_id,
+            "T5 correction model loaded: {}",
             model_dir.display()
         );
 
@@ -58,14 +56,7 @@ impl T5Context {
             tokenizer,
             device,
             config,
-            model_id: model_id.to_string(),
         })
-    }
-}
-
-impl jona_types::HasModelId for T5Context {
-    fn model_id(&self) -> &str {
-        &self.model_id
     }
 }
 

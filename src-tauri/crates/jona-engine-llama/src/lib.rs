@@ -1,8 +1,10 @@
 mod inference;
 
 use jona_types::{
-    ASREngine, ASRModel, DownloadType, EngineCategory, Language, common_languages,
+    ASREngine, ASRModel, DownloadType, EngineCategory, EngineError, EngineRegistration,
+    GpuMode, Language, common_languages,
 };
+use std::any::Any;
 
 pub use inference::{LlmContext, cleanup_text};
 
@@ -164,4 +166,25 @@ impl ASREngine for LlamaEngine {
             "Local LLM inference via llama.cpp with CPU."
         }
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = LlmContext::load(&model.local_path())
+            .map_err(|e| EngineError::LaunchFailed(e.to_string()))?;
+        Ok(Box::new(ctx))
+    }
+
+    fn cleanup(&self, ctx: &mut dyn Any, text: &str, language: &str, max_tokens: usize)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_ref::<LlmContext>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid LLM context".into()))?;
+        cleanup_text(ctx, text, language, max_tokens)
+            .map_err(|e| EngineError::LaunchFailed(e.to_string()))
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(LlamaEngine) }
 }

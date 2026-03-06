@@ -34,18 +34,9 @@ pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::Ho
 pub fn run() {
     env_logger::init();
 
-    // Initialize the engine catalog with external engine crates
-    engines::EngineCatalog::init(vec![
-        Box::new(jona_engine_whisper::WhisperEngine),
-        Box::new(jona_engine_qwen::QwenEngine),
-        Box::new(jona_engine_canary::CanaryEngine),
-        Box::new(jona_engine_parakeet::ParakeetEngine),
-        Box::new(jona_engine_voxtral::VoxtralEngine),
-        Box::new(jona_engine_llama::LlamaEngine),
-        Box::new(jona_engine_bert::BertPunctuationEngine),
-        Box::new(jona_engine_pcs::PcsPunctuationEngine),
-        Box::new(jona_engine_correction::CorrectionEngine),
-    ]);
+    // Initialize the engine catalog from inventory auto-registration.
+    // Each engine crate registers itself via `inventory::submit!`.
+    engines::EngineCatalog::init_auto();
 
     recording::cleanup_orphan_audio_files();
 

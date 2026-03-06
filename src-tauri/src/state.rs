@@ -4,39 +4,6 @@ pub use jona_types::*;
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 
-// -- Context groups (reference asr/cleanup types from this crate) --
-
-context_group!(AsrContexts {
-    whisper: crate::asr::WhisperCtx,
-    canary: crate::asr::CanaryContext,
-    parakeet: crate::asr::ParakeetContext,
-    qwen: crate::asr::QwenContext,
-    voxtral: crate::asr::VoxtralContext,
-});
-
-context_group!(CleanupContexts {
-    llm: crate::cleanup::LlmContext,
-    bert: crate::cleanup::BertContext,
-    candle_punct: crate::cleanup::CandlePunctContext,
-    pcs: crate::cleanup::PcsContext,
-    t5: crate::cleanup::T5Context,
-});
-
-/// All inference contexts, grouped by ASR and cleanup.
-pub struct InferenceContexts {
-    pub asr: AsrContexts,
-    pub cleanup: CleanupContexts,
-}
-
-impl InferenceContexts {
-    pub fn new() -> Self {
-        Self {
-            asr: AsrContexts::new(),
-            cleanup: CleanupContexts::new(),
-        }
-    }
-}
-
 // -- Main AppState --
 
 pub struct AppState {
@@ -45,9 +12,9 @@ pub struct AppState {
     pub settings: Mutex<Preferences>,
     pub history_db: Mutex<Connection>,
     pub tray_menu: Mutex<Option<crate::ui::tray::TrayMenuState>>,
-    /// Cached inference contexts (ASR + cleanup models). Each slot is lazy-loaded and
-    /// invalidated when the corresponding model selection changes.
-    pub inference: InferenceContexts,
+    /// Dynamic context map for all engine inference contexts (ASR + cleanup).
+    /// Replaces the old typed `InferenceContexts` with type-erased storage.
+    pub contexts: ContextMap,
     /// Lock-free flags for spectrum emitter hot path.
     pub audio_flags: AudioFlags,
 }
@@ -131,7 +98,7 @@ impl Default for AppState {
             settings: Mutex::new(prefs),
             history_db: Mutex::new(open_history_db()),
             tray_menu: Mutex::new(None),
-            inference: InferenceContexts::new(),
+            contexts: ContextMap::new(),
             audio_flags: AudioFlags::default(),
         }
     }

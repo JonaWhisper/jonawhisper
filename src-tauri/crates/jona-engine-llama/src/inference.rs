@@ -14,7 +14,6 @@ use jona_engines::llm_prompt::LlmError;
 pub struct LlmContext {
     backend: LlamaBackend,
     model: LlamaModel,
-    model_id: String,
 }
 
 // LlamaBackend/LlamaModel are Send+Sync
@@ -23,7 +22,7 @@ unsafe impl Sync for LlmContext {}
 
 impl LlmContext {
     /// Load a GGUF model from disk. GPU offloads all layers on macOS Metal.
-    pub fn load(path: &Path, model_id: &str) -> Result<Self, LlmError> {
+    pub fn load(path: &Path) -> Result<Self, LlmError> {
         let backend = LlamaBackend::init()
             .map_err(|e| LlmError::Inference(format!("Failed to init llama backend: {}", e)))?;
 
@@ -33,19 +32,12 @@ impl LlmContext {
         let model = LlamaModel::load_from_file(&backend, path, &model_params)
             .map_err(|e| LlmError::Inference(format!("Failed to load LLM model: {}", e)))?;
 
-        log::info!("LLM model loaded: {} ({})", model_id, path.display());
+        log::info!("LLM model loaded: {}", path.display());
 
         Ok(Self {
             backend,
             model,
-            model_id: model_id.to_string(),
         })
-    }
-}
-
-impl jona_types::HasModelId for LlmContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
     }
 }
 

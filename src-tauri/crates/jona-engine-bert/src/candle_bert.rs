@@ -55,18 +55,11 @@ pub struct CandlePunctContext {
     model: XLMRobertaForTokenClassification,
     tokenizer: Tokenizer,
     device: Device,
-    model_id: String,
-}
-
-impl jona_types::HasModelId for CandlePunctContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
 }
 
 impl CandlePunctContext {
     /// Load a safetensors punctuation model and its tokenizer from disk.
-    pub fn load(model_path: &Path, model_id: &str) -> Result<Self, String> {
+    pub fn load(model_path: &Path) -> Result<Self, String> {
         let model_dir = model_path
             .parent()
             .ok_or_else(|| "Invalid model path".to_string())?;
@@ -118,8 +111,7 @@ impl CandlePunctContext {
             .map_err(|e| format!("Failed to load tokenizer: {e}"))?;
 
         log::info!(
-            "Candle punctuation model loaded: {} ({})",
-            model_id,
+            "Candle punctuation model loaded: {}",
             model_path.display()
         );
 
@@ -127,7 +119,6 @@ impl CandlePunctContext {
             model,
             tokenizer,
             device,
-            model_id: model_id.to_string(),
         })
     }
 }

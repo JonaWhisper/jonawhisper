@@ -1,7 +1,8 @@
 use jona_types::{
-    ASREngine, ASRModel, DownloadType, EngineError, Language, GpuMode, HasModelId,
+    ASREngine, ASRModel, DownloadType, EngineError, EngineRegistration, Language, GpuMode,
     common_languages,
 };
+use std::any::Any;
 use std::path::Path;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
@@ -40,25 +41,18 @@ fn inference_threads() -> usize {
 
 // -- Context (cached model state) --
 
-/// Wrapper around `whisper_rs::WhisperContext` carrying model_id + gpu_mode for cache invalidation.
+/// Wrapper around `whisper_rs::WhisperContext` carrying gpu_mode for cache invalidation.
 pub struct WhisperCtx {
     pub context: WhisperContext,
-    pub model_id: String,
     pub gpu_mode: GpuMode,
-}
-
-impl HasModelId for WhisperCtx {
-    fn model_id(&self) -> &str {
-        &self.model_id
-    }
 }
 
 // -- Inference --
 
 /// Load a Whisper model into a context.
-pub fn load(model_id: &str, model_path: &Path, gpu_mode: GpuMode) -> Result<WhisperCtx, EngineError> {
+pub fn load(model_path: &Path, gpu_mode: GpuMode) -> Result<WhisperCtx, EngineError> {
     let use_gpu = gpu_mode != GpuMode::Cpu;
-    log::info!("Loading whisper model: {} (gpu_mode={:?})", model_id, gpu_mode);
+    log::info!("Loading whisper model: {} (gpu_mode={:?})", model_path.display(), gpu_mode);
     let mut ctx_params = WhisperContextParameters::default();
     ctx_params.use_gpu(use_gpu);
     ctx_params.flash_attn(true);
@@ -66,10 +60,9 @@ pub fn load(model_id: &str, model_path: &Path, gpu_mode: GpuMode) -> Result<Whis
         &model_path.to_string_lossy(),
         ctx_params,
     ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
-    log::info!("Whisper model loaded: {} (gpu={})", model_id, use_gpu);
+    log::info!("Whisper model loaded: {} (gpu={})", model_path.display(), use_gpu);
     Ok(WhisperCtx {
         context: wctx,
-        model_id: model_id.to_string(),
         gpu_mode,
     })
 }
@@ -273,4 +266,27 @@ impl ASREngine for WhisperEngine {
             "Native Whisper engine with CPU inference."
         }
     }
+
+    fn context_key(&self, model: &ASRModel, gpu_mode: GpuMode) -> String {
+        format!("{}:{:?}", model.id, gpu_mode)
+    }
+
+    fn create_context(&self, model: &ASRModel, gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let ctx = load(&model.local_path(), gpu_mode)?;
+        Ok(Box::new(ctx))
+    }
+
+    fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
+        -> Result<String, EngineError>
+    {
+        let ctx = ctx.downcast_ref::<WhisperCtx>()
+            .ok_or_else(|| EngineError::LaunchFailed("Invalid whisper context".into()))?;
+        transcribe(ctx, audio_path, language)
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(WhisperEngine) }
 }

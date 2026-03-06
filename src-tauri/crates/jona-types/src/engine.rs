@@ -1,7 +1,18 @@
 //! Core engine types, traits, and errors shared by all engine crates.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::any::Any;
+use std::path::{Path, PathBuf};
+
+use crate::GpuMode;
+
+// -- Engine auto-registration via inventory --
+
+pub struct EngineRegistration {
+    pub factory: fn() -> Box<dyn ASREngine>,
+}
+
+inventory::collect!(EngineRegistration);
 
 // -- Engine category --
 
@@ -108,6 +119,40 @@ pub trait ASREngine: Send + Sync {
     fn description(&self) -> &str;
     fn recommended_model_id(&self, _language: &str) -> Option<String> {
         self.models().into_iter().find(|m| m.recommended).map(|m| m.id)
+    }
+
+    // -- Inference methods (plug-and-play) --
+
+    /// Cache key for context reuse. Override to include extra state (e.g. gpu_mode).
+    fn context_key(&self, model: &ASRModel, _gpu_mode: GpuMode) -> String {
+        model.id.clone()
+    }
+
+    /// Create an inference context for the given model.
+    fn create_context(&self, _model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        Err(EngineError::LaunchFailed(format!("{}: no inference support", self.engine_id())))
+    }
+
+    /// Run ASR transcription using the given context.
+    fn transcribe(&self, _ctx: &mut dyn Any, _audio_path: &Path, _language: &str)
+        -> Result<String, EngineError>
+    {
+        Err(EngineError::LaunchFailed("Transcription not supported".into()))
+    }
+
+    /// Run text cleanup using the given context.
+    fn cleanup(&self, _ctx: &mut dyn Any, _text: &str, _language: &str, _max_tokens: usize)
+        -> Result<String, EngineError>
+    {
+        Err(EngineError::LaunchFailed("Cleanup not supported".into()))
+    }
+
+    /// Whether cleanup should run after finalize (punctuation, correction) vs before (LLM).
+    /// Default: based on category.
+    fn finalize_before_cleanup(&self) -> bool {
+        matches!(self.category(), EngineCategory::LLM)
     }
 }
 

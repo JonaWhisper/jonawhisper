@@ -2624,6 +2624,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory"
+version = "0.3.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "009ae045c87e7082cb72dab0ccd01ae075dd00141ddc108f43a0ea150a9e7227"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2764,6 +2773,7 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
+ "inventory",
  "jona-engines",
  "jona-types",
  "log",
@@ -2777,6 +2787,7 @@ name = "jona-engine-canary"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "inventory",
  "jona-engines",
  "jona-types",
  "log",
@@ -2790,6 +2801,7 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
+ "inventory",
  "jona-types",
  "log",
  "serde_json",
@@ -2801,6 +2813,7 @@ name = "jona-engine-llama"
 version = "0.1.0"
 dependencies = [
  "encoding_rs",
+ "inventory",
  "jona-engines",
  "jona-types",
  "llama-cpp-2",
@@ -2812,6 +2825,7 @@ name = "jona-engine-parakeet"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "inventory",
  "jona-engines",
  "jona-types",
  "log",
@@ -2822,6 +2836,7 @@ dependencies = [
 name = "jona-engine-pcs"
 version = "0.1.0"
 dependencies = [
+ "inventory",
  "jona-engines",
  "jona-types",
  "log",
@@ -2835,6 +2850,7 @@ name = "jona-engine-qwen"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "inventory",
  "jona-types",
  "log",
  "qwen-asr",
@@ -2846,6 +2862,7 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "hound",
+ "inventory",
  "jona-types",
  "log",
 ]
@@ -2855,6 +2872,7 @@ name = "jona-engine-whisper"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "inventory",
  "jona-types",
  "log",
  "whisper-rs",
@@ -2866,6 +2884,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "hound",
+ "inventory",
  "jona-types",
  "log",
  "ort",
@@ -2915,6 +2934,7 @@ name = "jona-types"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "inventory",
  "keyring",
  "log",
  "serde",

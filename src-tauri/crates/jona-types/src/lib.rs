@@ -2,62 +2,65 @@ pub mod engine;
 pub use engine::*;
 
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
-// -- Inference context abstractions --
+// -- Dynamic context map (plug-and-play engine contexts) --
 
-/// Trait for inference contexts that cache a loaded model.
-pub trait HasModelId: Send {
-    fn model_id(&self) -> &str;
+struct ContextEntry {
+    key: String,
+    ctx: Box<dyn Any + Send>,
 }
 
-/// A thread-safe slot for a cached inference context.
-/// Wraps `Mutex<Option<T>>` with convenience helpers.
-pub struct ContextSlot<T>(Mutex<Option<T>>);
-
-impl<T> ContextSlot<T> {
-    pub fn empty() -> Self {
-        Self(Mutex::new(None))
-    }
-
-    pub fn lock(&self) -> MutexGuard<'_, Option<T>> {
-        self.0.lock().unwrap()
-    }
-
-    pub fn invalidate(&self) {
-        *self.0.lock().unwrap() = None;
-    }
+/// Type-erased storage for engine inference contexts.
+/// Replaces typed `ContextSlot<T>` and `context_group!` with a single map
+/// keyed by engine_id. Contexts are lazily loaded and invalidated when
+/// the context_key changes (different model, different gpu_mode, etc.).
+pub struct ContextMap {
+    entries: Mutex<HashMap<String, ContextEntry>>,
 }
 
-impl<T: HasModelId> ContextSlot<T> {
-    /// Ensure the slot contains a context for `model_id`, loading via `loader` if needed.
-    /// Returns the locked guard (guaranteed `Some` after success).
-    pub fn get_or_load<E>(
+impl ContextMap {
+    pub fn new() -> Self {
+        Self { entries: Mutex::new(HashMap::new()) }
+    }
+
+    /// Get-or-load the context for `engine_id`, then run `action` on it.
+    /// If the stored context_key differs from the requested one, the old context
+    /// is dropped and `loader` creates a fresh one.
+    pub fn run_with<R>(
         &self,
-        model_id: &str,
-        loader: impl FnOnce() -> Result<T, E>,
-    ) -> Result<MutexGuard<'_, Option<T>>, E> {
-        let mut guard = self.0.lock().unwrap();
-        if guard.as_ref().map_or(true, |ctx| ctx.model_id() != model_id) {
-            *guard = Some(loader()?);
+        engine_id: &str,
+        context_key: &str,
+        loader: impl FnOnce() -> Result<Box<dyn Any + Send>, EngineError>,
+        action: impl FnOnce(&mut dyn Any) -> Result<R, EngineError>,
+    ) -> Result<R, EngineError> {
+        let mut map = self.entries.lock().unwrap();
+        let needs_load = map.get(engine_id)
+            .map_or(true, |e| e.key != context_key);
+        if needs_load {
+            let ctx = loader()?;
+            map.insert(engine_id.to_string(), ContextEntry {
+                key: context_key.to_string(),
+                ctx,
+            });
         }
-        Ok(guard)
+        let entry = map.get_mut(engine_id).unwrap();
+        action(&mut *entry.ctx)
     }
-}
 
-/// Generate a context group struct with `new()` and `invalidate_all()`.
-#[macro_export]
-macro_rules! context_group {
-    ($name:ident { $($field:ident : $ctx:ty),* $(,)? }) => {
-        pub struct $name { $(pub $field: $crate::ContextSlot<$ctx>,)* }
-        impl $name {
-            pub fn new() -> Self { Self { $($field: $crate::ContextSlot::empty(),)* } }
-            pub fn invalidate_all(&self) { $(self.$field.invalidate();)* }
-        }
-    };
+    /// Drop all cached contexts (e.g. on model deletion).
+    pub fn invalidate_all(&self) {
+        self.entries.lock().unwrap().clear();
+    }
+
+    /// Drop the context for a specific engine.
+    pub fn invalidate(&self, engine_id: &str) {
+        self.entries.lock().unwrap().remove(engine_id);
+    }
 }
 
 // -- History --

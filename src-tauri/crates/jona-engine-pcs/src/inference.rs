@@ -48,12 +48,11 @@ pub struct PcsContext {
     tokenizer: Tokenizer,
     bos_id: i64,
     eos_id: i64,
-    model_id: String,
 }
 
 impl PcsContext {
     /// Load the PCS ONNX model and its tokenizer from disk.
-    pub fn load(model_path: &Path, model_id: &str) -> Result<Self, String> {
+    pub fn load(model_path: &Path) -> Result<Self, String> {
         let model_dir = model_path
             .parent()
             .ok_or_else(|| "Invalid model path".to_string())?;
@@ -84,8 +83,7 @@ impl PcsContext {
             .map_err(|e| format!("Failed to load PCS ONNX model: {e}"))?;
 
         log::info!(
-            "PCS punctuation model loaded: {} ({})",
-            model_id,
+            "PCS punctuation model loaded: {}",
             model_path.display()
         );
 
@@ -94,14 +92,7 @@ impl PcsContext {
             tokenizer,
             bos_id,
             eos_id,
-            model_id: model_id.to_string(),
         })
-    }
-}
-
-impl jona_types::HasModelId for PcsContext {
-    fn model_id(&self) -> &str {
-        &self.model_id
     }
 }
 

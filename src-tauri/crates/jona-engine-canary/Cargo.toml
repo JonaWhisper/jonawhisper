@@ -5,6 +5,7 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 
 [dependencies]
+inventory = "0.3"
 jona-types = { path = "../jona-types" }
 jona-engines = { path = "../jona-engines" }
 ort = { version = "2.0.0-rc.11", features = ["coreml"] }

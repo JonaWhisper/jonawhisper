@@ -1,7 +1,11 @@
 pub mod ort_bert;
 pub mod candle_bert;
 
-use jona_types::{ASREngine, ASRModel, DownloadType, EngineCategory, Language};
+use jona_types::{
+    ASREngine, ASRModel, DownloadType, EngineCategory, EngineError, EngineRegistration,
+    GpuMode, Language,
+};
+use std::any::Any;
 
 pub use ort_bert::BertContext;
 pub use candle_bert::CandlePunctContext;
@@ -65,4 +69,41 @@ impl ASREngine for BertPunctuationEngine {
     fn description(&self) -> &str {
         "BERT-based punctuation restoration. Fast (~100ms), adds periods, commas, question marks."
     }
+
+    fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
+        -> Result<Box<dyn Any + Send>, EngineError>
+    {
+        let path = model.local_path();
+        let runtime = model.runtime.as_deref().unwrap_or("ort");
+        match runtime {
+            "candle" => {
+                let ctx = CandlePunctContext::load(&path)
+                    .map_err(EngineError::LaunchFailed)?;
+                Ok(Box::new(ctx))
+            }
+            _ => {
+                let ctx = BertContext::load(&path)
+                    .map_err(EngineError::LaunchFailed)?;
+                Ok(Box::new(ctx))
+            }
+        }
+    }
+
+    fn cleanup(&self, ctx: &mut dyn Any, text: &str, _language: &str, _max_tokens: usize)
+        -> Result<String, EngineError>
+    {
+        if let Some(ctx) = ctx.downcast_mut::<BertContext>() {
+            return ort_bert::restore_punctuation(ctx, text)
+                .map_err(|e| EngineError::LaunchFailed(e));
+        }
+        if let Some(ctx) = ctx.downcast_ref::<CandlePunctContext>() {
+            return candle_bert::restore_punctuation(ctx, text)
+                .map_err(|e| EngineError::LaunchFailed(e));
+        }
+        Err(EngineError::LaunchFailed("Invalid BERT context type".into()))
+    }
+}
+
+inventory::submit! {
+    EngineRegistration { factory: || Box::new(BertPunctuationEngine) }
 }

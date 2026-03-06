@@ -13,41 +13,10 @@ pub use jona_types::{
 
 use std::sync::OnceLock;
 
+use jona_types::EngineRegistration;
+
 /// Global engine catalog singleton — initialized by the app at startup.
 static CATALOG: OnceLock<EngineCatalog> = OnceLock::new();
-
-// -- Cleanup dispatch --
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PunctRuntime { BertOrt, BertCandle, Pcs }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CleanupKind {
-    Correction,
-    Punctuation(PunctRuntime),
-    LocalLlm,
-    CloudLlm(String),
-    None,
-}
-
-impl CleanupKind {
-    pub fn from_model_id(model_id: &str) -> Self {
-        if model_id.is_empty() { return Self::None; }
-        if let Some(pid) = model_id.strip_prefix("cloud:") { return Self::CloudLlm(pid.into()); }
-        if model_id.starts_with("correction:") { return Self::Correction; }
-        if model_id.starts_with("pcs-punctuation:") { return Self::Punctuation(PunctRuntime::Pcs); }
-        if model_id.starts_with("bert-punctuation:") {
-            let rt = EngineCatalog::global().model_by_id(model_id)
-                .and_then(|m| m.runtime).unwrap_or_else(|| "ort".into());
-            return match rt.as_str() {
-                "candle" => Self::Punctuation(PunctRuntime::BertCandle),
-                _ => Self::Punctuation(PunctRuntime::BertOrt),
-            };
-        }
-        if model_id.starts_with("llama:") { return Self::LocalLlm; }
-        Self::None
-    }
-}
 
 /// Resolve a model ID from the catalog and verify it's downloaded.
 pub fn resolve_model(model_id: &str) -> Result<(ASRModel, std::path::PathBuf), String> {
@@ -80,6 +49,16 @@ impl EngineCatalog {
         CATALOG.set(Self::build(engines)).is_ok()
     }
 
+    /// Initialize from inventory auto-registration (no manual engine list needed).
+    /// Each engine crate submits an `EngineRegistration` via `inventory::submit!`.
+    pub fn init_auto() -> bool {
+        let engines: Vec<Box<dyn ASREngine>> = inventory::iter::<EngineRegistration>()
+            .map(|reg| (reg.factory)())
+            .collect();
+        log::info!("EngineCatalog: auto-registered {} engines", engines.len());
+        Self::init(engines)
+    }
+
     fn build(engines: Vec<Box<dyn ASREngine>>) -> Self {
         Self { engines }
     }
@@ -105,6 +84,13 @@ impl EngineCatalog {
     pub fn model_by_id(&self, id: &str) -> Option<ASRModel> {
         self.engines.iter()
             .find_map(|e| e.models().into_iter().find(|m| m.id == id))
+    }
+
+    /// Look up an engine by its ID. Used for dynamic dispatch.
+    pub fn engine_by_id(&self, id: &str) -> Option<&dyn ASREngine> {
+        self.engines.iter()
+            .find(|e| e.engine_id() == id)
+            .map(|e| &**e)
     }
 
     pub fn downloaded_models(&self) -> Vec<ASRModel> {
