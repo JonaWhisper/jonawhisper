@@ -100,6 +100,8 @@ pub fn run() {
                         let _ = win2.hide();
                     }
                 });
+            } else {
+                log::warn!("Panel window not found at startup — check tauri.conf.json");
             }
 
             ui::tray::setup_tray(app.handle())?;

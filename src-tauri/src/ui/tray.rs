@@ -52,11 +52,33 @@ pub fn open_fixed_window(app: &AppHandle, label: &str, title: &str, url: &str, w
 }
 
 /// Show the panel window (pre-created hidden at startup via tauri.conf.json).
+/// Falls back to creating a new window if the pre-created one was destroyed.
 pub fn show_panel(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("panel") {
         let _ = window.show();
         activate_app();
         let _ = window.set_focus();
+        return;
+    }
+
+    // Fallback: recreate if destroyed (WebView crash, etc.)
+    log::warn!("Panel window missing, recreating");
+    if let Ok(win) = WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("/panel".into()))
+        .title("JonaWhisper")
+        .inner_size(750.0, 550.0)
+        .min_inner_size(680.0, 450.0)
+        .resizable(true)
+        .build()
+    {
+        let win2 = win.clone();
+        win.on_window_event(move |event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = win2.hide();
+            }
+        });
+        activate_app();
+        let _ = win.set_focus();
     }
 }
 
