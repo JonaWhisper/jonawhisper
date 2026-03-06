@@ -225,6 +225,9 @@ pub fn play_sound(name: &str) {
 // Plist at ~/Library/LaunchAgents/com.local.jona-whisper.plist with RunAtLoad=true.
 // Points to the current binary path — for a stable login item, install to /Applications.
 // Appears in System Settings > General > Login Items > "Allow in the Background".
+//
+// IMPORTANT: Must call `launchctl bootstrap`/`bootout` alongside plist write/delete.
+// Without bootout, macOS BTM (Background Task Manager) recreates the plist after deletion.
 
 const LAUNCH_AGENT_LABEL: &str = "com.local.jona-whisper";
 
@@ -234,14 +237,25 @@ fn launch_agent_plist_path() -> std::path::PathBuf {
         .join(format!("Library/LaunchAgents/{}.plist", LAUNCH_AGENT_LABEL))
 }
 
+fn current_uid() -> u32 {
+    // SAFETY: getuid() is a POSIX function, always safe to call.
+    unsafe {
+        extern "C" { fn getuid() -> u32; }
+        getuid()
+    }
+}
+
 /// Returns "enabled" if the LaunchAgent plist exists, "disabled" otherwise.
 pub fn get_launch_at_login_status() -> &'static str {
     if launch_agent_plist_path().exists() { "enabled" } else { "disabled" }
 }
 
 /// Write or remove the LaunchAgent plist to enable/disable launch at login.
+/// Uses launchctl bootstrap/bootout so BTM properly tracks the agent.
 pub fn set_launch_at_login(enabled: bool) -> Result<&'static str, String> {
     let plist_path = launch_agent_plist_path();
+    let uid = current_uid();
+    let session = format!("gui/{}", uid);
 
     if enabled {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -270,13 +284,25 @@ pub fn set_launch_at_login(enabled: bool) -> Result<&'static str, String> {
         if let Some(parent) = plist_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        std::fs::write(&plist_path, content).map_err(|e| e.to_string())?;
-        log::info!("LaunchAgent plist written: {} → {}", plist_path.display(), exe_str);
+        std::fs::write(&plist_path, &content).map_err(|e| e.to_string())?;
+
+        // Register with launchd so BTM tracks it (idempotent if already loaded).
+        let _ = std::process::Command::new("launchctl")
+            .args(["bootstrap", &session, plist_path.to_str().unwrap_or("")])
+            .output();
+
+        log::info!("LaunchAgent enabled: {} → {}", plist_path.display(), exe_str);
     } else {
+        // Deregister from launchd/BTM first — prevents BTM from recreating the plist.
+        let service = format!("{}/{}", session, LAUNCH_AGENT_LABEL);
+        let _ = std::process::Command::new("launchctl")
+            .args(["bootout", &service])
+            .output();
+
         if plist_path.exists() {
             std::fs::remove_file(&plist_path).map_err(|e| e.to_string())?;
-            log::info!("LaunchAgent plist removed: {}", plist_path.display());
         }
+        log::info!("LaunchAgent disabled: {}", plist_path.display());
     }
 
     Ok(get_launch_at_login_status())
