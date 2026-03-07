@@ -303,22 +303,22 @@ preprocess (hallucinations → dictée → disfluences)
 
 ## Roadmap
 
-### Phase 1 — Quick wins (effort très faible)
+### Phase 1 — Quick wins ✅ Terminé
 
 1. ~~**Regex disfluences** FR/EN dans `post_processor.rs`~~ — ✅ Implémenté (`strip_fillers()`)
-2. ~~**Regex ITN basique** — nombres 1-99 FR/EN, pourcentages, heures simples~~ — ✅ Implémenté (`cleanup/itn.rs` : parser compositionnel FR/EN complet, ordinaux, %, heures, devises, unités)
+2. ~~**Regex ITN** — nombres, ordinaux, %, heures, devises, unités FR/EN~~ — ✅ Implémenté (`cleanup/itn.rs` : parser compositionnel FR/EN complet)
 
-### Phase 2 — Améliorations modèles (effort modéré)
+### Phase 2 — Améliorations pipeline
 
-3. **Chaînage ponctuation + correction** — séparer les paramètres, exécuter séquentiellement dans `recording.rs`
-4. **Évaluer GECToR** — ONNX export du modèle Grammarly, tag-based = 10x plus rapide que T5, pas de hallucination
-5. **Évaluer Harper** — `harper-core` crate, rule-based EN, <10ms, complémentaire aux modèles ML
+3. **Chaînage ponctuation + correction** — séparer les paramètres, exécuter séquentiellement dans `recording/pipeline.rs`. Permettrait : ponctuation (PCS/BERT) → correction (T5) → ITN → finalize, au lieu du choix exclusif actuel.
 
-### Phase 3 — Pipeline avancé (effort élevé)
+### Évaluations terminées — items écartés
 
-6. ~~**ITN parser FR** — grammaire récursive pour nombres composés ("quatre-vingt-dix-sept")~~ — ✅ Fait dans Phase 1
-7. **GECToR multilingue** — entraîner/trouver un modèle tag-based FR
-8. **Truecasing avancé** — au-delà de PCS, utiliser des modèles NER pour les noms propres non couverts
+4. ~~**GECToR**~~ — ❌ Écarté (mars 2026). Pas d'ONNX pré-exporté, EN-only, modèles non officiels (licence non-commerciale), effort d'intégration élevé (export custom + décodeur de tags). Le T5 existant couvre déjà FR/EN avec une qualité correcte.
+5. ~~**Harper** (`harper-core`)~~ — ❌ Écarté (mars 2026). EN-only confirmé (v1.4.1). Checks couverts (spelling, a/an, mots répétés, capitalisation) largement redondants avec `finalize()` et la ponctuation PCS. Pas de valeur ajoutée pour un outil bilingue FR/EN.
+6. ~~**ITN parser FR avancé**~~ — ✅ Fait dans Phase 1 (parser compositionnel complet)
+7. ~~**GECToR multilingue**~~ — ❌ Écarté. Aucun modèle multilingue pré-entraîné disponible.
+8. ~~**Truecasing avancé (NER)**~~ — ❌ Écarté. PCS couvre déjà la capitalisation pour 47 langues. Les modèles NER ajouteraient complexité et latence pour un gain marginal sur les noms propres rares.
 
 ---
 
