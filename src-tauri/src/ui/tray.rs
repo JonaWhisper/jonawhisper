@@ -410,7 +410,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 "test_pill" => {
                     let app_clone = app.clone();
                     tauri::async_runtime::spawn(async move {
-                        crate::commands::simulate_pill_test(app_clone, Some(3)).await;
+                        crate::commands::app::simulate_pill_test(app_clone, Some(3)).await;
                     });
                 }
                 "open_setup" => {

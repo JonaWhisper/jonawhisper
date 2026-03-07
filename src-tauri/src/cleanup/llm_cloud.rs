@@ -1,4 +1,4 @@
-use super::llm_prompt::{sanitize_output, system_prompt, LlmError};
+use jona_engines::llm_prompt::{sanitize_output, system_prompt, LlmError};
 use crate::state::Provider;
 
 /// Clean up transcribed text using a cloud LLM.

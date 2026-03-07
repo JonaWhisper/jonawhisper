@@ -1,4 +1,4 @@
-use crate::engines::EngineError;
+use jona_engines::EngineError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {

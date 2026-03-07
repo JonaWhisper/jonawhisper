@@ -1,8 +1,6 @@
-mod asr;
 mod audio;
 mod cleanup;
 mod commands;
-mod engines;
 mod errors;
 mod events;
 mod migrations;
@@ -36,7 +34,7 @@ pub fn run() {
 
     // Initialize the engine catalog from inventory auto-registration.
     // Each engine crate registers itself via `inventory::submit!`.
-    engines::EngineCatalog::init_auto();
+    jona_engines::EngineCatalog::init_auto();
 
     recording::cleanup_orphan_audio_files();
 
@@ -54,40 +52,39 @@ pub fn run() {
 
         .manage(app_state.clone())
         .invoke_handler(tauri::generate_handler![
-            commands::get_audio_devices,
-            commands::get_engines,
-            commands::get_models,
-            commands::get_downloaded_models,
-            commands::download_model_cmd,
-            commands::delete_model_cmd,
-            commands::pause_download,
-            commands::cancel_download,
-            commands::get_languages,
-            commands::get_permissions,
-            commands::request_permission,
-            commands::start_monitoring,
-            commands::get_history,
-
-            commands::delete_history_entry,
-            commands::delete_history_day,
-            commands::clear_history,
-            commands::add_provider,
-            commands::remove_provider,
-            commands::update_provider,
-            commands::get_providers,
-            commands::fetch_provider_models,
-            commands::get_settings,
-            commands::set_setting,
-            commands::get_app_state,
-            commands::start_mic_test,
-            commands::stop_mic_test,
-            commands::enable_monitoring,
-            commands::start_shortcut_capture,
-            commands::stop_shortcut_capture,
-            commands::simulate_pill_test,
-            commands::get_system_locale,
-            commands::get_launch_at_login_status,
-            commands::set_launch_at_login,
+            commands::audio::get_audio_devices,
+            commands::audio::start_mic_test,
+            commands::audio::stop_mic_test,
+            commands::engines::get_engines,
+            commands::engines::get_models,
+            commands::engines::get_downloaded_models,
+            commands::engines::download_model_cmd,
+            commands::engines::delete_model_cmd,
+            commands::engines::pause_download,
+            commands::engines::cancel_download,
+            commands::engines::get_languages,
+            commands::history::get_history,
+            commands::history::delete_history_entry,
+            commands::history::delete_history_day,
+            commands::history::clear_history,
+            commands::providers::add_provider,
+            commands::providers::remove_provider,
+            commands::providers::update_provider,
+            commands::providers::get_providers,
+            commands::providers::fetch_provider_models,
+            commands::settings::get_settings,
+            commands::settings::set_setting,
+            commands::settings::get_system_locale,
+            commands::settings::get_launch_at_login_status,
+            commands::settings::set_launch_at_login,
+            commands::permissions::get_permissions,
+            commands::permissions::request_permission,
+            commands::permissions::start_monitoring,
+            commands::permissions::enable_monitoring,
+            commands::app::get_app_state,
+            commands::app::start_shortcut_capture,
+            commands::app::stop_shortcut_capture,
+            commands::app::simulate_pill_test,
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
