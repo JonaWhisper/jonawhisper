@@ -161,6 +161,7 @@ export interface SettingsPayload {
   audio_ducking_enabled: boolean
   audio_ducking_level: number
   vad_enabled: boolean
+  punctuation_model_id: string
   disfluency_removal_enabled: boolean
   itn_enabled: boolean
   theme: string

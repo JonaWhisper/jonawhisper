@@ -19,7 +19,19 @@ const engines = useEnginesStore()
 
 const DISABLED_VALUE = '_disabled'
 
-// Unified cleanup value: "_disabled" or the cleanup model id
+// --- Punctuation dropdown ---
+const punctuationValue = computed(() => settings.punctuationModelId || DISABLED_VALUE)
+
+async function onPunctuationChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await settings.setSetting('punctuation_model_id', value === DISABLED_VALUE ? '' : value)
+}
+
+const selectedPunctuationModel = computed(() =>
+  engines.punctuationModels.find(m => m.id === settings.punctuationModelId) ?? null
+)
+
+// --- Cleanup dropdown (correction / LLM) ---
 const unifiedCleanupValue = computed(() => {
   if (!settings.textCleanupEnabled) return DISABLED_VALUE
   return settings.cleanupModelId || DISABLED_VALUE
@@ -38,7 +50,6 @@ async function onUnifiedCleanupChange(value: string | number | bigint | Record<s
 const selectedCleanupModel = computed(() =>
   engines.cleanupModels.find(m => m.id === settings.cleanupModelId) ?? null
 )
-
 
 // LLM config (shown when cloud cleanup selected)
 const llmSelectedProvider = computed(() =>
@@ -134,7 +145,42 @@ function onMaxTokensSliderCommit(v: number[]) {
         />
       </div>
 
-      <!-- Unified cleanup dropdown with optgroups -->
+      <!-- Punctuation dropdown -->
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
+        <div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.punctuation') }}</div>
+        </div>
+        <Select
+          :model-value="punctuationValue"
+          @update:model-value="onPunctuationChange"
+        >
+          <SelectTrigger class="w-auto min-w-[190px] h-8 text-xs">
+            <span v-if="punctuationValue === DISABLED_VALUE" class="text-muted-foreground">
+              {{ t('settings.cleanup.disabled') }}
+            </span>
+            <ModelOption
+              v-else-if="selectedPunctuationModel"
+              :label="selectedPunctuationModel.label"
+              type="punctuation"
+              location="local"
+              compact
+            />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="DISABLED_VALUE">{{ t('settings.cleanup.disabled') }}</SelectItem>
+            <SelectItem v-for="m in engines.punctuationModels" :key="m.id" :value="m.id">
+              <ModelOption
+                :label="m.label"
+                type="punctuation"
+                location="local"
+                :recommended="m.recommended"
+              />
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <!-- Text cleanup dropdown (correction / LLM) -->
       <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>
           <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.textCleanup') }}</div>

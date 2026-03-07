@@ -22,6 +22,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "cancel_shortcut": s.cancel_shortcut,
         "recording_mode": s.recording_mode,
         "text_cleanup_enabled": s.text_cleanup_enabled,
+        "punctuation_model_id": s.punctuation_model_id,
         "cleanup_model_id": s.cleanup_model_id,
         "llm_provider_id": s.llm_provider_id,
         "llm_model": s.llm_model,
@@ -66,6 +67,7 @@ pub fn set_setting(
             "selected_model_id" => s.selected_model_id = value.clone(),
             "selected_language" => s.selected_language = value.clone(),
             "text_cleanup_enabled" => s.text_cleanup_enabled = value == "true",
+            "punctuation_model_id" => s.punctuation_model_id = value.clone(),
             "cleanup_model_id" => s.cleanup_model_id = value.clone(),
             "llm_provider_id" => s.llm_provider_id = value.clone(),
             "llm_model" => s.llm_model = value.clone(),
@@ -85,7 +87,7 @@ pub fn set_setting(
         }
     }
     // Invalidate cached contexts when model or GPU mode changes
-    if key == "selected_model_id" || key == "gpu_mode" || key == "cleanup_model_id" {
+    if key == "selected_model_id" || key == "gpu_mode" || key == "cleanup_model_id" || key == "punctuation_model_id" {
         state.contexts.invalidate_all();
     }
     // Send hotkey updates outside the settings lock

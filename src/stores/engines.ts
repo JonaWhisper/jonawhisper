@@ -41,11 +41,15 @@ export const useEnginesStore = defineStore('engines', () => {
     return models.value.filter(m => ids.has(m.engine_id) && m.is_downloaded)
   })
   const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
+  const punctuationModels = computed<CleanupModel[]>(() => {
+    return downloadedPunctuationModels.value.map(m => ({
+      id: m.id, label: m.label, group: 'punctuation' as const,
+      params: m.params, ram: m.ram, lang_codes: m.lang_codes,
+      quantization: m.quantization, recommended: !!m.recommended,
+    }))
+  })
   const cleanupModels = computed<CleanupModel[]>(() => {
     const result: CleanupModel[] = []
-    for (const m of downloadedPunctuationModels.value) {
-      result.push({ id: m.id, label: m.label, group: 'bert', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
-    }
     for (const m of downloadedCorrectionModels.value) {
       result.push({ id: m.id, label: m.label, group: 'correction', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
     }
@@ -101,6 +105,10 @@ export const useEnginesStore = defineStore('engines', () => {
     if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
       const first = asrModels.value[0]
       settingsStore.setSetting('selected_model_id', first?.id ?? '')
+    }
+    const punctIds = new Set(punctuationModels.value.map(m => m.id))
+    if (settingsStore.punctuationModelId && !punctIds.has(settingsStore.punctuationModelId)) {
+      settingsStore.setSetting('punctuation_model_id', '')
     }
     const cleanupIds = new Set(cleanupModels.value.map(m => m.id))
     if (settingsStore.cleanupModelId && !cleanupIds.has(settingsStore.cleanupModelId)) {
@@ -170,7 +178,7 @@ export const useEnginesStore = defineStore('engines', () => {
     selectedEngine, downloadedModels, asrEngines, llmEngines,
     downloadedLlmModels, punctuationEngines, downloadedPunctuationModels,
     correctionEngines, downloadedCorrectionModels,
-    bertModelReady, cleanupModels, asrModels,
+    bertModelReady, punctuationModels, cleanupModels, asrModels,
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,
     fetchPermissions, fetchProviders,

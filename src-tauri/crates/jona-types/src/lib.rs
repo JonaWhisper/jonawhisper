@@ -399,7 +399,10 @@ pub struct Preferences {
     pub recording_mode: RecordingMode,
     #[serde(default)]
     pub text_cleanup_enabled: bool,
-    /// Model ID for cleanup: "bert-punctuation:*", "llama:*", or "cloud"
+    /// Model ID for punctuation engine (PCS/BERT), runs before cleanup
+    #[serde(default)]
+    pub punctuation_model_id: String,
+    /// Model ID for cleanup: correction (T5), LLM (llama), or "cloud:*"
     #[serde(default)]
     pub cleanup_model_id: String,
     #[serde(default)]

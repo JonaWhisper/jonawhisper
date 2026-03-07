@@ -69,6 +69,7 @@
   "settings.postProcessing.hallucinations": "Filter hallucinations",
   "settings.postProcessing.disfluencyRemoval": "Remove filler words",
   "settings.postProcessing.itn": "Normalize numbers",
+  "settings.postProcessing.punctuation": "Punctuation",
   "settings.postProcessing.textCleanup": "Text cleanup",
   "settings.cleanup.recommended": "Recommended",
   "settings.langs": "langs",

@@ -164,7 +164,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (model_id, lang, hall_filter, disfluency_removal, itn_enabled, text_cleanup_enabled, cleanup_model_id,
+    let (model_id, lang, hall_filter, disfluency_removal, itn_enabled,
+         punctuation_model_id, text_cleanup_enabled, cleanup_model_id,
          llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
@@ -173,6 +174,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.hallucination_filter_enabled,
             s.disfluency_removal_enabled,
             s.itn_enabled,
+            s.punctuation_model_id.clone(),
             s.text_cleanup_enabled,
             s.cleanup_model_id.clone(),
             s.llm_model.clone(),
@@ -196,13 +198,29 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         return;
     }
 
-    // Step 2: cleanup based on selected model
     let mut effective_cleanup_model_id = String::new();
+    let gpu = state.settings.lock().unwrap().gpu_mode;
 
-    if text_cleanup_enabled && !cleanup_model_id.is_empty() {
+    // Step 2a: punctuation (PCS/BERT) — runs first if configured
+    if !punctuation_model_id.is_empty() {
+        match run_local_engine(state, &punctuation_model_id, &processed, &lang, gpu, 0).await {
+            Ok(cleaned) => {
+                log::info!("Punctuation: {} → {}", processed.len(), cleaned.len());
+                processed = cleaned;
+            }
+            Err(e) => log::warn!("Punctuation failed, continuing: {}", e),
+        }
+    }
+
+    // Step 2b: cleanup (correction/LLM) — runs after punctuation
+    let has_cleanup = text_cleanup_enabled && !cleanup_model_id.is_empty();
+    let mut finalized = false;
+
+    if has_cleanup {
         // Cloud LLM: special async path (provider-based, not an engine crate)
         if let Some(provider_id) = cleanup_model_id.strip_prefix("cloud:") {
             processed = cleanup::post_processor::finalize(&processed);
+            finalized = true;
             let effective_max_tokens = effective_llm_tokens(processed.len(), llm_max_tokens);
             let llm_result = if let Some(provider) = providers.iter().find(|p| p.id == provider_id) {
                 if !provider.has_llm() {
@@ -231,56 +249,33 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     let finalize_before = engine.finalize_before_cleanup();
                     if finalize_before {
                         processed = cleanup::post_processor::finalize(&processed);
+                        finalized = true;
                     }
 
-                    let state_clone = Arc::clone(state);
-                    let text_for_cleanup = processed.clone();
-                    let lang_for_cleanup = lang.clone();
-                    let mid = cleanup_model_id.clone();
-                    let eid = model.engine_id.clone();
-                    let gpu = state.settings.lock().unwrap().gpu_mode;
                     let max_tok = if finalize_before {
-                        effective_llm_tokens(text_for_cleanup.len(), llm_max_tokens) as usize
+                        effective_llm_tokens(processed.len(), llm_max_tokens) as usize
                     } else {
                         0
                     };
 
-                    let cleanup_result = tokio::task::spawn_blocking(move || {
-                        let catalog = EngineCatalog::global();
-                        let engine = catalog.engine_by_id(&eid).unwrap();
-                        let model = catalog.model_by_id(&mid).unwrap();
-                        let context_key = engine.context_key(&model, gpu);
-                        state_clone.contexts.run_with(
-                            &eid,
-                            &context_key,
-                            || engine.create_context(&model, gpu),
-                            |ctx| engine.cleanup(ctx, &text_for_cleanup, &lang_for_cleanup, max_tok),
-                        )
-                    }).await;
-
-                    match cleanup_result {
-                        Ok(Ok(cleaned)) => {
+                    match run_local_engine(state, &cleanup_model_id, &processed, &lang, gpu, max_tok).await {
+                        Ok(cleaned) => {
                             log::info!("{} cleanup: {} → {}", model.engine_id, processed.len(), cleaned.len());
                             processed = cleaned;
                             effective_cleanup_model_id = cleanup_model_id.clone();
                         }
-                        Ok(Err(e)) => log::warn!("{} cleanup failed, using preprocessed result: {}", model.engine_id, e),
-                        Err(e) => log::warn!("Cleanup task panicked: {}", e),
-                    }
-
-                    if !finalize_before {
-                        processed = cleanup::post_processor::finalize(&processed);
+                        Err(e) => log::warn!("{} cleanup failed, using preprocessed result: {}", model.engine_id, e),
                     }
                 } else {
                     log::warn!("Unknown cleanup engine for model: {}", cleanup_model_id);
-                    processed = cleanup::post_processor::finalize(&processed);
                 }
             } else {
                 log::warn!("Cleanup model not found: {}", cleanup_model_id);
-                processed = cleanup::post_processor::finalize(&processed);
             }
         }
-    } else {
+    }
+
+    if !finalized {
         processed = cleanup::post_processor::finalize(&processed);
     }
 
@@ -321,6 +316,48 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             "vad_trimmed": vad_trimmed,
         }),
     );
+}
+
+/// Run a local engine cleanup via dynamic dispatch (spawn_blocking).
+async fn run_local_engine(
+    state: &Arc<AppState>,
+    model_id: &str,
+    text: &str,
+    lang: &str,
+    gpu: crate::state::GpuMode,
+    max_tokens: usize,
+) -> Result<String, String> {
+    let catalog = EngineCatalog::global();
+    let model = catalog.model_by_id(model_id)
+        .ok_or_else(|| format!("Model not found: {}", model_id))?;
+    if catalog.engine_by_id(&model.engine_id).is_none() {
+        return Err(format!("Engine not found: {}", model.engine_id));
+    }
+
+    let state_clone = Arc::clone(state);
+    let text_owned = text.to_string();
+    let lang_owned = lang.to_string();
+    let mid = model_id.to_string();
+    let eid = model.engine_id.clone();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let catalog = EngineCatalog::global();
+        let engine = catalog.engine_by_id(&eid).unwrap();
+        let model = catalog.model_by_id(&mid).unwrap();
+        let context_key = engine.context_key(&model, gpu);
+        state_clone.contexts.run_with(
+            &eid,
+            &context_key,
+            || engine.create_context(&model, gpu),
+            |ctx| engine.cleanup(ctx, &text_owned, &lang_owned, max_tokens),
+        )
+    }).await;
+
+    match result {
+        Ok(Ok(cleaned)) => Ok(cleaned),
+        Ok(Err(e)) => Err(e.to_string()),
+        Err(e) => Err(format!("Task panicked: {}", e)),
+    }
 }
 
 fn effective_llm_tokens(text_len: usize, max: u32) -> u32 {

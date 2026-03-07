@@ -2,7 +2,7 @@ use serde_json::Value;
 use crate::state::{config_dir, default_model_id, Provider, ProviderKind, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 5;
+const CURRENT_VERSION: u32 = 6;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
@@ -12,6 +12,7 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (3, "Update llm_max_tokens default to 4096", migrate_v3),
     (4, "Migrate API keys to OS keychain", migrate_v4),
     (5, "Add provider capability flags", migrate_v5),
+    (6, "Split punctuation from cleanup model", migrate_v6),
 ];
 
 /// Rename data directory from WhisperDictate → JonaWhisper.
@@ -333,5 +334,21 @@ fn migrate_v5(_raw: &mut Value, prefs: &mut Preferences) {
         provider.supports_llm = provider.has_llm();
     }
     log::info!("Migration v5: set capability flags for {} provider(s)", prefs.providers.len());
+}
+
+/// v6: Split punctuation model out of cleanup_model_id into its own punctuation_model_id field.
+fn migrate_v6(_raw: &mut Value, prefs: &mut Preferences) {
+    let is_punctuation = prefs.cleanup_model_id.starts_with("bert-punctuation:")
+        || prefs.cleanup_model_id.starts_with("pcs-punctuation:");
+
+    if is_punctuation {
+        log::info!(
+            "Migration v6: moving {} from cleanup_model_id to punctuation_model_id",
+            prefs.cleanup_model_id
+        );
+        prefs.punctuation_model_id = std::mem::take(&mut prefs.cleanup_model_id);
+        // Disable text cleanup since the user only had punctuation, not a real cleanup model
+        prefs.text_cleanup_enabled = false;
+    }
 }
 

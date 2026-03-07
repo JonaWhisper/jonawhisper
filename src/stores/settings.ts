@@ -8,6 +8,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const selectedLanguage = ref('auto')
   const asrCloudModel = ref('whisper-1')
   const textCleanupEnabled = ref(false)
+  const punctuationModelId = ref('')
   const cleanupModelId = ref('')
   const llmModel = ref('')
   const llmMaxTokens = ref(4096)
@@ -37,6 +38,7 @@ export const useSettingsStore = defineStore('settings', () => {
       selectedModelId.value = s.selected_model_id
       selectedLanguage.value = s.selected_language
       textCleanupEnabled.value = s.text_cleanup_enabled ?? false
+      punctuationModelId.value = s.punctuation_model_id ?? ''
       cleanupModelId.value = s.cleanup_model_id ?? ''
       llmModel.value = s.llm_model ?? ''
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
@@ -62,6 +64,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'selected_model_id': return selectedModelId.value
       case 'selected_language': return selectedLanguage.value
       case 'text_cleanup_enabled': return String(textCleanupEnabled.value)
+      case 'punctuation_model_id': return punctuationModelId.value
       case 'cleanup_model_id': return cleanupModelId.value
       case 'llm_model': return llmModel.value
       case 'asr_cloud_model': return asrCloudModel.value
@@ -88,6 +91,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'selected_model_id': selectedModelId.value = value; break
       case 'selected_language': selectedLanguage.value = value; break
       case 'text_cleanup_enabled': textCleanupEnabled.value = value === 'true'; break
+      case 'punctuation_model_id': punctuationModelId.value = value; break
       case 'cleanup_model_id': cleanupModelId.value = value; break
       case 'llm_model': llmModel.value = value; break
       case 'asr_cloud_model': asrCloudModel.value = value; break
@@ -123,7 +127,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     selectedModelId, selectedLanguage, asrCloudModel,
-    textCleanupEnabled, cleanupModelId, llmModel, llmMaxTokens,
+    textCleanupEnabled, punctuationModelId, cleanupModelId, llmModel, llmMaxTokens,
     hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
     hotkey, cancelShortcut, recordingMode, appLocale, theme,
