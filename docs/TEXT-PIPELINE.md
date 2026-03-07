@@ -169,7 +169,7 @@ Texte → SentencePiece tokenize (Unigram, NFC+Lowercase+Metaspace)
 ```
 Texte → tokenize (SentencePiece via tokenizer.json)
      → T5 Encoder (safetensors, Metal GPU)
-     → Décodage autorégressif (KV cache, greedy avec température 0.1)
+     → Décodage autorégressif (KV cache, greedy, repeat penalty 1.5, n-gram blocking 4)
      → Texte corrigé
 ```
 
@@ -179,11 +179,12 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 
 | Protection | Mécanisme | Paramètre |
 |---|---|---|
-| Repeat penalty | Pénalise les tokens déjà générés | 1.1 |
-| N-gram blocking | Interdit les n-grams déjà vus | Activé |
-| Température | Réduit l'entropie de la distribution | 0.1 |
-| Longueur max | Limite le nombre de tokens générés | Proportionnel à l'input |
-| Sanitisation sortie | Vide → garder original, >3x input → garder original | Automatique |
+| Repeat penalty | Pénalise les tokens déjà générés | 1.5 |
+| N-gram blocking | Interdit les 4-grams déjà vus | Taille 4 |
+| Détection de boucle live | Stop si les 6 derniers tokens forment un pattern déjà vu | Fenêtre 6 tokens |
+| Longueur max génération | Limite le nombre de tokens générés | `input_tokens * 1.2 + 16` |
+| Sanitisation sortie | Vide → garder original, >1.5x input → garder original | Automatique |
+| Strip repetition post-hoc | Détecte les répétitions phrase/mot dans le texte final | Sentence + word level, seuil 80% |
 
 ### Modèles
 
@@ -194,7 +195,7 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 | FlanEC Large | 250M | 990 MB | EN | Post-ASR correction | ~800ms |
 | Flan-T5 Grammar | 783M | 3.1 GB | EN | Grammaire EN | ~2s |
 
-**Dispatch** : `CleanupKind::Correction` dans `engines/mod.rs`, routé dans `recording.rs` via `run_t5_correction()`.
+**Dispatch** : dynamic via `ASREngine::cleanup()` trait, routé dans `recording/pipeline.rs` via `EngineCatalog`.
 
 ---
 
@@ -257,21 +258,18 @@ Approche regex par couches, du plus spécifique au plus général :
 
 ## Limitation actuelle : pas de chaînage
 
-Le pipeline actuel dans `recording.rs` (`process_next_in_queue()`, lignes 362-492) utilise un `match` exclusif sur `CleanupKind` :
+Le pipeline actuel dans `recording/pipeline.rs` (`handle_transcription_result()`) utilise le dispatch dynamique via `ASREngine::cleanup()`. Le cleanup model est résolu via `EngineCatalog`, et l'engine décide si `finalize()` s'applique avant ou après le cleanup (`finalize_before_cleanup()`).
 
 ```
-match cleanup_kind {
-    Correction     → preprocess → T5 → finalize
-    Punctuation(_) → preprocess → BERT/PCS → finalize
-    LocalLlm       → preprocess → finalize → LLM
-    CloudLlm(_)    → preprocess → finalize → LLM
-    None           → preprocess → finalize
-}
+preprocess (hallucinations → dictée → disfluences)
+  → cleanup model (ponctuation OU correction OU LLM local OU LLM cloud)
+  → finalize (espacement, capitalisation)
+  → paste
 ```
 
 **Conséquence** : on ne peut pas chaîner ponctuation + correction. L'utilisateur choisit l'un OU l'autre dans les paramètres.
 
-**Solution proposée** : séparer le choix ponctuation et correction en deux paramètres indépendants, et exécuter séquentiellement : `preprocess → disfluences → ponctuation → correction → ITN → finalize`.
+**Solution proposée** : séparer le choix ponctuation et correction en deux paramètres indépendants, et exécuter séquentiellement : `preprocess → ponctuation → correction → ITN → finalize`.
 
 ---
 
@@ -279,19 +277,19 @@ match cleanup_kind {
 
 | Fichier | Rôle dans le pipeline |
 |---|---|
-| `recording.rs` | Orchestration : `process_next_in_queue()` appelle les étapes dans l'ordre |
-| `post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 3 (disfluences), 7 (finalize) |
-| `punct_common.rs` | Logique partagée ponctuation : windowing, labels, strip_and_split |
-| `bert_punctuation.rs` | Étape 4 : inférence BERT ort (ONNX + CoreML) |
-| `candle_punctuation.rs` | Étape 4 : inférence BERT Candle (safetensors + Metal) |
-| `pcs_punctuation.rs` | Étape 4 : inférence PCS (ONNX + SentencePiece, 4 heads) |
-| `t5_correction.rs` | Étape 5 : T5Context, chargement modèle, décodage autorégressif |
-| `ort_session.rs` | Builder de session ort partagé (CoreML EP) — utilisé par BERT, PCS |
-| `engines/mod.rs` | `CleanupKind` enum, dispatch, `EngineCatalog` |
-| `engines/bert.rs` | Enregistrement modèles BERT punctuation (2 modèles) |
-| `engines/pcs.rs` | Enregistrement modèle PCS punctuation (1 modèle, 47 langues) |
-| `engines/correction.rs` | Enregistrement modèles T5 correction (4 modèles) |
-| `state.rs` | Préférences : `cleanup_model_id`, `text_cleanup_enabled` |
+| `recording/pipeline.rs` | Orchestration : `handle_transcription_result()` appelle les étapes dans l'ordre |
+| `cleanup/post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 3 (disfluences), 7 (finalize) |
+| `cleanup/common.rs` | Logique partagée ponctuation : windowing, labels, strip_and_split |
+| `cleanup/bert.rs` | Étape 4 : inférence BERT ort (ONNX + CoreML) |
+| `cleanup/candle.rs` | Étape 4 : inférence BERT Candle (safetensors + Metal) |
+| `cleanup/pcs.rs` | Étape 4 : inférence PCS (ONNX + SentencePiece, 4 heads) |
+| `crates/jona-engine-correction/` | Étape 5 : T5Context, chargement modèle, décodage autorégressif avec anti-répétition |
+| `crates/jona-engines/src/ort_session.rs` | Builder de session ort partagé (CoreML EP) — utilisé par BERT, PCS |
+| `crates/jona-engines/src/lib.rs` | `EngineCatalog`, dispatch dynamique via `ASREngine` trait |
+| `crates/jona-engine-bert/` | Catalogue modèles BERT punctuation (2 modèles) |
+| `crates/jona-engine-pcs/` | Catalogue modèle PCS punctuation (1 modèle, 47 langues) |
+| `crates/jona-engine-correction/` | Catalogue + inférence modèles T5 correction (4 modèles) |
+| `crates/jona-types/src/lib.rs` | Préférences : `cleanup_model_id`, `text_cleanup_enabled`, `disfluency_removal_enabled` |
 
 ---
 

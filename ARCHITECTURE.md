@@ -11,7 +11,7 @@ The main Tauri crate (`src-tauri/src/`) is a **thin orchestrator**. It contains 
 - **Adding a new engine** = add a crate, implement the `ASREngine` trait, `inventory::submit!` it, add the `cargo` dependency. Zero changes to the orchestrator, zero changes to the frontend.
 - **No re-export layers** — the main crate uses `jona_engines::`, `jona_platform::`, `jona_provider::` directly. No wrapper modules that just do `pub use other_crate::*`.
 - **Engine isolation** — each engine crate owns its catalog (model list, sizes, URLs) and its inference code. They depend on `jona-types` for the trait and optionally on `jona-engines` for shared utilities (ort session builder, mel features, downloader).
-- **Auto-registration** — engine crates register themselves at link time via `inventory::submit!`. At startup, `EngineCatalog::init_auto()` collects all registered engines. The orchestrator never enumerates engines by name.
+- **Auto-registration** — engine crates register themselves at link time via `inventory::submit!`. At startup, `EngineCatalog::init_auto()` collects all registered engines. The orchestrator never enumerates engines by name. `build.rs` auto-generates `extern crate` declarations by scanning `Cargo.toml` for `jona-engine-*` dependencies, preventing the linker from eliminating unused crates.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -100,8 +100,7 @@ Text post-processing pipeline: VAD, punctuation, correction, LLM cleanup.
 | `cleanup/bert.rs` | BERT punctuation restoration via ONNX Runtime. Cached `BertContext` in `AppState`. Delegates windowing to `common`. |
 | `cleanup/candle.rs` | BERT punctuation restoration via Candle (safetensors, Metal GPU). `XLMRobertaForTokenClassification` built from base model + Linear head. Delegates windowing to `common`. |
 | `cleanup/pcs.rs` | PCS punctuation + capitalization + segmentation (47 languages) via ONNX Runtime. SentencePiece Unigram tokenizer parsed from protobuf via `prost`, cached as `tokenizer.json`. 4-head model, sliding window (128 tokens, 16 overlap). |
-| `cleanup/t5.rs` | T5 encoder-decoder text correction via Candle (Metal GPU). Autoregressive decoding with KV cache, repeat penalty (1.1), temperature (0.1). 4 models: GEC T5 Small (60M), T5 Spell FR (220M), FlanEC Large (250M), Flan-T5 Grammar (783M). |
-| `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, finalize (spacing, capitalization) |
+| `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, disfluency removal (filler word stripping FR/EN), finalize (spacing, capitalization) |
 | `cleanup/llm_cloud.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Uses `jona_engines::llm_prompt` for prompt templates and output sanitization. |
 | `cleanup/llm_local.rs` | Local LLM text cleanup via llama.cpp with Metal GPU offload. Cached `LlmContext` in `AppState`. |
 
@@ -155,7 +154,7 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-voxtral` | Mistral Voxtral 4B | vendored voxtral.c (Metal GPU) |
 | `jona-engine-bert` | BERT punctuation | Catalog only (inference in main crate `cleanup/`) |
 | `jona-engine-pcs` | PCS punctuation (47 lang) | Catalog only (inference in main crate `cleanup/`) |
-| `jona-engine-correction` | T5 grammar correction | Catalog only (inference in main crate `cleanup/`) |
+| `jona-engine-correction` | T5 grammar correction | Candle (Metal GPU), autoregressive with KV cache, repeat penalty 1.5, n-gram blocking, live loop detection |
 | `jona-engine-llama` | Local LLM (llama.cpp) | Catalog only (inference in main crate `cleanup/`) |
 
 ### Platform (`platform/`)
@@ -291,7 +290,7 @@ Main thread (Tauri + Tokio runtime)
 6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`
 7. **VAD check** → if `vad_enabled`, runs Silero VAD (`cleanup/vad.rs`): no speech → plays "Basso" sound, discards file. Speech found → trims leading/trailing silence, rewrites WAV.
 8. **Transcription** → `recording::pipeline::transcribe()` on a blocking thread (routes to cloud API or local engine via `ASREngine` trait)
-9. **Post-processing** → hallucination filter, dictation commands, optional text cleanup (BERT / PCS / T5 correction / local LLM / cloud LLM with autoscale max_tokens), finalize (spacing, capitalization). On any cleanup error, falls back to raw transcription.
+9. **Post-processing** → hallucination filter, dictation commands, disfluency removal (filler word stripping), optional text cleanup (BERT / PCS / T5 correction / local LLM / cloud LLM with autoscale max_tokens), finalize (spacing, capitalization). On any cleanup error, falls back to raw transcription.
 10. **Cancel check** → `transcription_cancelled` flag verified before paste
 11. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
 12. **History** → entry saved to SQLite (with cleanup_model_id, hallucination_filter, vad_trimmed metadata) → frontend notified via event

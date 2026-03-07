@@ -85,7 +85,7 @@ See [docs/AUDIO-PIPELINE.md](docs/AUDIO-PIPELINE.md) for the full architecture.
 ### Text pipeline
 
 ```
-ASR raw → Hallucination filter → Dictation commands → [Punctuation / Correction / LLM] → Finalize → Paste
+ASR raw → Hallucination filter → Dictation commands → Disfluency removal → [Punctuation / Correction / LLM] → Finalize → Paste
 ```
 
 | Stage | Status | Description |
