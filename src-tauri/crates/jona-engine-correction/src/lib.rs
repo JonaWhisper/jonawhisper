@@ -14,6 +14,8 @@ fn storage_dir() -> String {
     jona_types::models_dir().join("correction").to_string_lossy().to_string()
 }
 
+const HF_BASE: &str = "https://huggingface.co/realjPlot";
+
 impl ASREngine for CorrectionEngine {
     fn engine_id(&self) -> &str { "correction" }
     fn display_name(&self) -> &str { "T5 Correction" }
@@ -27,36 +29,41 @@ impl ASREngine for CorrectionEngine {
                 label: "GEC T5 Small".into(),
                 filename: "gec-t5-small".into(),
                 url: String::new(),
-                size: 242_000_000 + 800_000 + 2_000,
+                size: 376_325_263,
                 storage_dir: storage_dir(),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
-                            filename: "model.safetensors".into(),
-                            url: "https://huggingface.co/Unbabel/gec-t5_small/resolve/main/model.safetensors".into(),
-                            size: 242_000_000,
+                            filename: "encoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-gec-t5-small-onnx/resolve/main/encoder_model.onnx"),
+                            size: 141_410_256,
+                        },
+                        DownloadFile {
+                            filename: "decoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-gec-t5-small-onnx/resolve/main/decoder_model.onnx"),
+                            size: 232_491_073,
                         },
                         DownloadFile {
                             filename: "config.json".into(),
-                            url: "https://huggingface.co/Unbabel/gec-t5_small/resolve/main/config.json".into(),
-                            size: 800_000,
+                            url: format!("{HF_BASE}/jonawhisper-gec-t5-small-onnx/resolve/main/config.json"),
+                            size: 1_500,
                         },
                         DownloadFile {
                             filename: "tokenizer.json".into(),
-                            url: "https://huggingface.co/Unbabel/gec-t5_small/resolve/main/tokenizer.json".into(),
-                            size: 2_000,
+                            url: format!("{HF_BASE}/jonawhisper-gec-t5-small-onnx/resolve/main/tokenizer.json"),
+                            size: 2_422_434,
                         },
                     ],
                 },
-                download_marker: Some(".complete".into()),
+                download_marker: Some(".complete_v2".into()),
                 recommended: true,
                 params: Some(0.06),
-                ram: Some(350_000_000),
+                ram: Some(500_000_000),
                 lang_codes: Some(vec![
                     "en".into(), "de".into(), "fr".into(), "es".into(), "it".into(),
                     "pt".into(), "nl".into(), "ru".into(), "zh".into(), "ja".into(), "ko".into(),
                 ]),
-                runtime: Some("candle".into()),
+                runtime: Some("ort".into()),
                 quantization: Some("FP32".into()),
                 ..Default::default()
             },
@@ -66,33 +73,38 @@ impl ASREngine for CorrectionEngine {
                 label: "T5 Spell Correction FR".into(),
                 filename: "t5-spell-fr".into(),
                 url: String::new(),
-                size: 892_000_000 + 1_400 + 2_400_000,
+                size: 1_091_683_357,
                 storage_dir: storage_dir(),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
-                            filename: "model.safetensors".into(),
-                            url: "https://huggingface.co/fdemelo/t5-base-spell-correction-fr/resolve/main/model.safetensors".into(),
-                            size: 892_000_000,
+                            filename: "encoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-t5-spell-fr-onnx/resolve/main/encoder_model.onnx"),
+                            size: 438_588_825,
+                        },
+                        DownloadFile {
+                            filename: "decoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-t5-spell-fr-onnx/resolve/main/decoder_model.onnx"),
+                            size: 650_668_829,
                         },
                         DownloadFile {
                             filename: "config.json".into(),
-                            url: "https://huggingface.co/fdemelo/t5-base-spell-correction-fr/resolve/main/config.json".into(),
-                            size: 1_400,
+                            url: format!("{HF_BASE}/jonawhisper-t5-spell-fr-onnx/resolve/main/config.json"),
+                            size: 1_468,
                         },
                         DownloadFile {
                             filename: "tokenizer.json".into(),
-                            url: "https://huggingface.co/fdemelo/t5-base-spell-correction-fr/resolve/main/tokenizer.json".into(),
-                            size: 2_400_000,
+                            url: format!("{HF_BASE}/jonawhisper-t5-spell-fr-onnx/resolve/main/tokenizer.json"),
+                            size: 2_424_235,
                         },
                     ],
                 },
-                download_marker: Some(".complete".into()),
+                download_marker: Some(".complete_v2".into()),
                 recommended: false,
                 params: Some(0.22),
-                ram: Some(1_000_000_000),
+                ram: Some(1_200_000_000),
                 lang_codes: Some(vec!["fr".into()]),
-                runtime: Some("candle".into()),
+                runtime: Some("ort".into()),
                 quantization: Some("FP32".into()),
                 ..Default::default()
             },
@@ -102,33 +114,38 @@ impl ASREngine for CorrectionEngine {
                 label: "FlanEC Large".into(),
                 filename: "flanec-large".into(),
                 url: String::new(),
-                size: 990_000_000 + 1_500 + 2_400_000,
+                size: 3_267_721_038,
                 storage_dir: storage_dir(),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
-                            filename: "model.safetensors".into(),
-                            url: "https://huggingface.co/morenolq/flanec-large-cd/resolve/main/model.safetensors".into(),
-                            size: 990_000_000,
+                            filename: "encoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-flanec-large-onnx/resolve/main/encoder_model.onnx"),
+                            size: 1_365_296_186,
+                        },
+                        DownloadFile {
+                            filename: "decoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-flanec-large-onnx/resolve/main/decoder_model.onnx"),
+                            size: 1_900_001_851,
                         },
                         DownloadFile {
                             filename: "config.json".into(),
-                            url: "https://huggingface.co/morenolq/flanec-large-cd/resolve/main/config.json".into(),
-                            size: 1_500,
+                            url: format!("{HF_BASE}/jonawhisper-flanec-large-onnx/resolve/main/config.json"),
+                            size: 767,
                         },
                         DownloadFile {
                             filename: "tokenizer.json".into(),
-                            url: "https://huggingface.co/morenolq/flanec-large-cd/resolve/main/tokenizer.json".into(),
-                            size: 2_400_000,
+                            url: format!("{HF_BASE}/jonawhisper-flanec-large-onnx/resolve/main/tokenizer.json"),
+                            size: 2_422_234,
                         },
                     ],
                 },
-                download_marker: Some(".complete".into()),
+                download_marker: Some(".complete_v2".into()),
                 recommended: false,
                 params: Some(0.80),
-                ram: Some(1_200_000_000),
+                ram: Some(3_500_000_000),
                 lang_codes: Some(vec!["en".into()]),
-                runtime: Some("candle".into()),
+                runtime: Some("ort".into()),
                 quantization: Some("FP32".into()),
                 ..Default::default()
             },
@@ -138,69 +155,38 @@ impl ASREngine for CorrectionEngine {
                 label: "FlanEC Base".into(),
                 filename: "flanec-base".into(),
                 url: String::new(),
-                size: 990_000_000 + 1_500 + 2_400_000,
+                size: 1_092_005_311,
                 storage_dir: storage_dir(),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
-                            filename: "model.safetensors".into(),
-                            url: "https://huggingface.co/morenolq/flanec-base-cd/resolve/main/model.safetensors".into(),
-                            size: 990_000_000,
+                            filename: "encoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-flanec-base-onnx/resolve/main/encoder_model.onnx"),
+                            size: 438_705_681,
+                        },
+                        DownloadFile {
+                            filename: "decoder_model.onnx".into(),
+                            url: format!("{HF_BASE}/jonawhisper-flanec-base-onnx/resolve/main/decoder_model.onnx"),
+                            size: 650_875_887,
                         },
                         DownloadFile {
                             filename: "config.json".into(),
-                            url: "https://huggingface.co/morenolq/flanec-base-cd/resolve/main/config.json".into(),
-                            size: 1_500,
+                            url: format!("{HF_BASE}/jonawhisper-flanec-base-onnx/resolve/main/config.json"),
+                            size: 1_509,
                         },
                         DownloadFile {
                             filename: "tokenizer.json".into(),
-                            url: "https://huggingface.co/morenolq/flanec-base-cd/resolve/main/tokenizer.json".into(),
-                            size: 2_400_000,
+                            url: format!("{HF_BASE}/jonawhisper-flanec-base-onnx/resolve/main/tokenizer.json"),
+                            size: 2_422_234,
                         },
                     ],
                 },
-                download_marker: Some(".complete".into()),
+                download_marker: Some(".complete_v2".into()),
                 recommended: true,
                 params: Some(0.25),
-                ram: Some(800_000_000),
+                ram: Some(1_200_000_000),
                 lang_codes: Some(vec!["en".into()]),
-                runtime: Some("candle".into()),
-                quantization: Some("FP32".into()),
-                ..Default::default()
-            },
-            ASRModel {
-                id: "correction:flan-t5-grammar".into(),
-                engine_id: "correction".into(),
-                label: "Flan-T5 Large Grammar".into(),
-                filename: "flan-t5-grammar".into(),
-                url: String::new(),
-                size: 3_130_000_000 + 1_500 + 2_400_000,
-                storage_dir: storage_dir(),
-                download_type: DownloadType::MultiFile {
-                    files: vec![
-                        DownloadFile {
-                            filename: "model.safetensors".into(),
-                            url: "https://huggingface.co/pszemraj/flan-t5-large-grammar-synthesis/resolve/main/model.safetensors".into(),
-                            size: 3_130_000_000,
-                        },
-                        DownloadFile {
-                            filename: "config.json".into(),
-                            url: "https://huggingface.co/pszemraj/flan-t5-large-grammar-synthesis/resolve/main/config.json".into(),
-                            size: 1_500,
-                        },
-                        DownloadFile {
-                            filename: "tokenizer.json".into(),
-                            url: "https://huggingface.co/pszemraj/flan-t5-large-grammar-synthesis/resolve/main/tokenizer.json".into(),
-                            size: 2_400_000,
-                        },
-                    ],
-                },
-                download_marker: Some(".complete".into()),
-                recommended: false,
-                params: Some(0.80),
-                ram: Some(3_500_000_000),
-                lang_codes: Some(vec!["en".into()]),
-                runtime: Some("candle".into()),
+                runtime: Some("ort".into()),
                 quantization: Some("FP32".into()),
                 ..Default::default()
             },
@@ -228,7 +214,7 @@ impl ASREngine for CorrectionEngine {
     {
         let ctx = ctx.downcast_mut::<T5Context>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid T5 context".into()))?;
-        correct(ctx, text).map_err(|e| EngineError::LaunchFailed(e))
+        correct(ctx, text).map_err(EngineError::LaunchFailed)
     }
 }
 

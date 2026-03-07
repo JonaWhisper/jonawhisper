@@ -7,9 +7,9 @@ license = "GPL-3.0-or-later"
 [dependencies]
 inventory = "0.3"
 jona-types = { path = "../jona-types" }
-candle-core = { version = "0.9", features = ["metal", "accelerate"] }
-candle-nn = { version = "0.9", features = ["metal", "accelerate"] }
-candle-transformers = { version = "0.9", features = ["metal", "accelerate"] }
+jona-engines = { path = "../jona-engines" }
+ort = { version = "2.0.0-rc.11", features = ["coreml"] }
 tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
