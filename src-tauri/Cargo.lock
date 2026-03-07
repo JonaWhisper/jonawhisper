@@ -2863,6 +2863,8 @@ dependencies = [
  "inventory",
  "jona-types",
  "log",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

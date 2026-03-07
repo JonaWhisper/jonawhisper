@@ -53,6 +53,18 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# ── Spellcheck manifest cache ─────────────────────────────
+MANIFEST_URL="https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download/manifest.json"
+MANIFEST_DEST="$SCRIPT_DIR/src-tauri/crates/jona-engine-spellcheck/manifest.json"
+echo "  Fetching spellcheck manifest..."
+if curl -sL --max-time 10 -o "$MANIFEST_DEST.tmp" "$MANIFEST_URL" 2>/dev/null; then
+    mv "$MANIFEST_DEST.tmp" "$MANIFEST_DEST"
+    echo "  Manifest cached: $(wc -c < "$MANIFEST_DEST" | tr -d ' ') bytes"
+else
+    rm -f "$MANIFEST_DEST.tmp"
+    echo "  Manifest fetch failed (will use embedded fallback)"
+fi
+
 # Auto-install/update npm dependencies if needed
 if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
     echo "  Installing npm dependencies..."

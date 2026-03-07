@@ -19,7 +19,7 @@ rust_i18n::i18n!("../src/i18n");
 use state::AppState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// Resolve the effective locale ("fr" or "en") from preferences.
 pub fn resolve_locale(app_locale: &str) -> String {
@@ -28,6 +28,56 @@ pub fn resolve_locale(app_locale: &str) -> String {
     }
     let sys = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
     if sys.starts_with("fr") { "fr".to_string() } else { "en".to_string() }
+}
+
+/// Fetch the latest spellcheck manifest from GitHub and cache it on disk.
+/// If the manifest changed, emit MODELS_CHANGED so the frontend refreshes.
+fn refresh_spellcheck_manifest(app: &tauri::AppHandle) {
+    const URL: &str = "https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download/manifest.json";
+
+    let dest = jona_types::models_dir()
+        .join("spellcheck")
+        .join("manifest.json");
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build();
+    let client = match client {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("Spellcheck manifest refresh: failed to create client: {}", e);
+            return;
+        }
+    };
+
+    match client.get(URL).send().and_then(|r| r.error_for_status()) {
+        Ok(resp) => {
+            let body = match resp.text() {
+                Ok(b) => b,
+                Err(e) => {
+                    log::warn!("Spellcheck manifest refresh: read error: {}", e);
+                    return;
+                }
+            };
+
+            // Only write + emit if content changed
+            let old = std::fs::read_to_string(&dest).unwrap_or_default();
+            if body != old {
+                std::fs::create_dir_all(dest.parent().unwrap()).ok();
+                if let Err(e) = std::fs::write(&dest, &body) {
+                    log::warn!("Spellcheck manifest refresh: write error: {}", e);
+                    return;
+                }
+                log::info!("Spellcheck manifest updated ({} bytes)", body.len());
+                let _ = app.emit(events::MODELS_CHANGED, ());
+            } else {
+                log::debug!("Spellcheck manifest unchanged");
+            }
+        }
+        Err(e) => {
+            log::debug!("Spellcheck manifest refresh failed (offline?): {}", e);
+        }
+    }
 }
 
 /// Wrapper to store the hotkey update channel sender in Tauri managed state.
@@ -156,6 +206,14 @@ pub fn run() {
                 monitor_enabled.store(true, Ordering::SeqCst);
             } else {
                 ui::tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
+            }
+
+            // Refresh spellcheck manifest in background
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    refresh_spellcheck_manifest(&handle);
+                });
             }
 
             // Spectrum emission (30fps) + stream error detection

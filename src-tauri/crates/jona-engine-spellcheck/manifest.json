@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-03-07T21:07:25Z",
+  "languages": {
+    "en": {
+      "label": "English",
+      "files": {
+        "freq.txt": {
+          "filename": "en-freq.txt",
+          "size": 1332882,
+          "sha256": "d339191aea4ab08bedb58cdc93013314f9848f418a315c50fe009872375ce1ff",
+          "entries": 82834
+        },
+        "bigram.txt": {
+          "filename": "en-bigram.txt",
+          "size": 5137213,
+          "sha256": "fd892a160184101dd7ae807ac5a302d01fcea1c47304181a8ed7ed9c94545bcd",
+          "entries": 242342
+        }
+      }
+    },
+    "en-gb": {
+      "label": "English (British)",
+      "files": {
+        "freq.txt": {
+          "filename": "en-gb-freq.txt",
+          "size": 1332929,
+          "sha256": "e367744125f868cff09fcff855c994a09a9642e0d0ef581bd35cb8f2768f92c3",
+          "entries": 82837
+        },
+        "bigram.txt": {
+          "filename": "en-gb-bigram.txt",
+          "size": 5137213,
+          "sha256": "fd892a160184101dd7ae807ac5a302d01fcea1c47304181a8ed7ed9c94545bcd",
+          "entries": 242342
+        }
+      }
+    },
+    "fr": {
+      "label": "Fran\u00e7ais",
+      "files": {
+        "freq.txt": {
+          "filename": "fr-freq.txt",
+          "size": 9582284,
+          "sha256": "2e21fd7e275a9a239681ca4df718ed9dd1086d965a48ca4b0c9eb037edca1cba",
+          "entries": 645627
+        },
+        "bigram.txt": {
+          "filename": "fr-bigram.txt",
+          "size": 87164,
+          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
+          "entries": 5000
+        }
+      }
+    },
+    "fr-be": {
+      "label": "Fran\u00e7ais (Belgique)",
+      "files": {
+        "freq.txt": {
+          "filename": "fr-be-freq.txt",
+          "size": 9582639,
+          "sha256": "f806474f65bb1608035f705c23042acda2215a6a97322b83b38ce22ef53e0d27",
+          "entries": 645648
+        },
+        "bigram.txt": {
+          "filename": "fr-be-bigram.txt",
+          "size": 87164,
+          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
+          "entries": 5000
+        }
+      }
+    },
+    "fr-ca": {
+      "label": "Fran\u00e7ais (Qu\u00e9bec)",
+      "files": {
+        "freq.txt": {
+          "filename": "fr-ca-freq.txt",
+          "size": 9582921,
+          "sha256": "2dbe8b787bfa1ac226d8bcfc0da27371d8c79cba2df7232096b83f1f6fc6c845",
+          "entries": 645666
+        },
+        "bigram.txt": {
+          "filename": "fr-ca-bigram.txt",
+          "size": 87164,
+          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
+          "entries": 5000
+        }
+      }
+    },
+    "fr-ch": {
+      "label": "Fran\u00e7ais (Suisse)",
+      "files": {
+        "freq.txt": {
+          "filename": "fr-ch-freq.txt",
+          "size": 9582590,
+          "sha256": "369afecb7204f70bae5ae60da316d6ea13d9d5bfdc0c54a619b5b580e5543f97",
+          "entries": 645643
+        },
+        "bigram.txt": {
+          "filename": "fr-ch-bigram.txt",
+          "size": 87164,
+          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
+          "entries": 5000
+        }
+      }
+    }
+  }
+}
