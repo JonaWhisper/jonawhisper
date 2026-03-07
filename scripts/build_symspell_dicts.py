@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Build SymSpell frequency dictionaries for JonaWhisper.
 
-FR: Lexique383 (140K words with frequencies from books + films corpus)
+FR: Lexique383 (125K words with frequencies) + DELA (641K inflected forms)
 EN: SymSpell official frequency dictionary (wolfgarbe/SymSpell)
 
 Output: src-tauri/dicts/fr_freq.txt, src-tauri/dicts/en_freq.txt
-Format: word<space>frequency (one per line, lowercase)
+Format: word<tab>frequency (one per line, lowercase)
 """
 
 import csv
 import os
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -20,6 +21,9 @@ DICTS_DIR = PROJECT_ROOT / "src-tauri" / "dicts"
 
 LEXIQUE_URL = "http://www.lexique.org/databases/Lexique383/Lexique383.tsv"
 LEXIQUE_CACHE = Path("/tmp/Lexique383.tsv")
+
+# DELA French dictionary — 641K inflected forms from LADL
+DELA_DICT = Path("/tmp/dela/share/dict/dict-fr-DELA-common-words.unicode")
 
 # SymSpell official English frequency dict (82K words)
 EN_FREQ_URL = "https://raw.githubusercontent.com/wolfgarbe/SymSpell/master/SymSpell/frequency_dictionary_en_82_765.txt"
@@ -35,13 +39,29 @@ def download(url: str, dest: Path) -> Path:
     return dest
 
 
+def ensure_dela():
+    """Ensure DELA dictionary is available (pip install if needed)."""
+    if DELA_DICT.exists():
+        print(f"  DELA cached: {DELA_DICT}")
+        return
+    print("  Installing dict-fr-DELA from PyPI...")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "--target", "/tmp/dela", "dict-fr-DELA"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if not DELA_DICT.exists():
+        print("  WARNING: DELA install failed, skipping DELA enrichment")
+
+
 def build_fr_dict():
-    """Build French frequency dictionary from Lexique383."""
-    print("Building FR dictionary from Lexique383...")
+    """Build French frequency dictionary from Lexique383 + DELA."""
+    print("Building FR dictionary from Lexique383 + DELA...")
     src = download(LEXIQUE_URL, LEXIQUE_CACHE)
 
     words: dict[str, int] = {}
 
+    # Step 1: Load Lexique383 (with frequencies)
     with open(src, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
         for row in reader:
@@ -64,6 +84,29 @@ def build_fr_dict():
             # Keep highest frequency for duplicate words
             if word not in words or words[word] < freq:
                 words[word] = freq
+
+    lexique_count = len(words)
+    print(f"  Lexique383: {lexique_count} words")
+
+    # Step 2: Enrich with DELA (641K inflected forms, no frequency data)
+    ensure_dela()
+    dela_added = 0
+    if DELA_DICT.exists():
+        with open(DELA_DICT, "r", encoding="utf-8") as f:
+            for line in f:
+                word = line.strip().lower()
+                if not word or len(word) <= 1:
+                    continue
+                # Skip multi-word entries (spaces) — SymSpell handles single words
+                if " " in word:
+                    continue
+                # Only add words not already in Lexique383
+                if word not in words:
+                    words[word] = 1  # minimal frequency — known word but rare
+                    dela_added += 1
+        print(f"  DELA: +{dela_added} new words (total: {len(words)})")
+    else:
+        print("  DELA: skipped (not available)")
 
     # Sort by frequency descending
     sorted_words = sorted(words.items(), key=lambda x: -x[1])
