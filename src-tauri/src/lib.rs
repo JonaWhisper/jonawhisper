@@ -9,6 +9,19 @@ mod recording;
 mod state;
 mod ui;
 
+// Force the linker to include engine crates so their `inventory::submit!`
+// registrations are present at runtime. Without these, the crates are
+// optimized away as dead code and EngineCatalog sees 0 engines.
+extern crate jona_engine_whisper;
+extern crate jona_engine_qwen;
+extern crate jona_engine_canary;
+extern crate jona_engine_parakeet;
+extern crate jona_engine_voxtral;
+extern crate jona_engine_llama;
+extern crate jona_engine_bert;
+extern crate jona_engine_pcs;
+extern crate jona_engine_correction;
+
 rust_i18n::i18n!("../src/i18n");
 
 use state::AppState;
