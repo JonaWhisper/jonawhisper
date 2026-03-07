@@ -36,26 +36,3 @@
 
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
-## Audits récurrents
-
-À relancer après chaque grosse feature ou refactoring.
-
-- [ ] **Audit spacings (padding/margin/hauteurs)** — Vérifier la cohérence des paddings de page, cards/items, inputs, boutons, space-y, et tailles de texte sur toutes les vues et composants.
-
-- [ ] **Audit i18n** — Lancer `python3 scripts/audit-i18n.py` pour détecter clés orphelines, manquantes, dupliquées, et désync EN/FR. Compléter par une relecture manuelle pour les strings hardcodées.
-
-- [ ] **Audit architecture & séparation des modules** — Passer en revue tout le codebase :
-  - **Séparation des responsabilités** — chaque module a un rôle clair, pas de logique métier mélangée
-  - **Duplication** — code dupliqué entre composants, patterns répétés
-  - **Couplage** — dépendances entre modules, imports croisés
-  - **Code mort** — fonctions/types/imports inutilisés après refactorings
-  - **Frontend → backend** — logique métier côté JS qui devrait être côté Rust
-
-- [ ] **Audit patterns & bonnes pratiques** — Vérifier la cohérence sur tout le projet :
-  - **Error handling** — Result vs unwrap, propagation, messages clairs
-  - **Sécurité** — clés API, sanitization, permissions
-  - **Performance** — locks, allocations, I/O bloquant
-  - **Concurrence** — Mutex/Atomics/channels, deadlocks, ordering
-  - **Frontend** — listeners orphelins, memory leaks, cleanup onUnmounted
-  - **Naming** — conventions (Rust snake_case, TS camelCase, events kebab-case)
-  - **Tests** — couverture, zones critiques

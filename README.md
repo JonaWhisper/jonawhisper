@@ -173,6 +173,24 @@ Models are downloaded and managed from within the app. All models are stored in 
 
 See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full dependency list with rationale for each choice.
 
+## Architecture
+
+JonaWhisper follows a **thin orchestrator** design. The main Tauri crate (`src-tauri/src/`) contains no engine logic nor model definitions — it orchestrates infrastructure crates and independent engine crates via dynamic dispatch.
+
+**Workspace crates** (14 total):
+
+| Crate | Role |
+|-------|------|
+| `jona-types` | Shared types (`ASREngine` trait, `ASRModel`, `EngineError`, `Preferences`, `Provider`) |
+| `jona-engines` | Infrastructure: `EngineCatalog`, downloader, ort session builder, mel features |
+| `jona-platform` | OS-specific code: hotkey (CGEvent tap), permissions, paste, audio devices, ducking |
+| `jona-provider` | Cloud provider backends (OpenAI-compatible, Anthropic) |
+| `jona-engine-*` (9) | One crate per engine: whisper, canary, parakeet, qwen, voxtral, llama, bert, pcs, correction |
+
+**Plug-and-play engines**: each engine crate registers itself via `inventory::submit!` at link time. The main crate calls `EngineCatalog::init_auto()` at startup — no hardcoded engine list, no re-exports. Adding an engine = add a crate + `cargo` dependency, zero changes to the orchestrator.
+
+**Dynamic dispatch**: all ASR and cleanup operations go through the `ASREngine` trait. The orchestrator resolves models by ID, obtains the engine, and calls `transcribe()` or `cleanup()` — it never knows which engine it is talking to.
+
 ## Project structure
 
 ```
@@ -183,19 +201,18 @@ src/                       Vue frontend
   stores/                  Pinia stores (app, history, settings, engines, downloads)
   utils/                   Shared utilities (shortcut, formatting)
   i18n/                    Translations (en.json, fr.json)
-src-tauri/                 Rust backend
+src-tauri/                 Rust backend (thin orchestrator)
   src/
-    lib.rs                 Tauri setup & app lifecycle
-    commands.rs            Tauri IPC commands
+    lib.rs                 Tauri setup & app lifecycle (10 modules)
     state.rs               App state & persistent preferences
-    recording.rs           Recording state machine & transcription queue
+    recording/             Recording lifecycle, transcription pipeline, thread spawning
+    commands/              Tauri IPC commands (7 sub-modules: audio, engines, history, ...)
     audio.rs               cpal recording & FFT
-    asr/                   ASR inference (whisper, canary, parakeet, qwen, voxtral, mel)
     cleanup/               Text cleanup (bert, candle, pcs, t5, vad, llm, post_processor)
-    engines/               Engine catalog & model downloads
     platform/              macOS-specific (hotkey, permissions, paste, audio devices)
     ui/                    Native UI (tray, pill overlay, SDF icons)
   voxtral-c/               Vendored voxtral.c sources (C + Metal)
+crates/                    Workspace crates (types, engines, platform, provider, 9 engine crates)
 docs/                      Technical documentation
   AUDIO-PIPELINE.md        Audio preprocessing architecture & roadmap
   TEXT-PIPELINE.md         Text postprocessing architecture & roadmap
