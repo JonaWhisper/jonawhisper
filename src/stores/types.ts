@@ -68,7 +68,7 @@ export interface Provider {
 export interface CleanupModel {
   id: string
   label: string
-  group: 'bert' | 'llm' | 'cloud' | 'correction'
+  group: 'punctuation' | 'bert' | 'llm' | 'cloud' | 'correction'
   params: number | null
   ram: number | null
   lang_codes: string[] | null
