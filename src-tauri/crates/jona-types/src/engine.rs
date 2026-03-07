@@ -80,6 +80,12 @@ pub struct ASRModel {
     /// Quantization format (e.g. "INT8", "Q5", "Q8", "FP32").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quantization: Option<String>,
+    /// SHA256 hash of the model file (for single-file models).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    /// SHA256 hashes per file (for multi-file models). Key = filename, value = hash.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_hashes: Option<std::collections::HashMap<String, String>>,
 }
 
 impl ASRModel {

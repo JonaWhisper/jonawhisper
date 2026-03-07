@@ -28,3 +28,6 @@ pub const SHORTCUT_CAPTURE_COMPLETE: &str = "shortcut-capture-complete";
 // Mic test
 pub const MIC_TEST_SPECTRUM: &str = "mic-test-spectrum";
 pub const MIC_TEST_STOPPED: &str = "mic-test-stopped";
+
+// Model updates
+pub const MODEL_UPDATES_AVAILABLE: &str = "model-updates-available";

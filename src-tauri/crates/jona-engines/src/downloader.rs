@@ -1,9 +1,10 @@
 use super::{ASRModel, DownloadFile, DownloadType};
 use jona_types::{ActiveDownload, DownloadState};
 use futures_util::StreamExt;
+use sha2::{Sha256, Digest};
 use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::{Read as _, Write};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{AppHandle, Emitter};
@@ -88,6 +89,66 @@ pub fn delete_partial(model: &ASRModel) {
     }
 }
 
+/// Compute the SHA256 hash of a file.
+fn sha256_file(path: &Path) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = file.read(&mut buf).ok()?;
+        if n == 0 { break; }
+        hasher.update(&buf[..n]);
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+/// Write a `version.json` alongside the model after successful download.
+fn write_version_json(model: &ASRModel) {
+    let model_path = model.local_path();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let version_dir = if model_path.is_dir() {
+        model_path.clone()
+    } else {
+        match model_path.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return,
+        }
+    };
+
+    let version_path = version_dir.join("version.json");
+
+    let json = match &model.download_type {
+        DownloadType::MultiFile { files } => {
+            let mut file_hashes = serde_json::Map::new();
+            for f in files {
+                let fpath = model_path.join(&f.filename);
+                if let Some(hash) = sha256_file(&fpath) {
+                    file_hashes.insert(f.filename.clone(), serde_json::Value::String(hash));
+                }
+            }
+            serde_json::json!({
+                "model_id": model.id,
+                "files": file_hashes,
+                "downloaded_at": now,
+            })
+        }
+        _ => {
+            let hash = sha256_file(&model_path).unwrap_or_default();
+            serde_json::json!({
+                "model_id": model.id,
+                "sha256": hash,
+                "downloaded_at": now,
+            })
+        }
+    };
+
+    match fs::write(&version_path, serde_json::to_string_pretty(&json).unwrap_or_default()) {
+        Ok(()) => log::info!("Wrote version.json for {}", model.id),
+        Err(e) => log::warn!("Failed to write version.json for {}: {}", model.id, e),
+    }
+}
+
 pub async fn download_model(
     app: AppHandle,
     download_state: Arc<Mutex<DownloadState>>,
@@ -144,6 +205,10 @@ pub async fn download_model(
         log::info!("Cancelled download for {} — partial files deleted", model.id);
     } else if was_cancelled {
         log::info!("Stopped download for {} — partial file kept for resume", model.id);
+    }
+
+    if success {
+        write_version_json(&model);
     }
 
     clear_pending_state(&model);
@@ -485,6 +550,83 @@ async fn download_multi_file(
     emit_multi_progress(app, download_state, &model.id, total_size, total_size, 0);
     log::info!("All {} files downloaded for {}", files.len(), model.id);
     true
+}
+
+// -- Update detection --
+
+/// Result of comparing local version.json against catalog hashes.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdateStatus {
+    /// Local hashes match catalog — model is current.
+    UpToDate,
+    /// Catalog hashes differ from local — a newer version is available.
+    UpdateAvailable,
+    /// No version.json on disk — cannot determine (treated as up-to-date).
+    Unknown,
+}
+
+/// Check whether a downloaded model has an update available by comparing
+/// the hashes in its local `version.json` against the catalog's `sha256`/`file_hashes`.
+pub fn check_model_update(model: &ASRModel) -> UpdateStatus {
+    // Models without catalog hashes cannot be checked
+    let has_catalog_hash = model.sha256.is_some()
+        || model.file_hashes.as_ref().is_some_and(|h| !h.is_empty());
+    if !has_catalog_hash {
+        return UpdateStatus::Unknown;
+    }
+
+    let model_path = model.local_path();
+    let version_dir = if model_path.is_dir() {
+        model_path
+    } else {
+        match model_path.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return UpdateStatus::Unknown,
+        }
+    };
+
+    let version_path = version_dir.join("version.json");
+    let content = match fs::read_to_string(&version_path) {
+        Ok(c) => c,
+        Err(_) => return UpdateStatus::Unknown,
+    };
+
+    let local: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return UpdateStatus::Unknown,
+    };
+
+    // Single-file model: compare sha256
+    if let Some(catalog_hash) = &model.sha256 {
+        let local_hash = local.get("sha256").and_then(|v| v.as_str()).unwrap_or("");
+        return if local_hash == catalog_hash {
+            UpdateStatus::UpToDate
+        } else {
+            UpdateStatus::UpdateAvailable
+        };
+    }
+
+    // Multi-file model: compare per-file hashes
+    if let Some(catalog_hashes) = &model.file_hashes {
+        let local_files = local.get("files").and_then(|v| v.as_object());
+        match local_files {
+            None => return UpdateStatus::UpdateAvailable,
+            Some(local_map) => {
+                for (filename, catalog_hash) in catalog_hashes {
+                    let local_hash = local_map.get(filename)
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if local_hash != catalog_hash {
+                        return UpdateStatus::UpdateAvailable;
+                    }
+                }
+                return UpdateStatus::UpToDate;
+            }
+        }
+    }
+
+    UpdateStatus::Unknown
 }
 
 pub fn delete_model(model: &ASRModel) -> bool {

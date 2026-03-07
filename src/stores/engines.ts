@@ -17,6 +17,7 @@ export const useEnginesStore = defineStore('engines', () => {
   const audioDevices = ref<AudioDevice[]>([])
   const providers = ref<Provider[]>([])
   const permissions = ref<PermissionReport>({ microphone: 'Undetermined', accessibility: 'Denied', input_monitoring: 'Denied' })
+  const updatableModelIds = ref<Set<string>>(new Set())
 
   // Computed
   const selectedEngine = computed(() => {
@@ -167,6 +168,10 @@ export const useEnginesStore = defineStore('engines', () => {
     } catch (e) { console.error('updateProvider failed:', e) }
   }
 
+  function hasUpdate(modelId: string): boolean {
+    return updatableModelIds.value.has(modelId)
+  }
+
   // Listeners
   function setupListeners() {
     listen('permission-changed', () => {
@@ -175,6 +180,10 @@ export const useEnginesStore = defineStore('engines', () => {
 
     listen('models-changed', () => {
       fetchModels()
+    })
+
+    listen<string[]>('model-updates-available', (event) => {
+      updatableModelIds.value = new Set(event.payload)
     })
   }
 
@@ -186,6 +195,7 @@ export const useEnginesStore = defineStore('engines', () => {
     spellcheckEngines, hasSpellcheckDict,
     bertModelReady, punctuationModels, cleanupModels, asrModels,
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
+    updatableModelIds, hasUpdate,
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,
     fetchPermissions, fetchProviders,
     requestPermission, addProvider, removeProvider, updateProvider,

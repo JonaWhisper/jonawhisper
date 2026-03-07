@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-07T21:07:25Z",
+  "generated_at": "2026-03-07T21:20:46Z",
   "languages": {
     "en": {
       "label": "English",
@@ -36,7 +36,7 @@
       }
     },
     "fr": {
-      "label": "Fran\u00e7ais",
+      "label": "Français",
       "files": {
         "freq.txt": {
           "filename": "fr-freq.txt",
@@ -53,7 +53,7 @@
       }
     },
     "fr-be": {
-      "label": "Fran\u00e7ais (Belgique)",
+      "label": "Français (Belgique)",
       "files": {
         "freq.txt": {
           "filename": "fr-be-freq.txt",
@@ -70,7 +70,7 @@
       }
     },
     "fr-ca": {
-      "label": "Fran\u00e7ais (Qu\u00e9bec)",
+      "label": "Français (Québec)",
       "files": {
         "freq.txt": {
           "filename": "fr-ca-freq.txt",
@@ -87,7 +87,7 @@
       }
     },
     "fr-ch": {
-      "label": "Fran\u00e7ais (Suisse)",
+      "label": "Français (Suisse)",
       "files": {
         "freq.txt": {
           "filename": "fr-ch-freq.txt",

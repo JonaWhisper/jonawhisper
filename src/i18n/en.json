@@ -46,6 +46,8 @@
   "modelManager.resume": "Resume download",
   "modelManager.cancel": "Cancel",
   "modelManager.save": "Save",
+  "modelManager.updateAvailable": "Update available",
+  "modelManager.update": "Update",
   "provider.kind": "Type",
   "provider.kind.custom": "Custom Server",
   "provider.name": "Name",

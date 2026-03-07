@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDownloadStore } from '@/stores/downloads'
+import { useEnginesStore } from '@/stores/engines'
 import { isModelAvailable } from '@/stores/types'
 import type { ASRModel } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2, RefreshCw } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import BenchmarkBadges from '@/components/BenchmarkBadges.vue'
 import DownloadActions from '@/components/DownloadActions.vue'
@@ -14,6 +15,7 @@ import { formatSize } from '@/utils/format'
 
 const { t } = useI18n()
 const downloads = useDownloadStore()
+const engines = useEnginesStore()
 
 const props = defineProps<{
   model: ASRModel
@@ -30,6 +32,22 @@ const isDeleting = computed(() => !!downloads.deletingModels[props.model.id])
 const isPaused = computed(() => {
   return !isDownloading.value && !isDownloaded.value && props.model.partial_progress != null && props.model.partial_progress > 0
 })
+const hasUpdate = computed(() => engines.hasUpdate(props.model.id))
+const isUpdating = ref(false)
+
+async function handleUpdate() {
+  isUpdating.value = true
+  try {
+    const deleted = await downloads.deleteModel(props.model.id)
+    if (deleted) {
+      await downloads.downloadModel(props.model.id)
+      // Remove from updatable set after successful update
+      engines.updatableModelIds.delete(props.model.id)
+    }
+  } finally {
+    isUpdating.value = false
+  }
+}
 
 // ModelCell-specific states (deleting, hover-to-trash) override the base DownloadActions
 const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading.value && !isPaused.value)
@@ -64,6 +82,33 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
           <div class="absolute bottom-0.5 left-1 right-1 h-0.5 rounded-full overflow-hidden bg-muted-foreground/15">
             <div class="h-full w-1/3 rounded-full bg-muted-foreground/40 animate-indeterminate" />
           </div>
+        </div>
+      </template>
+
+      <!-- Downloaded with update available -->
+      <template v-else-if="showCustomDownloaded && hasUpdate">
+        <div class="flex items-center gap-1.5">
+          <Badge
+            variant="secondary"
+            class="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-transparent h-6 px-2 text-[10px] font-medium"
+          >
+            {{ t('modelManager.updateAvailable') }}
+          </Badge>
+          <TooltipProvider :delay-duration="300">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="ghost" size="icon-sm"
+                  class="cursor-pointer"
+                  :disabled="isUpdating"
+                  @click="handleUpdate"
+                >
+                  <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isUpdating }" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.update') }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </template>
 

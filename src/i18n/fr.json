@@ -46,6 +46,8 @@
   "modelManager.resume": "Reprendre le téléchargement",
   "modelManager.cancel": "Annuler",
   "modelManager.save": "Enregistrer",
+  "modelManager.updateAvailable": "Mise \u00e0 jour",
+  "modelManager.update": "Mettre \u00e0 jour",
   "provider.kind": "Type",
   "provider.kind.custom": "Serveur personnalisé",
   "provider.name": "Nom",

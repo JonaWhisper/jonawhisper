@@ -80,6 +80,27 @@ fn refresh_spellcheck_manifest(app: &tauri::AppHandle) {
     }
 }
 
+/// Scan all downloaded models and emit an event if any have updates available.
+fn check_model_updates(app: &tauri::AppHandle) {
+    let catalog = jona_engines::EngineCatalog::global();
+    let updatable: Vec<String> = catalog
+        .downloaded_models()
+        .iter()
+        .filter(|m| {
+            jona_engines::downloader::check_model_update(m)
+                == jona_engines::downloader::UpdateStatus::UpdateAvailable
+        })
+        .map(|m| m.id.clone())
+        .collect();
+
+    if !updatable.is_empty() {
+        log::info!("Model updates available: {:?}", updatable);
+        let _ = app.emit(events::MODEL_UPDATES_AVAILABLE, &updatable);
+    } else {
+        log::debug!("All downloaded models are up to date");
+    }
+}
+
 /// Wrapper to store the hotkey update channel sender in Tauri managed state.
 pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::HotkeyUpdate>);
 
@@ -208,11 +229,12 @@ pub fn run() {
                 ui::tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
             }
 
-            // Refresh spellcheck manifest in background
+            // Refresh spellcheck manifest in background, then check for model updates
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     refresh_spellcheck_manifest(&handle);
+                    check_model_updates(&handle);
                 });
             }
 
