@@ -17,6 +17,46 @@ fn storage_dir() -> String {
 const GH_RELEASE: &str =
     "https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download";
 
+fn spellcheck_model(
+    code: &str,
+    label: &str,
+    freq_size: u64,
+    bigram_size: u64,
+    ram: u64,
+) -> ASRModel {
+    ASRModel {
+        id: format!("spellcheck:{code}"),
+        engine_id: "spellcheck".into(),
+        label: label.into(),
+        filename: code.into(),
+        url: String::new(),
+        size: freq_size + bigram_size,
+        storage_dir: storage_dir(),
+        download_type: DownloadType::MultiFile {
+            files: vec![
+                DownloadFile {
+                    filename: "freq.txt".into(),
+                    url: format!("{GH_RELEASE}/{code}-freq.txt"),
+                    size: freq_size,
+                },
+                DownloadFile {
+                    filename: "bigram.txt".into(),
+                    url: format!("{GH_RELEASE}/{code}-bigram.txt"),
+                    size: bigram_size,
+                },
+            ],
+        },
+        download_marker: Some(".complete".into()),
+        recommended_for: Some(vec![code.into()]),
+        params: None,
+        ram: Some(ram),
+        lang_codes: Some(vec![code.into()]),
+        runtime: None,
+        quantization: None,
+        ..Default::default()
+    }
+}
+
 impl ASREngine for SpellCheckEngine {
     fn engine_id(&self) -> &str {
         "spellcheck"
@@ -30,68 +70,11 @@ impl ASREngine for SpellCheckEngine {
 
     fn models(&self) -> Vec<ASRModel> {
         vec![
-            ASRModel {
-                id: "spellcheck:fr".into(),
-                engine_id: "spellcheck".into(),
-                label: "Fran\u{00e7}ais".into(),
-                filename: "fr".into(),
-                url: String::new(),
-                size: 9_840_000 + 90_000,
-                storage_dir: storage_dir(),
-                download_type: DownloadType::MultiFile {
-                    files: vec![
-                        DownloadFile {
-                            filename: "freq.txt".into(),
-                            url: format!("{GH_RELEASE}/fr-freq.txt"),
-                            size: 9_840_000,
-                        },
-                        DownloadFile {
-                            filename: "bigram.txt".into(),
-                            url: format!("{GH_RELEASE}/fr-bigram.txt"),
-                            size: 90_000,
-                        },
-                    ],
-                },
-                download_marker: Some(".complete".into()),
-                recommended_for: Some(vec!["fr".into()]),
-                params: None,
-                ram: Some(100_000_000),
-                lang_codes: Some(vec!["fr".into()]),
-                runtime: None,
-                quantization: None,
-                ..Default::default()
-            },
-            ASRModel {
-                id: "spellcheck:en".into(),
-                engine_id: "spellcheck".into(),
-                label: "English".into(),
-                filename: "en".into(),
-                url: String::new(),
-                size: 1_335_000 + 5_140_000,
-                storage_dir: storage_dir(),
-                download_type: DownloadType::MultiFile {
-                    files: vec![
-                        DownloadFile {
-                            filename: "freq.txt".into(),
-                            url: format!("{GH_RELEASE}/en-freq.txt"),
-                            size: 1_335_000,
-                        },
-                        DownloadFile {
-                            filename: "bigram.txt".into(),
-                            url: format!("{GH_RELEASE}/en-bigram.txt"),
-                            size: 5_140_000,
-                        },
-                    ],
-                },
-                download_marker: Some(".complete".into()),
-                recommended_for: Some(vec!["en".into()]),
-                params: None,
-                ram: Some(30_000_000),
-                lang_codes: Some(vec!["en".into()]),
-                runtime: None,
-                quantization: None,
-                ..Default::default()
-            },
+            spellcheck_model("fr", "Fran\u{00e7}ais", 9_840_000, 90_000, 100_000_000),
+            spellcheck_model("fr-be", "Fran\u{00e7}ais (Belgique)", 9_900_000, 90_000, 100_000_000),
+            spellcheck_model("fr-ca", "Fran\u{00e7}ais (Qu\u{00e9}bec)", 9_900_000, 90_000, 100_000_000),
+            spellcheck_model("fr-ch", "Fran\u{00e7}ais (Suisse)", 9_900_000, 90_000, 100_000_000),
+            spellcheck_model("en", "English", 1_335_000, 5_140_000, 30_000_000),
         ]
     }
 
