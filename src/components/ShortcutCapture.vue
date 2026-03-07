@@ -10,6 +10,7 @@ const DISABLED_SHORTCUT: ShortcutDef = { key_codes: [], modifiers: 0, kind: 'Key
 const props = defineProps<{
   modelValue: string
   disabled?: boolean
+  fullWidth?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -86,7 +87,7 @@ onUnmounted(() => {
 <template>
   <div
     class="shortcut-capture"
-    :class="{ capturing, disabled }"
+    :class="{ capturing, disabled, 'full-width': fullWidth }"
     @click="!capturing && !disabled && startCapture()"
   >
     <!-- Capture mode: pulsing hint -->
@@ -134,10 +135,14 @@ onUnmounted(() => {
   color: hsl(var(--foreground));
   cursor: pointer;
   min-width: 200px;
-  width: 100%;
-  height: 36px;
+  height: 32px;
   justify-content: center;
   transition: all 0.2s;
+}
+
+.shortcut-capture.full-width {
+  width: 100%;
+  height: 36px;
 }
 
 .shortcut-capture:hover {

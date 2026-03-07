@@ -150,6 +150,7 @@ const canStart = computed(() => {
           <ShortcutCapture
             :model-value="settings.hotkey"
             @update:model-value="onHotkeyChange"
+            full-width
           />
         </div>
 
