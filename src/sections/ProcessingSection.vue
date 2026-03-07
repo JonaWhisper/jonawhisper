@@ -145,6 +145,17 @@ function onMaxTokensSliderCommit(v: number[]) {
         />
       </div>
 
+      <!-- Spell-check -->
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
+        <div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.spellcheck') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.spellcheckEnabled"
+          @update:model-value="(v: boolean) => settings.setSetting('spellcheck_enabled', String(v))"
+        />
+      </div>
+
       <!-- Punctuation dropdown -->
       <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>

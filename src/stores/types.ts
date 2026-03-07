@@ -164,5 +164,6 @@ export interface SettingsPayload {
   punctuation_model_id: string
   disfluency_removal_enabled: boolean
   itn_enabled: boolean
+  spellcheck_enabled: boolean
   theme: string
 }

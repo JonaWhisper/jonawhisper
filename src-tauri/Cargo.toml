@@ -68,6 +68,7 @@ prost = "0.13"
 candle-core = { version = "0.9", features = ["metal", "accelerate"] }
 candle-nn = { version = "0.9", features = ["metal", "accelerate"] }
 candle-transformers = { version = "0.9", features = ["metal", "accelerate"] }
+spellbook = "0.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }

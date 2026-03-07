@@ -23,6 +23,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const vadEnabled = ref(true)
   const disfluencyRemovalEnabled = ref(true)
   const itnEnabled = ref(true)
+  const spellcheckEnabled = ref(false)
   const appLocale = ref('auto')
   const theme = ref('system')
 
@@ -49,6 +50,7 @@ export const useSettingsStore = defineStore('settings', () => {
       vadEnabled.value = s.vad_enabled ?? true
       disfluencyRemovalEnabled.value = s.disfluency_removal_enabled ?? true
       itnEnabled.value = s.itn_enabled ?? true
+      spellcheckEnabled.value = s.spellcheck_enabled ?? false
       theme.value = s.theme ?? 'system'
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
@@ -75,6 +77,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'vad_enabled': return String(vadEnabled.value)
       case 'disfluency_removal_enabled': return String(disfluencyRemovalEnabled.value)
       case 'itn_enabled': return String(itnEnabled.value)
+      case 'spellcheck_enabled': return String(spellcheckEnabled.value)
       case 'theme': return theme.value
       default: return ''
     }
@@ -102,6 +105,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
       case 'disfluency_removal_enabled': disfluencyRemovalEnabled.value = value === 'true'; break
       case 'itn_enabled': itnEnabled.value = value === 'true'; break
+      case 'spellcheck_enabled': spellcheckEnabled.value = value === 'true'; break
       case 'theme': theme.value = value; break
     }
   }
@@ -128,7 +132,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     selectedModelId, selectedLanguage, asrCloudModel,
     textCleanupEnabled, punctuationModelId, cleanupModelId, llmModel, llmMaxTokens,
-    hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, selectedInputDeviceUid,
+    hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
     hotkey, cancelShortcut, recordingMode, appLocale, theme,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,

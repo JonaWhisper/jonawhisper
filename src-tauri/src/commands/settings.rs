@@ -34,6 +34,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "vad_enabled": s.vad_enabled,
         "disfluency_removal_enabled": s.disfluency_removal_enabled,
         "itn_enabled": s.itn_enabled,
+        "spellcheck_enabled": s.spellcheck_enabled,
         "theme": s.theme,
     })
 }
@@ -79,6 +80,7 @@ pub fn set_setting(
             "vad_enabled" => s.vad_enabled = value == "true",
             "disfluency_removal_enabled" => s.disfluency_removal_enabled = value == "true",
             "itn_enabled" => s.itn_enabled = value == "true",
+            "spellcheck_enabled" => s.spellcheck_enabled = value == "true",
             "theme" => s.theme = value.clone(),
             _ => {
                 log::warn!("Unknown setting key: {}", key);

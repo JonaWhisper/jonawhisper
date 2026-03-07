@@ -165,8 +165,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
 
     // Read settings once
     let (model_id, lang, hall_filter, disfluency_removal, itn_enabled,
-         punctuation_model_id, text_cleanup_enabled, cleanup_model_id,
-         llm_model, llm_max_tokens, providers) = {
+         spellcheck_enabled, punctuation_model_id, text_cleanup_enabled,
+         cleanup_model_id, llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.selected_model_id.clone(),
@@ -174,6 +174,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.hallucination_filter_enabled,
             s.disfluency_removal_enabled,
             s.itn_enabled,
+            s.spellcheck_enabled,
             s.punctuation_model_id.clone(),
             s.text_cleanup_enabled,
             s.cleanup_model_id.clone(),
@@ -212,7 +213,16 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         }
     }
 
-    // Step 2b: cleanup (correction/LLM) — runs after punctuation
+    // Step 2b: spell-check — runs after punctuation, before correction
+    if spellcheck_enabled {
+        let before = processed.len();
+        processed = cleanup::spellcheck::auto_correct(&processed, &lang);
+        if processed.len() != before {
+            log::info!("Spell-check: {} → {} chars", before, processed.len());
+        }
+    }
+
+    // Step 2c: cleanup (correction/LLM) — runs after spell-check
     let has_cleanup = text_cleanup_enabled && !cleanup_model_id.is_empty();
     let mut finalized = false;
 
