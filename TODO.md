@@ -6,6 +6,8 @@
 - [ ] **Tray menu se ferme au premier clic après lancement** — Bug upstream `tray-icon` (manque `acceptsFirstMouse:` sur TrayTarget NSView). Issue ouverte : tray-icon#251. Workaround actuel (menu attaché après build) est le meilleur disponible. Fix = PR upstream ou fork.
 - [ ] **Spectre plat/gris\u00e9 pendant l'enregistrement (intermittent)** — Parfois le spectre reste plat et gris\u00e9 pendant qu'on parle, alors que l'audio s'enregistre et transcrit correctement. Le flow audio fonctionne (la pill affiche bien l'\u00e9tat recording, la transcription aboutit). Suspect\u00e9 : race condition dans le flux de donn\u00e9es spectre entre le callback cpal, le mutex `AudioRecorder.spectrum`, la commande `GetSpectrum` et l'\u00e9metteur 30fps. Difficile \u00e0 reproduire \u2014 surveiller et investiguer quand le cas se pr\u00e9sente.
 
+- [ ] **T5 correction : répétitions en boucle** — Les modèles T5 génèrent parfois des répétitions massives (même phrase 10x). Causes : n-gram blocking trop petit (3), `strip_repetition` ne gère que les duplications simples, repeat penalty modérée (1.2), seuil longueur output trop généreux (2x input), pas de détection de boucle live. Fix : détection de boucle pendant la génération, n-gram blocking 4, repeat penalty 1.5, seuil longueur 1.3x, réécriture de `strip_repetition` pour patterns multi-répétés.
+
 ## Fonctionnalités
 
 - [ ] **Raccourci pour historique rapide** — Touche configurable pour afficher un popup flottant avec les dernières transcriptions. Permet de re-coller rapidement un texte récent sans ouvrir la fenêtre d'historique complète. Style popup léger (comme Spotlight/Alfred), clic ou Enter pour coller l'entrée sélectionnée.

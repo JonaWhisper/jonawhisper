@@ -1,4 +1,9 @@
 fn main() {
+    // Auto-generate `extern crate` for all jona-engine-* dependencies.
+    // This forces the linker to include them so their `inventory::submit!`
+    // registrations are present at runtime (without manual extern crate lines).
+    generate_engine_links();
+
     #[cfg(target_os = "macos")]
     {
         println!("cargo:rustc-link-lib=framework=AVFoundation");
@@ -38,4 +43,31 @@ fn main() {
     }
 
     tauri_build::build()
+}
+
+/// Scan Cargo.toml for `jona-engine-*` dependencies and emit a file
+/// with `extern crate` declarations. This makes engine registration
+/// truly plug-and-play: add a dep in Cargo.toml → done.
+fn generate_engine_links() {
+    let cargo_toml = std::fs::read_to_string("Cargo.toml")
+        .expect("Failed to read Cargo.toml");
+
+    let mut extern_lines = Vec::new();
+    for line in cargo_toml.lines() {
+        let trimmed = line.trim();
+        // Match lines like: jona-engine-whisper = { path = "..." }
+        if let Some(name) = trimmed.strip_suffix(|_: char| true).and(None).or_else(|| {
+            let dep = trimmed.split('=').next()?.trim();
+            if dep.starts_with("jona-engine-") { Some(dep) } else { None }
+        }) {
+            let crate_name = name.replace('-', "_");
+            extern_lines.push(format!("extern crate {};", crate_name));
+        }
+    }
+
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
+    let path = std::path::Path::new(&out_dir).join("engine_links.rs");
+    std::fs::write(&path, extern_lines.join("\n")).expect("Failed to write engine_links.rs");
+
+    println!("cargo:rerun-if-changed=Cargo.toml");
 }
