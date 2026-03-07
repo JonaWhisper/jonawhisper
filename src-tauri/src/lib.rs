@@ -229,10 +229,11 @@ pub fn run() {
                 ui::tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
             }
 
-            // Refresh spellcheck manifest in background, then check for model updates
+            // Migrate old download markers, refresh spellcheck manifest, then check for model updates
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
+                    jona_engines::downloader::migrate_download_markers();
                     refresh_spellcheck_manifest(&handle);
                     check_model_updates(&handle);
                 });

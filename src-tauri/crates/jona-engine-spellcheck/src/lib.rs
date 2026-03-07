@@ -42,7 +42,6 @@ struct ManifestLang {
 #[derive(Deserialize)]
 struct ManifestFile {
     size: u64,
-    sha256: Option<String>,
 }
 
 impl ManifestLang {
@@ -62,18 +61,6 @@ impl ManifestLang {
         0
     }
 
-    fn file_sha256(&self, name: &str) -> Option<String> {
-        if let Some(files) = &self.files {
-            if let Some(f) = files.get(name) {
-                return f.sha256.clone();
-            }
-        }
-        // Legacy format
-        if let Some(val) = self.legacy_files.get(name) {
-            return val.get("sha256").and_then(|s| s.as_str()).map(String::from);
-        }
-        None
-    }
 }
 
 /// Build an ASRModel from manifest data for a single language.
@@ -86,16 +73,6 @@ fn model_from_manifest(code: &str, lang: &ManifestLang) -> ASRModel {
     let bigram_size = lang.file_size("bigram.txt");
     // RAM estimate: ~10x freq file size (SymSpell BK-tree + delete hashes)
     let ram = lang.ram.unwrap_or(freq_size * 10);
-
-    // Collect per-file SHA256 hashes from manifest
-    let mut file_hashes = HashMap::new();
-    if let Some(h) = lang.file_sha256("freq.txt") {
-        file_hashes.insert("freq.txt".to_string(), h);
-    }
-    if let Some(h) = lang.file_sha256("bigram.txt") {
-        file_hashes.insert("bigram.txt".to_string(), h);
-    }
-    let file_hashes = if file_hashes.is_empty() { None } else { Some(file_hashes) };
 
     ASRModel {
         id: format!("spellcheck:{code}"),
@@ -126,7 +103,6 @@ fn model_from_manifest(code: &str, lang: &ManifestLang) -> ASRModel {
         lang_codes: Some(vec![code.into()]),
         runtime: None,
         quantization: None,
-        file_hashes,
         ..Default::default()
     }
 }

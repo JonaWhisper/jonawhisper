@@ -102,7 +102,49 @@ fn sha256_file(path: &Path) -> Option<String> {
     Some(format!("{:x}", hasher.finalize()))
 }
 
+/// Fetch the ETag for a URL using HEAD requests.
+///
+/// Strategy:
+/// 1. HEAD without following redirects → check `x-linked-etag` (HuggingFace content-addressed)
+/// 2. If absent, HEAD with redirects → check standard `etag`
+/// 3. If neither → None
+fn fetch_etag(url: &str) -> Option<String> {
+    let timeout = std::time::Duration::from_secs(5);
+
+    // Step 1: no-redirect HEAD for x-linked-etag (HuggingFace)
+    let no_redirect_client = reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(timeout)
+        .build()
+        .ok()?;
+
+    if let Ok(resp) = no_redirect_client.head(url).send() {
+        if let Some(val) = resp.headers().get("x-linked-etag") {
+            if let Ok(s) = val.to_str() {
+                return Some(s.to_string());
+            }
+        }
+    }
+
+    // Step 2: follow redirects, check standard etag
+    let client = reqwest::blocking::Client::builder()
+        .timeout(timeout)
+        .build()
+        .ok()?;
+
+    if let Ok(resp) = client.head(url).send() {
+        if let Some(val) = resp.headers().get("etag") {
+            if let Ok(s) = val.to_str() {
+                return Some(s.to_string());
+            }
+        }
+    }
+
+    None
+}
+
 /// Write a `version.json` alongside the model after successful download.
+/// Includes URL, ETag (from HTTP HEAD), and SHA256 (computed locally) for each file.
 fn write_version_json(model: &ASRModel) {
     let model_path = model.local_path();
     let now = chrono::Utc::now().to_rfc3339();
@@ -120,26 +162,40 @@ fn write_version_json(model: &ASRModel) {
 
     let json = match &model.download_type {
         DownloadType::MultiFile { files } => {
-            let mut file_hashes = serde_json::Map::new();
+            let mut file_entries = serde_json::Map::new();
             for f in files {
                 let fpath = model_path.join(&f.filename);
-                if let Some(hash) = sha256_file(&fpath) {
-                    file_hashes.insert(f.filename.clone(), serde_json::Value::String(hash));
+                let sha256 = sha256_file(&fpath);
+                let etag = fetch_etag(&f.url);
+                let mut entry = serde_json::Map::new();
+                entry.insert("url".into(), serde_json::Value::String(f.url.clone()));
+                if let Some(e) = etag {
+                    entry.insert("etag".into(), serde_json::Value::String(e));
                 }
+                if let Some(h) = sha256 {
+                    entry.insert("sha256".into(), serde_json::Value::String(h));
+                }
+                file_entries.insert(f.filename.clone(), serde_json::Value::Object(entry));
             }
             serde_json::json!({
                 "model_id": model.id,
-                "files": file_hashes,
+                "files": file_entries,
                 "downloaded_at": now,
             })
         }
         _ => {
-            let hash = sha256_file(&model_path).unwrap_or_default();
-            serde_json::json!({
+            let sha256 = sha256_file(&model_path).unwrap_or_default();
+            let etag = fetch_etag(&model.url);
+            let mut json = serde_json::json!({
                 "model_id": model.id,
-                "sha256": hash,
+                "url": model.url,
+                "sha256": sha256,
                 "downloaded_at": now,
-            })
+            });
+            if let Some(e) = etag {
+                json["etag"] = serde_json::Value::String(e);
+            }
+            json
         }
     };
 
@@ -554,28 +610,21 @@ async fn download_multi_file(
 
 // -- Update detection --
 
-/// Result of comparing local version.json against catalog hashes.
+/// Result of comparing local version.json ETags against remote.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdateStatus {
-    /// Local hashes match catalog — model is current.
+    /// Remote ETags match local — model is current.
     UpToDate,
-    /// Catalog hashes differ from local — a newer version is available.
+    /// At least one ETag differs — a newer version is available.
     UpdateAvailable,
-    /// No version.json on disk — cannot determine (treated as up-to-date).
+    /// No version.json, no stored ETags, or network error — cannot determine.
     Unknown,
 }
 
 /// Check whether a downloaded model has an update available by comparing
-/// the hashes in its local `version.json` against the catalog's `sha256`/`file_hashes`.
+/// the ETags stored in its local `version.json` against the current remote ETags.
 pub fn check_model_update(model: &ASRModel) -> UpdateStatus {
-    // Models without catalog hashes cannot be checked
-    let has_catalog_hash = model.sha256.is_some()
-        || model.file_hashes.as_ref().is_some_and(|h| !h.is_empty());
-    if !has_catalog_hash {
-        return UpdateStatus::Unknown;
-    }
-
     let model_path = model.local_path();
     let version_dir = if model_path.is_dir() {
         model_path
@@ -597,36 +646,84 @@ pub fn check_model_update(model: &ASRModel) -> UpdateStatus {
         Err(_) => return UpdateStatus::Unknown,
     };
 
-    // Single-file model: compare sha256
-    if let Some(catalog_hash) = &model.sha256 {
-        let local_hash = local.get("sha256").and_then(|v| v.as_str()).unwrap_or("");
-        return if local_hash == catalog_hash {
-            UpdateStatus::UpToDate
-        } else {
-            UpdateStatus::UpdateAvailable
+    // Collect (url, stored_etag) pairs from version.json
+    let mut url_etags: Vec<(String, String)> = Vec::new();
+
+    if let Some(files) = local.get("files").and_then(|v| v.as_object()) {
+        // Multi-file model
+        for (_filename, entry) in files {
+            let url = match entry.get("url").and_then(|v| v.as_str()) {
+                Some(u) => u.to_string(),
+                None => continue,
+            };
+            let etag = match entry.get("etag").and_then(|v| v.as_str()) {
+                Some(e) => e.to_string(),
+                None => continue, // No stored ETag for this file — skip
+            };
+            url_etags.push((url, etag));
+        }
+    } else if let Some(url) = local.get("url").and_then(|v| v.as_str()) {
+        // Single-file model
+        let etag = match local.get("etag").and_then(|v| v.as_str()) {
+            Some(e) => e.to_string(),
+            None => return UpdateStatus::Unknown,
         };
+        url_etags.push((url.to_string(), etag));
     }
 
-    // Multi-file model: compare per-file hashes
-    if let Some(catalog_hashes) = &model.file_hashes {
-        let local_files = local.get("files").and_then(|v| v.as_object());
-        match local_files {
-            None => return UpdateStatus::UpdateAvailable,
-            Some(local_map) => {
-                for (filename, catalog_hash) in catalog_hashes {
-                    let local_hash = local_map.get(filename)
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    if local_hash != catalog_hash {
-                        return UpdateStatus::UpdateAvailable;
-                    }
+    if url_etags.is_empty() {
+        return UpdateStatus::Unknown;
+    }
+
+    // Compare each stored ETag against the remote
+    for (url, stored_etag) in &url_etags {
+        match fetch_etag(url) {
+            Some(remote_etag) => {
+                if remote_etag != *stored_etag {
+                    log::info!("ETag changed for {}: {} -> {}", model.id, stored_etag, remote_etag);
+                    return UpdateStatus::UpdateAvailable;
                 }
-                return UpdateStatus::UpToDate;
+            }
+            None => {
+                // Network error or no ETag from server — cannot determine
+                return UpdateStatus::Unknown;
             }
         }
     }
 
-    UpdateStatus::Unknown
+    UpdateStatus::UpToDate
+}
+
+/// Migrate old download markers (.complete_v2, .complete_v3) to .complete.
+/// Should be called once at startup before check_model_updates.
+pub fn migrate_download_markers() {
+    let correction_dir = jona_types::models_dir().join("correction");
+    if !correction_dir.is_dir() {
+        return;
+    }
+
+    let entries = match fs::read_dir(&correction_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        for old_marker in &[".complete_v2", ".complete_v3"] {
+            let old_path = path.join(old_marker);
+            if old_path.exists() {
+                let new_path = path.join(".complete");
+                match fs::rename(&old_path, &new_path) {
+                    Ok(()) => log::info!("Migrated {} -> .complete in {}", old_marker, path.display()),
+                    Err(e) => log::warn!("Failed to migrate {} in {}: {}", old_marker, path.display(), e),
+                }
+            }
+        }
+    }
 }
 
 pub fn delete_model(model: &ASRModel) -> bool {
