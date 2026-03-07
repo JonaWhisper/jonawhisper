@@ -57,7 +57,7 @@ The main Tauri crate (`src-tauri/src/`) is a **thin orchestrator**. It contains 
 |------|------|
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag. 10 modules: audio, cleanup, commands, errors, events, migrations, platform, recording, state, ui. |
 | `state.rs` | `AppState` with fine-grained mutexes via `context_group!` macro: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts. History queries use cursor-based pagination (`WHERE timestamp < ?cursor … LIMIT`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. Keyring helpers (`keyring_store`, `keyring_load`, `keyring_delete`) manage API keys in the OS keychain. `Provider::validate_url()` enforces HTTPS on Custom providers (unless `allow_insecure`). |
-| `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). Current version: 4 (v4 migrates plaintext API keys to OS keychain). |
+| `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). Current version: 7 (v4 migrates API keys to OS keychain, v6 separates punctuation from cleanup model, v7 cleans up old Candle/safetensors correction models). |
 | `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. Also provides `read_wav_f32()` shared WAV reader. |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
@@ -95,14 +95,11 @@ Text post-processing pipeline: VAD, punctuation, correction, LLM cleanup.
 | File | Role |
 |------|------|
 | `cleanup/mod.rs` | Re-exports (`LlmError` from `jona_engines::llm_prompt`) |
-| `cleanup/vad.rs` | Voice Activity Detection using Silero VAD v6 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly. Provides `has_speech()` and `trim_silence()`. Fallback: always proceeds on error. |
-| `cleanup/common.rs` | Shared punctuation logic: labels, windowed inference (`restore_punctuation_windowed`), `strip_and_split`, `download_file`. Used by BERT, Candle, and PCS modules. |
-| `cleanup/bert.rs` | BERT punctuation restoration via ONNX Runtime. Cached `BertContext` in `AppState`. Delegates windowing to `common`. |
-| `cleanup/candle.rs` | BERT punctuation restoration via Candle (safetensors, Metal GPU). `XLMRobertaForTokenClassification` built from base model + Linear head. Delegates windowing to `common`. |
-| `cleanup/pcs.rs` | PCS punctuation + capitalization + segmentation (47 languages) via ONNX Runtime. SentencePiece Unigram tokenizer parsed from protobuf via `prost`, cached as `tokenizer.json`. 4-head model, sliding window (128 tokens, 16 overlap). |
+| `cleanup/vad.rs` | Voice Activity Detection using Silero VAD v5 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly. Provides `has_speech()` and `trim_silence()`. Fallback: always proceeds on error. |
 | `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, disfluency removal (filler word stripping FR/EN), finalize (spacing, capitalization) |
+| `cleanup/spellcheck.rs` | Spell-check via spellbook (Hunspell-compatible) with bundled LibreOffice dictionaries (FR/EN). Lazy-loaded via `OnceLock`. |
+| `cleanup/itn.rs` | Inverse Text Normalization — numbers, ordinals, percentages, hours, currencies, units (FR/EN). Compositional parser. |
 | `cleanup/llm_cloud.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Uses `jona_engines::llm_prompt` for prompt templates and output sanitization. |
-| `cleanup/llm_local.rs` | Local LLM text cleanup via llama.cpp with Metal GPU offload. Cached `LlmContext` in `AppState`. |
 
 ### UI (`ui/`)
 
@@ -152,10 +149,10 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-parakeet` | NVIDIA Parakeet-TDT 0.6B | ort + CoreML, vendored TDT decoder |
 | `jona-engine-qwen` | Alibaba Qwen3-ASR 0.6B | qwen-asr crate (Accelerate/AMX) |
 | `jona-engine-voxtral` | Mistral Voxtral 4B | vendored voxtral.c (Metal GPU) |
-| `jona-engine-bert` | BERT punctuation | Catalog only (inference in main crate `cleanup/`) |
-| `jona-engine-pcs` | PCS punctuation (47 lang) | Catalog only (inference in main crate `cleanup/`) |
-| `jona-engine-correction` | T5 grammar correction | Candle (Metal GPU), autoregressive with KV cache, repeat penalty 1.5, n-gram blocking, live loop detection |
-| `jona-engine-llama` | Local LLM (llama.cpp) | Catalog only (inference in main crate `cleanup/`) |
+| `jona-engine-bert` | BERT punctuation | ort (ONNX + CoreML) or Candle (safetensors + Metal GPU) |
+| `jona-engine-pcs` | PCS punctuation (47 lang) | ort (ONNX + CoreML), SentencePiece tokenizer |
+| `jona-engine-correction` | T5 grammar correction | ort (ONNX + CoreML), autoregressive decoding, repeat penalty 1.5, n-gram blocking, live loop detection |
+| `jona-engine-llama` | Local LLM (llama.cpp) | llama-cpp-2, Metal GPU offload, GGUF Q4 models |
 
 ### Platform (`platform/`)
 
@@ -293,7 +290,7 @@ Main thread (Tauri + Tokio runtime)
 9. **Post-processing** → hallucination filter, dictation commands, disfluency removal (filler word stripping), optional text cleanup (BERT / PCS / T5 correction / local LLM / cloud LLM with autoscale max_tokens), finalize (spacing, capitalization). On any cleanup error, falls back to raw transcription.
 10. **Cancel check** → `transcription_cancelled` flag verified before paste
 11. **Paste** → text written to clipboard → Cmd+V simulated via CGEvent
-12. **History** → entry saved to SQLite (with cleanup_model_id, hallucination_filter, vad_trimmed metadata) → frontend notified via event
+12. **History** → entry saved to SQLite (with cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn metadata) → frontend notified via event
 
 **Cancel flow:** Escape during recording → stops audio, discards file, shows error cross. Escape during transcription → sets cancel flag, clears queue. Both error and success pill closes use `PILL_CLOSE_GENERATION` to prevent stale closes from interfering with new recordings.
 

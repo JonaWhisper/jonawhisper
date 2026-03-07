@@ -49,10 +49,10 @@ All processing happens on your machine — no data leaves your Mac unless you ch
 |--------|--------|------|-----------|-------|
 | **GEC T5 Small** | 60M | 242 MB | 11 (multilingual) | ~200ms |
 | T5 Spell FR | 220M | 892 MB | FR | ~500ms |
-| FlanEC Large | 250M | 990 MB | EN | ~800ms |
-| Flan-T5 Grammar | 783M | 3.1 GB | EN | ~2s |
+| FlanEC Base | 250M | 990 MB | EN | ~500ms |
+| FlanEC Large | 800M | 3.1 GB | EN | ~1s |
 
-All run via Candle with Metal GPU, autoregressive decoding with KV cache.
+All run via ONNX Runtime with CoreML, autoregressive decoding with repeat penalty and n-gram blocking.
 
 ### Local LLM (Text Cleanup)
 
@@ -85,7 +85,7 @@ See [docs/AUDIO-PIPELINE.md](docs/AUDIO-PIPELINE.md) for the full architecture.
 ### Text pipeline
 
 ```
-ASR raw → Hallucination filter → Dictation commands → Disfluency removal → [Punctuation / Correction / LLM] → ITN → Finalize → Paste
+ASR raw → Hallucination filter → Dictation commands → Disfluency removal → Punctuation → Spell-check → Correction/LLM → Finalize → ITN → Paste
 ```
 
 | Stage | Status | Description |

@@ -38,11 +38,12 @@ Every dependency has a reason. This document explains **what** each one does and
 
 | Crate | Role | Why this one |
 |-------|------|--------------|
-| [`candle-core`](https://github.com/huggingface/candle) / `candle-nn` / `candle-transformers` | ML framework (Metal GPU) | Used for BERT punctuation (safetensors) and T5 correction (encoder-decoder). Metal GPU via candle-metal. Chosen over `tch` (libtorch 2 GB dependency) and `tract` (no Metal) |
+| [`candle-core`](https://github.com/huggingface/candle) / `candle-nn` / `candle-transformers` | ML framework (Metal GPU) | Used for BERT punctuation (safetensors + Metal GPU). Chosen over `tch` (libtorch 2 GB dependency) and `tract` (no Metal). T5 correction migrated to ONNX Runtime for better CoreML support. |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF) | llama.cpp bindings with Metal GPU offload. GGUF Q4 quantization = small models (400 MB–2.5 GB). Alternatives: `mistralrs` (heavier), `llm` crate (abandoned) |
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD | LSTM state and ONNX inputs/outputs for Silero VAD. Required by ort's tensor API |
 | [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizer library | Used for PCS punctuation (SentencePiece Unigram). Built programmatically from protobuf model, cached as tokenizer.json |
 | [`prost`](https://github.com/tokio-rs/prost) | Protobuf decoding | Parses SentencePiece `.model` files to extract Unigram vocabulary. Lighter than protobuf crate |
+| [`spellbook`](https://github.com/helix-editor/spellbook) | Spell-check (Hunspell-compatible) | Auto-correct via `check()` + `suggest()` with bundled LibreOffice dictionaries (FR/EN). Pure Rust, no C dependencies. From the Helix editor team |
 | [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Incremental UTF-8 decoding | LLM token-by-token streaming output. Handles partial multi-byte sequences at token boundaries |
 
 ### Network / IO

@@ -219,7 +219,7 @@ Phase 3 — Presets device (polish UX)
 
 | Fichier | Rôle dans le pipeline |
 |---|---|
-| `recording.rs` | Orchestration : stop → **VAD check** → transcribe → cleanup → paste |
+| `recording/pipeline.rs` | Orchestration : stop → **VAD check** → transcribe → cleanup → paste |
 | `audio.rs` | Capture cpal, callback PCM → insertion denoising temps réel (si activé) |
 | `platform/audio_devices.rs` | Détection device + transport type (pour presets) |
 | `state.rs` | Préférences : VAD on/off, denoising on/off, seuil VAD, presets device |

@@ -107,13 +107,9 @@ ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
 
 ## Étape 4 — Ponctuation & Capitalisation (✅ Implémenté)
 
-**Fichiers** :
-- `punct_common.rs` — logique partagée : `strip_and_split()`, `restore_punctuation_windowed()`, constantes `PUNCT_LABELS`, `WINDOW_SIZE` (230), `OVERLAP` (5)
-- `bert_punctuation.rs` — inférence BERT via ort (ONNX Runtime + CoreML)
-- `candle_punctuation.rs` — inférence BERT via Candle (safetensors + Metal GPU)
-- `pcs_punctuation.rs` — inférence PCS (ONNX + SentencePiece protobuf → sliding window 128, overlap 16)
-- `engines/bert.rs` — enregistrement des 2 modèles BERT
-- `engines/pcs.rs` — enregistrement du modèle PCS
+**Crates** :
+- `crates/jona-engine-bert/` — catalogue + inférence BERT (ort ONNX + CoreML, ou Candle + Metal GPU selon le modèle). Logique partagée : `strip_and_split()`, `restore_punctuation_windowed()`, constantes `PUNCT_LABELS`, `WINDOW_SIZE` (230), `OVERLAP` (5)
+- `crates/jona-engine-pcs/` — catalogue + inférence PCS (ONNX + SentencePiece protobuf → sliding window 128, overlap 16)
 
 ### Architecture commune (BERT)
 
@@ -150,7 +146,7 @@ Texte → SentencePiece tokenize (Unigram, NFC+Lowercase+Metaspace)
 | Fullstop Base FP32 | Candle + Metal | 1.1 GB | 5 (+ NL) | Non | ~80ms |
 | **PCS 47lang** | ort + CoreML | 233 MB | 47 | **Oui** | ~50ms |
 
-**Dispatch** : `CleanupKind::Punctuation(runtime)` dans `engines/mod.rs`, routé dans `recording.rs`.
+**Dispatch** : dynamique via `ASREngine::cleanup()` trait, routé dans `recording/pipeline.rs` via `EngineCatalog`.
 
 ---
 
@@ -177,16 +173,14 @@ Texte → SentencePiece tokenize (Unigram, NFC+Lowercase+Metaspace)
 
 ## Étape 6 — Correction grammaticale & orthographique (✅ Implémenté)
 
-**Fichiers** :
-- `t5_correction.rs` — `T5Context` : chargement safetensors + config.json + tokenizer.json, inférence Candle
-- `engines/correction.rs` — enregistrement des 4 modèles T5
+**Crate** : `crates/jona-engine-correction/` — catalogue (4 modèles T5) + inférence ONNX Runtime
 
 ### Architecture
 
 ```
 Texte → tokenize (SentencePiece via tokenizer.json)
-     → T5 Encoder (safetensors, Metal GPU)
-     → Décodage autorégressif (KV cache, greedy, repeat penalty 1.5, n-gram blocking 4)
+     → T5 Encoder (ONNX, ort + CoreML)
+     → Décodage autorégressif (greedy, repeat penalty 1.5, n-gram blocking 4)
      → Texte corrigé
 ```
 
@@ -200,7 +194,7 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 | N-gram blocking | Interdit les 4-grams déjà vus | Taille 4 |
 | Détection de boucle live | Stop si les 6 derniers tokens forment un pattern déjà vu | Fenêtre 6 tokens |
 | Longueur max génération | Limite le nombre de tokens générés | `input_tokens * 1.2 + 16` |
-| Sanitisation sortie | Vide → garder original, >1.5x input → garder original | Automatique |
+| Sanitisation sortie | Vide → garder original, >3x input → garder original | Automatique |
 | Strip repetition post-hoc | Détecte les répétitions phrase/mot dans le texte final | Sentence + word level, seuil 80% |
 
 ### Modèles
@@ -209,10 +203,10 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 |---|---|---|---|---|---|
 | **GEC T5 Small** | 60M | 242 MB | 11 langues | GEC multilingue | ~200ms |
 | T5 Spell FR | 220M | 892 MB | FR | Orthographe FR | ~500ms |
-| FlanEC Large | 250M | 990 MB | EN | Post-ASR correction | ~800ms |
-| Flan-T5 Grammar | 783M | 3.1 GB | EN | Grammaire EN | ~2s |
+| FlanEC Base | 250M | 990 MB | EN | Post-ASR correction | ~500ms |
+| FlanEC Large | 800M | 3.1 GB | EN | Post-ASR correction | ~1s |
 
-**Dispatch** : dynamic via `ASREngine::cleanup()` trait, routé dans `recording/pipeline.rs` via `EngineCatalog`.
+**Dispatch** : dynamique via `ASREngine::cleanup()` trait, routé dans `recording/pipeline.rs` via `EngineCatalog`.
 
 ---
 
@@ -309,18 +303,17 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 |---|---|
 | `recording/pipeline.rs` | Orchestration : `handle_transcription_result()` appelle les étapes dans l'ordre |
 | `cleanup/post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 3 (disfluences), 7 (finalize) |
-| `cleanup/itn.rs` | Étape 6 : ITN (nombres, ordinaux, %, heures, devises, unités FR/EN) |
-| `cleanup/common.rs` | Logique partagée ponctuation : windowing, labels, strip_and_split |
-| `cleanup/bert.rs` | Étape 4 : inférence BERT ort (ONNX + CoreML) |
-| `cleanup/candle.rs` | Étape 4 : inférence BERT Candle (safetensors + Metal) |
-| `cleanup/pcs.rs` | Étape 4 : inférence PCS (ONNX + SentencePiece, 4 heads) |
-| `crates/jona-engine-correction/` | Étape 5 : T5Context, chargement modèle, décodage autorégressif avec anti-répétition |
-| `crates/jona-engines/src/ort_session.rs` | Builder de session ort partagé (CoreML EP) — utilisé par BERT, PCS |
+| `cleanup/itn.rs` | Étape 8 : ITN (nombres, ordinaux, %, heures, devises, unités FR/EN) |
+| `cleanup/spellcheck.rs` | Étape 5 : spell-check Hunspell (spellbook, dictionnaires LibreOffice) |
+| `cleanup/llm_cloud.rs` | Cloud LLM cleanup (OpenAI/Anthropic API) |
+| `cleanup/vad.rs` | VAD Silero v5 (ONNX, pré-transcription) |
+| `crates/jona-engine-bert/` | Étape 4 : catalogue + inférence BERT punctuation (ort + Candle, 2 modèles) |
+| `crates/jona-engine-pcs/` | Étape 4 : catalogue + inférence PCS punctuation (ort, 1 modèle, 47 langues) |
+| `crates/jona-engine-correction/` | Étape 6 : catalogue + inférence T5 correction (ort ONNX, 4 modèles, décodage autorégressif) |
+| `crates/jona-engine-llama/` | Étape 6 (alt.) : catalogue + inférence LLM local (llama-cpp-2, Metal GPU) |
+| `crates/jona-engines/src/ort_session.rs` | Builder de session ort partagé (CoreML EP) — utilisé par BERT, PCS, T5 |
 | `crates/jona-engines/src/lib.rs` | `EngineCatalog`, dispatch dynamique via `ASREngine` trait |
-| `crates/jona-engine-bert/` | Catalogue modèles BERT punctuation (2 modèles) |
-| `crates/jona-engine-pcs/` | Catalogue modèle PCS punctuation (1 modèle, 47 langues) |
-| `crates/jona-engine-correction/` | Catalogue + inférence modèles T5 correction (4 modèles) |
-| `crates/jona-types/src/lib.rs` | Préférences : `punctuation_model_id`, `cleanup_model_id`, `text_cleanup_enabled`, `disfluency_removal_enabled`, `itn_enabled` |
+| `crates/jona-types/src/lib.rs` | Préférences : `punctuation_model_id`, `cleanup_model_id`, `text_cleanup_enabled`, `disfluency_removal_enabled`, `itn_enabled`, `spellcheck_enabled` |
 
 ---
 

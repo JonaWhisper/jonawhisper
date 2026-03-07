@@ -248,9 +248,9 @@ Modèles GGUF téléchargeables depuis le Model Manager, exécutés en local via
 Voir `docs/TEXT-PIPELINE.md` pour l'architecture complète du pipeline texte post-ASR.
 
 ```
-Pipeline texte actuel (7 étapes) :
-  ASR brut → [1. Filtre hallucinations] → [2. Commandes dictée] → [3. —]
-           → [4. Ponctuation OU 5. Correction OU LLM] → [7. Finalize] → Paste
+Pipeline texte actuel (8 étapes) :
+  ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
+           → [4. Ponctuation] → [5. Spell-check] → [6. Correction/LLM] → [7. Finalize] → [8. ITN] → Paste
 ```
 
 ### Ponctuation & Capitalisation — Modèles intégrés
@@ -280,12 +280,12 @@ Pipeline texte actuel (7 étapes) :
 
 | Modèle | ID | Params | Taille | Langues | Vitesse | Anti-hallucination | Statut |
 |---|---|---|---|---|---|---|---|
-| **GEC T5 Small** | `correction:gec-t5-small` | 60M | 242 MB | Multilingue (11 langues) | ~200ms | Repeat penalty 1.1, n-gram block | **Intégré** — **Recommandé** |
-| T5 Spell FR | `correction:t5-spell-fr` | 220M | 892 MB | FR | ~500ms | Repeat penalty 1.1, n-gram block | **Intégré** |
-| FlanEC Large | `correction:flanec-large` | 250M | 990 MB | EN | ~800ms | Repeat penalty 1.1, n-gram block | **Intégré** |
-| Flan-T5 Grammar | `correction:flan-t5-grammar` | 783M | 3.1 GB | EN | ~2s | Repeat penalty 1.1, n-gram block | **Intégré** |
+| **GEC T5 Small** | `correction:gec-t5-small` | 60M | 242 MB | Multilingue (11 langues) | ~200ms | Repeat penalty 1.5, n-gram block | **Intégré** — **Recommandé** |
+| T5 Spell FR | `correction:t5-spell-fr` | 220M | 892 MB | FR | ~500ms | Repeat penalty 1.5, n-gram block | **Intégré** |
+| FlanEC Base | `correction:flanec-base` | 250M | 990 MB | EN | ~500ms | Repeat penalty 1.5, n-gram block | **Intégré** |
+| FlanEC Large | `correction:flanec-large` | 800M | 3.1 GB | EN | ~1s | Repeat penalty 1.5, n-gram block | **Intégré** |
 
-Tous utilisent le runtime **Candle** (Metal GPU) avec décodage autorégressif, KV cache, température 0.1. Sortie sanitisée : vide → garder l'original, >3x longueur input → garder l'original (protection anti-hallucination).
+Tous utilisent le runtime **ort** (ONNX Runtime + CoreML) avec décodage autorégressif, repeat penalty 1.5, n-gram blocking (taille 4), détection de boucle live. Sortie sanitisée : vide → garder l'original, >3x longueur input → garder l'original (protection anti-hallucination).
 
 ### Correction — Modèles candidats
 
@@ -309,11 +309,11 @@ Les fillers/disfluences sont des mots parasites émis naturellement à l'oral. L
 | FR | euh, heu, hum, bah, ben, beh, enfin, quoi, genre, voilà, du coup, en fait, tu vois |
 | EN | uh, um, hmm, like, you know, I mean, basically, actually, so, well, right |
 
-**Approche recommandée** : regex simple (~0ms, fiabilité >95% sur fillers isolés).
+**Approche choisie** : regex simple (~0ms, fiabilité >95% sur fillers isolés).
 
 | Approche | Latence | Précision | Complexité | Statut |
 |---|---|---|---|---|
-| **Regex fillers** | ~0ms | >95% (fillers isolés) | Triviale | ❌ Non implémenté |
+| **Regex fillers** | ~0ms | >95% (fillers isolés) | Triviale | ✅ **Implémenté** (`post_processor.rs`) |
 | CTC Forced Alignment | ~100ms | 81.6% (disfluences complexes) | Élevée (modèle CTC + alignement) | Écarté — trop lourd |
 | Smooth-LLaMa | ~500ms | ~85% | Élevée (LLM fine-tuné) | Écarté — trop lourd |
 | Whisper word timestamps | ~0ms (déjà disponible) | Variable | Moyenne | Non exploré — nécessite word-level timestamps |
@@ -336,7 +336,7 @@ Convertit les nombres et entités textuelles en forme écrite canonique.
 
 | Approche | Langues | Précision | Portabilité Rust | Statut |
 |---|---|---|---|---|
-| **Regex rules FR/EN** | FR, EN | ~80% (cas courants) | Native | **Candidat immédiat** — couvre nombres, %, heures, devises |
+| **Regex rules FR/EN** | FR, EN | ~80% (cas courants) | Native | ✅ **Implémenté** (`cleanup/itn.rs`) — nombres, ordinaux, %, heures, devises, unités |
 | **NeMo ITN** (NVIDIA) | Multi (WFST) | >95% | Difficile (WFST C++) | Non intégré — WFST complexe à porter en Rust |
 | **Thutmose Tagger** | Multi (neural) | >90% | Difficile (Python, pas d'ONNX) | Non intégré — pas d'export ONNX disponible |
 | **Sparrowhawk** (Google) | Multi (WFST C++) | >95% | FFI possible mais complexe | Non intégré — FFI C++ + grammaires WFST |
@@ -361,24 +361,22 @@ Convertit les nombres et entités textuelles en forme écrite canonique.
 |---|---|---|---|---|---|
 | 1 | Filtre hallucinations | Regex 30+ patterns (HALLUCINATIONS) | ~0ms | `post_processor.rs` | ✅ Implémenté |
 | 2 | Commandes dictée | Substitution FR/EN ("virgule" → ",") | ~0ms | `post_processor.rs` | ✅ Implémenté |
-| 3 | Suppression disfluences | Regex fillers FR/EN | ~0ms | — | ❌ Non implémenté |
-| 4 | Ponctuation + Capitalisation | BERT/PCS token classification | ~50-100ms | `bert_punctuation.rs`, `candle_punctuation.rs`, `pcs_punctuation.rs` | ✅ Implémenté |
-| 5 | Correction gram/ortho | T5 encoder-decoder autorégressif | ~200ms-2s | `t5_correction.rs` | ✅ Implémenté |
-| 6 | ITN | Regex nombres/dates/heures | ~0ms | — | ❌ Non implémenté |
+| 3 | Suppression disfluences | Regex fillers FR/EN | ~0ms | `post_processor.rs` | ✅ Implémenté |
+| 4 | Ponctuation + Capitalisation | BERT/PCS token classification | ~50-100ms | `crates/jona-engine-bert/`, `crates/jona-engine-pcs/` | ✅ Implémenté |
+| 5 | Spell-check | Hunspell (spellbook) dictionnaires FR/EN | ~5-10ms | `cleanup/spellcheck.rs` | ✅ Implémenté |
+| 6 | Correction gram/ortho | T5 encoder-decoder autorégressif (ONNX) | ~200ms-1s | `crates/jona-engine-correction/` | ✅ Implémenté |
 | 7 | Finalize | Espacement ponctuation + capitalisation initiale | ~0ms | `post_processor.rs` | ✅ Implémenté |
+| 8 | ITN | Regex nombres/dates/heures FR/EN | ~0ms | `cleanup/itn.rs` | ✅ Implémenté |
 
-**Limitation actuelle** : les étapes 4 et 5 sont mutuellement exclusives (ponctuation OU correction OU LLM, pas chaînés). Le chaînage ponctuation → correction est une amélioration future. Voir `docs/TEXT-PIPELINE.md` pour le détail.
+**Pipeline séquentiel** : ponctuation et correction sont chaînés séquentiellement (ponctuation → spell-check → correction/LLM). Chacun a son propre paramètre indépendant. Voir `docs/TEXT-PIPELINE.md` pour le détail.
 
 ### Roadmap post-traitement texte
 
 | Priorité | Action | Effort | Impact |
 |---|---|---|---|
-| **1 — Immédiat** | Regex disfluences FR/EN (étape 3) | Très faible | Texte plus propre, ~0ms |
-| **2 — Court terme** | Regex ITN nombres/heures FR/EN (étape 6) | Faible | "vingt-trois" → "23" |
-| **3 — Court terme** | Chaînage ponctuation + correction | Modéré | Pipeline complet au lieu de OU exclusif |
-| **4 — Moyen terme** | Évaluer GECToR (tag-based, 10x T5) | Modéré | Correction ~20ms sans hallucination |
-| **5 — Moyen terme** | Évaluer Harper (rule-based Rust, EN) | Faible | Correction instantanée, complémentaire |
-| **6 — Optionnel** | ITN WFST (NeMo/Sparrowhawk) pour couverture complète | Élevé | >95% ITN multi-langues |
+| **1 — Moyen terme** | Évaluer GECToR (tag-based, 10x T5) | Modéré | Correction ~20ms sans hallucination |
+| **2 — Optionnel** | Évaluer Harper (rule-based Rust, EN) | Faible | Correction instantanée, complémentaire |
+| **3 — Optionnel** | ITN WFST (NeMo/Sparrowhawk) pour couverture complète | Élevé | >95% ITN multi-langues |
 
 ---
 
