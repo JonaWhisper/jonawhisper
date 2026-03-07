@@ -14,7 +14,7 @@ fn storage_dir() -> String {
     jona_types::models_dir().join("correction").to_string_lossy().to_string()
 }
 
-const HF_BASE: &str = "https://huggingface.co/realjPlot";
+const HF_BASE: &str = "https://huggingface.co/JonaWhisper";
 
 impl ASREngine for CorrectionEngine {
     fn engine_id(&self) -> &str { "correction" }

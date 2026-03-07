@@ -259,10 +259,10 @@ Les 4 modèles T5 correction ont été convertis en ONNX via `optimum-cli export
 
 | Modèle | Encoder | Decoder (merged) | Total | Repo HF |
 |---|---|---|---|---|
-| gec-t5-small | 135 MB | 222 MB | ~357 MB | `realjPlot/jonawhisper-gec-t5-small-onnx` |
-| t5-spell-fr | 419 MB | 621 MB | ~1.0 GB | `realjPlot/jonawhisper-t5-spell-fr-onnx` |
-| flanec-base | 419 MB | 622 MB | ~1.0 GB | `realjPlot/jonawhisper-flanec-base-onnx` |
-| flanec-large | 1.3 GB | 1.8 GB | ~3.1 GB | `realjPlot/jonawhisper-flanec-large-onnx` |
+| gec-t5-small | 135 MB | 222 MB | ~357 MB | `JonaWhisper/jonawhisper-gec-t5-small-onnx` |
+| t5-spell-fr | 419 MB | 621 MB | ~1.0 GB | `JonaWhisper/jonawhisper-t5-spell-fr-onnx` |
+| flanec-base | 419 MB | 622 MB | ~1.0 GB | `JonaWhisper/jonawhisper-flanec-base-onnx` |
+| flanec-large | 1.3 GB | 1.8 GB | ~3.1 GB | `JonaWhisper/jonawhisper-flanec-large-onnx` |
 
 **Note** : on utilise `decoder_model_merged.onnx` (combine decoder + decoder_with_past en un seul fichier) pour simplifier l'inférence.
 
@@ -318,7 +318,7 @@ Ce pipeline serait une **étape entre ponctuation et T5/LLM** — rapide, légè
 1. ~~**Intégrer spellbook**~~ — spell-check FR/EN comme étape pipeline ✅
 2. ~~**Ajouter flanec-base-cd**~~ — modèle correction EN léger (250M) ✅
 3. ~~**Corriger param counts**~~ dans le catalogue correction ✅
-4. ~~**Créer le repo HuggingFace**~~ — `realjPlot/jonawhisper-*-onnx` ✅
+4. ~~**Créer le repo HuggingFace**~~ — `JonaWhisper/jonawhisper-*-onnx` ✅
 5. ~~**Convertir T5 → ONNX**~~ — 4 modèles convertis et uploadés ✅
 
 ### Moyen terme
