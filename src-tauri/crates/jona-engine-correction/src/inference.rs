@@ -79,6 +79,32 @@ fn strip_repetition(text: &str) -> String {
         return text.to_string();
     }
 
+    // Word-level half-split: check if the second half mirrors the first half
+    // This catches "phrase phrase" even without sentence-ending punctuation
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() >= 6 {
+        // Try pattern lengths from half down to 3 words
+        for pattern_len in (3..=words.len() / 2).rev() {
+            let pattern = &words[..pattern_len];
+            let rest = &words[pattern_len..];
+            if rest.len() >= pattern_len {
+                let compare = &rest[..pattern_len];
+                let matching = pattern
+                    .iter()
+                    .zip(compare.iter())
+                    .filter(|(a, b)| a.to_lowercase() == b.to_lowercase())
+                    .count();
+                if matching >= pattern_len * 75 / 100 {
+                    log::warn!(
+                        "T5: word-level repetition (pattern={}/{} words, {}% match), keeping first",
+                        pattern_len, words.len(), matching * 100 / pattern_len
+                    );
+                    return words[..pattern_len].join(" ");
+                }
+            }
+        }
+    }
+
     // Sentence-level: split on sentence-ending punctuation
     let sentences: Vec<&str> = text
         .split(|c: char| c == '.' || c == '!' || c == '?')
@@ -101,7 +127,7 @@ fn strip_repetition(text: &str) -> String {
                     .zip(s_lower.chars())
                     .filter(|(a, b)| a == b)
                     .count();
-                matching >= len * 80 / 100
+                matching >= len * 75 / 100
             })
             .count();
 
@@ -111,36 +137,12 @@ fn strip_repetition(text: &str) -> String {
                 repeat_count,
                 sentences.len()
             );
-            // Return first sentence with its trailing punctuation
             let first_end = text.find(sentences[0]).unwrap_or(0) + sentences[0].len();
             let end = text[first_end..]
                 .find(|c: char| c == '.' || c == '!' || c == '?')
                 .map(|i| first_end + i + 1)
                 .unwrap_or(first_end);
             return text[..end].trim().to_string();
-        }
-    }
-
-    // Word-level: check if a word pattern repeats
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.len() >= 6 {
-        for pattern_len in (3..=words.len() / 2).rev() {
-            let pattern = &words[..pattern_len];
-            let rest = &words[pattern_len..];
-            if rest.len() >= pattern_len {
-                let matching = pattern
-                    .iter()
-                    .zip(rest.iter())
-                    .filter(|(a, b)| a.to_lowercase() == b.to_lowercase())
-                    .count();
-                if matching >= pattern_len * 80 / 100 {
-                    log::warn!(
-                        "T5: word-level repetition (pattern={} words), keeping first",
-                        pattern_len
-                    );
-                    return words[..pattern_len].join(" ");
-                }
-            }
         }
     }
 
@@ -276,6 +278,25 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
     }
 
     let result = strip_repetition(&result);
+
+    // If the output is significantly longer than input, it likely echoed/duplicated
+    // the input. Compare the first half with the input to detect this.
+    if result.len() > input_len * 5 / 4 {
+        let input_lower = text.trim().to_lowercase();
+        let result_lower = result.to_lowercase();
+        // Check if result starts like input and repeats
+        if result_lower.starts_with(&input_lower[..input_lower.len().min(20)]) {
+            let input_words: Vec<&str> = text.split_whitespace().collect();
+            let result_words: Vec<&str> = result.split_whitespace().collect();
+            if result_words.len() > input_words.len() * 5 / 4 {
+                log::warn!(
+                    "T5: output echoed input ({} → {} words), keeping original",
+                    input_words.len(), result_words.len()
+                );
+                return Ok(text.to_string());
+            }
+        }
+    }
 
     // Output shouldn't be much longer than input for correction tasks
     let max_len = std::cmp::max(input_len * 3 / 2, 100);
