@@ -1,9 +1,9 @@
 //! SymSpell-based spell correction with large frequency dictionaries.
 //!
-//! FR: 125K words from Lexique383 (book + film corpus frequencies).
+//! FR: 645K words from Lexique383 + DELA (book + film corpus frequencies) + 5K bigrams.
 //! EN: 82K words from SymSpell official frequency dictionary + 242K bigrams.
 //!
-//! Compared to spellbook (Hunspell, ~84K FR forms), SymSpell offers:
+//! Features:
 //! - Frequency-weighted suggestions (prefers common words)
 //! - `lookup_compound` for phrase-level correction (handles word boundary errors)
 //! - Sub-millisecond per-word lookup (vs ~10ms for Hunspell suggest)
@@ -12,6 +12,7 @@ use std::sync::OnceLock;
 use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
 
 static DICT_FR_FREQ: &str = include_str!("../../dicts/fr_freq.txt");
+static DICT_FR_BIGRAM: &str = include_str!("../../dicts/fr_bigram.txt");
 static DICT_EN_FREQ: &str = include_str!("../../dicts/en_freq.txt");
 static DICT_EN_BIGRAM: &str = include_str!("../../dicts/en_bigram.txt");
 
@@ -52,7 +53,7 @@ fn load_symspell(
 
 fn get_ss_fr() -> Option<&'static SymSpell<UnicodeStringStrategy>> {
     SS_FR
-        .get_or_init(|| load_symspell(DICT_FR_FREQ, "\t", None, "FR"))
+        .get_or_init(|| load_symspell(DICT_FR_FREQ, "\t", Some(DICT_FR_BIGRAM), "FR"))
         .as_ref()
 }
 
