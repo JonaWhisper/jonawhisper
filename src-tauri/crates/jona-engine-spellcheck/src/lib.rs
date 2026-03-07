@@ -13,7 +13,9 @@ fn storage_dir() -> String {
         .to_string()
 }
 
-const GH_RAW: &str = "https://raw.githubusercontent.com/JonaWhisper/jonawhisper-spellcheck-dicts/main";
+/// GitHub Releases URL — `/releases/latest/download/` auto-redirects to the newest release.
+const GH_RELEASE: &str =
+    "https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download";
 
 impl ASREngine for SpellCheckEngine {
     fn engine_id(&self) -> &str {
@@ -34,18 +36,18 @@ impl ASREngine for SpellCheckEngine {
                 label: "Fran\u{00e7}ais".into(),
                 filename: "fr".into(),
                 url: String::new(),
-                size: 9_840_000 + 90_000, // freq + bigrams
+                size: 9_840_000 + 90_000,
                 storage_dir: storage_dir(),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
                             filename: "freq.txt".into(),
-                            url: format!("{GH_RAW}/fr/freq.txt"),
+                            url: format!("{GH_RELEASE}/fr-freq.txt"),
                             size: 9_840_000,
                         },
                         DownloadFile {
                             filename: "bigram.txt".into(),
-                            url: format!("{GH_RAW}/fr/bigram.txt"),
+                            url: format!("{GH_RELEASE}/fr-bigram.txt"),
                             size: 90_000,
                         },
                     ],
@@ -53,7 +55,7 @@ impl ASREngine for SpellCheckEngine {
                 download_marker: Some(".complete".into()),
                 recommended_for: Some(vec!["fr".into()]),
                 params: None,
-                ram: Some(100_000_000), // ~100 MB in memory for 645K words
+                ram: Some(100_000_000),
                 lang_codes: Some(vec!["fr".into()]),
                 runtime: None,
                 quantization: None,
@@ -65,18 +67,18 @@ impl ASREngine for SpellCheckEngine {
                 label: "English".into(),
                 filename: "en".into(),
                 url: String::new(),
-                size: 1_335_000 + 5_140_000, // freq + bigrams
+                size: 1_335_000 + 5_140_000,
                 storage_dir: storage_dir(),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
                             filename: "freq.txt".into(),
-                            url: format!("{GH_RAW}/en/freq.txt"),
+                            url: format!("{GH_RELEASE}/en-freq.txt"),
                             size: 1_335_000,
                         },
                         DownloadFile {
                             filename: "bigram.txt".into(),
-                            url: format!("{GH_RAW}/en/bigram.txt"),
+                            url: format!("{GH_RELEASE}/en-bigram.txt"),
                             size: 5_140_000,
                         },
                     ],
@@ -84,7 +86,7 @@ impl ASREngine for SpellCheckEngine {
                 download_marker: Some(".complete".into()),
                 recommended_for: Some(vec!["en".into()]),
                 params: None,
-                ram: Some(30_000_000), // ~30 MB for 82K words
+                ram: Some(30_000_000),
                 lang_codes: Some(vec!["en".into()]),
                 runtime: None,
                 quantization: None,
@@ -106,7 +108,6 @@ impl ASREngine for SpellCheckEngine {
         _model: &ASRModel,
         _gpu_mode: GpuMode,
     ) -> Result<Box<dyn Any + Send>, EngineError> {
-        // No runtime context needed — symspell_correct.rs loads dicts directly
         Err(EngineError::LaunchFailed(
             "SpellCheck models are data-only, no context to create".into(),
         ))
