@@ -16,11 +16,16 @@ use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
 static SS_CACHE: Mutex<Option<HashMap<String, SymSpell<UnicodeStringStrategy>>>> =
     Mutex::new(None);
 
-/// Extract the spellcheck language code from a locale string.
+/// Resolve the best spellcheck dictionary code for a given language.
 ///
-/// Tries the full locale first (e.g. "fr-CA"), then the base language (e.g. "fr").
-/// Falls back to the input as-is if neither matches a downloaded dictionary.
-/// This allows regional dicts (fr-CA for Québec) to coexist with generic ones (fr).
+/// Resolution order:
+/// 1. If `lang` is already a full locale (e.g. "fr-CA") and that dict exists → use it
+/// 2. If `lang` is a base code (e.g. "fr"), check the system locale for a regional
+///    match (e.g. system is "fr_BE" → try "fr-be" dict)
+/// 3. Fall back to the base language code
+///
+/// This lets the user pick "fr" in the ASR language selector while automatically
+/// getting the Belgian/Québécois/Swiss dict based on their OS locale.
 fn lang_to_code(lang: &str) -> String {
     let base = jona_types::models_dir().join("spellcheck");
     let normalized = lang.replace('_', "-").to_lowercase();
@@ -30,16 +35,27 @@ fn lang_to_code(lang: &str) -> String {
         return normalized;
     }
 
-    // Try base language (e.g. "fr")
-    if let Some(code) = normalized.split('-').next() {
-        if code != normalized && base.join(code).join("freq.txt").exists() {
-            return code.to_string();
+    // If input is a base code (no dash), try refining with system locale
+    let base_code = normalized.split('-').next().unwrap_or(&normalized);
+    if !normalized.contains('-') {
+        if let Some(sys) = sys_locale::get_locale() {
+            let sys_norm = sys.replace('_', "-").to_lowercase();
+            // Only use system locale if it matches the same base language
+            if sys_norm.starts_with(&format!("{base_code}-")) {
+                if base.join(&sys_norm).join("freq.txt").exists() {
+                    return sys_norm;
+                }
+            }
         }
     }
 
+    // Try base language (e.g. "fr" from "fr-ca" if fr-ca dict not found)
+    if base_code != normalized && base.join(base_code).join("freq.txt").exists() {
+        return base_code.to_string();
+    }
+
     // Return base language code even if not downloaded yet
-    // (dict_dir caller will handle missing files gracefully)
-    normalized.split('-').next().unwrap_or(&normalized).to_string()
+    base_code.to_string()
 }
 
 /// Resolve the spellcheck dict directory for a given language.
