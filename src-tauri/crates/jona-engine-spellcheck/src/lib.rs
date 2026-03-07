@@ -75,6 +75,7 @@ impl ASREngine for SpellCheckEngine {
             spellcheck_model("fr-ca", "Fran\u{00e7}ais (Qu\u{00e9}bec)", 9_900_000, 90_000, 100_000_000),
             spellcheck_model("fr-ch", "Fran\u{00e7}ais (Suisse)", 9_900_000, 90_000, 100_000_000),
             spellcheck_model("en", "English", 1_335_000, 5_140_000, 30_000_000),
+            spellcheck_model("en-gb", "English (British)", 1_400_000, 5_140_000, 30_000_000),
         ]
     }
 
