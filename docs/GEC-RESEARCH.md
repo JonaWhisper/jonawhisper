@@ -23,7 +23,7 @@ Objectif : trouver des alternatives plus fiables, rapides, et couvrant bien FR +
 
 | Propriété | Valeur |
 |---|---|
-| Version | 0.3.4 (avril 2025) |
+| Version | 0.4.0 |
 | Maintenu par | Équipe Helix editor |
 | Base | Réécriture Rust de Nuspell (successeur C++ de Hunspell) |
 | Dépendances | `hashbrown` uniquement, `no_std` |
@@ -253,12 +253,24 @@ T5 encoder-decoder **fonctionne maintenant dans llama.cpp** (PR #8055/#8141 merg
 
 **Aucune GPU nécessaire** — CPU MacBook suffit.
 
-### 8.2 Stratégie repo HF
+### 8.2 Conversion réalisée
 
-1. Créer `huggingface.co/jplot/jona-whisper-models` (ou similaire)
-2. Script `scripts/convert_model.py` : HF → ONNX → quantise → upload
-3. **Avantages** : un seul runtime (ort+CoreML), modèles optimisés, contrôle total
-4. **Priorité** : convertir T5 correction (source des crashes Candle/Metal)
+Les 4 modèles T5 correction ont été convertis en ONNX via `optimum-cli export onnx` (Python 3.13 + venv) :
+
+| Modèle | Encoder | Decoder (merged) | Total | Repo HF |
+|---|---|---|---|---|
+| gec-t5-small | 135 MB | 222 MB | ~357 MB | `realjPlot/jonawhisper-gec-t5-small-onnx` |
+| t5-spell-fr | 419 MB | 621 MB | ~1.0 GB | `realjPlot/jonawhisper-t5-spell-fr-onnx` |
+| flanec-base | 419 MB | 622 MB | ~1.0 GB | `realjPlot/jonawhisper-flanec-base-onnx` |
+| flanec-large | 1.3 GB | 1.8 GB | ~3.1 GB | `realjPlot/jonawhisper-flanec-large-onnx` |
+
+**Note** : on utilise `decoder_model_merged.onnx` (combine decoder + decoder_with_past en un seul fichier) pour simplifier l'inférence.
+
+### 8.3 Prochaine étape
+
+1. Intégrer ces modèles ONNX dans le runtime ort+CoreML (remplacer Candle/safetensors)
+2. Quantisation INT8 optionnelle pour réduire la taille
+3. **Avantages** : un seul runtime, CoreML GPU, pas de crashes Metal/Candle
 
 ---
 
@@ -301,19 +313,20 @@ Ce pipeline serait une **étape entre ponctuation et T5/LLM** — rapide, légè
 
 ## 11. Plan d'action
 
-### Court terme
+### Court terme (✅ fait)
 
-1. **Intégrer spellbook** — spell-check FR/EN comme étape pipeline
-2. **Ajouter flanec-base-cd** — modèle correction EN léger (250M)
-3. **Corriger param counts** dans le catalogue correction
-4. **Créer le repo HuggingFace**
+1. ~~**Intégrer spellbook**~~ — spell-check FR/EN comme étape pipeline ✅
+2. ~~**Ajouter flanec-base-cd**~~ — modèle correction EN léger (250M) ✅
+3. ~~**Corriger param counts**~~ dans le catalogue correction ✅
+4. ~~**Créer le repo HuggingFace**~~ — `realjPlot/jonawhisper-*-onnx` ✅
+5. ~~**Convertir T5 → ONNX**~~ — 4 modèles convertis et uploadés ✅
 
 ### Moyen terme
 
-5. **SymSpell + DELA** — spell-check haute performance FR (683K formes)
-6. **Convertir T5 → ONNX** — éliminer Candle, unifier sur ort+CoreML
-7. **rphonetic** — désambiguaïson homophones FR
-8. **Tester T5 via GGUF/llama.cpp** — alternative à Candle via llama-cpp-2
+6. **Intégrer T5 ONNX** — remplacer Candle/safetensors par ort+CoreML
+7. **SymSpell + DELA** — spell-check haute performance FR (683K formes)
+8. **rphonetic** — désambiguaïsation homophones FR
+9. **Tester T5 via GGUF/llama.cpp** — alternative à Candle via llama-cpp-2
 
 ### Long terme
 
