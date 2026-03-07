@@ -430,7 +430,7 @@ impl ASREngine for CanaryEngine {
                 download_marker: Some(".complete".into()),
                 wer: Some(1.87),
                 rtf: Some(0.15),
-                recommended: false,
+                recommended_for: None,
                 params: Some(0.182),
                 ram: Some(300_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "de".into(), "es".into()]),

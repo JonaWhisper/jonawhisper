@@ -386,7 +386,7 @@ impl ASREngine for ParakeetEngine {
                 download_marker: Some(".complete".into()),
                 wer: Some(1.5),
                 rtf: Some(0.10),
-                recommended: false,
+                recommended_for: Some(vec![]),
                 params: Some(0.6),
                 ram: Some(750_000_000),
                 lang_codes: Some(vec![

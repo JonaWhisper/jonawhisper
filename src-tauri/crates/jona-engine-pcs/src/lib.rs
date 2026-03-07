@@ -31,7 +31,7 @@ impl ASREngine for PcsPunctuationEngine {
                 storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile,
                 download_marker: None,
-                recommended: false,
+                recommended_for: Some(vec![]),
                 params: Some(0.23),
                 ram: Some(300_000_000),
                 lang_codes: Some(vec![

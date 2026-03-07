@@ -167,7 +167,7 @@ impl ASREngine for VoxtralEngine {
                 download_marker: Some(".complete".into()),
                 wer: Some(8.7),
                 rtf: Some(0.40),
-                recommended: false,
+                recommended_for: None,
                 params: Some(4.4),
                 ram: Some(10_000_000_000),
                 lang_codes: Some(vec![

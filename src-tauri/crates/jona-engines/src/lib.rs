@@ -98,9 +98,9 @@ impl EngineCatalog {
     }
 
     pub fn recommended_model_ids(&self, language: &str) -> std::collections::HashSet<String> {
-        self.engines.iter()
-            .filter(|e| e.category() == EngineCategory::ASR)
-            .filter_map(|e| e.recommended_model_id(language))
+        self.all_models().into_iter()
+            .filter(|m| m.is_recommended_for(language))
+            .map(|m| m.id)
             .collect()
     }
 

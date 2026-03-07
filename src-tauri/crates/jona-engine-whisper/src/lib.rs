@@ -150,7 +150,7 @@ impl ASREngine for WhisperEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 wer: Some(2.1), rtf: Some(0.25),
                 params: Some(0.81), ram: Some(2_500_000_000),
-                recommended: true,
+                recommended_for: Some(vec![]),
                 quantization: Some("FP16".into()),
                 ..Default::default()
             },

@@ -76,7 +76,7 @@ impl ASREngine for LlamaEngine {
                 url: "https://huggingface.co/bartowski/Qwen_Qwen3-1.7B-GGUF/resolve/main/Qwen_Qwen3-1.7B-Q4_K_M.gguf".into(),
                 size: 1_282_439_584, storage_dir: storage_dir(),
                 download_type: DownloadType::SingleFile, download_marker: None,
-                recommended: true,
+                recommended_for: Some(vec![]),
                 params: Some(1.7), ram: Some(1_500_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),

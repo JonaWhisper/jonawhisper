@@ -7,7 +7,7 @@ const { t } = useI18n()
 
 defineProps<{
   label: string
-  type?: 'bert' | 'punctuation' | 'correction' | 'llm'
+  type?: 'punctuation' | 'correction' | 'llm'
   location: 'local' | 'cloud'
   recommended?: boolean
   compact?: boolean

@@ -62,8 +62,10 @@ pub struct ASRModel {
     pub download_marker: Option<String>,
     pub wer: Option<f32>,
     pub rtf: Option<f32>,
-    #[serde(default)]
-    pub recommended: bool,
+    /// Languages this model is recommended for.
+    /// None = not recommended, Some([]) = recommended for all, Some(["fr"]) = recommended for FR.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recommended_for: Option<Vec<String>>,
     /// Number of parameters in billions (for LLM models).
     pub params: Option<f32>,
     /// Estimated RAM usage in bytes when loaded.
@@ -83,6 +85,13 @@ impl ASRModel {
     pub fn local_path(&self) -> PathBuf {
         let expanded = shellexpand::tilde(&self.storage_dir);
         PathBuf::from(expanded.as_ref()).join(&self.filename)
+    }
+
+    /// Whether this model is recommended for the given language.
+    pub fn is_recommended_for(&self, language: &str) -> bool {
+        self.recommended_for.as_ref().is_some_and(|langs| {
+            langs.is_empty() || language == "auto" || langs.iter().any(|l| l == language)
+        })
     }
 
     pub fn is_downloaded(&self) -> bool {
@@ -117,8 +126,10 @@ pub trait ASREngine: Send + Sync {
     fn models(&self) -> Vec<ASRModel>;
     fn supported_languages(&self) -> Vec<Language>;
     fn description(&self) -> &str;
-    fn recommended_model_id(&self, _language: &str) -> Option<String> {
-        self.models().into_iter().find(|m| m.recommended).map(|m| m.id)
+    fn recommended_model_id(&self, language: &str) -> Option<String> {
+        self.models().into_iter()
+            .find(|m| m.is_recommended_for(language))
+            .map(|m| m.id)
     }
 
     // -- Inference methods (plug-and-play) --

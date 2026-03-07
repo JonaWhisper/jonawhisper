@@ -167,7 +167,7 @@ impl ASREngine for QwenEngine {
                 download_marker: Some(".complete".into()),
                 wer: Some(2.0),
                 rtf: Some(0.15),
-                recommended: false,
+                recommended_for: None,
                 params: Some(0.6),
                 ram: Some(2_000_000_000),
                 lang_codes: Some(vec![

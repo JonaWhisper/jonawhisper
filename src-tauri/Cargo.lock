@@ -2798,12 +2798,12 @@ dependencies = [
 name = "jona-engine-correction"
 version = "0.1.0"
 dependencies = [
- "candle-core",
- "candle-nn",
- "candle-transformers",
  "inventory",
+ "jona-engines",
  "jona-types",
  "log",
+ "ort",
+ "serde",
  "serde_json",
  "tokenizers",
 ]
@@ -2948,9 +2948,6 @@ name = "jona-whisper"
 version = "0.1.0"
 dependencies = [
  "block2",
- "candle-core",
- "candle-nn",
- "candle-transformers",
  "core-foundation 0.10.1",
  "core-graphics",
  "cpal",
