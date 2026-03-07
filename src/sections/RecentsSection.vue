@@ -156,8 +156,14 @@ function formatCleanupLabel(id: string): string {
   return model ? model.label : id
 }
 
-function cleanupBadgeType(id: string): 'bert' | 'correction' | 'llm' | 'cloud' {
-  if (id.startsWith('bert-punctuation:') || id.startsWith('pcs-punctuation:')) return 'bert'
+function formatModelLabel(id: string): string {
+  const model = enginesStore.models.find(m => m.id === id)
+  return model ? model.label : id.split(':').pop() || id
+}
+
+function cleanupBadgeType(id: string): 'bert' | 'punctuation' | 'correction' | 'llm' | 'cloud' {
+  if (id.startsWith('bert-punctuation:')) return 'bert'
+  if (id.startsWith('pcs-punctuation:')) return 'punctuation'
   if (id.startsWith('correction:')) return 'correction'
   if (parseCloudId(id)) return 'cloud'
   return 'llm'
@@ -296,11 +302,37 @@ function headerAt(index: number) {
                         </TooltipTrigger>
                         <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.cleanup') }}</TooltipContent>
                       </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).punctuation_model_id">
+                        <TooltipTrigger as-child>
+                          <TypeBadge type="punctuation">
+                            {{ formatModelLabel(entryAt(vItem.index).punctuation_model_id) }}
+                          </TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.punctuation') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).spellcheck">
+                        <TooltipTrigger as-child>
+                          <TypeBadge type="spellcheck">{{ t('history.badge.spellcheck') }}</TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.spellcheckTooltip') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).disfluency_removal">
+                        <TooltipTrigger as-child>
+                          <TypeBadge type="disfluency">{{ t('history.badge.disfluency') }}</TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.disfluencyTooltip') }}</TooltipContent>
+                      </Tooltip>
                       <Tooltip v-if="entryAt(vItem.index).hallucination_filter">
                         <TooltipTrigger as-child>
                           <TypeBadge type="hallucination" />
                         </TooltipTrigger>
                         <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.hallucination') }}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip v-if="entryAt(vItem.index).itn">
+                        <TooltipTrigger as-child>
+                          <TypeBadge type="itn">ITN</TypeBadge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.itnTooltip') }}</TooltipContent>
                       </Tooltip>
                     </div>
                   </TooltipProvider>

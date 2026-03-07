@@ -79,6 +79,14 @@ pub struct HistoryEntry {
     pub hallucination_filter: bool,
     #[serde(default)]
     pub vad_trimmed: bool,
+    #[serde(default)]
+    pub punctuation_model_id: String,
+    #[serde(default)]
+    pub spellcheck: bool,
+    #[serde(default)]
+    pub disfluency_removal: bool,
+    #[serde(default)]
+    pub itn: bool,
 }
 
 // -- Typed settings enums --

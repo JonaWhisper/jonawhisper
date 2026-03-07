@@ -49,6 +49,10 @@ export interface HistoryEntry {
   cleanup_model_id: string
   hallucination_filter: boolean
   vad_trimmed: boolean
+  punctuation_model_id: string
+  spellcheck: boolean
+  disfluency_removal: boolean
+  itn: boolean
 }
 
 export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom' | 'Groq' | 'Cerebras' | 'Gemini' | 'Mistral' | 'Fireworks' | 'Together' | 'DeepSeek'
@@ -68,7 +72,7 @@ export interface Provider {
 export interface CleanupModel {
   id: string
   label: string
-  group: 'punctuation' | 'bert' | 'llm' | 'cloud' | 'correction'
+  group: 'punctuation' | 'llm' | 'cloud' | 'correction'
   params: number | null
   ram: number | null
   lang_codes: string[] | null
@@ -109,6 +113,10 @@ export interface TranscriptionCompletePayload {
   cleanup_model_id?: string
   hallucination_filter?: boolean
   vad_trimmed?: boolean
+  punctuation_model_id?: string
+  spellcheck?: boolean
+  disfluency_removal?: boolean
+  itn?: boolean
 }
 
 export interface DownloadProgressPayload {

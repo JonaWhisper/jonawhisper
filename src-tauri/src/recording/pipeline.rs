@@ -3,7 +3,7 @@ use crate::cleanup;
 use crate::events;
 use crate::platform;
 use crate::platform::paste;
-use crate::state::AppState;
+use crate::state::{AppState, HistoryEntry};
 use jona_engines::{EngineCatalog, EngineError};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -314,7 +314,19 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     })
     .await;
     state.runtime.lock().unwrap().last_paste_had_content = true;
-    state.add_history(processed.clone(), model_id, lang.clone(), effective_cleanup_model_id.clone(), hall_filter, vad_trimmed);
+    state.add_history(HistoryEntry {
+        text: processed.clone(),
+        timestamp: 0, // filled by add_history
+        model_id: model_id.clone(),
+        language: lang.clone(),
+        cleanup_model_id: effective_cleanup_model_id.clone(),
+        hallucination_filter: hall_filter,
+        vad_trimmed,
+        punctuation_model_id: punctuation_model_id.clone(),
+        spellcheck: spellcheck_enabled,
+        disfluency_removal,
+        itn: itn_enabled,
+    });
     platform::play_sound("Glass");
 
     let _ = app.emit(
@@ -324,6 +336,10 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             "cleanup_model_id": effective_cleanup_model_id,
             "hallucination_filter": hall_filter,
             "vad_trimmed": vad_trimmed,
+            "punctuation_model_id": punctuation_model_id,
+            "spellcheck": spellcheck_enabled,
+            "disfluency_removal": disfluency_removal,
+            "itn": itn_enabled,
         }),
     );
 }

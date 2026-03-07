@@ -337,6 +337,22 @@ fn migrate_v5(_raw: &mut Value, prefs: &mut Preferences) {
     log::info!("Migration v5: set capability flags for {} provider(s)", prefs.providers.len());
 }
 
+/// v6: Split punctuation model out of cleanup_model_id into its own punctuation_model_id field.
+fn migrate_v6(_raw: &mut Value, prefs: &mut Preferences) {
+    let is_punctuation = prefs.cleanup_model_id.starts_with("bert-punctuation:")
+        || prefs.cleanup_model_id.starts_with("pcs-punctuation:");
+
+    if is_punctuation {
+        log::info!(
+            "Migration v6: moving {} from cleanup_model_id to punctuation_model_id",
+            prefs.cleanup_model_id
+        );
+        prefs.punctuation_model_id = std::mem::take(&mut prefs.cleanup_model_id);
+        // Disable text cleanup since the user only had punctuation, not a real cleanup model
+        prefs.text_cleanup_enabled = false;
+    }
+}
+
 /// v7: Clean up old Candle/safetensors correction model files, replaced by ONNX.
 /// Removes: model.safetensors, .complete marker, and the flan-t5-grammar directory.
 fn migrate_v7(_raw: &mut Value, prefs: &mut Preferences) {
@@ -378,22 +394,6 @@ fn migrate_v7(_raw: &mut Value, prefs: &mut Preferences) {
     if prefs.cleanup_model_id == "correction:flan-t5-grammar" {
         log::info!("Migration v7: resetting cleanup_model_id from flan-t5-grammar");
         prefs.cleanup_model_id.clear();
-        prefs.text_cleanup_enabled = false;
-    }
-}
-
-/// v6: Split punctuation model out of cleanup_model_id into its own punctuation_model_id field.
-fn migrate_v6(_raw: &mut Value, prefs: &mut Preferences) {
-    let is_punctuation = prefs.cleanup_model_id.starts_with("bert-punctuation:")
-        || prefs.cleanup_model_id.starts_with("pcs-punctuation:");
-
-    if is_punctuation {
-        log::info!(
-            "Migration v6: moving {} from cleanup_model_id to punctuation_model_id",
-            prefs.cleanup_model_id
-        );
-        prefs.punctuation_model_id = std::mem::take(&mut prefs.cleanup_model_id);
-        // Disable text cleanup since the user only had punctuation, not a real cleanup model
         prefs.text_cleanup_enabled = false;
     }
 }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Type, SpellCheck, MessageSquare, Cloud, Cpu, Scissors, ShieldCheck } from 'lucide-vue-next'
+import { Type, SpellCheck, MessageSquare, Cloud, Cpu, Scissors, ShieldCheck, BookA, Eraser, Hash } from 'lucide-vue-next'
 
 defineProps<{
-  type: 'local' | 'cloud' | 'bert' | 'punctuation' | 'correction' | 'llm' | 'vad' | 'hallucination'
+  type: 'local' | 'cloud' | 'bert' | 'punctuation' | 'correction' | 'llm' | 'vad' | 'hallucination' | 'spellcheck' | 'disfluency' | 'itn'
 }>()
 
 const config = {
@@ -11,9 +11,12 @@ const config = {
   bert:          { bg: 'bg-violet-500/10 text-violet-600 dark:text-violet-400', icon: Type },
   punctuation:   { bg: 'bg-violet-500/10 text-violet-600 dark:text-violet-400', icon: Type },
   correction:    { bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400', icon: SpellCheck },
-  llm:           { bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400', icon: MessageSquare },
+  llm:           { bg: 'bg-teal-500/10 text-teal-600 dark:text-teal-400', icon: MessageSquare },
   vad:           { bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', icon: Scissors },
   hallucination: { bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400', icon: ShieldCheck },
+  spellcheck:    { bg: 'bg-lime-500/10 text-lime-600 dark:text-lime-400', icon: BookA },
+  disfluency:    { bg: 'bg-pink-500/10 text-pink-600 dark:text-pink-400', icon: Eraser },
+  itn:           { bg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400', icon: Hash },
 }
 </script>
 

@@ -41,6 +41,10 @@ fn open_history_db() -> Connection {
     let _ = conn.execute("ALTER TABLE history ADD COLUMN cleanup_model_id TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("ALTER TABLE history ADD COLUMN hallucination_filter INTEGER NOT NULL DEFAULT 0", []);
     let _ = conn.execute("ALTER TABLE history ADD COLUMN vad_trimmed INTEGER NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN punctuation_model_id TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN spellcheck INTEGER NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN disfluency_removal INTEGER NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN itn INTEGER NOT NULL DEFAULT 0", []);
 
     // Migrate legacy history.json if it exists
     let json_path = dir.join(HISTORY_JSON_LEGACY);
@@ -141,15 +145,15 @@ impl AppState {
         })
     }
 
-    pub fn add_history(&self, text: String, model_id: String, language: String, cleanup_model_id: String, hallucination_filter: bool, vad_trimmed: bool) {
+    pub fn add_history(&self, entry: HistoryEntry) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
         let db = self.history_db.lock().unwrap();
         if let Err(e) = db.execute(
-            "INSERT INTO history (timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            rusqlite::params![timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed],
+            "INSERT INTO history (timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![timestamp, entry.text, entry.model_id, entry.language, entry.cleanup_model_id, entry.hallucination_filter, entry.vad_trimmed, entry.punctuation_model_id, entry.spellcheck, entry.disfluency_removal, entry.itn],
         ) {
             log::error!("Failed to insert history entry: {}", e);
         }
@@ -157,26 +161,27 @@ impl AppState {
 
     pub fn get_history(&self, query: &str, limit: u32, cursor: Option<u64>) -> Vec<HistoryEntry> {
         let db = self.history_db.lock().unwrap();
+        const COLS: &str = "timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn";
         let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match (query.is_empty(), cursor) {
             (true, None) => (
-                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history ORDER BY timestamp DESC LIMIT ?1".into(),
+                format!("SELECT {COLS} FROM history ORDER BY timestamp DESC LIMIT ?1"),
                 vec![Box::new(limit)],
             ),
             (true, Some(c)) => (
-                "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE timestamp < ?1 ORDER BY timestamp DESC LIMIT ?2".into(),
+                format!("SELECT {COLS} FROM history WHERE timestamp < ?1 ORDER BY timestamp DESC LIMIT ?2"),
                 vec![Box::new(c), Box::new(limit)],
             ),
             (false, None) => {
                 let pattern = format!("%{}%", query);
                 (
-                    "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2".into(),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2"),
                     vec![Box::new(pattern), Box::new(limit)],
                 )
             }
             (false, Some(c)) => {
                 let pattern = format!("%{}%", query);
                 (
-                    "SELECT timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed FROM history WHERE text LIKE ?1 AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3".into(),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
                     vec![Box::new(pattern), Box::new(c), Box::new(limit)],
                 )
             }
@@ -192,6 +197,10 @@ impl AppState {
                 cleanup_model_id: row.get(4)?,
                 hallucination_filter: row.get(5)?,
                 vad_trimmed: row.get(6)?,
+                punctuation_model_id: row.get(7)?,
+                spellcheck: row.get(8)?,
+                disfluency_removal: row.get(9)?,
+                itn: row.get(10)?,
             })
         }).unwrap().filter_map(|r| r.ok()).collect()
     }

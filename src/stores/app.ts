@@ -80,6 +80,10 @@ export const useAppStore = defineStore('app', () => {
           cleanup_model_id: event.payload.cleanup_model_id ?? '',
           hallucination_filter: event.payload.hallucination_filter ?? false,
           vad_trimmed: event.payload.vad_trimmed ?? false,
+          punctuation_model_id: event.payload.punctuation_model_id ?? '',
+          spellcheck: event.payload.spellcheck ?? false,
+          disfluency_removal: event.payload.disfluency_removal ?? false,
+          itn: event.payload.itn ?? false,
         })
       }
     })
