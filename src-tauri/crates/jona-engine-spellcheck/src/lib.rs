@@ -13,7 +13,7 @@ fn storage_dir() -> String {
         .to_string()
 }
 
-const HF_BASE: &str = "https://huggingface.co/realjPlot";
+const GH_RAW: &str = "https://raw.githubusercontent.com/JonaWhisper/jonawhisper-spellcheck-dicts/main";
 
 impl ASREngine for SpellCheckEngine {
     fn engine_id(&self) -> &str {
@@ -40,16 +40,12 @@ impl ASREngine for SpellCheckEngine {
                     files: vec![
                         DownloadFile {
                             filename: "freq.txt".into(),
-                            url: format!(
-                                "{HF_BASE}/jonawhisper-spellcheck-fr/resolve/main/freq.txt"
-                            ),
+                            url: format!("{GH_RAW}/fr/freq.txt"),
                             size: 9_840_000,
                         },
                         DownloadFile {
                             filename: "bigram.txt".into(),
-                            url: format!(
-                                "{HF_BASE}/jonawhisper-spellcheck-fr/resolve/main/bigram.txt"
-                            ),
+                            url: format!("{GH_RAW}/fr/bigram.txt"),
                             size: 90_000,
                         },
                     ],
@@ -75,16 +71,12 @@ impl ASREngine for SpellCheckEngine {
                     files: vec![
                         DownloadFile {
                             filename: "freq.txt".into(),
-                            url: format!(
-                                "{HF_BASE}/jonawhisper-spellcheck-en/resolve/main/freq.txt"
-                            ),
+                            url: format!("{GH_RAW}/en/freq.txt"),
                             size: 1_335_000,
                         },
                         DownloadFile {
                             filename: "bigram.txt".into(),
-                            url: format!(
-                                "{HF_BASE}/jonawhisper-spellcheck-en/resolve/main/bigram.txt"
-                            ),
+                            url: format!("{GH_RAW}/en/bigram.txt"),
                             size: 5_140_000,
                         },
                     ],
