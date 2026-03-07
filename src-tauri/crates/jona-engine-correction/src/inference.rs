@@ -60,43 +60,86 @@ impl T5Context {
     }
 }
 
-/// Detect and strip repetition.
+/// Detect token-level looping: if the last `window` tokens repeat a pattern
+/// that already appeared earlier, the model is stuck in a loop.
+fn is_looping(generated: &[u32], window: usize) -> bool {
+    if generated.len() < window * 2 {
+        return false;
+    }
+    let tail = &generated[generated.len() - window..];
+    let before = &generated[..generated.len() - window];
+    // Check if this exact window appears anywhere earlier
+    before.windows(window).any(|w| w == tail)
+}
+
+/// Detect and strip repeated phrases/sentences from output text.
 fn strip_repetition(text: &str) -> String {
     let text = text.trim();
-    let len = text.len();
-    if len < 20 {
+    if text.len() < 20 {
         return text.to_string();
     }
 
-    let bytes = text.as_bytes();
-    let mid = len / 2;
-    let range_start = mid.saturating_sub(len / 10);
-    let range_end = (mid + len / 10).min(len.saturating_sub(1));
+    // Sentence-level: split on sentence-ending punctuation
+    let sentences: Vec<&str> = text
+        .split(|c: char| c == '.' || c == '!' || c == '?')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
 
-    for i in range_start..=range_end {
-        if bytes[i] != b' ' {
-            continue;
+    if sentences.len() >= 3 {
+        let first = sentences[0].to_lowercase();
+        let repeat_count = sentences
+            .iter()
+            .filter(|&&s| {
+                let s_lower = s.to_lowercase();
+                let len = first.len().min(s_lower.len());
+                if len < 5 {
+                    return false;
+                }
+                let matching = first
+                    .chars()
+                    .zip(s_lower.chars())
+                    .filter(|(a, b)| a == b)
+                    .count();
+                matching >= len * 80 / 100
+            })
+            .count();
+
+        if repeat_count >= 2 {
+            log::warn!(
+                "T5: sentence repetition ({}/{} match), keeping first",
+                repeat_count,
+                sentences.len()
+            );
+            // Return first sentence with its trailing punctuation
+            let first_end = text.find(sentences[0]).unwrap_or(0) + sentences[0].len();
+            let end = text[first_end..]
+                .find(|c: char| c == '.' || c == '!' || c == '?')
+                .map(|i| first_end + i + 1)
+                .unwrap_or(first_end);
+            return text[..end].trim().to_string();
         }
-        let first = &text[..i];
-        let rest = text[i + 1..].trim_start();
+    }
 
-        let first_chars: Vec<char> = first.chars().take(15).collect();
-        let rest_chars: Vec<char> = rest.chars().take(15).collect();
-        let compare_len = first_chars.len().min(rest_chars.len());
-
-        if compare_len >= 8 {
-            let matching = first_chars[..compare_len]
-                .iter()
-                .zip(rest_chars[..compare_len].iter())
-                .filter(|(a, b)| a == b)
-                .count();
-            if matching >= compare_len * 80 / 100 {
-                log::warn!(
-                    "T5 correction: repetition detected, keeping first half ({} -> {} chars)",
-                    len,
-                    first.trim_end().len()
-                );
-                return first.trim_end().to_string();
+    // Word-level: check if a word pattern repeats
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() >= 6 {
+        for pattern_len in (3..=words.len() / 2).rev() {
+            let pattern = &words[..pattern_len];
+            let rest = &words[pattern_len..];
+            if rest.len() >= pattern_len {
+                let matching = pattern
+                    .iter()
+                    .zip(rest.iter())
+                    .filter(|(a, b)| a.to_lowercase() == b.to_lowercase())
+                    .count();
+                if matching >= pattern_len * 80 / 100 {
+                    log::warn!(
+                        "T5: word-level repetition (pattern={} words), keeping first",
+                        pattern_len
+                    );
+                    return words[..pattern_len].join(" ");
+                }
             }
         }
     }
@@ -149,12 +192,18 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
         .config
         .decoder_start_token_id
         .unwrap_or(ctx.config.pad_token_id) as u32;
-    let max_tokens = (input_token_count as f32 * 1.5) as usize + 32;
-    let repeat_penalty = 1.2_f64;
+    let max_tokens = (input_token_count as f32 * 1.2) as usize + 16;
+    let repeat_penalty = 1.5_f64;
 
     let mut generated_ids: Vec<u32> = vec![decoder_start_id];
 
-    for _ in 0..max_tokens {
+    for step in 0..max_tokens {
+        // Live loop detection: if the last 6 tokens form a pattern already seen, stop
+        if step >= 12 && is_looping(&generated_ids, 6) {
+            log::warn!("T5: loop detected at step {}, stopping early", step);
+            break;
+        }
+
         let decoder_input = Tensor::new(&generated_ids[generated_ids.len() - 1..], &ctx.device)
             .and_then(|t| t.unsqueeze(0))
             .map_err(|e| format!("Decoder input tensor failed: {e}"))?;
@@ -170,43 +219,30 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
             .squeeze(0)
             .map_err(|e| format!("Failed to squeeze logits: {e}"))?;
 
-        let logits = if repeat_penalty != 1.0 {
-            let logits_vec: Vec<f32> = logits
+        // Apply repeat penalty
+        let logits = {
+            let mut v: Vec<f32> = logits
                 .to_vec1()
                 .map_err(|e| format!("Failed to extract logits: {e}"))?;
-            let mut modified = logits_vec;
             for &token_id in &generated_ids {
                 let idx = token_id as usize;
-                if idx < modified.len() {
-                    if modified[idx] > 0.0 {
-                        modified[idx] /= repeat_penalty as f32;
+                if idx < v.len() {
+                    if v[idx] > 0.0 {
+                        v[idx] /= repeat_penalty as f32;
                     } else {
-                        modified[idx] *= repeat_penalty as f32;
+                        v[idx] *= repeat_penalty as f32;
                     }
                 }
             }
-            Tensor::new(modified.as_slice(), &Device::Cpu)
+            // N-gram blocking (size 4)
+            let banned = calc_banned_ngram_tokens(&generated_ids, 4);
+            for &token_id in &banned {
+                if (token_id as usize) < v.len() {
+                    v[token_id as usize] = f32::NEG_INFINITY;
+                }
+            }
+            Tensor::new(v.as_slice(), &Device::Cpu)
                 .map_err(|e| format!("Failed to create modified logits: {e}"))?
-        } else {
-            logits
-        };
-
-        let logits = {
-            let banned = calc_banned_ngram_tokens(&generated_ids, 3);
-            if banned.is_empty() {
-                logits
-            } else {
-                let mut v: Vec<f32> = logits
-                    .to_vec1()
-                    .map_err(|e| format!("Failed to extract logits for ngram blocking: {e}"))?;
-                for &token_id in &banned {
-                    if (token_id as usize) < v.len() {
-                        v[token_id as usize] = f32::NEG_INFINITY;
-                    }
-                }
-                Tensor::new(v.as_slice(), &Device::Cpu)
-                    .map_err(|e| format!("Failed to create ngram-blocked logits: {e}"))?
-            }
         };
 
         let next_token = logits
@@ -241,7 +277,8 @@ pub fn correct(ctx: &mut T5Context, text: &str) -> Result<String, String> {
 
     let result = strip_repetition(&result);
 
-    let max_len = std::cmp::max(input_len * 2, 200);
+    // Output shouldn't be much longer than input for correction tasks
+    let max_len = std::cmp::max(input_len * 3 / 2, 100);
     if result.len() > max_len {
         log::warn!(
             "T5 correction output too long (len={} vs input={}, max={}), keeping original",
