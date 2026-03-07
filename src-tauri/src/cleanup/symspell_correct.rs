@@ -16,9 +16,35 @@ use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
 static SS_CACHE: Mutex<Option<HashMap<String, SymSpell<UnicodeStringStrategy>>>> =
     Mutex::new(None);
 
+/// Extract the spellcheck language code from a locale string.
+///
+/// Tries the full locale first (e.g. "fr-CA"), then the base language (e.g. "fr").
+/// Falls back to the input as-is if neither matches a downloaded dictionary.
+/// This allows regional dicts (fr-CA for Québec) to coexist with generic ones (fr).
+fn lang_to_code(lang: &str) -> String {
+    let base = jona_types::models_dir().join("spellcheck");
+    let normalized = lang.replace('_', "-").to_lowercase();
+
+    // Try full locale first (e.g. "fr-ca")
+    if base.join(&normalized).join("freq.txt").exists() {
+        return normalized;
+    }
+
+    // Try base language (e.g. "fr")
+    if let Some(code) = normalized.split('-').next() {
+        if code != normalized && base.join(code).join("freq.txt").exists() {
+            return code.to_string();
+        }
+    }
+
+    // Return base language code even if not downloaded yet
+    // (dict_dir caller will handle missing files gracefully)
+    normalized.split('-').next().unwrap_or(&normalized).to_string()
+}
+
 /// Resolve the spellcheck dict directory for a given language.
 fn dict_dir(lang: &str) -> std::path::PathBuf {
-    let code = if lang.starts_with("fr") { "fr" } else { "en" };
+    let code = lang_to_code(lang);
     jona_types::models_dir().join("spellcheck").join(code)
 }
 
@@ -71,18 +97,18 @@ fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeSt
 /// Get (or lazily load) the SymSpell instance for a language.
 /// Returns None if the dict is not downloaded.
 fn get_ss(language: &str) -> bool {
-    let code = if language.starts_with("fr") { "fr" } else { "en" };
+    let code = lang_to_code(language);
 
     let mut guard = SS_CACHE.lock().unwrap();
     let cache = guard.get_or_insert_with(HashMap::new);
 
-    if cache.contains_key(code) {
+    if cache.contains_key(&code) {
         return true;
     }
 
     let dir = dict_dir(language);
-    if let Some(ss) = load_from_dir(&dir, code) {
-        cache.insert(code.to_string(), ss);
+    if let Some(ss) = load_from_dir(&dir, &code) {
+        cache.insert(code, ss);
         true
     } else {
         false
@@ -94,10 +120,10 @@ fn with_ss<T>(language: &str, f: impl FnOnce(&SymSpell<UnicodeStringStrategy>) -
     if !get_ss(language) {
         return None;
     }
-    let code = if language.starts_with("fr") { "fr" } else { "en" };
+    let code = lang_to_code(language);
     let guard = SS_CACHE.lock().unwrap();
     let cache = guard.as_ref()?;
-    cache.get(code).map(f)
+    cache.get(&code).map(f)
 }
 
 /// Correct text using SymSpell with frequency-weighted suggestions.
@@ -467,11 +493,11 @@ mod tests {
     }
 
     #[test]
-    fn test_unknown_lang_routes_to_english() {
+    fn test_unknown_lang_returns_unchanged() {
         ensure_test_dicts();
-        // Non-fr language defaults to English
+        // Language without downloaded dict returns text unchanged
         let result = auto_correct("helo", "de");
-        assert!(!result.is_empty());
+        assert_eq!(result, "helo");
     }
 
     // --- match_case helper ---
