@@ -2987,7 +2987,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
- "spellbook",
+ "symspell",
  "sys-locale",
  "tauri",
  "tauri-build",
@@ -5582,16 +5582,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "spellbook"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28332bb44a9e7e7f1aa43ce4d97b6d1b27323a1fc160d4cfe0089245e1750845"
-dependencies = [
- "foldhash 0.2.0",
- "hashbrown 0.16.1",
-]
-
-[[package]]
 name = "spm_precompiled"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5661,6 +5651,20 @@ dependencies = [
  "base64 0.21.7",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symspell"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0c8f69794fa4370d8fff17895350e56c8c803576a7ca782a5c6598d434a2646"
+dependencies = [
+ "derive_builder",
+ "serde",
+ "serde_derive",
+ "strsim",
+ "unidecode",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -6662,6 +6666,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39ec24b3121d976906ece63c9daad25b85969647682eee313cb5779fdd69e14e"
 
 [[package]]
+name = "unidecode"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "402bb19d8e03f1d1a7450e2bd613980869438e0666331be3e073089124aa1adc"
+
+[[package]]
 name = "unsafe-libyaml"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6860,6 +6870,8 @@ dependencies = [
  "cfg-if",
  "once_cell",
  "rustversion",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
  "wasm-bindgen-shared",
 ]

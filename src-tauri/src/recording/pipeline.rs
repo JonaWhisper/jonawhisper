@@ -213,12 +213,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         }
     }
 
-    // Step 2b: spell-check — runs after punctuation, before correction
+    // Step 2b: spell-check (SymSpell) — runs after punctuation, before correction
     if spellcheck_enabled {
-        let before = processed.len();
-        processed = cleanup::spellcheck::auto_correct(&processed, &lang);
-        if processed.len() != before {
-            log::info!("Spell-check: {} → {} chars", before, processed.len());
+        let before = processed.clone();
+        processed = cleanup::symspell_correct::auto_correct(&processed, &lang);
+        if processed != before {
+            log::info!("SymSpell: «{}» → «{}»", before, processed);
         }
     }
 

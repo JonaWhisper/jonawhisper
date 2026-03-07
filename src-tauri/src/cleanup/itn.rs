@@ -725,4 +725,55 @@ mod tests {
         assert_eq!(apply_itn("bonjour le monde", "fr"), "bonjour le monde");
         assert_eq!(apply_itn("hello world", "en"), "hello world");
     }
+
+    // -- Edge cases --
+
+    #[test]
+    fn test_empty_input() {
+        assert_eq!(apply_itn("", "fr"), "");
+        assert_eq!(apply_itn("  ", "en"), "  ");
+    }
+
+    #[test]
+    fn test_fr_million() {
+        assert_eq!(apply_itn("deux millions", "fr"), "2000000");
+    }
+
+    #[test]
+    fn test_en_million() {
+        assert_eq!(apply_itn("three million", "en"), "3000000");
+    }
+
+    #[test]
+    fn test_fr_complex_number() {
+        assert_eq!(apply_itn("mille deux cent trente-quatre", "fr"), "1234");
+    }
+
+    #[test]
+    fn test_en_complex_number() {
+        assert_eq!(apply_itn("one thousand two hundred and thirty four", "en"), "1234");
+    }
+
+    #[test]
+    fn test_multiple_numbers_in_sentence() {
+        assert_eq!(apply_itn("j'ai cinq chats et trois chiens", "fr"), "j'ai 5 chats et 3 chiens");
+    }
+
+    #[test]
+    fn test_fr_degrees() {
+        assert_eq!(apply_itn("vingt degrés", "fr"), "20 \u{00B0}");
+    }
+
+    #[test]
+    fn test_en_degrees() {
+        assert_eq!(apply_itn("seventy degrees", "en"), "70 \u{00B0}");
+    }
+
+    #[test]
+    fn test_lang_prefix_routes() {
+        // "fr-FR" should use French rules
+        assert_eq!(apply_itn("cinq euros", "fr-FR"), "5 \u{20AC}");
+        // "en-US" should use English rules
+        assert_eq!(apply_itn("five dollars", "en-US"), "5 $");
+    }
 }

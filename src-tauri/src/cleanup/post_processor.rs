@@ -324,4 +324,97 @@ mod tests {
         assert!(result.contains("Bonjour"));
         assert!(!result.to_lowercase().contains("sous-titrage"));
     }
+
+    // --- finalize ---
+
+    #[test]
+    fn test_finalize_space_before_punct() {
+        assert_eq!(finalize("hello ."), "Hello.");
+    }
+
+    #[test]
+    fn test_finalize_space_after_punct() {
+        assert_eq!(finalize("hello.world"), "Hello. World");
+    }
+
+    #[test]
+    fn test_finalize_capitalize_first() {
+        assert_eq!(finalize("hello"), "Hello");
+    }
+
+    #[test]
+    fn test_finalize_capitalize_after_question() {
+        assert_eq!(finalize("why? because"), "Why? Because");
+    }
+
+    #[test]
+    fn test_finalize_newline_capitalize() {
+        assert_eq!(finalize("hello.\nworld"), "Hello.\nWorld");
+    }
+
+    #[test]
+    fn test_finalize_open_paren_no_space() {
+        assert_eq!(finalize("test ( value )"), "Test (value)");
+    }
+
+    // --- preprocess edge cases ---
+
+    #[test]
+    fn test_preprocess_empty() {
+        let opts = default_opts();
+        assert_eq!(preprocess("", "en", &opts), "");
+    }
+
+    #[test]
+    fn test_preprocess_whitespace_only() {
+        let opts = default_opts();
+        assert_eq!(preprocess("   ", "en", &opts), "");
+    }
+
+    #[test]
+    fn test_dictation_newline_fr() {
+        let opts = default_opts();
+        let result = preprocess("bonjour à la ligne monde", "fr", &opts);
+        assert!(result.contains('\n'), "Expected newline in: {:?}", result);
+    }
+
+    #[test]
+    fn test_dictation_paragraph_en() {
+        let opts = default_opts();
+        let result = preprocess("hello new paragraph world", "en", &opts);
+        assert!(result.contains("\n\n"), "Expected double newline in: {:?}", result);
+    }
+
+    // --- resolve_language ---
+
+    #[test]
+    fn test_auto_detect_english() {
+        let result = process("the cat is on the table", "auto", &default_opts());
+        // No French words → should default to English
+        assert!(result.starts_with("The"));
+    }
+
+    // --- hallucination edge cases ---
+
+    #[test]
+    fn test_hallucination_ellipsis_unicode() {
+        let opts = default_opts();
+        assert_eq!(process("\u{2026}", "en", &opts), "");
+    }
+
+    #[test]
+    fn test_hallucination_with_trailing_dots() {
+        let opts = default_opts();
+        assert_eq!(process("sous-titrage...", "fr", &opts), "");
+    }
+
+    // --- fillers with surrounding text preserved ---
+
+    #[test]
+    fn test_fillers_dont_eat_real_words() {
+        let result = process("j'ai euh acheté euh du pain", "fr", &default_opts());
+        assert!(result.contains("achet"), "Real words should survive: {}", result);
+        assert!(result.contains("pain"), "Real words should survive: {}", result);
+        assert!(!result.to_lowercase().contains("euh"), "Fillers should be removed");
+    }
 }
