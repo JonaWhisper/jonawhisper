@@ -85,7 +85,7 @@ See [docs/AUDIO-PIPELINE.md](docs/AUDIO-PIPELINE.md) for the full architecture.
 ### Text pipeline
 
 ```
-ASR raw → Hallucination filter → Dictation commands → Disfluency removal → [Punctuation / Correction / LLM] → Finalize → Paste
+ASR raw → Hallucination filter → Dictation commands → Disfluency removal → [Punctuation / Correction / LLM] → ITN → Finalize → Paste
 ```
 
 | Stage | Status | Description |
@@ -96,7 +96,7 @@ ASR raw → Hallucination filter → Dictation commands → Disfluency removal �
 | Punctuation | Done | BERT or PCS token classification |
 | Correction | Done | T5 encoder-decoder (grammar, spelling) |
 | LLM cleanup | Done | Local (llama.cpp) or cloud (OpenAI/Anthropic) |
-| ITN | Planned | Inverse text normalization ("vingt-trois" → "23") |
+| ITN | Done | Inverse text normalization — numbers, ordinals, %, hours, currencies, units (FR/EN) |
 | Finalize | Done | Spacing, capitalization |
 
 See [docs/TEXT-PIPELINE.md](docs/TEXT-PIPELINE.md) for the full architecture.

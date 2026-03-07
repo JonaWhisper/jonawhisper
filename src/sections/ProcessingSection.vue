@@ -123,6 +123,17 @@ function onMaxTokensSliderCommit(v: number[]) {
         />
       </div>
 
+      <!-- ITN (Inverse Text Normalization) -->
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
+        <div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.itn') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.itnEnabled"
+          @update:model-value="(v: boolean) => settings.setSetting('itn_enabled', String(v))"
+        />
+      </div>
+
       <!-- Unified cleanup dropdown with optgroups -->
       <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>

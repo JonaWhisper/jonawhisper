@@ -420,6 +420,8 @@ pub struct Preferences {
     pub vad_enabled: bool,
     #[serde(default = "default_true")]
     pub disfluency_removal_enabled: bool,
+    #[serde(default = "default_true")]
+    pub itn_enabled: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
 }

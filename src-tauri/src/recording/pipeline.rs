@@ -164,7 +164,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (model_id, lang, hall_filter, disfluency_removal, text_cleanup_enabled, cleanup_model_id,
+    let (model_id, lang, hall_filter, disfluency_removal, itn_enabled, text_cleanup_enabled, cleanup_model_id,
          llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
@@ -172,6 +172,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
             s.disfluency_removal_enabled,
+            s.itn_enabled,
             s.text_cleanup_enabled,
             s.cleanup_model_id.clone(),
             s.llm_model.clone(),
@@ -281,6 +282,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         }
     } else {
         processed = cleanup::post_processor::finalize(&processed);
+    }
+
+    // Step 3: ITN (Inverse Text Normalization) — numbers, ordinals, currencies, units
+    if itn_enabled {
+        processed = cleanup::itn::apply_itn(&processed, &lang);
     }
 
     // Check cancel flag before pasting (cancel may arrive during LLM cleanup)
