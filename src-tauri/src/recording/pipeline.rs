@@ -164,13 +164,14 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Read settings once
-    let (model_id, lang, hall_filter, text_cleanup_enabled, cleanup_model_id,
+    let (model_id, lang, hall_filter, disfluency_removal, text_cleanup_enabled, cleanup_model_id,
          llm_model, llm_max_tokens, providers) = {
         let s = state.settings.lock().unwrap();
         (
             s.selected_model_id.clone(),
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
+            s.disfluency_removal_enabled,
             s.text_cleanup_enabled,
             s.cleanup_model_id.clone(),
             s.llm_model.clone(),
@@ -179,10 +180,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         )
     };
 
-    // Step 1: preprocess (hallucination filter + dictation commands)
+    // Step 1: preprocess (hallucination filter + dictation commands + disfluency removal)
     let mut processed = {
         let opts = cleanup::post_processor::PostProcessOptions {
             hallucination_filter: hall_filter,
+            disfluency_removal,
         };
         cleanup::post_processor::preprocess(trimmed, &lang, &opts)
     };

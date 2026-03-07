@@ -8,7 +8,7 @@ Architecture du pipeline texte entre la sortie ASR brute et le texte final coll�
 
 ```
 Pipeline actuel :
-  ASR brut → [1. Hallucinations] → [2. Dictée] → [4/5. Punct OU Correct OU LLM] → [7. Finalize] → Paste
+  ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences] → [4/5. Punct OU Correct OU LLM] → [7. Finalize] → Paste
 
 Pipeline proposé (complet) :
   ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
@@ -76,40 +76,28 @@ Pipeline proposé (complet) :
 
 ---
 
-## Étape 3 — Suppression disfluences (❌ Non implémenté)
+## Étape 3 — Suppression disfluences (✅ Implémenté)
 
-**But** : supprimer les mots parasites (fillers) de l'oral qui polluent le texte écrit.
+**Fichier** : `post_processor.rs` — fonction `preprocess()` → `strip_fillers()`
 
-**Approche recommandée** : regex simple sur les fillers isolés.
+**But** : supprimer les mots parasites (fillers/hésitations) de l'oral qui polluent le texte écrit.
 
-### Fillers cibles
+**Mécanisme** :
+- Deux regex pré-compilées : `RE_FILLERS_FR` et `RE_FILLERS_EN` avec word-boundary `\b`
+- Appliqué après les commandes dictée, avant le cleanup model
+- Espaces multiples nettoyés via `RE_MULTI_SPACES`
+- Toggle : `disfluency_removal_enabled` dans Preferences (défaut : activé)
 
-| Langue | Fillers | Contexte |
+**Fillers supprimés** :
+
+| Langue | Fillers | Type |
 |---|---|---|
-| FR | euh, heu, hum, bah, ben, beh | Hésitation pure |
-| FR | enfin, quoi, genre, voilà, du coup, en fait, tu vois | Fillers discursifs (prudence — sens réel possible) |
-| EN | uh, um, hmm | Hésitation pure |
-| EN | like, you know, I mean, basically, actually, so, well, right | Fillers discursifs (prudence) |
+| FR | euh, heu, hum, bah, ben, beh | Hésitation pure — aucune ambiguïté sémantique |
+| EN | uh, um, hmm | Hésitation pure — aucune ambiguïté sémantique |
 
-### Stratégie de suppression
+**Note** : les fillers discursifs (genre, du coup, like, you know) ne sont PAS supprimés car ils ont un sens réel dans certains contextes. Seuls les marqueurs d'hésitation purs sont ciblés.
 
-1. **Fillers purs** (euh, uh, um, hum, hmm) : suppression systématique en début/milieu de phrase — aucune ambiguïté
-2. **Fillers discursifs** (genre, du coup, like, you know) : suppression uniquement quand isolés (entourés de pauses/ponctuation) — ces mots ont un sens réel dans certains contextes
-3. **Regex word-boundary** : `\b(euh|heu|hum)\b` avec gestion des espaces résiduels
-
-### Implémentation proposée
-
-```rust
-// Dans post_processor.rs, nouvelle fonction entre preprocess() et le cleanup model
-static RE_FILLERS_FR: LazyLock<Regex> = LazyLock::new(||
-    Regex::new(r"(?i)\b(euh|heu|hum|bah|ben|beh)\b\s*").unwrap()
-);
-static RE_FILLERS_EN: LazyLock<Regex> = LazyLock::new(||
-    Regex::new(r"(?i)\b(uh|um|hmm)\b\s*").unwrap()
-);
-```
-
-**Latence** : ~0ms
+**Latence** : ~0ms (regex pré-compilées)
 
 ### Alternatives ML écartées
 
@@ -292,7 +280,7 @@ match cleanup_kind {
 | Fichier | Rôle dans le pipeline |
 |---|---|
 | `recording.rs` | Orchestration : `process_next_in_queue()` appelle les étapes dans l'ordre |
-| `post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 7 (finalize) |
+| `post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 3 (disfluences), 7 (finalize) |
 | `punct_common.rs` | Logique partagée ponctuation : windowing, labels, strip_and_split |
 | `bert_punctuation.rs` | Étape 4 : inférence BERT ort (ONNX + CoreML) |
 | `candle_punctuation.rs` | Étape 4 : inférence BERT Candle (safetensors + Metal) |
@@ -311,7 +299,7 @@ match cleanup_kind {
 
 ### Phase 1 — Quick wins (effort très faible)
 
-1. **Regex disfluences** FR/EN dans `post_processor.rs` — nouvelle fonction `strip_fillers()` entre `preprocess()` et le modèle de cleanup
+1. ~~**Regex disfluences** FR/EN dans `post_processor.rs`~~ — ✅ Implémenté (`strip_fillers()`)
 2. **Regex ITN basique** — nombres 1-99 FR/EN, pourcentages, heures simples
 
 ### Phase 2 — Améliorations modèles (effort modéré)

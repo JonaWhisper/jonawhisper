@@ -20,6 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const cancelShortcut = ref('escape')
   const recordingMode = ref('push_to_talk')
   const vadEnabled = ref(true)
+  const disfluencyRemovalEnabled = ref(true)
   const appLocale = ref('auto')
   const theme = ref('system')
 
@@ -43,6 +44,7 @@ export const useSettingsStore = defineStore('settings', () => {
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
       vadEnabled.value = s.vad_enabled ?? true
+      disfluencyRemovalEnabled.value = s.disfluency_removal_enabled ?? true
       theme.value = s.theme ?? 'system'
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
@@ -66,6 +68,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
       case 'audio_ducking_level': return String(audioDuckingLevel.value)
       case 'vad_enabled': return String(vadEnabled.value)
+      case 'disfluency_removal_enabled': return String(disfluencyRemovalEnabled.value)
       case 'theme': return theme.value
       default: return ''
     }
@@ -90,6 +93,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
+      case 'disfluency_removal_enabled': disfluencyRemovalEnabled.value = value === 'true'; break
       case 'theme': theme.value = value; break
     }
   }
@@ -116,7 +120,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     selectedModelId, selectedLanguage, asrCloudModel,
     textCleanupEnabled, cleanupModelId, llmModel, llmMaxTokens,
-    hallucinationFilterEnabled, vadEnabled, selectedInputDeviceUid,
+    hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
     hotkey, cancelShortcut, recordingMode, appLocale, theme,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,

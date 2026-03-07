@@ -67,6 +67,7 @@
   "settings.locale.en": "English",
   "settings.postProcessing.vad": "Filter silence (VAD)",
   "settings.postProcessing.hallucinations": "Filter hallucinations",
+  "settings.postProcessing.disfluencyRemoval": "Remove filler words",
   "settings.postProcessing.textCleanup": "Text cleanup",
   "settings.cleanup.recommended": "Recommended",
   "settings.langs": "langs",

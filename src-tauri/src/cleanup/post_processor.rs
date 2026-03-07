@@ -11,8 +11,17 @@ static RE_SPACE_AFTER_OPEN: LazyLock<Regex> =
 static RE_CAPITALIZE_AFTER_SENTENCE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"([.?!]\s+|\n)(\p{Ll})").unwrap());
 
+// Filler word regexes (pure hesitation markers — no semantic ambiguity)
+static RE_FILLERS_FR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(euh|heu|hum|bah|ben|beh)\b").unwrap());
+static RE_FILLERS_EN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(uh|um|hmm)\b").unwrap());
+static RE_MULTI_SPACES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"  +").unwrap());
+
 pub struct PostProcessOptions {
     pub hallucination_filter: bool,
+    pub disfluency_removal: bool,
 }
 
 /// Phase 1: hallucination filter + dictation command substitution.
@@ -28,6 +37,11 @@ pub fn preprocess(text: &str, language: &str, opts: &PostProcessOptions) -> Stri
 
     let lang = resolve_language(language, &result);
     result = apply_dictation_commands(&result, &lang);
+
+    if opts.disfluency_removal {
+        result = strip_fillers(&result, &lang);
+    }
+
     result
 }
 
@@ -201,6 +215,18 @@ fn apply_dictation_commands(text: &str, language: &str) -> String {
     result
 }
 
+/// Strip pure hesitation fillers (euh, uh, um, etc.) — no semantic ambiguity.
+fn strip_fillers(text: &str, language: &str) -> String {
+    let re = if language.starts_with("fr") {
+        &*RE_FILLERS_FR
+    } else {
+        &*RE_FILLERS_EN
+    };
+    let result = re.replace_all(text, "").to_string();
+    let result = RE_MULTI_SPACES.replace_all(&result, " ").to_string();
+    result.trim().to_string()
+}
+
 fn fix_punctuation_spacing(text: &str) -> String {
     let mut result = text.to_string();
 
@@ -230,7 +256,7 @@ mod tests {
     use super::*;
 
     fn default_opts() -> PostProcessOptions {
-        PostProcessOptions { hallucination_filter: true }
+        PostProcessOptions { hallucination_filter: true, disfluency_removal: true }
     }
 
     #[test]
@@ -268,9 +294,28 @@ mod tests {
 
     #[test]
     fn test_hallucination_filter_disabled() {
-        let opts = PostProcessOptions { hallucination_filter: false };
+        let opts = PostProcessOptions { hallucination_filter: false, disfluency_removal: true };
         let result = process("sous-titrage", "fr", &opts);
         assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_filler_removal_french() {
+        let result = process("euh ben euh bonjour", "fr", &default_opts());
+        assert_eq!(result, "Bonjour");
+    }
+
+    #[test]
+    fn test_filler_removal_english() {
+        let result = process("um hello uh world", "en", &default_opts());
+        assert_eq!(result, "Hello world");
+    }
+
+    #[test]
+    fn test_filler_removal_disabled() {
+        let opts = PostProcessOptions { hallucination_filter: true, disfluency_removal: false };
+        let result = process("euh bonjour", "fr", &opts);
+        assert!(result.to_lowercase().contains("euh"));
     }
 
     #[test]

@@ -92,7 +92,7 @@ ASR raw → Hallucination filter → Dictation commands → [Punctuation / Corre
 |-------|--------|-------------|
 | Hallucination filter | Done | 30+ regex patterns (FR/EN) |
 | Dictation commands | Done | Voice commands → punctuation ("virgule" → ",") |
-| Disfluency removal | Planned | Strip fillers (euh, uh, um) |
+| Disfluency removal | Done | Strip fillers (euh, uh, um) — regex-based, FR/EN |
 | Punctuation | Done | BERT or PCS token classification |
 | Correction | Done | T5 encoder-decoder (grammar, spelling) |
 | LLM cleanup | Done | Local (llama.cpp) or cloud (OpenAI/Anthropic) |

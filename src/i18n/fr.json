@@ -67,6 +67,7 @@
   "settings.locale.en": "English",
   "settings.postProcessing.vad": "Filtrer le silence (VAD)",
   "settings.postProcessing.hallucinations": "Filtrage des hallucinations",
+  "settings.postProcessing.disfluencyRemoval": "Supprimer les h\u00e9sitations",
   "settings.postProcessing.textCleanup": "Nettoyage du texte",
   "settings.cleanup.recommended": "Recommandé",
   "settings.langs": "langues",

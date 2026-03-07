@@ -418,6 +418,8 @@ pub struct Preferences {
     pub audio_ducking_level: f32,
     #[serde(default = "default_true")]
     pub vad_enabled: bool,
+    #[serde(default = "default_true")]
+    pub disfluency_removal_enabled: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
 }

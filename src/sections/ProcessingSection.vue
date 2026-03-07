@@ -112,6 +112,17 @@ function onMaxTokensSliderCommit(v: number[]) {
         />
       </div>
 
+      <!-- Disfluency removal -->
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
+        <div>
+          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.disfluencyRemoval') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.disfluencyRemovalEnabled"
+          @update:model-value="(v: boolean) => settings.setSetting('disfluency_removal_enabled', String(v))"
+        />
+      </div>
+
       <!-- Unified cleanup dropdown with optgroups -->
       <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
         <div>

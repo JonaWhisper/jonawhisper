@@ -31,6 +31,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "audio_ducking_enabled": s.audio_ducking_enabled,
         "audio_ducking_level": s.audio_ducking_level,
         "vad_enabled": s.vad_enabled,
+        "disfluency_removal_enabled": s.disfluency_removal_enabled,
         "theme": s.theme,
     })
 }
@@ -73,6 +74,7 @@ pub fn set_setting(
             "audio_ducking_enabled" => s.audio_ducking_enabled = value == "true",
             "audio_ducking_level" => s.audio_ducking_level = value.parse().unwrap_or(0.8),
             "vad_enabled" => s.vad_enabled = value == "true",
+            "disfluency_removal_enabled" => s.disfluency_removal_enabled = value == "true",
             "theme" => s.theme = value.clone(),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
