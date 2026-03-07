@@ -36,5 +36,6 @@
 
 ## Technique / Infra
 
+- [ ] **Système de mise à jour des modèles/dicts** — Mécanisme pour détecter les nouvelles versions de fichiers téléchargés (dicts spellcheck, modèles). Approche envisagée : fichier `version.json` dans chaque repo source, check au démarrage de l'app, notification ou re-téléchargement automatique si version locale < version distante. Concerne tous les modèles hébergés, pas seulement les dicts.
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
