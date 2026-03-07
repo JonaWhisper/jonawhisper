@@ -2,7 +2,7 @@ use serde_json::Value;
 use crate::state::{config_dir, default_model_id, Provider, ProviderKind, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 6;
+const CURRENT_VERSION: u32 = 7;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
@@ -13,6 +13,7 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (4, "Migrate API keys to OS keychain", migrate_v4),
     (5, "Add provider capability flags", migrate_v5),
     (6, "Split punctuation from cleanup model", migrate_v6),
+    (7, "Clean up old Candle/safetensors correction models", migrate_v7),
 ];
 
 /// Rename data directory from WhisperDictate → JonaWhisper.
@@ -334,6 +335,51 @@ fn migrate_v5(_raw: &mut Value, prefs: &mut Preferences) {
         provider.supports_llm = provider.has_llm();
     }
     log::info!("Migration v5: set capability flags for {} provider(s)", prefs.providers.len());
+}
+
+/// v7: Clean up old Candle/safetensors correction model files, replaced by ONNX.
+/// Removes: model.safetensors, .complete marker, and the flan-t5-grammar directory.
+fn migrate_v7(_raw: &mut Value, prefs: &mut Preferences) {
+    let correction_dir = jona_types::models_dir().join("correction");
+    if !correction_dir.exists() {
+        return;
+    }
+
+    // Models that switched from safetensors to ONNX
+    let migrated_models = ["gec-t5-small", "t5-spell-fr", "flanec-base", "flanec-large"];
+    let stale_files = ["model.safetensors", ".complete"];
+
+    for model_name in &migrated_models {
+        let model_dir = correction_dir.join(model_name);
+        if !model_dir.exists() {
+            continue;
+        }
+        for filename in &stale_files {
+            let path = model_dir.join(filename);
+            if path.exists() {
+                match std::fs::remove_file(&path) {
+                    Ok(()) => log::info!("Migration v7: removed {}", path.display()),
+                    Err(e) => log::warn!("Migration v7: failed to remove {}: {}", path.display(), e),
+                }
+            }
+        }
+    }
+
+    // flan-t5-grammar was removed from the catalog entirely
+    let flan_dir = correction_dir.join("flan-t5-grammar");
+    if flan_dir.exists() {
+        match std::fs::remove_dir_all(&flan_dir) {
+            Ok(()) => log::info!("Migration v7: removed {}", flan_dir.display()),
+            Err(e) => log::warn!("Migration v7: failed to remove {}: {}", flan_dir.display(), e),
+        }
+    }
+
+    // Reset cleanup_model_id if it pointed to flan-t5-grammar
+    if prefs.cleanup_model_id == "correction:flan-t5-grammar" {
+        log::info!("Migration v7: resetting cleanup_model_id from flan-t5-grammar");
+        prefs.cleanup_model_id.clear();
+        prefs.text_cleanup_enabled = false;
+    }
 }
 
 /// v6: Split punctuation model out of cleanup_model_id into its own punctuation_model_id field.
