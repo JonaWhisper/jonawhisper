@@ -2857,6 +2857,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-spellcheck"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+]
+
+[[package]]
 name = "jona-engine-voxtral"
 version = "0.1.0"
 dependencies = [
@@ -2964,6 +2973,7 @@ dependencies = [
  "jona-engine-parakeet",
  "jona-engine-pcs",
  "jona-engine-qwen",
+ "jona-engine-spellcheck",
  "jona-engine-voxtral",
  "jona-engine-whisper",
  "jona-engines",

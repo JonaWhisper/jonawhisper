@@ -4,6 +4,7 @@ members = [
     "crates/jona-engine-whisper", "crates/jona-engine-qwen", "crates/jona-engine-canary",
     "crates/jona-engine-parakeet", "crates/jona-engine-voxtral", "crates/jona-engine-llama",
     "crates/jona-engine-bert", "crates/jona-engine-pcs", "crates/jona-engine-correction",
+    "crates/jona-engine-spellcheck",
 ]
 
 [package]
@@ -35,6 +36,7 @@ jona-engine-llama = { path = "crates/jona-engine-llama" }
 jona-engine-bert = { path = "crates/jona-engine-bert" }
 jona-engine-pcs = { path = "crates/jona-engine-pcs" }
 jona-engine-correction = { path = "crates/jona-engine-correction" }
+jona-engine-spellcheck = { path = "crates/jona-engine-spellcheck" }
 
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 

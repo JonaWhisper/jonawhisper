@@ -1,30 +1,41 @@
-//! SymSpell-based spell correction with large frequency dictionaries.
+//! SymSpell-based spell correction with downloadable per-language dictionaries.
 //!
-//! FR: 645K words from Lexique383 + DELA (book + film corpus frequencies) + 5K bigrams.
-//! EN: 82K words from SymSpell official frequency dictionary + 242K bigrams.
+//! Dictionaries are downloaded as "spellcheck" engine models (freq.txt + bigram.txt).
+//! Stored in ~/Library/Application Support/JonaWhisper/models/spellcheck/{lang}/
 //!
 //! Features:
 //! - Frequency-weighted suggestions (prefers common words)
 //! - `lookup_compound` for phrase-level correction (handles word boundary errors)
-//! - Sub-millisecond per-word lookup (vs ~10ms for Hunspell suggest)
+//! - Sub-millisecond per-word lookup
 
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
 
-static DICT_FR_FREQ: &str = include_str!("../../dicts/fr_freq.txt");
-static DICT_FR_BIGRAM: &str = include_str!("../../dicts/fr_bigram.txt");
-static DICT_EN_FREQ: &str = include_str!("../../dicts/en_freq.txt");
-static DICT_EN_BIGRAM: &str = include_str!("../../dicts/en_bigram.txt");
+/// Global cache of loaded SymSpell instances keyed by language code.
+static SS_CACHE: Mutex<Option<HashMap<String, SymSpell<UnicodeStringStrategy>>>> =
+    Mutex::new(None);
 
-static SS_FR: OnceLock<Option<SymSpell<UnicodeStringStrategy>>> = OnceLock::new();
-static SS_EN: OnceLock<Option<SymSpell<UnicodeStringStrategy>>> = OnceLock::new();
+/// Resolve the spellcheck dict directory for a given language.
+fn dict_dir(lang: &str) -> std::path::PathBuf {
+    let code = if lang.starts_with("fr") { "fr" } else { "en" };
+    jona_types::models_dir().join("spellcheck").join(code)
+}
 
-fn load_symspell(
-    freq_data: &str,
-    separator: &str,
-    bigram_data: Option<&str>,
-    lang: &str,
-) -> Option<SymSpell<UnicodeStringStrategy>> {
+fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeStringStrategy>> {
+    let freq_path = dir.join("freq.txt");
+    if !freq_path.exists() {
+        log::warn!("SymSpell {}: freq.txt not found at {}", lang, dir.display());
+        return None;
+    }
+
+    let freq_data = std::fs::read_to_string(&freq_path).ok()?;
+    let bigram_path = dir.join("bigram.txt");
+    let bigram_data = std::fs::read_to_string(&bigram_path).ok();
+
+    // Detect separator: tab for FR (Lexique383 multi-word entries), space for EN
+    let separator = if freq_data.contains('\t') { "\t" } else { " " };
+
     let mut ss = SymSpell::default();
 
     let mut count = 0u32;
@@ -35,7 +46,7 @@ fn load_symspell(
         }
     }
 
-    if let Some(bigrams) = bigram_data {
+    if let Some(ref bigrams) = bigram_data {
         let mut bi_count = 0u32;
         for line in bigrams.lines() {
             if !line.is_empty() {
@@ -43,136 +54,148 @@ fn load_symspell(
                 bi_count += 1;
             }
         }
-        log::info!("SymSpell {}: loaded {} words + {} bigrams", lang, count, bi_count);
+        log::info!(
+            "SymSpell {}: loaded {} words + {} bigrams from {}",
+            lang, count, bi_count, dir.display()
+        );
     } else {
-        log::info!("SymSpell {}: loaded {} words", lang, count);
+        log::info!(
+            "SymSpell {}: loaded {} words from {}",
+            lang, count, dir.display()
+        );
     }
 
     Some(ss)
 }
 
-fn get_ss_fr() -> Option<&'static SymSpell<UnicodeStringStrategy>> {
-    SS_FR
-        .get_or_init(|| load_symspell(DICT_FR_FREQ, "\t", Some(DICT_FR_BIGRAM), "FR"))
-        .as_ref()
+/// Get (or lazily load) the SymSpell instance for a language.
+/// Returns None if the dict is not downloaded.
+fn get_ss(language: &str) -> bool {
+    let code = if language.starts_with("fr") { "fr" } else { "en" };
+
+    let mut guard = SS_CACHE.lock().unwrap();
+    let cache = guard.get_or_insert_with(HashMap::new);
+
+    if cache.contains_key(code) {
+        return true;
+    }
+
+    let dir = dict_dir(language);
+    if let Some(ss) = load_from_dir(&dir, code) {
+        cache.insert(code.to_string(), ss);
+        true
+    } else {
+        false
+    }
 }
 
-fn get_ss_en() -> Option<&'static SymSpell<UnicodeStringStrategy>> {
-    SS_EN
-        .get_or_init(|| load_symspell(DICT_EN_FREQ, " ", Some(DICT_EN_BIGRAM), "EN"))
-        .as_ref()
+/// Run a closure with the SymSpell instance for the given language.
+fn with_ss<T>(language: &str, f: impl FnOnce(&SymSpell<UnicodeStringStrategy>) -> T) -> Option<T> {
+    if !get_ss(language) {
+        return None;
+    }
+    let code = if language.starts_with("fr") { "fr" } else { "en" };
+    let guard = SS_CACHE.lock().unwrap();
+    let cache = guard.as_ref()?;
+    cache.get(code).map(f)
 }
 
 /// Correct text using SymSpell with frequency-weighted suggestions.
 ///
-/// Uses per-word `lookup` (edit distance ≤ 2) with casing preservation,
-/// same approach as the spellbook-based corrector but with a much larger
-/// frequency dictionary.
+/// Uses per-word `lookup` (edit distance ≤ 2) with casing preservation.
+/// Returns text unchanged if the dict for the language is not downloaded.
 pub fn auto_correct(text: &str, language: &str) -> String {
-    let ss = if language.starts_with("fr") {
-        get_ss_fr()
-    } else {
-        get_ss_en()
-    };
+    with_ss(language, |ss| {
+        let mut result = String::with_capacity(text.len());
+        let mut last_end = 0;
 
-    let ss = match ss {
-        Some(s) => s,
-        None => return text.to_string(),
-    };
+        for (start, word) in word_boundaries(text) {
+            result.push_str(&text[last_end..start]);
+            last_end = start + word.len();
 
-    let mut result = String::with_capacity(text.len());
-    let mut last_end = 0;
+            // Skip short words, numbers, acronyms
+            if word.len() <= 1
+                || word.chars().any(|c| c.is_ascii_digit())
+                || word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic())
+            {
+                result.push_str(word);
+                continue;
+            }
 
-    for (start, word) in word_boundaries(text) {
-        result.push_str(&text[last_end..start]);
-        last_end = start + word.len();
+            let lower = word.to_lowercase();
+            let suggestions = ss.lookup(&lower, Verbosity::Top, 2);
 
-        // Skip short words, numbers, acronyms
-        if word.len() <= 1
-            || word.chars().any(|c| c.is_ascii_digit())
-            || word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic())
-        {
-            result.push_str(word);
-            continue;
-        }
-
-        let lower = word.to_lowercase();
-        let suggestions = ss.lookup(&lower, Verbosity::Top, 2);
-
-        if let Some(best) = suggestions.first() {
-            if best.term != lower {
-                let corrected = match_case(word, &best.term);
-                log::debug!("SymSpell: {} → {} (freq={}, dist={})", word, corrected, best.count, best.distance);
-                result.push_str(&corrected);
+            if let Some(best) = suggestions.first() {
+                if best.term != lower {
+                    let corrected = match_case(word, &best.term);
+                    log::debug!(
+                        "SymSpell: {} → {} (freq={}, dist={})",
+                        word, corrected, best.count, best.distance
+                    );
+                    result.push_str(&corrected);
+                } else {
+                    result.push_str(word);
+                }
             } else {
                 result.push_str(word);
             }
-        } else {
-            // No match at all — word unknown, keep as-is
-            result.push_str(word);
         }
-    }
 
-    result.push_str(&text[last_end..]);
-    result
+        result.push_str(&text[last_end..]);
+        result
+    })
+    .unwrap_or_else(|| text.to_string())
 }
 
 /// Correct an entire phrase using SymSpell's compound lookup.
 /// This handles word boundary errors (e.g. "jesuisallé" → "je suis allé").
-/// Only available for languages with bigram data (currently EN).
+/// Returns text unchanged if the dict for the language is not downloaded.
+#[allow(dead_code)]
 pub fn correct_compound(text: &str, language: &str) -> String {
-    let ss = if language.starts_with("fr") {
-        get_ss_fr()
-    } else {
-        get_ss_en()
-    };
+    with_ss(language, |ss| {
+        let mut result = String::with_capacity(text.len());
+        let mut last = 0;
 
-    let ss = match ss {
-        Some(s) => s,
-        None => return text.to_string(),
-    };
-
-    // Process sentence by sentence (split on . ? !)
-    let mut result = String::with_capacity(text.len());
-    let mut last = 0;
-
-    for (i, ch) in text.char_indices() {
-        if ch == '.' || ch == '?' || ch == '!' || ch == '\n' {
-            let sentence = &text[last..i];
-            if !sentence.trim().is_empty() {
-                let suggestions = ss.lookup_compound(sentence.trim(), 2);
-                if let Some(best) = suggestions.first() {
-                    // Preserve leading whitespace
-                    let leading: &str = &text[last..last + sentence.len() - sentence.trim_start().len()];
-                    result.push_str(leading);
-                    result.push_str(&best.term);
+        for (i, ch) in text.char_indices() {
+            if ch == '.' || ch == '?' || ch == '!' || ch == '\n' {
+                let sentence = &text[last..i];
+                if !sentence.trim().is_empty() {
+                    let suggestions = ss.lookup_compound(sentence.trim(), 2);
+                    if let Some(best) = suggestions.first() {
+                        let leading: &str =
+                            &text[last..last + sentence.len() - sentence.trim_start().len()];
+                        result.push_str(leading);
+                        result.push_str(&best.term);
+                    } else {
+                        result.push_str(sentence);
+                    }
                 } else {
                     result.push_str(sentence);
                 }
-            } else {
-                result.push_str(sentence);
+                result.push(ch);
+                last = i + ch.len_utf8();
             }
-            result.push(ch);
-            last = i + ch.len_utf8();
         }
-    }
 
-    // Handle remaining text (no trailing punctuation)
-    let remaining = &text[last..];
-    if !remaining.trim().is_empty() {
-        let suggestions = ss.lookup_compound(remaining.trim(), 2);
-        if let Some(best) = suggestions.first() {
-            let leading: &str = &text[last..last + remaining.len() - remaining.trim_start().len()];
-            result.push_str(leading);
-            result.push_str(&best.term);
+        // Handle remaining text (no trailing punctuation)
+        let remaining = &text[last..];
+        if !remaining.trim().is_empty() {
+            let suggestions = ss.lookup_compound(remaining.trim(), 2);
+            if let Some(best) = suggestions.first() {
+                let leading: &str =
+                    &text[last..last + remaining.len() - remaining.trim_start().len()];
+                result.push_str(leading);
+                result.push_str(&best.term);
+            } else {
+                result.push_str(remaining);
+            }
         } else {
             result.push_str(remaining);
         }
-    } else {
-        result.push_str(remaining);
-    }
 
-    result
+        result
+    })
+    .unwrap_or_else(|| text.to_string())
 }
 
 // --- Shared helpers (same as spellcheck.rs) ---
@@ -230,35 +253,71 @@ fn match_case(original: &str, suggestion: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Once;
+
+    static SETUP: Once = Once::new();
+
+    /// Copy bundled dicts from src-tauri/dicts/ to the model directory
+    /// so that the disk-based loader finds them during tests.
+    fn ensure_test_dicts() {
+        SETUP.call_once(|| {
+            let dicts_src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("dicts");
+            let model_base = jona_types::models_dir().join("spellcheck");
+
+            for (lang, freq_name, bigram_name) in [
+                ("fr", "fr_freq.txt", "fr_bigram.txt"),
+                ("en", "en_freq.txt", "en_bigram.txt"),
+            ] {
+                let dest = model_base.join(lang);
+                std::fs::create_dir_all(&dest).ok();
+                let freq_src = dicts_src.join(freq_name);
+                let bi_src = dicts_src.join(bigram_name);
+                if freq_src.exists() {
+                    std::fs::copy(&freq_src, dest.join("freq.txt")).ok();
+                }
+                if bi_src.exists() {
+                    std::fs::copy(&bi_src, dest.join("bigram.txt")).ok();
+                }
+            }
+        });
+    }
 
     // --- Dictionary loading ---
 
     #[test]
     fn test_fr_lookup_known_word() {
-        let ss = get_ss_fr().expect("FR dict should load");
-        let results = ss.lookup("bonjour", Verbosity::Top, 2);
-        assert!(!results.is_empty());
-        assert_eq!(results[0].term, "bonjour");
+        ensure_test_dicts();
+        let loaded = with_ss("fr", |ss| {
+            let results = ss.lookup("bonjour", Verbosity::Top, 2);
+            assert!(!results.is_empty());
+            assert_eq!(results[0].term, "bonjour");
+        });
+        assert!(loaded.is_some(), "FR dict should load");
     }
 
     #[test]
     fn test_en_lookup_known_word() {
-        let ss = get_ss_en().expect("EN dict should load");
-        let results = ss.lookup("hello", Verbosity::Top, 2);
-        assert!(!results.is_empty());
-        assert_eq!(results[0].term, "hello");
+        ensure_test_dicts();
+        let loaded = with_ss("en", |ss| {
+            let results = ss.lookup("hello", Verbosity::Top, 2);
+            assert!(!results.is_empty());
+            assert_eq!(results[0].term, "hello");
+        });
+        assert!(loaded.is_some(), "EN dict should load");
     }
 
     // --- FR auto_correct ---
 
     #[test]
     fn test_fr_correct_misspelled() {
+        ensure_test_dicts();
         let result = auto_correct("Bonojur le monde", "fr");
         assert!(result.contains("Bonjour"), "Expected 'Bonjour' in: {}", result);
     }
 
     #[test]
     fn test_fr_correct_multiple_errors() {
+        ensure_test_dicts();
         let result = auto_correct("le problme est compliqu", "fr");
         assert!(result.contains("problème") || result.contains("probleme"),
             "Expected correction in: {}", result);
@@ -266,6 +325,7 @@ mod tests {
 
     #[test]
     fn test_fr_known_words_unchanged() {
+        ensure_test_dicts();
         let result = auto_correct("je suis content de te voir", "fr");
         assert_eq!(result, "je suis content de te voir");
     }
@@ -274,12 +334,14 @@ mod tests {
 
     #[test]
     fn test_en_correct_misspelled() {
+        ensure_test_dicts();
         let result = auto_correct("the quik brown fox", "en");
         assert!(result.contains("quick"), "Expected 'quick' in: {}", result);
     }
 
     #[test]
     fn test_en_known_words_unchanged() {
+        ensure_test_dicts();
         let result = auto_correct("the quick brown fox", "en");
         assert_eq!(result, "the quick brown fox");
     }
@@ -288,30 +350,35 @@ mod tests {
 
     #[test]
     fn test_preserves_punctuation() {
+        ensure_test_dicts();
         let result = auto_correct("Hello, world!", "en");
         assert_eq!(result, "Hello, world!");
     }
 
     #[test]
     fn test_preserves_casing_allcaps() {
+        ensure_test_dicts();
         let result = auto_correct("HELLO world", "en");
         assert!(result.contains("HELLO"), "ALL CAPS should be preserved");
     }
 
     #[test]
     fn test_preserves_casing_titlecase() {
+        ensure_test_dicts();
         let result = auto_correct("Bonojur le monde", "fr");
         assert!(result.starts_with("B"), "Title case should be preserved: {}", result);
     }
 
     #[test]
     fn test_preserves_newlines() {
+        ensure_test_dicts();
         let result = auto_correct("hello\nworld", "en");
         assert_eq!(result, "hello\nworld");
     }
 
     #[test]
     fn test_preserves_multiple_spaces() {
+        ensure_test_dicts();
         let result = auto_correct("hello  world", "en");
         assert_eq!(result, "hello  world");
     }
@@ -320,6 +387,7 @@ mod tests {
 
     #[test]
     fn test_skips_single_char() {
+        ensure_test_dicts();
         let result = auto_correct("I a m here", "en");
         // Single chars 'I', 'a', 'm' should be untouched
         assert!(result.contains("I"), "Single char 'I' should be preserved");
@@ -327,18 +395,21 @@ mod tests {
 
     #[test]
     fn test_skips_numbers() {
+        ensure_test_dicts();
         let result = auto_correct("test123 hello", "en");
         assert!(result.contains("test123"), "Words with digits should be preserved");
     }
 
     #[test]
     fn test_skips_acronyms() {
+        ensure_test_dicts();
         let result = auto_correct("NASA is great", "en");
         assert!(result.contains("NASA"), "Acronyms should be preserved");
     }
 
     #[test]
     fn test_handles_apostrophes() {
+        ensure_test_dicts();
         let result = auto_correct("l'homme est là", "fr");
         // Apostrophe words should be handled without crashing
         assert!(!result.is_empty());
@@ -346,6 +417,7 @@ mod tests {
 
     #[test]
     fn test_handles_hyphens() {
+        ensure_test_dicts();
         let result = auto_correct("peut-être aujourd'hui", "fr");
         assert!(!result.is_empty());
     }
@@ -371,6 +443,7 @@ mod tests {
 
     #[test]
     fn test_compound_en() {
+        ensure_test_dicts();
         let result = correct_compound("the bigest problem", "en");
         assert!(result.contains("biggest") || result.contains("bigest"),
             "Expected compound correction in: {}", result);
@@ -378,6 +451,7 @@ mod tests {
 
     #[test]
     fn test_compound_preserves_punctuation() {
+        ensure_test_dicts();
         let result = correct_compound("hello world.", "en");
         assert!(result.contains("."), "Sentence-final dot should be preserved");
     }
@@ -386,6 +460,7 @@ mod tests {
 
     #[test]
     fn test_fr_prefix_routes_to_french() {
+        ensure_test_dicts();
         // "fr-FR" should use French dict
         let result = auto_correct("Bonojur", "fr-FR");
         assert!(result.contains("Bonjour"), "fr-FR should route to FR: {}", result);
@@ -393,6 +468,7 @@ mod tests {
 
     #[test]
     fn test_unknown_lang_routes_to_english() {
+        ensure_test_dicts();
         // Non-fr language defaults to English
         let result = auto_correct("helo", "de");
         assert!(!result.is_empty());

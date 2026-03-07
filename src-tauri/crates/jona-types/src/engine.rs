@@ -23,6 +23,7 @@ pub enum EngineCategory {
     LLM,
     Punctuation,
     Correction,
+    SpellCheck,
 }
 
 // -- Download type --

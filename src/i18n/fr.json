@@ -168,6 +168,7 @@
   "models.filter.punctuation": "Ponctuation",
   "models.filter.correction": "Correction",
   "models.filter.llm": "Reformulation",
+  "models.filter.spellcheck": "Dictionnaires",
   "menu.panel": "R\u00e9glages\u2026",
   "window.panel": "JonaWhisper"
 }
