@@ -111,12 +111,11 @@ See [docs/TEXT-PIPELINE.md](docs/TEXT-PIPELINE.md) for the full architecture.
 ## Build
 
 ```bash
-npm install
 ./build.sh
 open build/JonaWhisper.app
 ```
 
-The build script produces `build/JonaWhisper.app` and `build/JonaWhisper.dmg`. Tauri handles code signing automatically — if a Developer certificate is available (via `APPLE_SIGNING_IDENTITY`), the app is signed with hardened runtime and entitlements. Notarization is supported via `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` environment variables.
+The build script installs npm dependencies automatically, then produces `build/JonaWhisper.app` and `build/JonaWhisper.dmg`. Tauri handles code signing automatically — if a Developer certificate is available (via `APPLE_SIGNING_IDENTITY`), the app is signed with hardened runtime and entitlements. Notarization is supported via `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` environment variables.
 
 For a debug build:
 
@@ -131,7 +130,7 @@ npm install
 npm run tauri dev
 ```
 
-This starts the Vite dev server with hot reload for the frontend. Rust changes trigger a rebuild automatically.
+This starts the Vite dev server with hot reload for the frontend. Rust changes trigger a rebuild automatically. Note: `npm install` is only needed once for dev mode — `build.sh` handles it automatically for production builds.
 
 ## Permissions
 
