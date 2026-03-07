@@ -36,8 +36,9 @@ impl T5Context {
 
         let n_threads = jona_engines::ort_session::inference_threads();
 
-        let encoder_path = model_dir.join("encoder_model.onnx");
-        let decoder_path = model_dir.join("decoder_model.onnx");
+        // Prefer INT8 quantized models if available (75% smaller, ~2-3x faster)
+        let encoder_path = prefer_int8(model_dir, "encoder_model");
+        let decoder_path = prefer_int8(model_dir, "decoder_model");
 
         if !encoder_path.exists() {
             return Err(format!("Encoder not found: {}", encoder_path.display()));
@@ -75,6 +76,16 @@ impl T5Context {
             eos_id,
         })
     }
+}
+
+/// Return INT8 path if it exists, otherwise FP32.
+fn prefer_int8(model_dir: &Path, base_name: &str) -> std::path::PathBuf {
+    let int8 = model_dir.join(format!("{base_name}_int8.onnx"));
+    if int8.exists() {
+        log::info!("Using INT8 model: {}", int8.display());
+        return int8;
+    }
+    model_dir.join(format!("{base_name}.onnx"))
 }
 
 fn parse_eos_id(config: &T5Config) -> i64 {
