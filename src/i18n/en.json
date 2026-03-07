@@ -70,6 +70,7 @@
   "settings.postProcessing.disfluencyRemoval": "Remove filler words",
   "settings.postProcessing.itn": "Normalize numbers",
   "settings.postProcessing.spellcheck": "Spell check",
+  "settings.postProcessing.spellcheckNoDict": "Download a dictionary in Models",
   "settings.postProcessing.punctuation": "Punctuation",
   "settings.postProcessing.textCleanup": "Text cleanup",
   "settings.cleanup.recommended": "Recommended",

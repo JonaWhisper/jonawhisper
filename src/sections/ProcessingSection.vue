@@ -146,12 +146,16 @@ function onMaxTokensSliderCommit(v: number[]) {
       </div>
 
       <!-- Spell-check -->
-      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
+      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider" :class="{ 'opacity-40': !engines.hasSpellcheckDict }">
         <div>
           <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.spellcheck') }}</div>
+          <div v-if="!engines.hasSpellcheckDict" class="text-[11px] text-muted-foreground">
+            {{ t('settings.postProcessing.spellcheckNoDict') }}
+          </div>
         </div>
         <Switch
           :model-value="settings.spellcheckEnabled"
+          :disabled="!engines.hasSpellcheckDict"
           @update:model-value="(v: boolean) => settings.setSetting('spellcheck_enabled', String(v))"
         />
       </div>
