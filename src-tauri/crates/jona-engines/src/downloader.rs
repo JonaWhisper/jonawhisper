@@ -56,15 +56,28 @@ pub fn partial_progress(model: &ASRModel) -> Option<f64> {
             // Sum completed files + any current partial file
             let model_dir = model.local_path();
             let mut completed_bytes: u64 = 0;
+            let mut all_complete = true;
             for f in files {
                 let file_path = model_dir.join(&f.filename);
                 if file_path.exists() {
                     completed_bytes += f.size;
                 } else {
+                    all_complete = false;
                     // Check for partial
                     let p = multi_file_partial_path(model, &f.filename);
                     completed_bytes += fs::metadata(p).map(|m| m.len()).unwrap_or(0);
                 }
+            }
+            // All files present but marker missing — write it now (crash recovery)
+            if all_complete {
+                if let Some(marker) = &model.download_marker {
+                    let marker_path = model_dir.join(marker);
+                    if !marker_path.exists() {
+                        let _ = fs::write(&marker_path, "");
+                        log::info!("Recovered missing completion marker for {}", model.id);
+                    }
+                }
+                return None;
             }
             let total: u64 = files.iter().map(|f| f.size).sum();
             if completed_bytes > 0 && total > 0 {
@@ -677,6 +690,41 @@ mod tests {
             ..Default::default()
         };
         assert!(partial_progress(&model).is_none());
+    }
+
+    #[test]
+    fn partial_progress_multifile_all_complete_recovers_marker() {
+        let dir = std::env::temp_dir().join("jona_test_multifile_recovery");
+        let model_dir = dir.join("spellcheck_en");
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::create_dir_all(&model_dir);
+
+        // Write all files but NO .complete marker
+        std::fs::write(model_dir.join("freq.txt"), "word 100").unwrap();
+        std::fs::write(model_dir.join("bigram.txt"), "a b 50").unwrap();
+
+        let model = ASRModel {
+            id: "spellcheck:en".to_string(),
+            storage_dir: dir.to_string_lossy().to_string(),
+            filename: "spellcheck_en".to_string(),
+            size: 1000,
+            download_marker: Some(".complete".to_string()),
+            download_type: DownloadType::MultiFile {
+                files: vec![
+                    DownloadFile { url: String::new(), filename: "freq.txt".into(), size: 500 },
+                    DownloadFile { url: String::new(), filename: "bigram.txt".into(), size: 500 },
+                ],
+            },
+            ..Default::default()
+        };
+
+        // Before fix: would return Some(0.99), model shows as "paused"
+        // After fix: returns None, auto-writes .complete marker
+        assert!(partial_progress(&model).is_none());
+        assert!(model_dir.join(".complete").exists());
+        assert!(model.is_downloaded());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
