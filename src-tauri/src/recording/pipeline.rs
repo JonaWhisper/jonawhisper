@@ -242,9 +242,13 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     pipeline_steps.push(("punctuation", processed.clone()));
                 } else {
                     processed = cleaned;
+                    pipeline_steps.push(("punctuation:nochange", String::new()));
                 }
             }
-            Err(e) => log::warn!("Punctuation failed, continuing: {}", e),
+            Err(e) => {
+                log::warn!("Punctuation failed, continuing: {}", e);
+                pipeline_steps.push(("punctuation:error", e.to_string()));
+            }
         }
     }
 
@@ -255,6 +259,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         if processed != before {
             log::debug!("SymSpell: «{}» → «{}»", before, processed);
             pipeline_steps.push(("spellcheck", processed.clone()));
+        } else {
+            pipeline_steps.push(("spellcheck:nochange", String::new()));
         }
     }
 
@@ -291,9 +297,14 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     effective_cleanup_model_id = cleanup_model_id.clone();
                     if changed {
                         pipeline_steps.push(("correction", processed.clone()));
+                    } else {
+                        pipeline_steps.push(("correction:nochange", String::new()));
                     }
                 }
-                Err(e) => log::warn!("Cloud LLM cleanup failed (fallback to raw): {}", e),
+                Err(e) => {
+                    log::warn!("Cloud LLM cleanup failed (fallback to raw): {}", e);
+                    pipeline_steps.push(("correction:error", e.to_string()));
+                }
             }
         } else {
             // Local engine cleanup — dynamic dispatch via ASREngine trait
@@ -324,9 +335,14 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                             effective_cleanup_model_id = cleanup_model_id.clone();
                             if changed {
                                 pipeline_steps.push(("correction", processed.clone()));
+                            } else {
+                                pipeline_steps.push(("correction:nochange", String::new()));
                             }
                         }
-                        Err(e) => log::warn!("{} cleanup failed, using preprocessed result: {}", model.engine_id, e),
+                        Err(e) => {
+                            log::warn!("{} cleanup failed, using preprocessed result: {}", model.engine_id, e);
+                            pipeline_steps.push(("correction:error", e.to_string()));
+                        }
                     }
                 } else {
                     log::warn!("Unknown cleanup engine for model: {}", cleanup_model_id);
@@ -351,6 +367,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         processed = cleanup::itn::apply_itn(&processed, &lang);
         if processed != before {
             pipeline_steps.push(("itn", processed.clone()));
+        } else {
+            pipeline_steps.push(("itn:nochange", String::new()));
         }
     }
 

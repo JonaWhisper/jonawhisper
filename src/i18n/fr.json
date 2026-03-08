@@ -140,6 +140,8 @@
   "history.badge.disfluency": "Disfluences",
   "history.badge.disfluencyTooltip": "Suppression des h\u00e9sitations",
   "history.badge.itnTooltip": "Normalisation du texte (nombres, dates\u2026)",
+  "history.badge.noChange": "aucun changement",
+  "history.badge.error": "erreur",
   "shortcutCapture.waiting": "Appuyez sur un raccourci\u2026",
   "shortcutCapture.side.right": "Droit",
   "shortcutCapture.side.left": "Gauche",

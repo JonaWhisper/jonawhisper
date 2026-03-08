@@ -129,6 +129,28 @@ const stepsWithDiff = computed(() => {
   return names
 })
 
+// Steps that ran but produced no change (step:nochange markers)
+const stepsNoChange = computed(() => {
+  const names = new Set<string>()
+  for (const s of pipelineSteps.value) {
+    if (s.step.endsWith(':nochange')) {
+      names.add(s.step.replace(':nochange', ''))
+    }
+  }
+  return names
+})
+
+// Steps that failed with an error (step:error markers)
+const stepsError = computed(() => {
+  const names = new Set<string>()
+  for (const s of pipelineSteps.value) {
+    if (s.step.endsWith(':error')) {
+      names.add(s.step.replace(':error', ''))
+    }
+  }
+  return names
+})
+
 // -- Pipeline stepper UI --
 
 interface PipelineIcon {
@@ -136,6 +158,8 @@ interface PipelineIcon {
   icon: typeof Mic
   active: boolean
   hasDiff: boolean
+  noChange: boolean   // ran but produced no change
+  hasError: boolean   // ran but failed
   tooltip: string
   color: string       // active color classes
 }
@@ -152,6 +176,8 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: isCloud ? Cloud : Mic,
     active: true,
     hasDiff: false,
+    noChange: false,
+    hasError: false,
     tooltip: asrLabel + (e.language ? ` (${e.language})` : ''),
     color: isCloud ? 'text-sky-500' : 'text-blue-500',
   })
@@ -162,6 +188,8 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: Scissors,
     active: !!e.vad_trimmed,
     hasDiff: false,
+    noChange: false,
+    hasError: false,
     tooltip: t('history.badge.vad'),
     color: 'text-emerald-500',
   })
@@ -172,6 +200,8 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: ShieldCheck,
     active: !!e.hallucination_filter,
     hasDiff: false,
+    noChange: false,
+    hasError: false,
     tooltip: t('history.badge.hallucination'),
     color: 'text-rose-500',
   })
@@ -182,6 +212,8 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: Eraser,
     active: !!e.disfluency_removal,
     hasDiff: false,
+    noChange: false,
+    hasError: false,
     tooltip: t('history.badge.disfluencyTooltip'),
     color: 'text-pink-500',
   })
@@ -193,7 +225,9 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: Type,
     active: !!e.punctuation_model_id,
     hasDiff: stepsWithDiff.value.has('punctuation'),
-    tooltip: punctLabel,
+    noChange: stepsNoChange.value.has('punctuation'),
+    hasError: stepsError.value.has('punctuation'),
+    tooltip: punctLabel + (stepsNoChange.value.has('punctuation') ? ` (${t('history.badge.noChange')})` : '') + (stepsError.value.has('punctuation') ? ` (${t('history.badge.error')})` : ''),
     color: 'text-violet-500',
   })
 
@@ -203,7 +237,9 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: BookA,
     active: !!e.spellcheck,
     hasDiff: stepsWithDiff.value.has('spellcheck'),
-    tooltip: t('history.badge.spellcheckTooltip'),
+    noChange: stepsNoChange.value.has('spellcheck'),
+    hasError: stepsError.value.has('spellcheck'),
+    tooltip: t('history.badge.spellcheckTooltip') + (stepsNoChange.value.has('spellcheck') ? ` (${t('history.badge.noChange')})` : '') + (stepsError.value.has('spellcheck') ? ` (${t('history.badge.error')})` : ''),
     color: 'text-lime-600',
   })
 
@@ -214,7 +250,9 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: e.cleanup_model_id && parseCloudId(e.cleanup_model_id) ? MessageSquare : SpellCheck,
     active: !!e.cleanup_model_id,
     hasDiff: stepsWithDiff.value.has('correction'),
-    tooltip: cleanupLabel,
+    noChange: stepsNoChange.value.has('correction'),
+    hasError: stepsError.value.has('correction'),
+    tooltip: cleanupLabel + (stepsNoChange.value.has('correction') ? ` (${t('history.badge.noChange')})` : '') + (stepsError.value.has('correction') ? ` (${t('history.badge.error')})` : ''),
     color: 'text-amber-500',
   })
 
@@ -224,7 +262,9 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     icon: Hash,
     active: !!e.itn,
     hasDiff: stepsWithDiff.value.has('itn'),
-    tooltip: t('history.badge.itnTooltip'),
+    noChange: stepsNoChange.value.has('itn'),
+    hasError: false,
+    tooltip: t('history.badge.itnTooltip') + (stepsNoChange.value.has('itn') ? ` (${t('history.badge.noChange')})` : ''),
     color: 'text-cyan-500',
   })
 
@@ -274,19 +314,25 @@ watch(() => props.entry.timestamp, () => {
             <Tooltip>
               <TooltipTrigger as-child>
                 <button
-                  class="w-5 h-5 flex items-center justify-center rounded-full transition-all duration-150 shrink-0"
+                  class="relative w-5 h-5 flex items-center justify-center rounded-full transition-all duration-150 shrink-0"
                   :class="[
                     !step.active
                       ? 'text-muted-foreground/25 cursor-default'
-                      : step.hasDiff
-                        ? 'cursor-pointer hover:bg-muted/80 ' + step.color
-                        : 'text-foreground/70 cursor-default',
+                      : step.hasError
+                        ? 'text-destructive cursor-default'
+                        : step.hasDiff
+                          ? 'cursor-pointer hover:bg-muted/80 ' + step.color
+                          : step.noChange
+                            ? 'text-muted-foreground/50 cursor-default'
+                            : 'text-foreground/70 cursor-default',
                     activeDiffStep === step.id ? 'ring-1.5 ring-current bg-current/10 scale-110' : '',
                   ]"
                   :disabled="!step.hasDiff"
                   @click="step.hasDiff && toggleDiffStep(step.id)"
                 >
                   <component :is="step.icon" class="h-3 w-3" />
+                  <span v-if="step.noChange" class="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-[2px] rounded-full bg-muted-foreground/40" />
+                  <span v-if="step.hasError" class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-destructive" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" :side-offset="4">
