@@ -159,7 +159,7 @@ impl AppState {
         }
     }
 
-    pub fn get_history(&self, query: &str, limit: u32, cursor: Option<u64>) -> Vec<HistoryEntry> {
+    pub fn get_history(&self, query: &str, limit: u32, cursor: Option<u64>) -> Result<Vec<HistoryEntry>, rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
         const COLS: &str = "timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn";
         let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match (query.is_empty(), cursor) {
@@ -186,9 +186,9 @@ impl AppState {
                 )
             }
         };
-        let mut stmt = db.prepare(&sql).unwrap();
+        let mut stmt = db.prepare(&sql)?;
         let params_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| p.as_ref()).collect();
-        stmt.query_map(params_refs.as_slice(), |row| {
+        let entries = stmt.query_map(params_refs.as_slice(), |row| {
             Ok(HistoryEntry {
                 timestamp: row.get(0)?,
                 text: row.get(1)?,
@@ -202,16 +202,17 @@ impl AppState {
                 disfluency_removal: row.get(9)?,
                 itn: row.get(10)?,
             })
-        }).unwrap().filter_map(|r| r.ok()).collect()
+        })?.filter_map(|r| r.ok()).collect();
+        Ok(entries)
     }
 
-    pub fn history_count(&self, query: &str) -> u32 {
+    pub fn history_count(&self, query: &str) -> Result<u32, rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
         if query.is_empty() {
-            db.query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0)).unwrap_or(0)
+            db.query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0))
         } else {
             let pattern = format!("%{}%", query);
-            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1", [&pattern], |row| row.get(0)).unwrap_or(0)
+            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1", [&pattern], |row| row.get(0))
         }
     }
 
@@ -300,7 +301,7 @@ mod tests {
         let state = AppState::test_instance();
         state.add_history_at(1000, entry("Bonjour le monde", "whisper:large-v3", "fr"));
 
-        let results = state.get_history("", 10, None);
+        let results = state.get_history("", 10, None).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].text, "Bonjour le monde");
         assert_eq!(results[0].model_id, "whisper:large-v3");
@@ -314,7 +315,7 @@ mod tests {
         state.add_history_at(300, entry("Third", "whisper:tiny", "en"));
         state.add_history_at(200, entry("Second", "whisper:tiny", "en"));
 
-        let results = state.get_history("", 10, None);
+        let results = state.get_history("", 10, None).unwrap();
         assert_eq!(results[0].text, "Third");
         assert_eq!(results[1].text, "Second");
         assert_eq!(results[2].text, "First");
@@ -323,12 +324,12 @@ mod tests {
     #[test]
     fn history_count_reflects_total() {
         let state = AppState::test_instance();
-        assert_eq!(state.history_count(""), 0);
+        assert_eq!(state.history_count("").unwrap(), 0);
 
         state.add_history_at(100, entry("One", "", ""));
         state.add_history_at(200, entry("Two", "", ""));
         state.add_history_at(300, entry("Three", "", ""));
-        assert_eq!(state.history_count(""), 3);
+        assert_eq!(state.history_count("").unwrap(), 3);
     }
 
     #[test]
@@ -338,7 +339,7 @@ mod tests {
             state.add_history_at(i, entry(&format!("Entry {}", i), "", ""));
         }
 
-        let results = state.get_history("", 5, None);
+        let results = state.get_history("", 5, None).unwrap();
         assert_eq!(results.len(), 5);
     }
 
@@ -352,14 +353,14 @@ mod tests {
         state.add_history_at(300, entry("Recent", "", ""));
 
         // First page: most recent
-        let page1 = state.get_history("", 2, None);
+        let page1 = state.get_history("", 2, None).unwrap();
         assert_eq!(page1.len(), 2);
         assert_eq!(page1[0].text, "Recent");
         assert_eq!(page1[1].text, "Middle");
 
         // Second page: cursor = timestamp of last entry on page 1
         let cursor = page1[1].timestamp;
-        let page2 = state.get_history("", 2, Some(cursor));
+        let page2 = state.get_history("", 2, Some(cursor)).unwrap();
         assert_eq!(page2.len(), 1);
         assert_eq!(page2[0].text, "Old");
     }
@@ -369,7 +370,7 @@ mod tests {
         let state = AppState::test_instance();
         state.add_history_at(100, entry("Only one", "", ""));
 
-        let results = state.get_history("", 10, Some(50));
+        let results = state.get_history("", 10, Some(50)).unwrap();
         assert!(results.is_empty());
     }
 
@@ -382,7 +383,7 @@ mod tests {
         state.add_history_at(200, entry("Hello world", "", "en"));
         state.add_history_at(300, entry("Bonsoir tout le monde", "", "fr"));
 
-        let results = state.get_history("monde", 10, None);
+        let results = state.get_history("monde", 10, None).unwrap();
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|e| e.text.contains("monde")));
     }
@@ -393,7 +394,7 @@ mod tests {
         state.add_history_at(100, entry("BONJOUR", "", ""));
 
         // SQLite LIKE is case-insensitive for ASCII
-        let results = state.get_history("bonjour", 10, None);
+        let results = state.get_history("bonjour", 10, None).unwrap();
         assert_eq!(results.len(), 1);
     }
 
@@ -404,9 +405,9 @@ mod tests {
         state.add_history_at(200, entry("Hello", "", ""));
         state.add_history_at(300, entry("Bon appétit", "", ""));
 
-        assert_eq!(state.history_count("Bon"), 2);
-        assert_eq!(state.history_count("Hello"), 1);
-        assert_eq!(state.history_count("xyz"), 0);
+        assert_eq!(state.history_count("Bon").unwrap(), 2);
+        assert_eq!(state.history_count("Hello").unwrap(), 1);
+        assert_eq!(state.history_count("xyz").unwrap(), 0);
     }
 
     #[test]
@@ -416,11 +417,11 @@ mod tests {
         state.add_history_at(200, entry("Hello", "", ""));
         state.add_history_at(300, entry("Bonjour B", "", ""));
 
-        let page1 = state.get_history("Bonjour", 1, None);
+        let page1 = state.get_history("Bonjour", 1, None).unwrap();
         assert_eq!(page1.len(), 1);
         assert_eq!(page1[0].text, "Bonjour B");
 
-        let page2 = state.get_history("Bonjour", 1, Some(page1[0].timestamp));
+        let page2 = state.get_history("Bonjour", 1, Some(page1[0].timestamp)).unwrap();
         assert_eq!(page2.len(), 1);
         assert_eq!(page2[0].text, "Bonjour A");
     }
@@ -434,7 +435,7 @@ mod tests {
         state.add_history_at(200, entry("Delete me", "", ""));
 
         state.delete_history_entry(200);
-        let results = state.get_history("", 10, None);
+        let results = state.get_history("", 10, None).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].text, "Keep me");
     }
@@ -450,7 +451,7 @@ mod tests {
 
         state.delete_history_day(day_start);
 
-        let results = state.get_history("", 10, None);
+        let results = state.get_history("", 10, None).unwrap();
         assert_eq!(results.len(), 2);
         assert!(results.iter().any(|e| e.text == "Next day"));
         assert!(results.iter().any(|e| e.text == "Previous day"));
@@ -462,11 +463,11 @@ mod tests {
         for i in 0..10 {
             state.add_history_at(i * 100, entry(&format!("Entry {}", i), "", ""));
         }
-        assert_eq!(state.history_count(""), 10);
+        assert_eq!(state.history_count("").unwrap(), 10);
 
         state.clear_history();
-        assert_eq!(state.history_count(""), 0);
-        assert!(state.get_history("", 10, None).is_empty());
+        assert_eq!(state.history_count("").unwrap(), 0);
+        assert!(state.get_history("", 10, None).unwrap().is_empty());
     }
 
     // -- Metadata preservation --
@@ -488,7 +489,7 @@ mod tests {
             itn: true,
         });
 
-        let results = state.get_history("", 10, None);
+        let results = state.get_history("", 10, None).unwrap();
         let e = &results[0];
         assert_eq!(e.cleanup_model_id, "correction:gec-t5-small");
         assert!(e.hallucination_filter);

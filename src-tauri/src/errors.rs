@@ -6,6 +6,8 @@ pub enum AppError {
     Engine(#[from] EngineError),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Database error: {0}")]
+    Database(#[from] rusqlite::Error),
     #[error("{0}")]
     Other(String),
 }

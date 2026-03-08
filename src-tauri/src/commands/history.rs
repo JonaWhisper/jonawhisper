@@ -1,3 +1,4 @@
+use crate::errors::AppError;
 use crate::state::{AppState, HistoryEntry};
 use serde::Serialize;
 use std::sync::Arc;
@@ -9,10 +10,10 @@ pub struct HistoryPage {
 }
 
 #[tauri::command]
-pub fn get_history(query: String, limit: u32, cursor: Option<u64>, state: tauri::State<'_, Arc<AppState>>) -> HistoryPage {
-    let entries = state.get_history(&query, limit, cursor);
-    let total = state.history_count(&query);
-    HistoryPage { entries, total }
+pub fn get_history(query: String, limit: u32, cursor: Option<u64>, state: tauri::State<'_, Arc<AppState>>) -> Result<HistoryPage, AppError> {
+    let entries = state.get_history(&query, limit, cursor)?;
+    let total = state.history_count(&query)?;
+    Ok(HistoryPage { entries, total })
 }
 
 #[tauri::command]
