@@ -79,6 +79,7 @@ ndarray = "0.17"
 tokenizers.workspace = true
 prost = "0.13"
 symspell = "0.4.5"
+rphonetic = { version = "3.0", features = ["embedded_bm"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }

@@ -14,10 +14,15 @@
 //! - Sub-millisecond per-word lookup
 
 use jona_engine_lm::KenLMModel;
+use rphonetic::DoubleMetaphone;
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::time::SystemTime;
 use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
+
+/// Double Metaphone encoder for phonetic similarity scoring.
+/// Works reasonably well across European languages for ASR error patterns.
+static DMETA: LazyLock<DoubleMetaphone> = LazyLock::new(DoubleMetaphone::default);
 
 /// User dictionary: words the user defined that should never be corrected.
 struct UserDict {
@@ -267,6 +272,43 @@ fn with_lm<T>(language: &str, f: impl FnOnce(&KenLMModel) -> T) -> Option<T> {
     cache.get(base_code).map(f)
 }
 
+/// Check if a candidate is phonetically plausible as a correction for the input.
+/// Uses Double Metaphone: if either the primary or alternate codes match, it's plausible.
+/// Returns true if the candidate sounds similar enough to the input.
+fn is_phonetically_plausible(input: &str, candidate: &str) -> bool {
+    if input == candidate {
+        return true;
+    }
+    let in_result = DMETA.double_metaphone(input);
+    let cand_result = DMETA.double_metaphone(candidate);
+
+    let in_primary = in_result.primary();
+    let in_alternate = in_result.alternate();
+    let cand_primary = cand_result.primary();
+    let cand_alternate = cand_result.alternate();
+
+    // Empty codes mean the encoder couldn't process it — allow through
+    if in_primary.is_empty() || cand_primary.is_empty() {
+        return true;
+    }
+
+    // Match if any combination of primary/alternate codes match
+    if in_primary == cand_primary {
+        return true;
+    }
+    if !in_alternate.is_empty() && in_alternate == cand_primary {
+        return true;
+    }
+    if !cand_alternate.is_empty() && in_primary == cand_alternate {
+        return true;
+    }
+    if !in_alternate.is_empty() && !cand_alternate.is_empty() && in_alternate == cand_alternate {
+        return true;
+    }
+
+    false
+}
+
 /// Correct text using SymSpell with context-aware KenLM reranking.
 ///
 /// When a KenLM model is available for the language:
@@ -320,26 +362,40 @@ pub fn auto_correct(text: &str, language: &str) -> String {
             // Word is unknown — generate correction candidates
             if have_lm {
                 // Context-aware correction: get all candidates at minimum edit distance
-                let candidates = ss.lookup(&lower, Verbosity::Closest, 2);
-                if candidates.is_empty() {
+                let all_candidates = ss.lookup(&lower, Verbosity::Closest, 2);
+                if all_candidates.is_empty() {
                     result.push_str(word);
                     continue;
                 }
 
-                if candidates.len() == 1 {
+                // Filter by phonetic plausibility (ASR errors sound similar)
+                let candidates: Vec<_> = all_candidates
+                    .iter()
+                    .filter(|c| is_phonetically_plausible(&lower, &c.term))
+                    .collect();
+
+                // If phonetic filter removed everything, fall back to all candidates
+                let candidates_ref: Vec<&symspell::Suggestion> = if candidates.is_empty() {
+                    all_candidates.iter().collect()
+                } else {
+                    candidates
+                };
+
+                if candidates_ref.len() == 1 {
                     // Single candidate — use it directly
-                    let corrected = match_case(word, &candidates[0].term);
+                    let corrected = match_case(word, &candidates_ref[0].term);
                     log::debug!(
                         "SymSpell+LM: {} → {} (single candidate, dist={})",
-                        word, corrected, candidates[0].distance
+                        word, corrected, candidates_ref[0].distance
                     );
                     result.push_str(&corrected);
                     continue;
                 }
 
                 // Multiple candidates — score each in trigram context via KenLM
+                let owned: Vec<symspell::Suggestion> = candidates_ref.iter().map(|s| (*s).clone()).collect();
                 let best = with_lm(language, |lm| {
-                    score_candidates_in_context(lm, &candidates, &word_lowers, idx)
+                    score_candidates_in_context(lm, &owned, &word_lowers, idx)
                 })
                 .flatten();
 
@@ -349,23 +405,26 @@ pub fn auto_correct(text: &str, language: &str) -> String {
                     result.push_str(&corrected);
                 } else {
                     // LM scoring failed — fall back to frequency best
-                    let corrected = match_case(word, &candidates[0].term);
+                    let corrected = match_case(word, &candidates_ref[0].term);
                     result.push_str(&corrected);
                 }
             } else {
-                // No LM available — original frequency-only behavior
+                // No LM available — frequency-only with phonetic filtering
                 let suggestions = ss.lookup(&lower, Verbosity::Top, 2);
-                if let Some(best) = suggestions.first() {
-                    if best.term != lower {
-                        let corrected = match_case(word, &best.term);
-                        log::debug!(
-                            "SymSpell: {} → {} (freq={}, dist={})",
-                            word, corrected, best.count, best.distance
-                        );
-                        result.push_str(&corrected);
-                    } else {
-                        result.push_str(word);
-                    }
+                // Prefer phonetically plausible candidates
+                let best = suggestions
+                    .iter()
+                    .find(|s| s.term != lower && is_phonetically_plausible(&lower, &s.term))
+                    .or_else(|| suggestions.first().filter(|s| s.term != lower));
+
+                if let Some(best) = best {
+                    let corrected = match_case(word, &best.term);
+                    log::debug!(
+                        "SymSpell: {} → {} (freq={}, dist={}, phonetic={})",
+                        word, corrected, best.count, best.distance,
+                        is_phonetically_plausible(&lower, &best.term)
+                    );
+                    result.push_str(&corrected);
                 } else {
                     result.push_str(word);
                 }
@@ -859,5 +918,30 @@ mod tests {
         let words = word_boundaries("test'");
         assert_eq!(words.len(), 1);
         assert_eq!(words[0].1, "test");
+    }
+
+    // --- Phonetic plausibility ---
+
+    #[test]
+    fn test_phonetic_same_word() {
+        assert!(is_phonetically_plausible("hello", "hello"));
+    }
+
+    #[test]
+    fn test_phonetic_similar_words() {
+        // "knight" and "night" sound the same
+        assert!(is_phonetically_plausible("night", "knight"));
+    }
+
+    #[test]
+    fn test_phonetic_different_words() {
+        // "cat" and "dog" are phonetically distant
+        assert!(!is_phonetically_plausible("cat", "dog"));
+    }
+
+    #[test]
+    fn test_phonetic_asr_typo() {
+        // Common ASR error: "smith" vs "smyth"
+        assert!(is_phonetically_plausible("smith", "smyth"));
     }
 }
