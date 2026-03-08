@@ -3,7 +3,7 @@ import { ref, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useAppStore } from '@/stores/app'
-import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2 } from 'lucide-vue-next'
+import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2, BookOpen } from 'lucide-vue-next'
 
 // Lazy-load sections — only the active one is loaded
 const RecentsSection = defineAsyncComponent(() => import('@/sections/RecentsSection.vue'))
@@ -15,6 +15,7 @@ const MicrophoneSection = defineAsyncComponent(() => import('@/sections/Micropho
 const ProvidersSection = defineAsyncComponent(() => import('@/sections/ProvidersSection.vue'))
 const PermissionsSection = defineAsyncComponent(() => import('@/sections/PermissionsSection.vue'))
 const GeneralSection = defineAsyncComponent(() => import('@/sections/GeneralSection.vue'))
+const DictionarySection = defineAsyncComponent(() => import('@/sections/DictionarySection.vue'))
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -26,6 +27,7 @@ const sections = [
   { id: 'models', icon: Package, label: 'panel.models' },
   { id: 'transcription', icon: AudioLines, label: 'panel.transcription' },
   { id: 'processing', icon: Sparkles, label: 'panel.processing' },
+  { id: 'dictionary', icon: BookOpen, label: 'panel.dictionary' },
   { id: 'shortcuts', icon: Keyboard, label: 'panel.shortcuts' },
   { id: 'microphone', icon: Mic, label: 'panel.microphone' },
   { id: 'providers', icon: Cloud, label: 'panel.providers' },
@@ -99,7 +101,8 @@ onMounted(async () => {
           <RecentsSection v-if="activeSection === 'recents'" key="recents" />
           <ModelsSection v-else-if="activeSection === 'models'" key="models" />
           <TranscriptionSection v-else-if="activeSection === 'transcription'" key="transcription" />
-          <ProcessingSection v-else-if="activeSection === 'processing'" key="processing" />
+          <ProcessingSection v-else-if="activeSection === 'processing'" key="processing" @navigate="activeSection = $event" />
+          <DictionarySection v-else-if="activeSection === 'dictionary'" key="dictionary" />
           <ShortcutsSection v-else-if="activeSection === 'shortcuts'" key="shortcuts" />
           <MicrophoneSection v-else-if="activeSection === 'microphone'" key="microphone" />
           <ProvidersSection v-else-if="activeSection === 'providers'" key="providers" />

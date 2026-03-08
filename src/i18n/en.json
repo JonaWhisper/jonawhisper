@@ -188,6 +188,16 @@
   "aria.edit": "Edit",
   "aria.add": "Add",
   "aria.copy": "Copy",
+  "panel.dictionary": "Dictionary",
+  "dictionary.description": "Words protected from spell-check correction and ITN abbreviation mappings.",
+  "dictionary.add": "Add",
+  "dictionary.entries": "Entries",
+  "dictionary.empty": "No entries yet",
+  "dictionary.placeholder.word": "Word to protect\u2026",
+  "dictionary.placeholder.mapping": "pattern=replacement",
+  "dictionary.hint.word": "This word will be kept as-is by the spell checker.",
+  "dictionary.hint.mapping": "Format: pattern=replacement (applied during text normalization).",
+  "dictionary.toggleKind": "Toggle between word and mapping",
   "menu.panel": "Settings\u2026",
   "window.panel": "JonaWhisper"
 }

@@ -188,6 +188,16 @@
   "aria.edit": "Modifier",
   "aria.add": "Ajouter",
   "aria.copy": "Copier",
+  "panel.dictionary": "Dictionnaire",
+  "dictionary.description": "Mots prot\u00e9g\u00e9s de la correction orthographique et abr\u00e9viations ITN.",
+  "dictionary.add": "Ajouter",
+  "dictionary.entries": "Entr\u00e9es",
+  "dictionary.empty": "Aucune entr\u00e9e",
+  "dictionary.placeholder.word": "Mot \u00e0 prot\u00e9ger\u2026",
+  "dictionary.placeholder.mapping": "motif=remplacement",
+  "dictionary.hint.word": "Ce mot sera conserv\u00e9 tel quel par le correcteur orthographique.",
+  "dictionary.hint.mapping": "Format : motif=remplacement (appliqu\u00e9 lors de la normalisation du texte).",
+  "dictionary.toggleKind": "Basculer entre mot et correspondance",
   "menu.panel": "R\u00e9glages\u2026",
   "window.panel": "JonaWhisper"
 }

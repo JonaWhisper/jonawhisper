@@ -14,6 +14,10 @@ import ModelOption from '@/components/ModelOption.vue'
 import SettingToggle from '@/components/SettingToggle.vue'
 import { BookOpen } from 'lucide-vue-next'
 
+const emit = defineEmits<{
+  'navigate': [section: string]
+}>()
+
 const { t } = useI18n()
 const settings = useSettingsStore()
 const engines = useEnginesStore()
@@ -158,7 +162,7 @@ function onToggle(v: boolean, key: string) {
         </div>
         <button
           class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background h-8 px-3 text-xs hover:bg-accent hover:text-accent-foreground shrink-0"
-          @click="invoke('open_user_dict')"
+          @click="emit('navigate', 'dictionary')"
         >
           <BookOpen class="h-3.5 w-3.5" />
           <span>{{ t('settings.postProcessing.userDictOpen') }}</span>
