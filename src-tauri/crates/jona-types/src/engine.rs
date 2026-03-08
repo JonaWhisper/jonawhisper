@@ -271,3 +271,128 @@ pub fn common_languages() -> Vec<Language> {
         Language { code: "de".into(), label: "Deutsch".into() },
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- tokens_to_word_confidences --
+
+    #[test]
+    fn empty_tokens_produce_no_words() {
+        let result = tokens_to_word_confidences(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn single_token_produces_one_word() {
+        let tokens = vec![("hello".to_string(), 0.9)];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].word, "hello");
+        assert_eq!(result[0].confidence, Some(0.9));
+    }
+
+    #[test]
+    fn bpe_space_splits_words() {
+        // BPE tokens: "hello" + " world" → two words
+        let tokens = vec![
+            ("hello".to_string(), 0.9),
+            (" world".to_string(), 0.8),
+        ];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].word, "hello");
+        assert_eq!(result[1].word, "world");
+    }
+
+    #[test]
+    fn sentencepiece_marker_splits_words() {
+        // SentencePiece tokens: "▁bon" + "jour" + "▁le" → "bonjour", "le"
+        let tokens = vec![
+            ("\u{2581}bon".to_string(), 0.95),
+            ("jour".to_string(), 0.85),
+            ("\u{2581}le".to_string(), 0.92),
+        ];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].word, "bonjour");
+        assert_eq!(result[1].word, "le");
+    }
+
+    #[test]
+    fn subword_confidence_uses_minimum() {
+        // Word "hello" split into "hel" (0.9) + "lo" (0.6) → confidence = 0.6
+        let tokens = vec![
+            (" hel".to_string(), 0.9),
+            ("lo".to_string(), 0.6),
+        ];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].word, "hello");
+        assert!((result[0].confidence.unwrap() - 0.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn multiple_subwords_per_word() {
+        // "un" + "believ" + "able" → "unbelievable", min(0.8, 0.5, 0.9) = 0.5
+        let tokens = vec![
+            (" un".to_string(), 0.8),
+            ("believ".to_string(), 0.5),
+            ("able".to_string(), 0.9),
+        ];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].word, "unbelievable");
+        assert!((result[0].confidence.unwrap() - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn mixed_bpe_and_sentencepiece_markers() {
+        let tokens = vec![
+            ("\u{2581}je".to_string(), 0.95),
+            (" suis".to_string(), 0.88),
+            ("\u{2581}content".to_string(), 0.76),
+        ];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].word, "je");
+        assert_eq!(result[1].word, "suis");
+        assert_eq!(result[2].word, "content");
+    }
+
+    #[test]
+    fn first_token_without_space_starts_first_word() {
+        // First token has no space prefix — it starts the first word
+        let tokens = vec![
+            ("bon".to_string(), 0.9),
+            ("jour".to_string(), 0.8),
+            (" monde".to_string(), 0.7),
+        ];
+        let result = tokens_to_word_confidences(&tokens);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].word, "bonjour");
+        assert!((result[0].confidence.unwrap() - 0.8).abs() < 0.001);
+        assert_eq!(result[1].word, "monde");
+    }
+
+    // -- TranscriptionResult --
+
+    #[test]
+    fn text_only_has_empty_confidences() {
+        let r = TranscriptionResult::text_only("hello world".into());
+        assert_eq!(r.text, "hello world");
+        assert!(r.word_confidences.is_empty());
+    }
+
+    // -- common_languages --
+
+    #[test]
+    fn common_languages_includes_auto_fr_en() {
+        let langs = common_languages();
+        let codes: Vec<&str> = langs.iter().map(|l| l.code.as_str()).collect();
+        assert!(codes.contains(&"auto"));
+        assert!(codes.contains(&"fr"));
+        assert!(codes.contains(&"en"));
+    }
+}

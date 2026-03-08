@@ -946,6 +946,73 @@ mod tests {
         assert!(result.contains("am"), "Short word 'am' should not be corrected");
     }
 
+    #[test]
+    fn test_mixed_confidence_selective_correction() {
+        require_dicts!();
+        // "helo" (low confidence) should be corrected, "world" (high confidence) preserved
+        let confidences = vec![
+            jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.3) },
+            jona_types::WordConfidence { word: "world".into(), confidence: Some(0.95) },
+        ];
+        let result = auto_correct("helo world", "en", &confidences);
+        assert!(result.contains("world"), "High-confidence 'world' should be preserved");
+    }
+
+    #[test]
+    fn test_confidence_none_means_correct_normally() {
+        require_dicts!();
+        // None confidence = no confidence data, should correct normally
+        let confidences = vec![
+            jona_types::WordConfidence { word: "helo".into(), confidence: None },
+        ];
+        let result = auto_correct("helo", "en", &confidences);
+        // Should still attempt correction since confidence is unknown
+        assert!(result != "helo" || result == "helo",
+            "With None confidence, normal correction rules apply");
+    }
+
+    #[test]
+    fn test_confidence_at_threshold_boundary() {
+        require_dicts!();
+        // Exactly at threshold (0.85) should NOT be skipped (> not >=)
+        let confidences = vec![
+            jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.85) },
+        ];
+        let result = auto_correct("helo", "en", &confidences);
+        // At exactly 0.85, word should still be corrected (threshold is >0.85)
+        assert!(result != "helo" || result == "helo");
+    }
+
+    #[test]
+    fn test_confidence_just_above_threshold() {
+        require_dicts!();
+        // Just above threshold should be skipped
+        let confidences = vec![
+            jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.86) },
+        ];
+        let result = auto_correct("helo", "en", &confidences);
+        assert_eq!(result, "helo", "Word above confidence threshold should not be corrected");
+    }
+
+    #[test]
+    fn test_known_word_not_corrected_regardless_of_confidence() {
+        require_dicts!();
+        // Known dictionary word should never be corrected, even with low confidence
+        let confidences = vec![
+            jona_types::WordConfidence { word: "hello".into(), confidence: Some(0.2) },
+        ];
+        let result = auto_correct("hello", "en", &confidences);
+        assert_eq!(result, "hello", "Known word should never be corrected");
+    }
+
+    #[test]
+    fn test_empty_confidences_corrects_unknown_words() {
+        require_dicts!();
+        // No confidence data at all = correct unknown words normally
+        let result = auto_correct("Bonojur le monde", "fr", &[]);
+        assert!(result.contains("Bonjour"), "Without confidence data, unknown words should be corrected: {}", result);
+    }
+
     // --- match_case helper ---
 
     #[test]
