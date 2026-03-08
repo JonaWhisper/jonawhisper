@@ -1,6 +1,57 @@
 {
-  "generated_at": "2026-03-07T21:20:46Z",
+  "generated_at": "2026-03-08T16:06:22Z",
   "languages": {
+    "de": {
+      "label": "Deutsch",
+      "files": {
+        "freq.txt": {
+          "filename": "de-freq.txt",
+          "size": 1731182,
+          "sha256": "a98c27cbe0921cb3a9927eb28639efb45fc3493f72466cca0622c64dff4e74a9",
+          "entries": 100000
+        },
+        "bigram.txt": {
+          "filename": "de-bigram.txt",
+          "size": 1634037,
+          "sha256": "5ad5f21716bcbf6792ce804083f96e77d25e43e8aad7dd60472ac99d196fb8e2",
+          "entries": 100000
+        }
+      }
+    },
+    "de-at": {
+      "label": "Deutsch (\u00d6sterreich)",
+      "files": {
+        "freq.txt": {
+          "filename": "de-at-freq.txt",
+          "size": 1731756,
+          "sha256": "c2eadab1cbf1ebc89eb978284d6d662669747fd2149292dc48d984a9ea8014dd",
+          "entries": 100039
+        },
+        "bigram.txt": {
+          "filename": "de-at-bigram.txt",
+          "size": 1634037,
+          "sha256": "5ad5f21716bcbf6792ce804083f96e77d25e43e8aad7dd60472ac99d196fb8e2",
+          "entries": 100000
+        }
+      }
+    },
+    "de-ch": {
+      "label": "Deutsch (Schweiz)",
+      "files": {
+        "freq.txt": {
+          "filename": "de-ch-freq.txt",
+          "size": 1731764,
+          "sha256": "cabf5d116aaf2135f96cee581190aa8c164e20ecc66b801e6511ad081f708833",
+          "entries": 100041
+        },
+        "bigram.txt": {
+          "filename": "de-ch-bigram.txt",
+          "size": 1634037,
+          "sha256": "5ad5f21716bcbf6792ce804083f96e77d25e43e8aad7dd60472ac99d196fb8e2",
+          "entries": 100000
+        }
+      }
+    },
     "en": {
       "label": "English",
       "files": {
@@ -35,8 +86,42 @@
         }
       }
     },
+    "es": {
+      "label": "Espa\u00f1ol",
+      "files": {
+        "freq.txt": {
+          "filename": "es-freq.txt",
+          "size": 1619287,
+          "sha256": "fd538cb220cd00d0a9f20d2190ba6f033b76f91ee08c6c0df8fadbf46bbdf319",
+          "entries": 100000
+        },
+        "bigram.txt": {
+          "filename": "es-bigram.txt",
+          "size": 1594179,
+          "sha256": "6c9068944cd3a5e0bc48b02f9039b3fbee30b00034998fa9c07bb307313c05f4",
+          "entries": 100000
+        }
+      }
+    },
+    "es-mx": {
+      "label": "Espa\u00f1ol (M\u00e9xico)",
+      "files": {
+        "freq.txt": {
+          "filename": "es-mx-freq.txt",
+          "size": 1619592,
+          "sha256": "47857224558523802a284c2e4482bdd222656046aa914469e7aed7ecaf97f22c",
+          "entries": 100023
+        },
+        "bigram.txt": {
+          "filename": "es-mx-bigram.txt",
+          "size": 1594179,
+          "sha256": "6c9068944cd3a5e0bc48b02f9039b3fbee30b00034998fa9c07bb307313c05f4",
+          "entries": 100000
+        }
+      }
+    },
     "fr": {
-      "label": "Français",
+      "label": "Fran\u00e7ais",
       "files": {
         "freq.txt": {
           "filename": "fr-freq.txt",
@@ -46,14 +131,14 @@
         },
         "bigram.txt": {
           "filename": "fr-bigram.txt",
-          "size": 87164,
-          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
-          "entries": 5000
+          "size": 1605869,
+          "sha256": "858c6f19883d4fa0afcf600f57da049bb060b798061626794c389ba01becaa6d",
+          "entries": 100000
         }
       }
     },
     "fr-be": {
-      "label": "Français (Belgique)",
+      "label": "Fran\u00e7ais (Belgique)",
       "files": {
         "freq.txt": {
           "filename": "fr-be-freq.txt",
@@ -63,14 +148,14 @@
         },
         "bigram.txt": {
           "filename": "fr-be-bigram.txt",
-          "size": 87164,
-          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
-          "entries": 5000
+          "size": 1605869,
+          "sha256": "858c6f19883d4fa0afcf600f57da049bb060b798061626794c389ba01becaa6d",
+          "entries": 100000
         }
       }
     },
     "fr-ca": {
-      "label": "Français (Québec)",
+      "label": "Fran\u00e7ais (Qu\u00e9bec)",
       "files": {
         "freq.txt": {
           "filename": "fr-ca-freq.txt",
@@ -80,14 +165,14 @@
         },
         "bigram.txt": {
           "filename": "fr-ca-bigram.txt",
-          "size": 87164,
-          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
-          "entries": 5000
+          "size": 1605869,
+          "sha256": "858c6f19883d4fa0afcf600f57da049bb060b798061626794c389ba01becaa6d",
+          "entries": 100000
         }
       }
     },
     "fr-ch": {
-      "label": "Français (Suisse)",
+      "label": "Fran\u00e7ais (Suisse)",
       "files": {
         "freq.txt": {
           "filename": "fr-ch-freq.txt",
@@ -97,9 +182,145 @@
         },
         "bigram.txt": {
           "filename": "fr-ch-bigram.txt",
-          "size": 87164,
-          "sha256": "fdb6b65ccfc714a2ad2887f3720749e9b848a6b85e2df8d0be0b9264f8b4edc7",
-          "entries": 5000
+          "size": 1605869,
+          "sha256": "858c6f19883d4fa0afcf600f57da049bb060b798061626794c389ba01becaa6d",
+          "entries": 100000
+        }
+      }
+    },
+    "it": {
+      "label": "Italiano",
+      "files": {
+        "freq.txt": {
+          "filename": "it-freq.txt",
+          "size": 1592580,
+          "sha256": "5f746afb7e6ae802872061ef025ce883cfa2a8779780968fa285dfd0907e9cfc",
+          "entries": 100000
+        },
+        "bigram.txt": {
+          "filename": "it-bigram.txt",
+          "size": 1571378,
+          "sha256": "f91bb4fd06c9d03aeec8305fecea1ea91397500ef8d7eca00d081a14b3e8276d",
+          "entries": 100000
+        }
+      }
+    },
+    "nl": {
+      "label": "Nederlands",
+      "files": {
+        "freq.txt": {
+          "filename": "nl-freq.txt",
+          "size": 650533,
+          "sha256": "ca70564c6f37838e9fe559d187a31b1cb9bcba806b719ab2ec4cd0982933cf49",
+          "entries": 49970
+        },
+        "bigram.txt": {
+          "filename": "nl-bigram.txt",
+          "size": 1546278,
+          "sha256": "6a363022ad44e46160638f4a0fb70236b88b374936127a8b555e5cf755b5c6bb",
+          "entries": 100000
+        }
+      }
+    },
+    "nl-be": {
+      "label": "Nederlands (Belgi\u00eb)",
+      "files": {
+        "freq.txt": {
+          "filename": "nl-be-freq.txt",
+          "size": 650854,
+          "sha256": "70e145ebb3cb7c0d73ee5d9628f4b0ca5522d9c530b213c53621d8393dc23b81",
+          "entries": 49990
+        },
+        "bigram.txt": {
+          "filename": "nl-be-bigram.txt",
+          "size": 1546278,
+          "sha256": "6a363022ad44e46160638f4a0fb70236b88b374936127a8b555e5cf755b5c6bb",
+          "entries": 100000
+        }
+      }
+    },
+    "pl": {
+      "label": "Polski",
+      "files": {
+        "freq.txt": {
+          "filename": "pl-freq.txt",
+          "size": 676239,
+          "sha256": "cef5cb7aaa7c774ee056f4e0399847b4cbb4262a270bbe4fc7248bb3818fdb97",
+          "entries": 49967
+        },
+        "bigram.txt": {
+          "filename": "pl-bigram.txt",
+          "size": 1679225,
+          "sha256": "44c46facc09d1d5eda02552087b489f63e9247df7fe6b05fbf87bf65d4d75b94",
+          "entries": 100000
+        }
+      }
+    },
+    "pt": {
+      "label": "Portugu\u00eas",
+      "files": {
+        "freq.txt": {
+          "filename": "pt-freq.txt",
+          "size": 652076,
+          "sha256": "115b94fac0cdc810761752b238fce868f62093a60a88b8ea7030c82aeb69bc8b",
+          "entries": 49963
+        },
+        "bigram.txt": {
+          "filename": "pt-bigram.txt",
+          "size": 1586377,
+          "sha256": "c6bf9ee23079dc719b74c4170996eace880592d7ae24026ddf479a367dabf14b",
+          "entries": 100000
+        }
+      }
+    },
+    "pt-br": {
+      "label": "Portugu\u00eas (Brasil)",
+      "files": {
+        "freq.txt": {
+          "filename": "pt-br-freq.txt",
+          "size": 652273,
+          "sha256": "a35898230996293654ee4694cd5df6af8ea4b87e35fef1d0dc6787f75b2b01e4",
+          "entries": 49973
+        },
+        "bigram.txt": {
+          "filename": "pt-br-bigram.txt",
+          "size": 1586377,
+          "sha256": "c6bf9ee23079dc719b74c4170996eace880592d7ae24026ddf479a367dabf14b",
+          "entries": 100000
+        }
+      }
+    },
+    "pt-pt": {
+      "label": "Portugu\u00eas (Portugal)",
+      "files": {
+        "freq.txt": {
+          "filename": "pt-pt-freq.txt",
+          "size": 652151,
+          "sha256": "e731473989c239c9ef4ae44097795fc23edb6deb1f859505c7afe4e8d56a7e40",
+          "entries": 49965
+        },
+        "bigram.txt": {
+          "filename": "pt-pt-bigram.txt",
+          "size": 1586377,
+          "sha256": "c6bf9ee23079dc719b74c4170996eace880592d7ae24026ddf479a367dabf14b",
+          "entries": 100000
+        }
+      }
+    },
+    "ru": {
+      "label": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
+      "files": {
+        "freq.txt": {
+          "filename": "ru-freq.txt",
+          "size": 2524277,
+          "sha256": "2028262759546fdc346386369a59541d0464f48634c3103ff3f36d01518efcc6",
+          "entries": 100000
+        },
+        "bigram.txt": {
+          "filename": "ru-bigram.txt",
+          "size": 2731780,
+          "sha256": "2182e83b888b8467fc7b3ec25b8ba62f4b9b19a1d0a8687f74f970991b145ddc",
+          "entries": 100000
         }
       }
     }

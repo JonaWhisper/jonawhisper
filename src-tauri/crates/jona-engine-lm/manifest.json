@@ -13,6 +13,55 @@
       "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/en.binary",
       "size": 0,
       "ram": 0
+    },
+    "de": {
+      "label": "Deutsch",
+      "filename": "de.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/de.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "es": {
+      "label": "Espa\u00f1ol",
+      "filename": "es.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/es.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "pt": {
+      "label": "Portugu\u00eas",
+      "filename": "pt.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/pt.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "it": {
+      "label": "Italiano",
+      "filename": "it.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/it.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "nl": {
+      "label": "Nederlands",
+      "filename": "nl.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/nl.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "pl": {
+      "label": "Polski",
+      "filename": "pl.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/pl.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "ru": {
+      "label": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
+      "filename": "ru.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/ru.binary",
+      "size": 0,
+      "ram": 0
     }
   }
 }
