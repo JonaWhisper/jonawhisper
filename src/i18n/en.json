@@ -198,6 +198,8 @@
   "dictionary.hint.word": "This word will be kept as-is by the spell checker.",
   "dictionary.hint.mapping": "Format: pattern=replacement (applied during text normalization).",
   "dictionary.toggleKind": "Toggle between word and mapping",
+  "dictionary.kind.word": "Protected word",
+  "dictionary.kind.mapping": "Replacement mapping",
   "menu.panel": "Settings\u2026",
   "window.panel": "JonaWhisper"
 }

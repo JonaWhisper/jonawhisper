@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { Plus, Trash2, ArrowRightLeft, Type } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface UserDictEntry {
   value: string
@@ -64,15 +65,25 @@ onMounted(load)
           class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           @keydown.enter="addEntry"
         />
-        <button
-          class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground shrink-0 transition-colors"
-          :class="newKind === 'mapping' ? 'text-amber-500 border-amber-500/30' : 'text-blue-500 border-blue-500/30'"
-          :aria-label="t('dictionary.toggleKind')"
-          @click="newKind = newKind === 'word' ? 'mapping' : 'word'"
-        >
-          <ArrowRightLeft v-if="newKind === 'mapping'" class="h-3.5 w-3.5" />
-          <Type v-else class="h-3.5 w-3.5" />
-        </button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground shrink-0 transition-colors"
+                :class="newKind === 'mapping' ? 'text-amber-500 border-amber-500/30' : 'text-blue-500 border-blue-500/30'"
+                :aria-label="t('dictionary.toggleKind')"
+                @click="newKind = newKind === 'word' ? 'mapping' : 'word'"
+              >
+                <ArrowRightLeft v-if="newKind === 'mapping'" class="h-3.5 w-3.5" />
+                <Type v-else class="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <span v-if="newKind === 'word'">{{ t('dictionary.kind.word') }}</span>
+              <span v-else>{{ t('dictionary.kind.mapping') }}</span>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <button
           class="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-8 w-8 hover:bg-primary/90 shrink-0 transition-colors disabled:opacity-40"
           :disabled="!newValue.trim()"
@@ -107,13 +118,23 @@ onMounted(load)
           class="flex items-center justify-between py-2 gap-3 group"
         >
           <div class="flex items-center gap-2 min-w-0">
-            <span
-              class="inline-flex items-center justify-center w-5 h-5 rounded shrink-0"
-              :class="entry.kind === 'mapping' ? 'text-amber-500 bg-amber-500/10' : 'text-blue-500 bg-blue-500/10'"
-            >
-              <ArrowRightLeft v-if="entry.kind === 'mapping'" class="h-3 w-3" />
-              <Type v-else class="h-3 w-3" />
-            </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded shrink-0"
+                    :class="entry.kind === 'mapping' ? 'text-amber-500 bg-amber-500/10' : 'text-blue-500 bg-blue-500/10'"
+                  >
+                    <ArrowRightLeft v-if="entry.kind === 'mapping'" class="h-3 w-3" />
+                    <Type v-else class="h-3 w-3" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <span v-if="entry.kind === 'word'">{{ t('dictionary.kind.word') }}</span>
+                  <span v-else>{{ t('dictionary.kind.mapping') }}</span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <span class="text-[13px] text-foreground truncate">{{ entry.value }}</span>
           </div>
           <button

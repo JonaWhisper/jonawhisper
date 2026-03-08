@@ -198,6 +198,8 @@
   "dictionary.hint.word": "Ce mot sera conserv\u00e9 tel quel par le correcteur orthographique.",
   "dictionary.hint.mapping": "Format : motif=remplacement (appliqu\u00e9 lors de la normalisation du texte).",
   "dictionary.toggleKind": "Basculer entre mot et correspondance",
+  "dictionary.kind.word": "Mot prot\u00e9g\u00e9",
+  "dictionary.kind.mapping": "R\u00e8gle de remplacement",
   "menu.panel": "R\u00e9glages\u2026",
   "window.panel": "JonaWhisper"
 }
