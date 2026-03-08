@@ -6,7 +6,7 @@ import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, X, Minus,
+  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, X, Slash,
 } from 'lucide-vue-next'
 import { diffWords } from 'diff'
 
@@ -330,11 +330,11 @@ watch(() => props.entry.timestamp, () => {
                   :disabled="!step.hasDiff"
                   @click="step.hasDiff && toggleDiffStep(step.id)"
                 >
-                  <component :is="step.icon" class="h-3 w-3" :class="step.hasError ? 'opacity-30' : ''" />
-                  <!-- Error: red X overlaid on the icon -->
-                  <X v-if="step.hasError" class="absolute h-4 w-4 text-destructive stroke-[3]" />
-                  <!-- No change: subtle dash through icon -->
-                  <Minus v-if="step.noChange" class="absolute h-4 w-4 text-muted-foreground/60 stroke-[2.5]" />
+                  <component :is="step.icon" class="h-3 w-3" :class="step.hasError ? 'opacity-50' : ''" />
+                  <!-- Error: small red X overlaid on the icon -->
+                  <X v-if="step.hasError" class="absolute h-3 w-3 text-destructive/70 stroke-[2]" />
+                  <!-- No change: diagonal slash through icon -->
+                  <Slash v-if="step.noChange" class="absolute h-3.5 w-3.5 text-muted-foreground/50 stroke-[1.5]" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" :side-offset="4">
