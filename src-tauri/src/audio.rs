@@ -277,26 +277,40 @@ fn process_samples(
     fft_buffer: &Mutex<Vec<f32>>,
     spectrum: &Mutex<Vec<f32>>,
 ) {
-    // Write to WAV
-    if let Some(ref mut w) = *writer.lock().unwrap() {
-        for &sample in data {
-            let s16 = (sample * 32767.0).clamp(-32768.0, 32767.0) as i16;
-            let _ = w.write_sample(s16);
+    // Write to WAV — use try_lock to avoid blocking the realtime audio thread
+    if let Ok(mut guard) = writer.try_lock() {
+        if let Some(ref mut w) = *guard {
+            for &sample in data {
+                let s16 = (sample * 32767.0).clamp(-32768.0, 32767.0) as i16;
+                let _ = w.write_sample(s16);
+            }
         }
+    } else {
+        log::trace!("process_samples: writer lock contention, skipping chunk");
     }
 
-    // Accumulate FFT buffer
-    let mut buf = fft_buffer.lock().unwrap();
-    buf.extend_from_slice(data);
+    // Accumulate FFT buffer and compute spectrum outside lock
+    let fft_samples = if let Ok(mut buf) = fft_buffer.try_lock() {
+        buf.extend_from_slice(data);
+        if buf.len() >= FFT_SIZE {
+            Some(buf.drain(..FFT_SIZE).collect::<Vec<f32>>())
+        } else {
+            None
+        }
+    } else {
+        log::trace!("process_samples: fft_buffer lock contention, skipping");
+        None
+    };
 
-    if buf.len() >= FFT_SIZE {
-        let samples: Vec<f32> = buf.drain(..FFT_SIZE).collect();
+    // FFT computation runs without any lock held
+    if let Some(samples) = fft_samples {
         let new_spectrum = compute_spectrum(&samples);
 
-        let mut spec = spectrum.lock().unwrap();
-        let old_weight = 1.0 - SPECTRUM_SMOOTHING;
-        for (s, &ns) in spec.iter_mut().zip(new_spectrum.iter()) {
-            *s = *s * old_weight + ns * SPECTRUM_SMOOTHING;
+        if let Ok(mut spec) = spectrum.try_lock() {
+            let old_weight = 1.0 - SPECTRUM_SMOOTHING;
+            for (s, &ns) in spec.iter_mut().zip(new_spectrum.iter()) {
+                *s = *s * old_weight + ns * SPECTRUM_SMOOTHING;
+            }
         }
     }
 }
