@@ -131,7 +131,7 @@ static RE_ORDINAL_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
 });
 
 static RE_PCT_FR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bpour cent\b").unwrap()
+    Regex::new(r"(?i)\bpour ?cents?\b").unwrap()
 });
 
 static RE_HOURS_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
@@ -247,6 +247,9 @@ mod tests {
     #[test]
     fn percentages() {
         assert_eq!(apply_itn("dix pour cent", "fr"), "10 %");
+        // "pourcent" as one word (common ASR output)
+        assert_eq!(apply_itn("dix pourcent", "fr"), "10 %");
+        assert_eq!(apply_itn("cinq pourcents", "fr"), "5 %");
     }
 
     #[test]
