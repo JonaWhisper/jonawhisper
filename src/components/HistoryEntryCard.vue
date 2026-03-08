@@ -6,7 +6,7 @@ import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight,
+  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, X, Minus,
 } from 'lucide-vue-next'
 import { diffWords } from 'diff'
 
@@ -319,20 +319,22 @@ watch(() => props.entry.timestamp, () => {
                     !step.active
                       ? 'text-muted-foreground/25 cursor-default'
                       : step.hasError
-                        ? 'text-destructive cursor-default'
+                        ? 'text-muted-foreground/30 cursor-default'
                         : step.hasDiff
                           ? 'cursor-pointer hover:bg-muted/80 ' + step.color
                           : step.noChange
-                            ? 'text-muted-foreground/50 cursor-default'
+                            ? 'text-muted-foreground/40 cursor-default'
                             : 'text-foreground/70 cursor-default',
                     activeDiffStep === step.id ? 'ring-1.5 ring-current bg-current/10 scale-110' : '',
                   ]"
                   :disabled="!step.hasDiff"
                   @click="step.hasDiff && toggleDiffStep(step.id)"
                 >
-                  <component :is="step.icon" class="h-3 w-3" />
-                  <span v-if="step.noChange" class="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-[2px] rounded-full bg-muted-foreground/40" />
-                  <span v-if="step.hasError" class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-destructive" />
+                  <component :is="step.icon" class="h-3 w-3" :class="step.hasError ? 'opacity-30' : ''" />
+                  <!-- Error: red X overlaid on the icon -->
+                  <X v-if="step.hasError" class="absolute h-4 w-4 text-destructive stroke-[3]" />
+                  <!-- No change: subtle dash through icon -->
+                  <Minus v-if="step.noChange" class="absolute h-4 w-4 text-muted-foreground/60 stroke-[2.5]" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" :side-offset="4">
