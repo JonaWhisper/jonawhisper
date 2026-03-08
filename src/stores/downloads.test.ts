@@ -64,10 +64,10 @@ describe('downloads store', () => {
 
       // Entry should exist immediately
       expect(downloads.activeDownloads['whisper:tiny']).toBeDefined()
-      expect(downloads.activeDownloads['whisper:tiny'].progress).toBe(0)
-      expect(downloads.activeDownloads['whisper:tiny'].stopping).toBe(false)
-      expect(downloads.activeDownloads['whisper:tiny'].totalSize).toBe(50_000_000)
-      expect(downloads.activeDownloads['whisper:tiny'].speed).toBe(0)
+      expect(downloads.activeDownloads['whisper:tiny']!.progress).toBe(0)
+      expect(downloads.activeDownloads['whisper:tiny']!.stopping).toBe(false)
+      expect(downloads.activeDownloads['whisper:tiny']!.totalSize).toBe(50_000_000)
+      expect(downloads.activeDownloads['whisper:tiny']!.speed).toBe(0)
 
       await promise
 
@@ -83,7 +83,7 @@ describe('downloads store', () => {
       mockInvoke.mockImplementation(async (cmd: string) => {
         if (cmd === 'download_model_cmd') {
           // Simulate progress reaching 100%
-          downloads.activeDownloads['whisper:tiny'].progress = 1.0
+          downloads.activeDownloads['whisper:tiny']!.progress = 1.0
           return true
         }
         if (cmd === 'get_models') return engines.models
@@ -105,7 +105,7 @@ describe('downloads store', () => {
 
       mockInvoke.mockImplementation(async (cmd: string) => {
         if (cmd === 'download_model_cmd') {
-          downloads.activeDownloads['whisper:tiny'].progress = 0.5
+          downloads.activeDownloads['whisper:tiny']!.progress = 0.5
           return false
         }
         if (cmd === 'get_models') return engines.models
@@ -146,7 +146,7 @@ describe('downloads store', () => {
       const promise = downloads.downloadModel('whisper:tiny')
 
       // Should start from saved progress
-      expect(downloads.activeDownloads['whisper:tiny'].progress).toBe(0.6)
+      expect(downloads.activeDownloads['whisper:tiny']!.progress).toBe(0.6)
 
       await promise
     })
@@ -271,8 +271,8 @@ describe('downloads store', () => {
       downloads.hydrateFromBackend({ 'model-a': 0.3, 'model-b': 0.8 })
 
       expect(Object.keys(downloads.activeDownloads)).toEqual(['model-a', 'model-b'])
-      expect(downloads.activeDownloads['model-a'].progress).toBe(0.3)
-      expect(downloads.activeDownloads['model-b'].progress).toBe(0.8)
+      expect(downloads.activeDownloads['model-a']!.progress).toBe(0.3)
+      expect(downloads.activeDownloads['model-b']!.progress).toBe(0.8)
     })
 
     it('preserves stopping state from existing entries', () => {
@@ -281,8 +281,8 @@ describe('downloads store', () => {
       downloads.activeDownloads = { 'model-a': { progress: 0.2, stopping: true, downloaded: 0, totalSize: 0, speed: 0 } }
       downloads.hydrateFromBackend({ 'model-a': 0.5 })
 
-      expect(downloads.activeDownloads['model-a'].stopping).toBe(true)
-      expect(downloads.activeDownloads['model-a'].progress).toBe(0.5)
+      expect(downloads.activeDownloads['model-a']!.stopping).toBe(true)
+      expect(downloads.activeDownloads['model-a']!.progress).toBe(0.5)
     })
   })
 
@@ -298,9 +298,9 @@ describe('downloads store', () => {
         payload: { model_id: 'whisper:tiny', progress: 0.5, downloaded: 50_000_000, total_size: 100_000_000, speed: 2_000_000 },
       })
 
-      expect(downloads.activeDownloads['whisper:tiny'].progress).toBe(0.5)
-      expect(downloads.activeDownloads['whisper:tiny'].downloaded).toBe(50_000_000)
-      expect(downloads.activeDownloads['whisper:tiny'].speed).toBe(2_000_000)
+      expect(downloads.activeDownloads['whisper:tiny']!.progress).toBe(0.5)
+      expect(downloads.activeDownloads['whisper:tiny']!.downloaded).toBe(50_000_000)
+      expect(downloads.activeDownloads['whisper:tiny']!.speed).toBe(2_000_000)
     })
 
     it('does not regress progress', () => {
@@ -314,7 +314,7 @@ describe('downloads store', () => {
       })
 
       // Should NOT go backwards
-      expect(downloads.activeDownloads['whisper:tiny'].progress).toBe(0.8)
+      expect(downloads.activeDownloads['whisper:tiny']!.progress).toBe(0.8)
     })
 
     it('ignores events for unknown models', () => {
