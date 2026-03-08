@@ -4,7 +4,7 @@ Local-first voice-to-text dictation for macOS. Runs in the menu bar, records aud
 
 All processing happens on your machine — no data leaves your Mac unless you choose a cloud provider. Cloud API keys are stored in the macOS Keychain, never in plaintext files.
 
-![CI](https://github.com/jplot/dictate-macos/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/jplot/jona-whisper/actions/workflows/ci.yml/badge.svg)
 
 ## Features
 
@@ -71,7 +71,7 @@ All GGUF Q4 quantized, run via llama.cpp with Metal GPU. 11 models available tot
 ### Audio pipeline
 
 ```
-Mic (cpal) → WAV 16 kHz → VAD (Silero v6) → Trim silence → ASR
+Mic (cpal) → WAV 16 kHz → VAD (Silero v5) → Trim silence → ASR
 ```
 
 | Stage | Status | Description |

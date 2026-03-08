@@ -11,8 +11,8 @@
 
 ```bash
 # Clone the repo
-git clone https://github.com/jplot/dictate-macos.git
-cd dictate-macos
+git clone https://github.com/jplot/jona-whisper.git
+cd jona-whisper
 
 # Install frontend dependencies
 npm install
