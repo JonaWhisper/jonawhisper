@@ -112,6 +112,32 @@ pub fn set_setting(
 }
 
 #[tauri::command]
+pub fn open_user_dict() -> Result<(), String> {
+    let path = crate::cleanup::symspell_correct::user_dict_path();
+    if !path.exists() {
+        std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+        std::fs::write(
+            &path,
+            "# User Dictionary — JonaWhisper\n\
+             #\n\
+             # One entry per line:\n\
+             #   word            \u{2014} protected from spell-check correction\n\
+             #   word\\tfrequency  \u{2014} word with custom frequency (tab-separated)\n\
+             #   pattern=replacement \u{2014} ITN mapping (e.g. SNCF=S.N.C.F.)\n\
+             #\n\
+             # Lines starting with # are comments.\n\
+             # Changes are picked up automatically (no restart needed).\n",
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    std::process::Command::new("open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_launch_at_login_status() -> String {
     platform::get_launch_at_login_status().to_string()
 }

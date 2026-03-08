@@ -5,6 +5,8 @@
 //! Per-language rules live in their own submodule for easy extension.
 
 use regex::Regex;
+use std::sync::Mutex;
+use std::time::SystemTime;
 
 // Macro must be defined before `mod` declarations so child modules can use it.
 macro_rules! regex_rules {
@@ -30,13 +32,78 @@ fn lang_base(language: &str) -> &str {
     language.split(&['-', '_'][..]).next().unwrap_or(language)
 }
 
+/// User ITN mappings (abbreviation=expansion from user_dict.txt).
+struct UserItn {
+    rules: Vec<(Regex, String)>,
+    mtime: SystemTime,
+}
+
+static USER_ITN: Mutex<Option<UserItn>> = Mutex::new(None);
+
+/// Load or reload user ITN mappings from user_dict.txt if the file changed.
+fn refresh_user_itn() {
+    let path = crate::cleanup::symspell_correct::user_dict_path();
+    let Ok(meta) = std::fs::metadata(&path) else {
+        return;
+    };
+    let Ok(mtime) = meta.modified() else {
+        return;
+    };
+
+    let mut guard = USER_ITN.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(ref ui) = *guard {
+        if ui.mtime == mtime {
+            return;
+        }
+    }
+
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let mut rules = Vec::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some((pattern, replacement)) = line.split_once('=') {
+            let pattern = pattern.trim();
+            let replacement = replacement.trim();
+            if !pattern.is_empty() {
+                if let Ok(re) = Regex::new(&format!("(?i)\\b{}\\b", regex::escape(pattern))) {
+                    rules.push((re, replacement.to_string()));
+                }
+            }
+        }
+    }
+    if !rules.is_empty() {
+        log::info!("User ITN: loaded {} mappings", rules.len());
+    }
+    *guard = Some(UserItn { rules, mtime });
+}
+
+/// Apply user ITN mappings to text.
+fn apply_user_itn(text: &str) -> String {
+    let guard = USER_ITN.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(ref ui) = *guard else {
+        return text.to_string();
+    };
+    let mut result = text.to_string();
+    for (re, replacement) in &ui.rules {
+        result = re.replace_all(&result, replacement.as_str()).to_string();
+    }
+    result
+}
+
 /// Apply ITN transformations to text.
 pub fn apply_itn(text: &str, language: &str) -> String {
     if text.trim().is_empty() {
         return text.to_string();
     }
 
-    match lang_base(language) {
+    refresh_user_itn();
+
+    let result = match lang_base(language) {
         "fr" => fr::apply_all(text),
         "de" => de::apply_all(text),
         "es" => es::apply_all(text),
@@ -46,7 +113,10 @@ pub fn apply_itn(text: &str, language: &str) -> String {
         "pl" => pl::apply_all(text),
         "ru" => ru::apply_all(text),
         _ => en::apply_all(text),
-    }
+    };
+
+    // Apply user-defined ITN mappings last (user overrides take precedence)
+    apply_user_itn(&result)
 }
 
 /// Apply a list of (regex, replacement) pairs to text.

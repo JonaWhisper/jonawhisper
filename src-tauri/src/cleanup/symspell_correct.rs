@@ -14,9 +14,72 @@
 //! - Sub-millisecond per-word lookup
 
 use jona_engine_lm::KenLMModel;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
+use std::time::SystemTime;
 use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
+
+/// User dictionary: words the user defined that should never be corrected.
+struct UserDict {
+    words: HashSet<String>,
+    mtime: SystemTime,
+}
+
+static USER_DICT: Mutex<Option<UserDict>> = Mutex::new(None);
+
+/// Path to the user dictionary file.
+pub fn user_dict_path() -> std::path::PathBuf {
+    jona_types::config_dir().join("user_dict.txt")
+}
+
+/// Load or reload the user dictionary if the file changed.
+/// Called before each correction pass — the stat() call is sub-millisecond.
+fn refresh_user_dict() {
+    let path = user_dict_path();
+    let Ok(meta) = std::fs::metadata(&path) else {
+        return; // File doesn't exist — no user dict
+    };
+    let Ok(mtime) = meta.modified() else {
+        return;
+    };
+
+    let mut guard = USER_DICT.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(ref ud) = *guard {
+        if ud.mtime == mtime {
+            return; // Unchanged
+        }
+    }
+
+    // (Re)load
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let mut words = HashSet::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        // Skip ITN mapping lines (handled in itn/mod.rs)
+        if line.contains('=') {
+            continue;
+        }
+        // word or word\tfrequency — extract word part
+        let word = line.split('\t').next().unwrap_or(line).trim().to_lowercase();
+        if !word.is_empty() {
+            words.insert(word);
+        }
+    }
+    let count = words.len();
+    *guard = Some(UserDict { words, mtime });
+    log::info!("User dict: loaded {} words from {}", count, path.display());
+}
+
+/// Check if a word is in the user dictionary (case-insensitive).
+fn is_user_word(word: &str) -> bool {
+    let guard = USER_DICT.lock().unwrap_or_else(|e| e.into_inner());
+    guard.as_ref().is_some_and(|ud| ud.words.contains(&word.to_lowercase()))
+}
 
 /// Global cache of loaded KenLM instances keyed by language code.
 static LM_CACHE: Mutex<Option<HashMap<String, KenLMModel>>> = Mutex::new(None);
@@ -95,6 +158,16 @@ fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeSt
             count += 1;
         }
     }
+
+    // Inject user dictionary words with high frequency so they're always "known"
+    let user_guard = USER_DICT.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(ref ud) = *user_guard {
+        for word in &ud.words {
+            ss.load_dictionary_line(&format!("{word} 1000000"), 0, 1, " ");
+            count += 1;
+        }
+    }
+    drop(user_guard);
 
     if let Some(ref bigrams) = bigram_data {
         let mut bi_count = 0u32;
@@ -205,6 +278,8 @@ fn with_lm<T>(language: &str, f: impl FnOnce(&KenLMModel) -> T) -> Option<T> {
 /// Without KenLM: falls back to frequency-only correction (original behavior).
 /// Returns text unchanged if the SymSpell dict is not downloaded.
 pub fn auto_correct(text: &str, language: &str) -> String {
+    refresh_user_dict();
+
     with_ss(language, |ss| {
         let words = word_boundaries(text);
         let have_lm = get_lm(language);
@@ -222,6 +297,12 @@ pub fn auto_correct(text: &str, language: &str) -> String {
                 || word.chars().any(|c| c.is_ascii_digit())
                 || word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic())
             {
+                result.push_str(word);
+                continue;
+            }
+
+            // Skip user dictionary words (never correct them)
+            if is_user_word(word) {
                 result.push_str(word);
                 continue;
             }

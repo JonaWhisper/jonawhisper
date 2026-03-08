@@ -150,6 +150,7 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::set_setting,
             commands::settings::get_system_locale,
+            commands::settings::open_user_dict,
             commands::settings::get_launch_at_login_status,
             commands::settings::set_launch_at_login,
             commands::permissions::get_permissions,
