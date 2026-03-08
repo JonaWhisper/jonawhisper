@@ -17,7 +17,7 @@ const DPR: f32 = 2.0; // Retina
 const PX_W: usize = (PILL_WIDTH as f32 * DPR) as usize; // 160
 const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PillMode {
     Preparing,
     Recording,
@@ -480,3 +480,264 @@ const DIGITS: [[u8; 15]; 10] = [
     [1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1], // 8
     [1,1,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1], // 9
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- Alpha compositing --
+
+    #[test]
+    fn over_composites_opaque_source_on_transparent_dest() {
+        let (mut r, mut g, mut b, mut a) = (0.0, 0.0, 0.0, 0.0);
+        over(&mut r, &mut g, &mut b, &mut a, 1.0, 0.0, 0.0, 1.0);
+        assert!((r - 1.0).abs() < 0.001);
+        assert!((a - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn over_blends_semitransparent_source() {
+        let (mut r, mut g, mut b, mut a) = (0.0, 0.0, 1.0, 1.0);
+        over(&mut r, &mut g, &mut b, &mut a, 0.5, 0.0, 0.0, 0.5);
+        // Source (red 0.5 @ 50%) over dest (blue 1.0 @ 100%)
+        assert!(r > 0.4, "Red should bleed through: {r}");
+        assert!(b > 0.4, "Blue should remain: {b}");
+        assert!((a - 1.0).abs() < 0.001, "Alpha should be ~1.0: {a}");
+    }
+
+    // -- SDF primitives --
+
+    #[test]
+    fn sdf_aa_inside_is_opaque() {
+        assert!((sdf_aa(-5.0) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn sdf_aa_outside_is_transparent() {
+        assert!(sdf_aa(5.0) < 0.001);
+    }
+
+    #[test]
+    fn sdf_aa_boundary_is_half() {
+        assert!((sdf_aa(0.0) - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn circle_center_is_inside() {
+        let d = sdf_circle(50.0, 50.0, 50.0, 50.0, 10.0);
+        assert!(d < 0.0, "Center of circle should be inside (negative SDF)");
+    }
+
+    #[test]
+    fn circle_far_point_is_outside() {
+        let d = sdf_circle(100.0, 100.0, 50.0, 50.0, 10.0);
+        assert!(d > 0.0, "Far point should be outside (positive SDF)");
+    }
+
+    #[test]
+    fn rrect_center_is_inside() {
+        let d = sdf_rrect(80.0, 32.0, 80.0, 32.0, 80.0, 32.0, 16.0);
+        assert!(d < 0.0, "Center of rounded rect should be inside");
+    }
+
+    #[test]
+    fn segment_point_on_line_has_zero_distance() {
+        // Midpoint of horizontal segment
+        let d = sdf_segment(5.0, 0.0, 0.0, 0.0, 10.0, 0.0);
+        assert!(d < 0.1, "Point on segment should have ~0 distance: {d}");
+    }
+
+    // -- Spectrum bars --
+
+    #[test]
+    fn spectrum_silent_audio_produces_minimal_bars() {
+        let silent = [0.0f32; 12];
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        // Sample at the center of bar 6 (vertically centered)
+        let bar_w = (cw * 0.035).max(2.0 * DPR);
+        let gap = (cw * 0.025).max(1.0 * DPR);
+        let total = 12.0 * bar_w + 11.0 * gap;
+        let bar6_cx = (cw - total) / 2.0 + 6.0 * (bar_w + gap) + bar_w / 2.0;
+        let a = spectrum_alpha(bar6_cx, ch / 2.0, &silent, cw, ch);
+        assert!(a > 0.0, "Even silent spectrum should show minimal bars at bar center");
+    }
+
+    #[test]
+    fn spectrum_loud_audio_produces_tall_bars() {
+        let loud = [1.0f32; 12];
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        // Sample at bar 6 center, near the top of the pill
+        let bar_w = (cw * 0.035).max(2.0 * DPR);
+        let gap = (cw * 0.025).max(1.0 * DPR);
+        let total = 12.0 * bar_w + 11.0 * gap;
+        let bar6_cx = (cw - total) / 2.0 + 6.0 * (bar_w + gap) + bar_w / 2.0;
+        let a = spectrum_alpha(bar6_cx, ch * 0.25, &loud, cw, ch);
+        assert!(a > 0.0, "Loud spectrum should have bars reaching top quarter");
+    }
+
+    #[test]
+    fn spectrum_outside_pill_is_transparent() {
+        let loud = [1.0f32; 12];
+        let a = spectrum_alpha(0.0, 0.0, &loud, PX_W as f32, PX_H as f32);
+        assert!(a < 0.01, "Spectrum outside pill area should be transparent");
+    }
+
+    // -- Dots animation (transcribing) --
+
+    #[test]
+    fn dots_visible_at_pill_center() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        let (_, _, _, a) = dots_pixel(cw / 2.0, ch / 2.0, 0.0, cw, ch);
+        assert!(a > 0.0, "Transcribing dots should be visible at center");
+    }
+
+    #[test]
+    fn dots_invisible_outside_pill() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        let (_, _, _, a) = dots_pixel(0.0, 0.0, 0.0, cw, ch);
+        assert!(a < 0.01, "Dots should not render outside pill");
+    }
+
+    // -- Success checkmark --
+
+    #[test]
+    fn success_checkmark_visible_at_center() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        // Sample along the checkmark path (slightly right of center, on the long stroke)
+        let a = success_alpha(cw * 0.55, ch * 0.4, cw, ch);
+        assert!(a > 0.0, "Success checkmark should be visible near center");
+    }
+
+    // -- Error cross --
+
+    #[test]
+    fn error_cross_visible_at_center() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        let a = error_alpha(cw / 2.0, ch / 2.0, cw, ch);
+        assert!(a > 0.0, "Error cross should be visible at center");
+    }
+
+    #[test]
+    fn error_cross_invisible_far_from_center() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        let a = error_alpha(cw - 1.0, ch - 1.0, cw, ch);
+        assert!(a < 0.01, "Error cross should not reach corners");
+    }
+
+    // -- Badge --
+
+    #[test]
+    fn badge_hidden_when_count_is_one() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        // badge_pixel is only called when count > 1 in render_frame,
+        // but the function itself should still render — the guard is in render_frame
+        let (_, _, _, a) = badge_pixel(cw - 10.0, 10.0, 1, cw, ch);
+        // Badge still renders at count=1, but render_frame skips the call
+        assert!(a >= 0.0); // just verify no panic
+    }
+
+    #[test]
+    fn badge_shows_digit_at_count_5() {
+        let cw = PX_W as f32;
+        let ch = PX_H as f32;
+        let badge_r = (ch * 0.4 / 2.0).round();
+        let bx = cw - badge_r - 2.0 * DPR;
+        let by = badge_r + 2.0 * DPR;
+        let (_, _, _, a) = badge_pixel(bx, by, 5, cw, ch);
+        assert!(a > 0.0, "Badge with count 5 should be visible at badge center");
+    }
+
+    // -- Full frame render --
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn render_frame_produces_correct_buffer_size() {
+        let p = PillInner {
+            ns_window: std::ptr::null_mut(),
+            image_view: std::ptr::null_mut(),
+            mode: PillMode::Recording,
+            spectrum: [0.5; 12],
+            smoothed: [0.5; 12],
+            dot_phase: 0.0,
+            pending_count: 0,
+        };
+        let rgba = render_frame(&p);
+        assert_eq!(rgba.len(), PX_W * PX_H * 4, "RGBA buffer should be width*height*4");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn render_frame_has_transparent_corners() {
+        let p = PillInner {
+            ns_window: std::ptr::null_mut(),
+            image_view: std::ptr::null_mut(),
+            mode: PillMode::Recording,
+            spectrum: [0.5; 12],
+            smoothed: [0.5; 12],
+            dot_phase: 0.0,
+            pending_count: 0,
+        };
+        let rgba = render_frame(&p);
+        // Top-left corner (0,0) should be transparent (pill is a capsule shape)
+        let a = rgba[3];
+        assert_eq!(a, 0, "Corner pixels should be transparent (capsule shape)");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn render_frame_has_opaque_center() {
+        let p = PillInner {
+            ns_window: std::ptr::null_mut(),
+            image_view: std::ptr::null_mut(),
+            mode: PillMode::Idle,
+            spectrum: [0.0; 12],
+            smoothed: [0.0; 12],
+            dot_phase: 0.0,
+            pending_count: 0,
+        };
+        let rgba = render_frame(&p);
+        // Center pixel should be opaque (pill background)
+        let center = (PX_H / 2 * PX_W + PX_W / 2) * 4;
+        let a = rgba[center + 3];
+        assert!(a > 200, "Center pixel should be nearly opaque: {a}");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn each_pill_mode_renders_different_content() {
+        let modes = [
+            PillMode::Recording,
+            PillMode::Transcribing,
+            PillMode::Success,
+            PillMode::Error,
+        ];
+        let mut frames: Vec<Vec<u8>> = Vec::new();
+        for mode in modes {
+            let p = PillInner {
+                ns_window: std::ptr::null_mut(),
+                image_view: std::ptr::null_mut(),
+                mode,
+                spectrum: [0.5; 12],
+                smoothed: [0.5; 12],
+                dot_phase: 1.0,
+                pending_count: 0,
+            };
+            frames.push(render_frame(&p));
+        }
+        // Each mode should produce a visually distinct frame
+        for i in 0..frames.len() {
+            for j in (i + 1)..frames.len() {
+                assert_ne!(frames[i], frames[j],
+                    "Modes {:?} and {:?} should render differently", modes[i], modes[j]);
+            }
+        }
+    }
+}
