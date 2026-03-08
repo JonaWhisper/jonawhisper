@@ -87,30 +87,15 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
 
       <!-- Downloaded with update available -->
       <template v-else-if="showCustomDownloaded && hasUpdate">
-        <div class="flex items-center gap-1.5">
-          <Badge
-            variant="secondary"
-            class="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-transparent h-6 px-2 text-[10px] font-medium"
-          >
-            {{ t('modelManager.updateAvailable') }}
-          </Badge>
-          <TooltipProvider :delay-duration="300">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <Button
-                  variant="ghost" size="icon-sm"
-                  class="cursor-pointer"
-                  :aria-label="t('aria.update')"
-                  :disabled="isUpdating"
-                  @click="handleUpdate"
-                >
-                  <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isUpdating }" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.update') }}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <Button
+          size="sm"
+          class="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+          :disabled="isUpdating"
+          @click="handleUpdate"
+        >
+          <RefreshCw v-if="isUpdating" class="w-3.5 h-3.5 mr-1.5 animate-spin" />
+          {{ t('modelManager.update') }}
+        </Button>
       </template>
 
       <!-- Downloaded — badge swaps to trash on hover -->

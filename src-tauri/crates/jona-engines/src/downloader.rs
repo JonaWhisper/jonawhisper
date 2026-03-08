@@ -433,10 +433,15 @@ async fn download_single_file(
     let tmp_path = partial_path(model);
     let model_id = model.id.clone();
 
+    let mut last_bytes: u64 = 0;
+    let mut last_time = std::time::Instant::now();
     let mut progress_cb = |downloaded: u64, total: u64| {
-        let elapsed = std::time::Instant::now();
-        _ = elapsed;
-        emit_progress(app, download_state, &model_id, downloaded, total, 0);
+        let now = std::time::Instant::now();
+        let dt = now.duration_since(last_time).as_secs_f64();
+        let speed = if dt > 0.0 { ((downloaded - last_bytes) as f64 / dt) as u64 } else { 0 };
+        last_bytes = downloaded;
+        last_time = now;
+        emit_progress(app, download_state, &model_id, downloaded, total, speed);
     };
 
     let downloaded = download_one_file(&model.url, &tmp_path, cancel_flag, &mut progress_cb).await;
@@ -482,8 +487,15 @@ async fn download_multi_file(
         let base = cumulative_completed;
         let model_id = model.id.clone();
 
+        let mut last_bytes: u64 = 0;
+        let mut last_time = std::time::Instant::now();
         let mut progress_cb = |file_downloaded: u64, _file_total: u64| {
-            emit_progress(app, download_state, &model_id, base + file_downloaded, total_size, 0);
+            let now = std::time::Instant::now();
+            let dt = now.duration_since(last_time).as_secs_f64();
+            let speed = if dt > 0.0 { ((file_downloaded - last_bytes) as f64 / dt) as u64 } else { 0 };
+            last_bytes = file_downloaded;
+            last_time = now;
+            emit_progress(app, download_state, &model_id, base + file_downloaded, total_size, speed);
         };
 
         let result = download_one_file(&df.url, &tmp_path, cancel_flag, &mut progress_cb).await;

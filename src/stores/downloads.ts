@@ -49,14 +49,18 @@ export const useDownloadStore = defineStore('downloads', () => {
   async function pauseDownload(id: string) {
     const entry = activeDownloads.value[id]
     if (!entry) return
+    // Mark as stopping so UI shows spinner instead of controls
+    activeDownloads.value = { ...activeDownloads.value, [id]: { ...entry, stopping: true } }
+    try { await invoke('pause_download', { id }) }
+    catch (e) { console.error('pauseDownload failed:', e) }
+    // Save partial progress and remove from active downloads after backend confirms
+    const current = activeDownloads.value[id]
     const m = enginesStore.models.find(m => m.id === id)
-    if (m && entry.progress > 0) {
-      m.partial_progress = entry.progress
+    if (m && current && current.progress > 0) {
+      m.partial_progress = current.progress
     }
     const { [id]: _, ...rest } = activeDownloads.value
     activeDownloads.value = rest
-    try { await invoke('pause_download', { id }) }
-    catch (e) { console.error('pauseDownload failed:', e) }
   }
 
   async function cancelDownload(id: string) {
