@@ -70,7 +70,7 @@ Recording lifecycle and transcription pipeline, split into focused sub-modules.
 |------|------|
 | `recording/mod.rs` | Public types (`AudioCmd`, `AudioReply`, `RecordingState`, `MicTestSender`), timing constants, shared helpers (`show_error_then_close`, `cleanup_orphan_audio_files`). |
 | `recording/lifecycle.rs` | `start_recording`, `stop_recording_and_enqueue`, `handle_short_tap`, `cancel_recording`, `cancel_transcription`. Everything that touches the record button. |
-| `recording/pipeline.rs` | `process_next_in_queue` → VAD pre-check → ASR dispatch (cloud or local via `ASREngine` trait) → hallucination filter → dictation commands → cleanup (punctuation / correction / LLM) → finalize → paste. All engine interactions go through `jona_engines::EngineCatalog`. |
+| `recording/pipeline.rs` | `process_next_in_queue` → VAD pre-check → ASR dispatch (cloud or local via `ASREngine` trait) → hallucination filter → dictation commands → disfluency removal → punctuation → spell-check → correction/LLM → finalize → ITN → paste. Each step records its result in `pipeline_steps` (changed / `:nochange` / `:error`). All engine interactions go through `jona_engines::EngineCatalog`. |
 | `recording/threads.rs` | Three long-lived threads: audio (cpal), hotkey handler, spectrum emitter (30fps). |
 
 ### Commands (`commands/`)
@@ -96,9 +96,9 @@ Text post-processing pipeline: VAD, punctuation, correction, LLM cleanup.
 |------|------|
 | `cleanup/mod.rs` | Re-exports (`LlmError` from `jona_engines::llm_prompt`) |
 | `cleanup/vad.rs` | Voice Activity Detection using Silero VAD v6.2 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly. Provides `has_speech()` and `trim_silence()`. Fallback: always proceeds on error. |
-| `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, disfluency removal (filler word stripping FR/EN), finalize (spacing, capitalization) |
-| `cleanup/symspell_correct.rs` | Spell-check via SymSpell with downloadable frequency dictionaries (FR/EN + regional variants). Lazy-loaded per language via `Mutex<HashMap>`. |
-| `cleanup/itn.rs` | Inverse Text Normalization — numbers, ordinals, percentages, hours, currencies, units (FR/EN). Compositional parser. |
+| `cleanup/post_processor/` | Regex-based text cleanup, split into sub-modules: `hallucinations.rs` (9-lang pattern matching + repetition detection), `dictation.rs` (FR/EN voice commands → punctuation), `fillers.rs` (9-lang disfluency removal), `mod.rs` (orchestration, finalize spacing/capitalization). |
+| `cleanup/symspell_correct.rs` | Spell-check via SymSpell with downloadable frequency dictionaries (6 variants: fr, fr-be, fr-ca, fr-ch, en, en-gb). KenLM trigram reranking for context-aware correction. French guards (plural/apostrophe). Deadlock-free loading (load outside mutex). |
+| `cleanup/itn/` | Inverse Text Normalization — 9 languages (FR, EN, DE, ES, PT, IT, NL, PL, RU). Each file: number parser + regex rules (ordinals, %, hours, currencies, units). `mod.rs`: dispatch + shared helpers (`replace_numbers`, `regex_rules!` macro). |
 | `cleanup/llm_cloud.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Uses `jona_engines::llm_prompt` for prompt templates and output sanitization. |
 
 ### UI (`ui/`)

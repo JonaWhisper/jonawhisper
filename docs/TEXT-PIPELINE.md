@@ -173,6 +173,10 @@ Texte → SentencePiece tokenize (Unigram, NFC+Lowercase+Metaspace)
 - Chargement lazy depuis disque, cache par langue via `Mutex<HashMap>`
 - `lookup_compound` pour les erreurs de frontières de mots (fréquentes en ASR)
 - Résolution langue : essaie locale complète (fr-ca), puis langue de base (fr)
+- **KenLM reranking** : les candidats SymSpell sont rescorés en contexte trigram via un modèle de langue KenLM (Wikipedia, pruned + quantized 8-bit). Le meilleur candidat en contexte est sélectionné. Dégradation gracieuse sans modèle LM.
+- **French guards** : pluriel (mot finissant par 's' + radical connu → garder), apostrophe/élision (j'avais → "avais" connu → garder)
+- **Dynamic max_distance** : edit distance 1 pour mots <6 chars, 2 pour les plus longs — réduit les faux positifs sur les mots courts
+- **Chargement deadlock-free** : les dictionnaires (~645K mots FR) sont chargés HORS du mutex. Pattern : vérification rapide sous lock → chargement hors lock → insertion sous lock
 
 **Toggle** : `spellcheck_enabled` dans Preferences (défaut : désactivé).
 
@@ -284,11 +288,32 @@ cleanup/itn/
 
 Chaque fichier par langue exporte `pub(super) fn apply_all(text: &str) -> String` qui chaîne : regex substitutions (%, heures, devises, ordinaux, unités) → parser de nombres cardinaux.
 
-**Sécurité** : "un"/"une", "a", "один" isolés ne sont pas convertis (ambiguïté article/nombre).
+**Sécurité** :
+- "un"/"une"/"a"/"один" isolés ne sont pas convertis (ambiguïté article/nombre) — sauf si suivis d'un mot d'unité (kilomètre, heure, etc.)
+- "zéro"/"zero" est toujours converti (jamais un article)
+- FR pourcentages : `pour cent` (2 mots) et `pourcent(s)` (1 mot) sont tous les deux reconnus
 
 **Toggle** : `itn_enabled` dans Preferences (défaut : activé).
 
 **Latence** : ~0ms (regex pré-compilées + lookup)
+
+---
+
+## Suivi des étapes du pipeline (✅ Implémenté)
+
+Chaque étape du pipeline (ponctuation, spell-check, correction, ITN) enregistre son résultat dans `pipeline_steps` :
+
+| Suffixe | Signification | Exemple |
+|---|---|---|
+| *(aucun)* | L'étape a modifié le texte | `("punctuation", "Texte ponctué.")` |
+| `:nochange` | L'étape a tourné mais n'a rien changé | `("spellcheck:nochange", "")` |
+| `:error` | L'étape a échoué | `("correction:error", "Model not loaded")` |
+
+Le frontend affiche ces états dans le **pipeline stepper** (8 icônes dans `HistoryEntryCard.vue`) avec 4 états visuels :
+- **Gris** : étape désactivée
+- **Coloré** : étape active avec diff (cliquable → diff mot-à-mot inline)
+- **Atténué + Slash** : étape active, aucun changement
+- **Atténué + X** : étape en erreur
 
 ---
 
@@ -339,6 +364,123 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 
 ---
 
+## Recherche & décisions techniques
+
+Cette section documente les recherches menées pour améliorer le pipeline texte : alternatives évaluées, décisions prises, et justifications.
+
+### Spell-check : SymSpell + KenLM (choix retenu)
+
+**Problème initial** : SymSpell seul dégradait la transcription — les corrections étaient basées uniquement sur la distance d'édition, sans contexte. Un mot rare mais correct pouvait être "corrigé" vers un mot fréquent inapproprié.
+
+**Solution** : combiner SymSpell (génération de candidats rapide) avec KenLM (scoring contextuel trigram).
+
+| Composant | Rôle | Source |
+|---|---|---|
+| **SymSpell** | Génère les candidats (symmetric delete, O(1) lookup) | `symspell` crate |
+| **KenLM** | Score les candidats en contexte trigram (probabilité du mot sachant les 2 précédents) | C++ vendoré (`kenlm_ffi.cc`), LGPL 2.1+ |
+| **Dictionnaires fréquence** | FR: DELA 683K formes + régionaux. EN: liste de fréquences | `jonawhisper-spellcheck-dicts` (GitHub Releases) |
+| **Bigrams** | FR: 100K bigrams de Leipzig Corpora (3 corpus × 1M phrases) | Idem |
+| **Modèles de langue** | 9 langues, Wikipedia, pruned trigram, quantized 8-bit, 50-100 MB/lang | `JonaWhisper/kenlm-models` (HuggingFace) |
+
+**Pipeline** :
+1. SymSpell `lookup` pour chaque mot inconnu → liste de candidats
+2. KenLM score chaque candidat dans le contexte trigram de la phrase
+3. Le candidat avec le meilleur score KenLM est retenu
+4. Sans modèle KenLM installé → dégradation gracieuse, SymSpell seul
+
+**Quantization des modèles KenLM** : les modèles bruts Wikipedia (~2-8 GB) sont prunés (trigram seulement) puis quantifiés 8-bit via KenLM `build_binary` avec `-q 8 -a 22 -b 8`. Résultat : 50-100 MB par langue au lieu de plusieurs GB.
+
+**Alternatives évaluées et écartées** :
+
+| Alternative | Raison d'exclusion |
+|---|---|
+| **GECToR** (encoder-based GEC) | Pas d'ONNX pré-exporté, EN-only, modèles non officiels (licence non-commerciale), effort d'intégration élevé |
+| **Harper** (`harper-core`) | EN-only (v1.4.1), checks redondants avec `finalize()` + PCS |
+| **GECToR multilingue** | Aucun modèle pré-entraîné multilingue disponible |
+| **Truecasing NER** | PCS couvre déjà la capitalisation 47 langues, NER ajouterait complexité pour un gain marginal |
+| **LanguageTool** | Java, lourd (500 MB+), latence élevée (server mode), licence LGPL mais complexité d'intégration |
+| **rphonetic** (Soundex/Metaphone) | Évalué pour le filtrage phonétique des candidats SymSpell — reste une piste intéressante (les erreurs ASR sont phonétiquement proches), pas encore implémenté |
+
+### T5 Correction : INT8 quantization
+
+**Problème** : les modèles T5 FP32 sont trop lourds (220-800 MB) et lents pour de la correction post-ASR en temps réel.
+
+**Solution** : quantization dynamique INT8 via `onnxruntime.quantization.quantize_dynamic`.
+
+| Modèle | FP32 | INT8 | Réduction | Qualité |
+|---|---|---|---|---|
+| GEC T5 Small (60M) | 242 MB | 96 MB | -60% | Comparable |
+| T5 Spell FR (220M) | 884 MB | 276 MB | -69% | Comparable |
+| FlanEC Base (250M) | 955 MB | 276 MB | -71% | Comparable |
+| FlanEC Large (800M) | 3.2 GB | 821 MB | -74% | Légère dégradation |
+
+**Pipeline de conversion** (dans `jonawhisper-model-tools`) :
+1. Source PyTorch (HuggingFace) → ONNX FP32 (`optimum.exporters.onnx.main_export`)
+2. ONNX FP32 → ONNX INT8 (`onnxruntime.quantization.quantize_dynamic`)
+3. Upload HuggingFace (`HfApi().upload_file()`)
+
+Les modèles INT8 sont auto-préférés via `prefer_int8()` dans `jona-engine-correction/inference.rs` : si les fichiers INT8 existent, ils sont utilisés à la place des FP32.
+
+### Dictionnaires SymSpell : architecture de build
+
+**Repo** : `JonaWhisper/jonawhisper-spellcheck-dicts` (GitHub public)
+
+**Architecture** :
+- Script Ruby (`build_dicts.rb`) avec un fichier par langue (`langs/*.rb`)
+- Chaque langue définit : `base_words`, `build_freq`, `build_bigrams`, `freq_separator`
+- Variantes régionales (fr-be, fr-ca, fr-ch, en-gb) : héritent de la base + merge TSV (`data/*.tsv`)
+- CI mensuel : build → compare manifest SHA256 → crée release versionnée si changement
+- Distribution via GitHub Releases (pas de fichiers git-trackés)
+
+**Ajouter une langue de base** :
+1. `langs/xx.rb` avec les 4 méthodes
+2. `spellcheck:xx` model dans `jona-engine-spellcheck`
+
+**Ajouter une variante régionale** :
+1. `data/xx-yy.tsv` (mot / fréquence / définition)
+2. `langs/xx_yy.rb` (hérite base + merge TSV)
+3. `spellcheck:xx-yy` model dans le crate
+
+### KenLM : vendoring et intégration
+
+**Choix du vendoring** : KenLM C++ est inclus directement dans `jona-engine-lm` (query-only sources, ~20 fichiers .cc/.hh). Licence LGPL 2.1+ compatible avec GPL-3.0 du projet.
+
+**FFI** : wrapper minimal `kenlm_ffi.cc` exposant 7 fonctions C :
+- `kenlm_load(path)` / `kenlm_free(model)` — cycle de vie
+- `kenlm_score_word(model, word, state_in, state_out)` — score un mot en contexte
+- `kenlm_score_sentence(model, sentence)` — score une phrase complète
+- `kenlm_begin_state` / `kenlm_null_state` / `kenlm_vocab_index` — gestion d'état
+
+**Rust wrapper** : `KenLMModel` (Send+Sync, mmap-backed, ~0 overhead de chargement).
+
+**Modèles** : 9 langues (FR, EN, DE, ES, PT, IT, NL, PL, RU), entraînés sur Wikipedia, pruned trigram, quantized 8-bit. Hébergés sur HuggingFace `JonaWhisper/kenlm-models`. Pipeline de build dans `jonawhisper-model-tools` (GitHub Actions, matrix par langue).
+
+### Ponctuation : PCS vs BERT
+
+**PCS** a été retenu comme modèle recommandé :
+
+| Critère | BERT (Fullstop) | PCS |
+|---|---|---|
+| Langues | 4-5 | **47** |
+| Capitalisation | Non | **Oui** |
+| Taille | 562 MB - 1.1 GB | **233 MB** |
+| Vitesse | ~80-100ms | **~50ms** |
+| Architecture | Token classification | **4 heads** (pre/post punct, caps, segmentation) |
+
+BERT reste disponible comme alternative (certains utilisateurs le préfèrent pour des langues spécifiques).
+
+### Pistes non encore implémentées
+
+| Piste | Description | Effort | Impact |
+|---|---|---|---|
+| **Filtrage phonétique** | Score Soundex/Metaphone pour filtrer les faux positifs SymSpell | Modéré | Moyen |
+| **Log-probs hallucinations** | Token log-probs + compression ratio Whisper | Modéré | Haut |
+| **Passe unique LLM** | Un LLM local remplaçant spell+punct+GEC | Élevé | Haut |
+| **Correction sélective** | Ne corriger que les segments à faible confiance ASR | Modéré | Moyen |
+| **Ponctuation domain-adapted** | Fine-tuner sur corpus ASR oral | Élevé | Moyen |
+
+---
+
 ## Roadmap
 
 ### Phase 1 — Quick wins ✅ Terminé
@@ -367,5 +509,7 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 8. ~~**Truecasing avancé (NER)**~~ — ❌ Écarté. PCS couvre déjà la capitalisation pour 47 langues. Les modèles NER ajouteraient complexité et latence pour un gain marginal sur les noms propres rares.
 
 ---
+
+*Voir aussi : [BENCHMARK.md](BENCHMARK.md) pour les données de benchmark détaillées (WER, RTF, latences par modèle).*
 
 *Dernière mise à jour : mars 2026*

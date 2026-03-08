@@ -233,4 +233,6 @@ Phase 3 — Presets device (polish UX)
 
 ---
 
+*Voir aussi : [BENCHMARK.md](BENCHMARK.md) pour les données de benchmark détaillées (WER, RTF par modèle ASR).*
+
 *Dernière mise à jour : mars 2026*

@@ -361,6 +361,44 @@ Use shadcn-vue `Tooltip` with `delay-duration="300"` everywhere instead of nativ
 </TooltipProvider>
 ```
 
+### Pipeline stepper (History)
+
+Each history entry shows 8 pipeline step icons in a horizontal sequence:
+
+| Icon | Step | Lucide icon |
+|---|---|---|
+| 1 | Mic (ASR) | `Mic` |
+| 2 | VAD | `Scissors` |
+| 3 | Hallucination filter | `ShieldCheck` |
+| 4 | Disfluency removal | `Eraser` |
+| 5 | Punctuation | `Type` |
+| 6 | Spell-check | `BookA` |
+| 7 | Correction/LLM | `SpellCheck` |
+| 8 | ITN | `Hash` |
+
+**4 visual states:**
+
+| State | Appearance | Interaction |
+|---|---|---|
+| Disabled | Gray icon | None |
+| Active + diff | Colored icon (step color) | Click → inline word-level diff (`diffWords` from `diff` npm) |
+| Active + no change | Muted icon + `Slash` overlay (diagonal, `text-muted-foreground/50`, `stroke-[1.5]`) | Tooltip: "(no change)" |
+| Active + error | Semi-transparent icon (`opacity-60`) + `X` overlay (`h-2.5 w-2.5`, `text-destructive/50`, `stroke-[2]`) | Tooltip: "(error)" |
+
+The overlays (X, Slash) are Lucide icons absolutely positioned over the step icon. Keep them subtle — they should not completely hide the icon behind them.
+
+### Word confidence display
+
+When word-level confidence scores are available (Canary, Parakeet), words are displayed with colored backgrounds:
+
+| Score range | Color | Meaning |
+|---|---|---|
+| ≥ 90% | Green background | High confidence |
+| ≥ 70% | Yellow background | Medium confidence |
+| < 70% | Red background + amber dotted underline | Low confidence |
+
+Tooltip on hover shows the exact score. Low-confidence words (< 70%) get an additional `border-b border-dotted border-amber-500` underline as a visual alert.
+
 ## Typography
 
 | Style | Tailwind classes | Usage |
