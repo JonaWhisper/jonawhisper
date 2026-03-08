@@ -676,6 +676,7 @@ mod tests {
             EngineCategory::Punctuation,
             EngineCategory::Correction,
             EngineCategory::SpellCheck,
+            EngineCategory::LanguageModel,
         ];
         for cat in &categories {
             let json = serde_json::to_string(cat).unwrap();
@@ -688,6 +689,7 @@ mod tests {
     fn engine_category_serde_rename() {
         assert_eq!(serde_json::to_string(&EngineCategory::SpellCheck).unwrap(), "\"spellcheck\"");
         assert_eq!(serde_json::to_string(&EngineCategory::ASR).unwrap(), "\"asr\"");
+        assert_eq!(serde_json::to_string(&EngineCategory::LanguageModel).unwrap(), "\"languagemodel\"");
     }
 
     // -- EngineError --

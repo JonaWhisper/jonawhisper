@@ -1,0 +1,18 @@
+{
+  "languages": {
+    "fr": {
+      "label": "Fran\u00e7ais",
+      "filename": "fr.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/fr.binary",
+      "size": 0,
+      "ram": 0
+    },
+    "en": {
+      "label": "English",
+      "filename": "en.binary",
+      "url": "https://huggingface.co/JonaWhisper/kenlm-models/resolve/main/en.binary",
+      "size": 0,
+      "ram": 0
+    }
+  }
+}

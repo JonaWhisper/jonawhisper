@@ -1,0 +1,15 @@
+[package]
+name = "jona-engine-lm"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+inventory.workspace = true
+jona-types = { path = "../jona-types" }
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[build-dependencies]
+cc = "1"

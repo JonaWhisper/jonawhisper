@@ -2822,6 +2822,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-lm"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "inventory",
+ "jona-types",
+ "log",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jona-engine-parakeet"
 version = "0.1.0"
 dependencies = [
@@ -2974,6 +2986,7 @@ dependencies = [
  "jona-engine-canary",
  "jona-engine-correction",
  "jona-engine-llama",
+ "jona-engine-lm",
  "jona-engine-parakeet",
  "jona-engine-pcs",
  "jona-engine-qwen",

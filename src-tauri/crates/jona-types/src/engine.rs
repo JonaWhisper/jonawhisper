@@ -24,6 +24,7 @@ pub enum EngineCategory {
     Punctuation,
     Correction,
     SpellCheck,
+    LanguageModel,
 }
 
 // -- Download type --
