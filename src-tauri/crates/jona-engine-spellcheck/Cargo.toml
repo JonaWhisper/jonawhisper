@@ -5,8 +5,8 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 
 [dependencies]
-inventory = "0.3"
+inventory.workspace = true
 jona-types = { path = "../jona-types" }
-log = "0.4"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true

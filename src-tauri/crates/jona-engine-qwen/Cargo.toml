@@ -5,8 +5,8 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 
 [dependencies]
-inventory = "0.3"
+inventory.workspace = true
 jona-types = { path = "../jona-types" }
 jona-engines = { path = "../jona-engines" }
 qwen-asr = "0.3"
-log = "0.4"
+log.workspace = true

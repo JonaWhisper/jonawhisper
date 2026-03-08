@@ -27,15 +27,15 @@ fn simulate_paste() -> Result<(), String> {
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
     let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
-        .ok_or("Failed to create CGEventSource")?;
+        .map_err(|_| "Failed to create CGEventSource".to_string())?;
 
     // Key code 9 = 'V'
     let key_down = CGEvent::new_keyboard_event(source.clone(), 9, true)
-        .ok_or("Failed to create key down event")?;
+        .map_err(|_| "Failed to create key down event".to_string())?;
     key_down.set_flags(CGEventFlags::CGEventFlagCommand);
 
     let key_up = CGEvent::new_keyboard_event(source, 9, false)
-        .ok_or("Failed to create key up event")?;
+        .map_err(|_| "Failed to create key up event".to_string())?;
     key_up.set_flags(CGEventFlags::CGEventFlagCommand);
 
     key_down.post(core_graphics::event::CGEventTapLocation::HID);

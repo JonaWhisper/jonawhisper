@@ -5,11 +5,11 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 
 [dependencies]
-inventory = "0.3"
+inventory.workspace = true
 jona-types = { path = "../jona-types" }
 jona-engines = { path = "../jona-engines" }
 encoding_rs = "0.8"
-log = "0.4"
+log.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }

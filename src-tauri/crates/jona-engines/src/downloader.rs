@@ -306,13 +306,12 @@ fn emit_progress(
 }
 
 /// Download a single URL to `tmp_path`, with Range resume and progress reporting.
-/// `base_downloaded` is the byte offset for progress (non-zero for multi-file).
 /// Returns the number of bytes downloaded for this file, or None on failure/cancel.
 async fn download_one_file(
     url: &str,
     tmp_path: &Path,
     cancel_flag: &AtomicBool,
-    progress_cb: &mut dyn FnMut(u64, u64),
+    progress_cb: &mut (dyn FnMut(u64, u64) + Send),
 ) -> Option<u64> {
     let client = &*DOWNLOAD_CLIENT;
     let existing_size = fs::metadata(tmp_path).map(|m| m.len()).unwrap_or(0);
@@ -365,7 +364,6 @@ async fn download_one_file(
     }
 
     let mut last_emit_time = std::time::Instant::now();
-    let mut last_emit_bytes = downloaded;
 
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
@@ -384,8 +382,6 @@ async fn download_one_file(
                     if elapsed >= std::time::Duration::from_millis(250) || is_done {
                         progress_cb(downloaded, total_size);
                         last_emit_time = now;
-                        last_emit_bytes = downloaded;
-                        _ = last_emit_bytes; // used implicitly via closure captures
                     }
                 }
             }
