@@ -17,22 +17,24 @@ ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
 
 ## Étape 1 — Filtre hallucinations (✅ Implémenté)
 
-**Fichier** : `post_processor.rs` — fonction `preprocess()` → `strip_hallucinations()`
+**Fichier** : `cleanup/post_processor/hallucinations.rs` — fonction `strip_hallucinations()`
 
 **But** : supprimer les phrases parasites que Whisper génère sur du silence, du bruit ou des segments très courts.
 
 **Mécanisme** :
-- Liste `HALLUCINATIONS` : 30+ patterns connus (compilés en regex case-insensitive via `LazyLock`)
-- Deux passes :
-  1. Match exact (texte entier = hallucination) → retourne `""` (discard complet)
-  2. Match partiel (hallucination dans un texte plus long) → suppression inline
+- Liste `HALLUCINATIONS` : 60+ patterns connus en 9 langues (compilés en regex case-insensitive via `LazyLock`)
+- Trois passes :
+  1. Détection musique/symboles uniquement (♪, ♫, …) → discard complet
+  2. Match exact (texte entier = hallucination) → retourne `""` (discard complet)
+  3. Détection répétition excessive (même mot 3× consécutifs, ou >70% d'un seul mot) → discard
+  4. Match partiel (hallucination dans un texte plus long) → suppression inline
 - Si le résultat est vide après filtrage → son `Basso` + pas de transcription
 
-**Patterns couverts** :
-- Sous-titrage (FR) : "sous-titrage société radio-canada", "sous-titres par", etc.
-- Signature (EN) : "thank you for watching", "please subscribe", etc.
+**Patterns couverts** (9 langues : FR, EN, DE, ES, PT, IT, NL, PL, RU) :
+- Sous-titrage : "sous-titrage société radio-canada", "subtitles by", "Untertitel im Auftrag des ZDF", etc.
+- Signature : "thank you for watching", "gracias por ver", "спасибо за просмотр", etc.
 - Artefacts : "♪", "...", "…", "www.", "http"
-- Salutations orphelines : "bye.", "au revoir.", "à bientôt."
+- Salutations orphelines : "bye.", "au revoir.", "tschüss", "tchau", etc.
 
 **Latence** : ~0ms (regex pré-compilées)
 
@@ -40,12 +42,12 @@ ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
 
 ## Étape 2 — Commandes dictée (✅ Implémenté)
 
-**Fichier** : `post_processor.rs` — fonction `preprocess()` → `apply_dictation_commands()`
+**Fichier** : `cleanup/post_processor/dictation.rs` — fonction `apply_dictation_commands()`
 
 **But** : convertir les commandes vocales en caractères de ponctuation ou formatage.
 
 **Mécanisme** :
-- Deux jeux de regex pré-compilées : `DICTATION_COMMANDS_FR` (16 commandes) et `DICTATION_COMMANDS_EN` (19 commandes)
+- Deux jeux de regex pré-compilées : `DICTATION_COMMANDS_FR` (17 commandes) et `DICTATION_COMMANDS_EN` (21 commandes)
 - Détection de langue automatique (`resolve_language()`) si `language == "auto"` : compte les mots français courants, ≥2 → FR
 - Substitution séquentielle (ordre important : "point d'interrogation" avant "point")
 
@@ -74,12 +76,12 @@ ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
 
 ## Étape 3 — Suppression disfluences (✅ Implémenté)
 
-**Fichier** : `post_processor.rs` — fonction `preprocess()` → `strip_fillers()`
+**Fichier** : `cleanup/post_processor/fillers.rs` — fonction `strip_fillers()`
 
 **But** : supprimer les mots parasites (fillers/hésitations) de l'oral qui polluent le texte écrit.
 
 **Mécanisme** :
-- Deux regex pré-compilées : `RE_FILLERS_FR` et `RE_FILLERS_EN` avec word-boundary `\b`
+- 9 regex pré-compilées (une par langue) avec word-boundary `\b`
 - Appliqué après les commandes dictée, avant le cleanup model
 - Espaces multiples nettoyés via `RE_MULTI_SPACES`
 - Toggle : `disfluency_removal_enabled` dans Preferences (défaut : activé)
@@ -88,8 +90,15 @@ ASR brut → [1. Hallucinations] → [2. Dictée] → [3. Disfluences]
 
 | Langue | Fillers | Type |
 |---|---|---|
-| FR | euh, heu, hum, bah, ben, beh | Hésitation pure — aucune ambiguïté sémantique |
-| EN | uh, um, hmm | Hésitation pure — aucune ambiguïté sémantique |
+| FR | euh, heu, hum, bah, ben, beh | Hésitation pure |
+| EN | uh, um, hmm | Hésitation pure |
+| DE | äh, ähm, hm, hmm, tja, naja | Hésitation pure |
+| ES | eh, em, este, pues | Hésitation pure |
+| PT | hum, tipo, né | Hésitation pure |
+| IT | ehm, allora, cioè, ecco | Hésitation/discursif léger |
+| NL | eh, ehm, uhm, nou | Hésitation pure |
+| PL | yyy, eee, no, jakby | Hésitation pure |
+| RU | э, эм, ну, вот, типа, как бы | Hésitation pure |
 
 **Note** : les fillers discursifs (genre, du coup, like, you know) ne sont PAS supprimés car ils ont un sens réel dans certains contextes. Seuls les marqueurs d'hésitation purs sont ciblés.
 
@@ -214,7 +223,7 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 
 ## Étape 7 — Finalize (✅ Implémenté)
 
-**Fichier** : `post_processor.rs` — fonction `finalize()`
+**Fichier** : `cleanup/post_processor/mod.rs` — fonction `finalize()`
 
 **But** : corriger l'espacement autour de la ponctuation et capitaliser le texte.
 
@@ -236,13 +245,17 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 
 ## Étape 8 — ITN (Inverse Text Normalization) (✅ Implémenté)
 
-**Fichier** : `cleanup/itn.rs` — fonction `apply_itn()`
+**Module** : `cleanup/itn/` — 9 fichiers par langue + `mod.rs` dispatch
 
 **But** : convertir les nombres, dates, heures et devises de leur forme orale vers leur forme écrite canonique.
 
-### Catégories couvertes
+### Langues supportées
 
-| Catégorie | Entrée (FR) | Sortie | Entrée (EN) | Sortie |
+FR, EN, DE, ES, PT, IT, NL, PL, RU — chaque langue a son propre fichier avec atoms, multipliers, parser, regex rules et tests.
+
+### Catégories couvertes (toutes langues)
+
+| Catégorie | Exemple FR | Sortie | Exemple EN | Sortie |
 |---|---|---|---|---|
 | Nombres cardinaux | vingt-trois | 23 | twenty three | 23 |
 | Nombres composés | quatre-vingt-dix-sept | 97 | two hundred and fifty | 250 |
@@ -256,19 +269,22 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 ### Architecture
 
 ```
-Texte → Pourcentages ("pour cent" → "%")
-     → Heures ("heure(s)" → "h", "et quart" → "15")
-     → Devises ("euros" → "€")
-     → Ordinaux ("premier" → "1er")
-     → Unités ("kilomètres" → "km")
-     → Nombres cardinaux (parser compositionnel FR/EN)
+cleanup/itn/
+├── mod.rs    — dispatch apply_itn(), shared helpers (replace_numbers, apply_regex_list, regex_rules! macro)
+├── fr.rs     — atoms (0-60, soixante-dix, quatre-vingts), composés hyphenés, "et" conjonctif
+├── en.rs     — atoms 0-90, "and" conjonctif, composés hyphenés
+├── de.rs     — composés inversés (dreiundzwanzig = 3+20), strip_suffix("hundert"/"tausend")
+├── es.rs     — composés soudés (veintitrés), centaines genrées (doscientos/doscientas)
+├── pt.rs     — composés "e" séparateur, centaines (duzentos, trezentos...)
+├── it.rs     — élision voyelle (ventuno, trentotto), prefix matching pour décomposition
+├── nl.rs     — composés inversés avec "en" (drieëntwintig), strip_suffix("honderd"/"duizend")
+├── pl.rs     — centaines composées (dwieście, pięćset), milliers avec déclinaisons
+└── ru.rs     — centaines soudées (двести-девятьсот), milliers avec déclinaisons (тысяча/тысячи/тысяч)
 ```
 
-**Parser FR** : gère la composition complète du système français : `fr_atom()` (0-60) + `fr_multiplier()` (cent, mille, million, milliard) + récursion pour les composés hyphenés ("quatre-vingt-dix-sept"). Gère "et" conjonctif ("vingt et un").
+Chaque fichier par langue exporte `pub(super) fn apply_all(text: &str) -> String` qui chaîne : regex substitutions (%, heures, devises, ordinaux, unités) → parser de nombres cardinaux.
 
-**Parser EN** : atoms 0-90 + multipliers (hundred, thousand, million, billion) + "and" conjonctif + composés hyphenés ("twenty-three").
-
-**Sécurité** : "un"/"une" et "a" isolés ne sont pas convertis (ambiguïté article/nombre).
+**Sécurité** : "un"/"une", "a", "один" isolés ne sont pas convertis (ambiguïté article/nombre).
 
 **Toggle** : `itn_enabled` dans Preferences (défaut : activé).
 
@@ -304,8 +320,12 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 | Fichier | Rôle dans le pipeline |
 |---|---|
 | `recording/pipeline.rs` | Orchestration : `handle_transcription_result()` appelle les étapes dans l'ordre |
-| `cleanup/post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 3 (disfluences), 7 (finalize) |
-| `cleanup/itn.rs` | Étape 8 : ITN (nombres, ordinaux, %, heures, devises, unités FR/EN) |
+| `cleanup/post_processor/mod.rs` | Orchestration preprocess/finalize, ponctuation spacing, capitalisation |
+| `cleanup/post_processor/hallucinations.rs` | Étape 1 : phrases connues (9 langues), musique, répétition |
+| `cleanup/post_processor/dictation.rs` | Étape 2 : commandes dictée FR/EN |
+| `cleanup/post_processor/fillers.rs` | Étape 3 : disfluences/fillers (9 langues) |
+| `cleanup/itn/mod.rs` | Étape 8 : dispatch ITN + helpers partagés (replace_numbers, regex_rules!) |
+| `cleanup/itn/{fr,en,de,es,pt,it,nl,pl,ru}.rs` | Étape 8 : ITN par langue (9 langues) |
 | `cleanup/symspell_correct.rs` | Étape 5 : spell-check SymSpell (dicts téléchargeables, GitHub Releases) |
 | `cleanup/llm_cloud.rs` | Cloud LLM cleanup (OpenAI/Anthropic API) |
 | `cleanup/vad.rs` | VAD Silero v6.2 (ONNX, pré-transcription) |
@@ -329,6 +349,14 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 ### Phase 2 — Améliorations pipeline
 
 3. ~~**Chaînage ponctuation + correction**~~ — ✅ Implémenté. Ponctuation et correction sont maintenant des paramètres indépendants avec exécution séquentielle.
+
+### Phase 3 — Améliorations qualité (recherche)
+
+9. **Filtrage hallucinations par log-probabilité** — Token log-probs + compression ratio pour détecter les hallucinations de manière plus robuste que les listes statiques. Papers : "Whispering LLaMA" (2023), "Hallucination detection in neural ASR" (2024). Haut impact, effort modéré.
+10. **Dictionnaire utilisateur / biasing contextuel** — Mots/noms propres définis par l'utilisateur pour améliorer SymSpell et ITN. Faible effort, fort impact pour utilisateurs spécialisés.
+11. **Filtrage phonétique SymSpell** — Score Soundex/Metaphone pour filtrer les faux positifs SymSpell. Les erreurs ASR sont phonétiquement proches → SymSpell ne le sait pas. Effort modéré.
+12. **Passe unique LLM** — Un seul appel LLM local (Qwen3 4B) remplaçant spell+punct+GEC. Cohérence globale, moins de passes. Risque : latence, hallucinations LLM. Évaluer sur benchmark avant migration.
+13. **Correction sélective par confiance** — Ne corriger que les segments à faible confiance ASR (Parakeet/Canary exposent des scores, Whisper non). Effort modéré.
 
 ### Évaluations terminées — items écartés
 

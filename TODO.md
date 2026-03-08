@@ -34,6 +34,15 @@
     - **ASR** : whisper.cpp server (`brew install whisper-cpp`, port 8080) ou MLX-Audio (`pip install mlx-audio`, port 8000)
   - Voir `docs/BENCHMARK.md` pour les comparatifs détaillés
 
+## Axes d'amélioration pipeline texte
+
+- [ ] **Filtrage hallucinations par log-probabilité** — Utiliser les token log-probs et le compression ratio de Whisper pour détecter les hallucinations de manière plus robuste que les listes de phrases. Papers : "Whispering LLaMA" (2023), "Hallucination detection in neural ASR" (2024). Haut impact, effort modéré (Whisper expose déjà ces métriques, les autres engines non).
+- [ ] **Dictionnaire utilisateur / biasing contextuel** — Permettre à l'utilisateur de définir des mots/noms propres fréquents (jargon métier, noms de personnes) pour améliorer le spell-check SymSpell et l'ITN. Fichier `~/.config/jonawhisper/user_dict.txt` chargé au démarrage. Faible effort, impact fort pour les utilisateurs spécialisés.
+- [ ] **Filtrage phonétique des candidats SymSpell** — Intégrer un score de similarité phonétique (Soundex/Metaphone) pour filtrer les faux positifs SymSpell. Les erreurs ASR sont phonétiquement proches de la cible — SymSpell ne le sait pas et propose parfois des corrections aberrantes. Effort modéré (crate `rphonetic` déjà évalué dans GEC-RESEARCH.md).
+- [ ] **Passe unique LLM remplaçant spell+punct+GEC** — À terme, un seul appel LLM local (Qwen3 4B ou équivalent) pourrait remplacer la chaîne SymSpell → PCS → T5. Avantage : cohérence globale de la correction, moins de passes, gestion du contexte. Risque : latence (~1s), hallucinations LLM. Évaluer sur un benchmark FR/EN avant migration. Paper : "LLM-based post-editing for ASR" (2024).
+- [ ] **Ponctuation domain-adapted** — Fine-tuner PCS ou BERT sur un corpus ASR (transcriptions orales avec ponctuation de référence) plutôt que du texte écrit. Les modèles actuels sont entraînés sur texte formel, pas sur de l'oral transcrit. Impact modéré, effort élevé (besoin de données annotées).
+- [ ] **Correction sélective guidée par confiance** — Ne corriger que les segments à faible confiance ASR (si l'engine expose un score de confiance par mot). Évite de "corriger" des mots déjà corrects. Parakeet et Canary exposent des scores, Whisper non. Effort modéré.
+
 ## Technique / Infra
 
 - [ ] **Refonte du système de logging** — Le logging actuel est insuffisant pour diagnostiquer les bugs en production (pill grisé, latence aléatoire). Problèmes identifiés :
