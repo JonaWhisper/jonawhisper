@@ -221,4 +221,28 @@ mod tests {
     fn percentages() {
         assert_eq!(apply_itn("diez por ciento", "es"), "10 %");
     }
+
+    #[test]
+    fn zero() {
+        assert_eq!(apply_itn("tengo cero errores", "es"), "tengo 0 errores");
+    }
+
+    #[test]
+    fn un_before_unit() {
+        assert_eq!(apply_itn("un euro", "es"), "1 \u{20AC}");
+        assert_eq!(apply_itn("una hora", "es"), "1 hora");
+        // Non-unit: stays as article
+        assert_eq!(apply_itn("un gato", "es"), "un gato");
+    }
+
+    #[test]
+    fn thousands() {
+        assert_eq!(apply_itn("mil", "es"), "1000");
+        assert_eq!(apply_itn("dos mil", "es"), "2000");
+    }
+
+    #[test]
+    fn million() {
+        assert_eq!(apply_itn("tres millones", "es"), "3000000");
+    }
 }

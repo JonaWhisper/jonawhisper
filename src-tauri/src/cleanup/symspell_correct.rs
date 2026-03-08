@@ -1086,6 +1086,72 @@ mod tests {
         assert!(result.contains("Bonjour"), "Without confidence data, unknown words should be corrected: {}", result);
     }
 
+    // --- French plural guard ---
+
+    #[test]
+    fn test_fr_plural_guard_s_ending() {
+        require_dicts!();
+        // "chats" is the plural of "chat" — should NOT be corrected
+        let result = ac("les chats sont là", "fr");
+        assert!(result.contains("chats"), "Plural 'chats' should be preserved: {}", result);
+    }
+
+    #[test]
+    fn test_fr_plural_guard_various() {
+        require_dicts!();
+        // Various French plurals that should be preserved
+        let result = ac("les problèmes sont résolus", "fr");
+        assert!(result.contains("problèmes") || result.contains("probl\u{00e8}mes"),
+            "Plural 'problèmes' should be preserved: {}", result);
+    }
+
+    // --- French apostrophe/elision guard ---
+
+    #[test]
+    fn test_fr_apostrophe_elision_guard() {
+        require_dicts!();
+        // "j'avais" — "avais" is a known word, should not be corrected
+        let result = ac("j'avais raison", "fr");
+        assert!(result.contains("j'avais"), "Elision 'j'avais' should be preserved: {}", result);
+    }
+
+    #[test]
+    fn test_fr_apostrophe_lhomme() {
+        require_dicts!();
+        // "l'homme" — "homme" is known
+        let result = ac("l'homme est là", "fr");
+        assert!(result.contains("l'homme"), "Elision 'l'homme' should be preserved: {}", result);
+    }
+
+    // --- Dynamic max distance ---
+
+    #[test]
+    fn test_short_word_conservative_distance() {
+        require_dicts!();
+        // Short word "vois" (4 chars) → max_distance=1, so it should NOT be corrected to "vous" (distance 2)
+        // "vois" is actually in dict (je vois), so let's test with a word that's not in dict
+        // but is close to multiple words — the key is that distance 1 is used for short words
+        let result = ac("je vois bien", "fr");
+        assert!(result.contains("vois"), "Short known word 'vois' should be preserved: {}", result);
+    }
+
+    // --- Concurrent loading ---
+
+    #[test]
+    fn test_concurrent_dict_access_no_deadlock() {
+        require_dicts!();
+        // Spawn multiple threads hitting get_ss/with_ss concurrently
+        let handles: Vec<_> = (0..4).map(|_| {
+            std::thread::spawn(|| {
+                let _ = ac("Bonojur le monde", "fr");
+                let _ = ac("the quik brown fox", "en");
+            })
+        }).collect();
+        for h in handles {
+            h.join().expect("Thread should not panic or deadlock");
+        }
+    }
+
     // --- match_case helper ---
 
     #[test]

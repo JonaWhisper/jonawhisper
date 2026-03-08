@@ -231,4 +231,22 @@ mod tests {
     fn percentages() {
         assert_eq!(apply_itn("zehn Prozent", "de"), "10 %");
     }
+
+    #[test]
+    fn zero() {
+        assert_eq!(apply_itn("ich habe null Fehler", "de"), "ich habe 0 Fehler");
+    }
+
+    #[test]
+    fn ein_before_unit() {
+        assert_eq!(apply_itn("ein Kilometer", "de"), "1 km");
+        assert_eq!(apply_itn("eine Stunde", "de"), "1 Stunde");
+        // Non-unit: stays as article
+        assert_eq!(apply_itn("ein Hund", "de"), "ein Hund");
+    }
+
+    #[test]
+    fn million() {
+        assert_eq!(apply_itn("drei Millionen", "de"), "3000000");
+    }
 }

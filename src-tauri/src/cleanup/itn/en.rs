@@ -276,6 +276,17 @@ mod tests {
     }
 
     #[test]
+    fn zero() {
+        assert_eq!(apply_itn("I have zero cats", "en"), "I have 0 cats");
+    }
+
+    #[test]
+    fn a_hundred() {
+        assert_eq!(apply_itn("a hundred people", "en"), "100 people");
+        assert_eq!(apply_itn("a thousand dollars", "en"), "1000 $");
+    }
+
+    #[test]
     fn one_before_unit() {
         // "one" before a unit should be converted to "1"
         assert_eq!(apply_itn("one hour later", "en"), "1 hour later");

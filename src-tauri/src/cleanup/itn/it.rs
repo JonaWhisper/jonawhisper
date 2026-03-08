@@ -234,4 +234,23 @@ mod tests {
     fn percentages() {
         assert_eq!(apply_itn("dieci per cento", "it"), "10 %");
     }
+
+    #[test]
+    fn zero() {
+        assert_eq!(apply_itn("ho zero possibilit\u{00E0}", "it"), "ho 0 possibilit\u{00E0}");
+    }
+
+    #[test]
+    fn un_before_unit() {
+        assert_eq!(apply_itn("un euro", "it"), "1 \u{20AC}");
+        assert_eq!(apply_itn("un chilo di pasta", "it"), "1 chilo di pasta");
+        // Non-unit: stays as article
+        assert_eq!(apply_itn("un gatto", "it"), "un gatto");
+    }
+
+    #[test]
+    fn thousands() {
+        assert_eq!(apply_itn("mille", "it"), "1000");
+        assert_eq!(apply_itn("duemila", "it"), "2000");
+    }
 }

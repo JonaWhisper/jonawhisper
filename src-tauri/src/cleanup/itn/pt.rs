@@ -196,4 +196,28 @@ mod tests {
     fn ordinals() {
         assert_eq!(apply_itn("o primeiro dia", "pt"), "o 1.\u{00BA} dia");
     }
+
+    #[test]
+    fn zero() {
+        assert_eq!(apply_itn("tenho zero erros", "pt"), "tenho 0 erros");
+    }
+
+    #[test]
+    fn um_before_unit() {
+        assert_eq!(apply_itn("um euro", "pt"), "1 \u{20AC}");
+        assert_eq!(apply_itn("um quilo de arroz", "pt"), "1 kg de arroz");
+        // Non-unit: stays as article
+        assert_eq!(apply_itn("um gato", "pt"), "um gato");
+    }
+
+    #[test]
+    fn thousands() {
+        assert_eq!(apply_itn("mil", "pt"), "1000");
+        assert_eq!(apply_itn("dois mil", "pt"), "2000");
+    }
+
+    #[test]
+    fn percentages() {
+        assert_eq!(apply_itn("dez por cento", "pt"), "10 %");
+    }
 }

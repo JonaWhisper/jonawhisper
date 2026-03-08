@@ -159,7 +159,8 @@ fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>, lang
         if let Some((value, consumed)) = parser(&words[i..]) {
             // Don't convert standalone "un"/"une"/"a"/"one" — too ambiguous as article
             // UNLESS the next word is a known unit (heure, euro, kilo, etc.)
-            if consumed == 1 && value <= 1 {
+            // Note: value==0 ("zero") is never an article, always convert it.
+            if consumed == 1 && value == 1 {
                 let next_is_unit = words.get(i + 1).is_some_and(|w| is_unit_word(w, lang_units));
                 if !next_is_unit {
                     result.push_str(words[i]);

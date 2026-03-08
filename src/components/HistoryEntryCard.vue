@@ -313,7 +313,7 @@ watch(() => props.entry.timestamp, () => {
       </div>
       <!-- Normal view with confidence hover -->
       <TooltipProvider v-else-if="wordScores.length > 0" :delay-duration="200">
-        <p class="text-[13px] leading-snug line-clamp-2 mb-1">
+        <p class="text-[13px] leading-snug mb-1">
           <template v-for="(ws, i) in wordScores" :key="i">
             <Tooltip>
               <TooltipTrigger as-child>
@@ -330,7 +330,7 @@ watch(() => props.entry.timestamp, () => {
         </p>
       </TooltipProvider>
       <!-- Fallback: plain text -->
-      <p v-else class="text-[13px] leading-snug line-clamp-2 mb-1">{{ entry.text }}</p>
+      <p v-else class="text-[13px] leading-snug mb-1">{{ entry.text }}</p>
     </div>
     <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
       <TooltipProvider :delay-duration="300">

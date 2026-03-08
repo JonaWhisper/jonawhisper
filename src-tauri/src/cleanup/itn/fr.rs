@@ -309,6 +309,28 @@ mod tests {
     }
 
     #[test]
+    fn zero() {
+        assert_eq!(apply_itn("j'ai zéro chance", "fr"), "j'ai 0 chance");
+    }
+
+    #[test]
+    fn quatre_vingts_vs_quatre_vingt_dix() {
+        assert_eq!(apply_itn("quatre-vingts personnes", "fr"), "80 personnes");
+        assert_eq!(apply_itn("quatre-vingt-dix jours", "fr"), "90 jours");
+        assert_eq!(apply_itn("quatre-vingt-onze", "fr"), "91");
+    }
+
+    #[test]
+    fn un_une_before_unit() {
+        assert_eq!(apply_itn("un euro", "fr"), "1 \u{20AC}");
+        assert_eq!(apply_itn("une heure de vol", "fr"), "1 h de vol");
+        assert_eq!(apply_itn("un kilo de pommes", "fr"), "1 kg de pommes");
+        // Non-unit: stays as article
+        assert_eq!(apply_itn("un chat", "fr"), "un chat");
+        assert_eq!(apply_itn("une pomme", "fr"), "une pomme");
+    }
+
+    #[test]
     fn hours_complex() {
         assert_eq!(apply_itn("quatorze heures trente", "fr"), "14 h 30");
         assert_eq!(apply_itn("le rendez-vous est à trois heures", "fr"), "le rendez-vous est à 3 h");
