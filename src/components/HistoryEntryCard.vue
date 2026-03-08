@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useEnginesStore } from '@/stores/engines'
 import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Copy, Check, Trash2, GitCompareArrows } from 'lucide-vue-next'
+import {
+  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight,
+} from 'lucide-vue-next'
 import { diffWords } from 'diff'
-import TypeBadge from '@/components/TypeBadge.vue'
 
 const { t } = useI18n()
 const enginesStore = useEnginesStore()
@@ -37,10 +38,6 @@ function formatAsrLabel(modelId: string): string {
   return model ? model.label : modelId
 }
 
-function isCloudAsr(modelId: string): boolean {
-  return !!parseCloudId(modelId)
-}
-
 function formatCleanupLabel(id: string): string {
   if (id.startsWith('bert-punctuation:')) return 'BERT'
   const cloudId = parseCloudId(id)
@@ -57,15 +54,7 @@ function formatModelLabel(id: string): string {
   return model ? model.label : id.split(':').pop() || id
 }
 
-function cleanupBadgeType(id: string): 'bert' | 'punctuation' | 'correction' | 'llm' | 'cloud' {
-  if (id.startsWith('bert-punctuation:')) return 'bert'
-  if (id.startsWith('pcs-punctuation:')) return 'punctuation'
-  if (id.startsWith('correction:')) return 'correction'
-  if (parseCloudId(id)) return 'cloud'
-  return 'llm'
-}
-
-// -- Word confidence scores (hover only, no colors) --
+// -- Word confidence scores --
 
 interface WordScore {
   word: string
@@ -86,12 +75,11 @@ function confidenceLabel(score: number): string {
 }
 
 function confidenceColor(score: number): string {
-  if (score < 0) return '' // unknown → default color
-  if (score >= 0.9) return '#22c55e' // green
-  if (score >= 0.7) return '#eab308' // yellow
-  return '#ef4444' // red
+  if (score < 0) return ''
+  if (score >= 0.9) return '#22c55e'
+  if (score >= 0.7) return '#eab308'
+  return '#ef4444'
 }
-
 
 // -- Pipeline steps diff --
 
@@ -107,7 +95,6 @@ const pipelineSteps = computed<PipelineStep[]>(() => {
     if (!Array.isArray(parsed) || parsed.length < 2) return []
     return parsed.map(([step, text]) => ({ step, text }))
   } catch {
-    // Legacy format: raw_text is a plain string
     if (props.entry.raw_text && props.entry.raw_text !== props.entry.text) {
       return [
         { step: 'asr', text: props.entry.raw_text },
@@ -118,13 +105,12 @@ const pipelineSteps = computed<PipelineStep[]>(() => {
   }
 })
 
-// Filter out cosmetic steps (finalize, itn) — only show substantive changes
+// Substantive steps: ASR + steps that actually changed text
 const substantiveStepNames = new Set(['preprocess', 'punctuation', 'spellcheck', 'correction'])
 
 const substantiveSteps = computed(() => {
   const all = pipelineSteps.value
   if (all.length < 2) return []
-  // Keep ASR (first) + substantive steps that actually changed the text
   const filtered = [all[0]!]
   for (let i = 1; i < all.length; i++) {
     if (substantiveStepNames.has(all[i]!.step) && all[i]!.text !== filtered[filtered.length - 1]!.text) {
@@ -134,26 +120,142 @@ const substantiveSteps = computed(() => {
   return filtered.length >= 2 ? filtered : []
 })
 
-const hasSteps = computed(() => substantiveSteps.value.length >= 2)
-const showDiff = ref(false)
-const selectedStep = ref(0)
-
-const stepLabels: Record<string, string> = {
-  asr: 'ASR',
-  preprocess: 'Preprocess',
-  punctuation: 'Punctuation',
-  spellcheck: 'Spellcheck',
-  correction: 'Correction',
-  final: 'Final',
-}
-
-const currentDiff = computed(() => {
-  const steps = substantiveSteps.value
-  if (steps.length < 2) return []
-  const idx = Math.min(selectedStep.value, steps.length - 2)
-  return diffWords(steps[idx]!.text, steps[idx + 1]!.text)
+// Set of step names that have actual text diffs available
+const stepsWithDiff = computed(() => {
+  const names = new Set<string>()
+  for (const s of substantiveSteps.value) {
+    if (s.step !== 'asr') names.add(s.step)
+  }
+  return names
 })
 
+// -- Pipeline stepper UI --
+
+interface PipelineIcon {
+  id: string
+  icon: typeof Mic
+  active: boolean
+  hasDiff: boolean
+  tooltip: string
+  color: string       // active color classes
+}
+
+const pipelineIcons = computed<PipelineIcon[]>(() => {
+  const e = props.entry
+  const icons: PipelineIcon[] = []
+
+  // 1. ASR — always present
+  const asrLabel = e.model_id ? formatAsrLabel(e.model_id) : 'ASR'
+  const isCloud = e.model_id ? !!parseCloudId(e.model_id) : false
+  icons.push({
+    id: 'asr',
+    icon: isCloud ? Cloud : Mic,
+    active: true,
+    hasDiff: false,
+    tooltip: asrLabel + (e.language ? ` (${e.language})` : ''),
+    color: isCloud ? 'text-sky-500' : 'text-blue-500',
+  })
+
+  // 2. VAD
+  icons.push({
+    id: 'vad',
+    icon: Scissors,
+    active: !!e.vad_trimmed,
+    hasDiff: false,
+    tooltip: t('history.badge.vad'),
+    color: 'text-emerald-500',
+  })
+
+  // 3. Hallucination filter
+  icons.push({
+    id: 'hallucination',
+    icon: ShieldCheck,
+    active: !!e.hallucination_filter,
+    hasDiff: false,
+    tooltip: t('history.badge.hallucination'),
+    color: 'text-rose-500',
+  })
+
+  // 4. Disfluency removal
+  icons.push({
+    id: 'disfluency',
+    icon: Eraser,
+    active: !!e.disfluency_removal,
+    hasDiff: false,
+    tooltip: t('history.badge.disfluencyTooltip'),
+    color: 'text-pink-500',
+  })
+
+  // 5. Punctuation
+  const punctLabel = e.punctuation_model_id ? formatModelLabel(e.punctuation_model_id) : t('history.badge.punctuation')
+  icons.push({
+    id: 'punctuation',
+    icon: Type,
+    active: !!e.punctuation_model_id,
+    hasDiff: stepsWithDiff.value.has('punctuation'),
+    tooltip: punctLabel,
+    color: 'text-violet-500',
+  })
+
+  // 6. Spellcheck
+  icons.push({
+    id: 'spellcheck',
+    icon: BookA,
+    active: !!e.spellcheck,
+    hasDiff: stepsWithDiff.value.has('spellcheck'),
+    tooltip: t('history.badge.spellcheckTooltip'),
+    color: 'text-lime-600',
+  })
+
+  // 7. Correction / LLM cleanup
+  const cleanupLabel = e.cleanup_model_id ? formatCleanupLabel(e.cleanup_model_id) : t('history.badge.cleanup')
+  icons.push({
+    id: 'correction',
+    icon: e.cleanup_model_id && parseCloudId(e.cleanup_model_id) ? MessageSquare : SpellCheck,
+    active: !!e.cleanup_model_id,
+    hasDiff: stepsWithDiff.value.has('correction'),
+    tooltip: cleanupLabel,
+    color: 'text-amber-500',
+  })
+
+  // 8. ITN
+  icons.push({
+    id: 'itn',
+    icon: Hash,
+    active: !!e.itn,
+    hasDiff: false,
+    tooltip: t('history.badge.itnTooltip'),
+    color: 'text-cyan-500',
+  })
+
+  return icons
+})
+
+// Active diff state
+const activeDiffStep = ref<string | null>(null)
+
+// Map step id to its index in substantiveSteps for diff computation
+const diffForStep = computed(() => {
+  if (!activeDiffStep.value) return []
+  const steps = substantiveSteps.value
+  // Find the index of the active step in substantiveSteps
+  const idx = steps.findIndex(s => s.step === activeDiffStep.value)
+  if (idx < 1) return [] // need a previous step to diff against
+  return diffWords(steps[idx - 1]!.text, steps[idx]!.text)
+})
+
+function toggleDiffStep(stepId: string) {
+  if (activeDiffStep.value === stepId) {
+    activeDiffStep.value = null
+  } else {
+    activeDiffStep.value = stepId
+  }
+}
+
+// Reset diff when entry changes
+watch(() => props.entry.timestamp, () => {
+  activeDiffStep.value = null
+})
 </script>
 
 <template>
@@ -164,22 +266,43 @@ const currentDiff = computed(() => {
       {{ formatTime(entry.timestamp) }}
     </span>
     <div class="flex-1 min-w-0">
-      <!-- Diff view: inline diff per step -->
-      <div v-if="showDiff && hasSteps" class="mb-1">
-        <div class="flex items-center gap-1.5 mb-1.5">
-          <button
-            v-for="idx in substantiveSteps.length - 1"
-            :key="idx"
-            class="px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors"
-            :class="selectedStep === idx - 1
-              ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300'
-              : 'bg-muted/50 text-muted-foreground hover:bg-muted'"
-            @click="selectedStep = idx - 1"
-          >{{ stepLabels[substantiveSteps[idx]!.step] ?? substantiveSteps[idx]!.step }}</button>
+      <!-- Pipeline stepper -->
+      <TooltipProvider v-if="entry.model_id" :delay-duration="200">
+        <div class="flex items-center gap-0 mb-1.5">
+          <template v-for="(step, i) in pipelineIcons" :key="step.id">
+            <ChevronRight v-if="i > 0" class="h-2.5 w-2.5 text-muted-foreground/30 shrink-0 -mx-0.5" />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="w-5 h-5 flex items-center justify-center rounded-full transition-all duration-150 shrink-0"
+                  :class="[
+                    !step.active
+                      ? 'text-muted-foreground/25 cursor-default'
+                      : step.hasDiff
+                        ? 'cursor-pointer hover:bg-muted/80 ' + step.color
+                        : 'text-foreground/70 cursor-default',
+                    activeDiffStep === step.id ? 'ring-1.5 ring-current bg-current/10 scale-110' : '',
+                  ]"
+                  :disabled="!step.hasDiff"
+                  @click="step.hasDiff && toggleDiffStep(step.id)"
+                >
+                  <component :is="step.icon" class="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" :side-offset="4">
+                <span class="text-[11px]">{{ step.tooltip }}</span>
+              </TooltipContent>
+            </Tooltip>
+          </template>
         </div>
+      </TooltipProvider>
+
+      <!-- Diff view for selected pipeline step -->
+      <div v-if="activeDiffStep && diffForStep.length > 0" class="mb-1">
+        <span class="text-[10px] text-muted-foreground mb-0.5 block">{{ pipelineIcons.find(s => s.id === activeDiffStep)?.tooltip }}</span>
         <p class="text-[13px] leading-snug">
           <span
-            v-for="(part, i) in currentDiff"
+            v-for="(part, i) in diffForStep"
             :key="i"
             :class="{
               'bg-green-500/20 text-green-700 dark:text-green-300 rounded-sm': part.added,
@@ -188,7 +311,7 @@ const currentDiff = computed(() => {
           >{{ part.value }}</span>
         </p>
       </div>
-      <!-- Normal view with confidence hover (colored by score) -->
+      <!-- Normal view with confidence hover -->
       <TooltipProvider v-else-if="wordScores.length > 0" :delay-duration="200">
         <p class="text-[13px] leading-snug line-clamp-2 mb-1">
           <template v-for="(ws, i) in wordScores" :key="i">
@@ -208,88 +331,9 @@ const currentDiff = computed(() => {
       </TooltipProvider>
       <!-- Fallback: plain text -->
       <p v-else class="text-[13px] leading-snug line-clamp-2 mb-1">{{ entry.text }}</p>
-      <TooltipProvider v-if="entry.model_id" :delay-duration="300">
-        <div class="flex flex-wrap gap-1">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <TypeBadge :type="isCloudAsr(entry.model_id) ? 'cloud' : 'local'">
-                {{ formatAsrLabel(entry.model_id) }}
-              </TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.asr') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.language">
-            <TooltipTrigger as-child>
-              <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-zinc-500/10 text-zinc-600 dark:text-zinc-400">
-                {{ entry.language }}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.language') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.vad_trimmed">
-            <TooltipTrigger as-child>
-              <TypeBadge type="vad">VAD</TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.vad') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.cleanup_model_id">
-            <TooltipTrigger as-child>
-              <TypeBadge :type="cleanupBadgeType(entry.cleanup_model_id)">
-                {{ formatCleanupLabel(entry.cleanup_model_id) }}
-              </TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.cleanup') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.punctuation_model_id">
-            <TooltipTrigger as-child>
-              <TypeBadge type="punctuation">
-                {{ formatModelLabel(entry.punctuation_model_id) }}
-              </TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.punctuation') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.spellcheck">
-            <TooltipTrigger as-child>
-              <TypeBadge type="spellcheck">{{ t('history.badge.spellcheck') }}</TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.spellcheckTooltip') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.disfluency_removal">
-            <TooltipTrigger as-child>
-              <TypeBadge type="disfluency">{{ t('history.badge.disfluency') }}</TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.disfluencyTooltip') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.hallucination_filter">
-            <TooltipTrigger as-child>
-              <TypeBadge type="hallucination" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.hallucination') }}</TooltipContent>
-          </Tooltip>
-          <Tooltip v-if="entry.itn">
-            <TooltipTrigger as-child>
-              <TypeBadge type="itn">ITN</TypeBadge>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('history.badge.itnTooltip') }}</TooltipContent>
-          </Tooltip>
-        </div>
-      </TooltipProvider>
     </div>
     <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
       <TooltipProvider :delay-duration="300">
-        <Tooltip v-if="hasSteps">
-          <TooltipTrigger as-child>
-            <button
-              :aria-label="t('history.diff')"
-              class="w-6 h-6 flex items-center justify-center rounded hover:bg-muted/50 transition-colors"
-              :class="showDiff ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground hover:text-foreground'"
-              @click="showDiff = !showDiff"
-            >
-              <GitCompareArrows class="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" :side-offset="4">{{ t('history.diff') }}</TooltipContent>
-        </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
             <button :aria-label="t('aria.copy')" class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="emit('copy', entry)">
