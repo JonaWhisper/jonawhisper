@@ -9,7 +9,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use tauri::{AppHandle, Emitter};
 
-static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
+static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(600))
+        .build()
+        .expect("failed to build download client")
+});
 
 /// Blocking client that does NOT follow redirects (for x-linked-etag on HuggingFace).
 static ETAG_CLIENT_NO_REDIRECT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
@@ -281,6 +287,130 @@ pub async fn download_model(
     success
 }
 
+/// Emit download progress event and update active download state.
+fn emit_progress(
+    app: &AppHandle, download_state: &Mutex<DownloadState>, model_id: &str,
+    downloaded: u64, total: u64, speed: u64,
+) {
+    let progress = if total > 0 { downloaded as f64 / total as f64 } else { 0.0 };
+    if let Some(entry) = download_state.lock().unwrap().active.get_mut(model_id) {
+        entry.progress = progress;
+    }
+    let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
+        "model_id": model_id,
+        "progress": progress,
+        "downloaded": downloaded,
+        "total_size": total,
+        "speed": speed,
+    }));
+}
+
+/// Download a single URL to `tmp_path`, with Range resume and progress reporting.
+/// `base_downloaded` is the byte offset for progress (non-zero for multi-file).
+/// Returns the number of bytes downloaded for this file, or None on failure/cancel.
+async fn download_one_file(
+    url: &str,
+    tmp_path: &Path,
+    cancel_flag: &AtomicBool,
+    progress_cb: &mut dyn FnMut(u64, u64),
+) -> Option<u64> {
+    let client = &*DOWNLOAD_CLIENT;
+    let existing_size = fs::metadata(tmp_path).map(|m| m.len()).unwrap_or(0);
+
+    let mut request = client.get(url);
+    if existing_size > 0 {
+        log::info!("Resuming from {} bytes: {}", existing_size, url);
+        request = request.header("Range", format!("bytes={}-", existing_size));
+    }
+
+    let response = match request.send().await {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("Download failed: {}", e);
+            return None;
+        }
+    };
+
+    let status = response.status();
+
+    if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+        log::warn!("Server returned 416, deleting partial and retrying: {}", url);
+        let _ = fs::remove_file(tmp_path);
+        return Box::pin(download_one_file(url, tmp_path, cancel_flag, progress_cb)).await;
+    }
+
+    let (resumed, total_size) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
+        let remaining = response.content_length().unwrap_or(0);
+        (true, existing_size + remaining)
+    } else {
+        (false, response.content_length().unwrap_or(0))
+    };
+
+    let mut downloaded: u64 = if resumed { existing_size } else { 0 };
+
+    let mut file = if resumed {
+        match fs::OpenOptions::new().append(true).open(tmp_path) {
+            Ok(f) => f,
+            Err(e) => { log::error!("Failed to open partial for append: {}", e); return None; }
+        }
+    } else {
+        match fs::File::create(tmp_path) {
+            Ok(f) => f,
+            Err(e) => { log::error!("Failed to create temp file: {}", e); return None; }
+        }
+    };
+
+    if resumed && total_size > 0 {
+        progress_cb(downloaded, total_size);
+    }
+
+    let mut last_emit_time = std::time::Instant::now();
+    let mut last_emit_bytes = downloaded;
+
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        if cancel_flag.load(Ordering::SeqCst) {
+            log::info!("Download cancelled");
+            return None;
+        }
+        match chunk {
+            Ok(bytes) => {
+                if file.write_all(&bytes).is_err() { return None; }
+                downloaded += bytes.len() as u64;
+                if total_size > 0 {
+                    let now = std::time::Instant::now();
+                    let elapsed = now.duration_since(last_emit_time);
+                    let is_done = downloaded >= total_size;
+                    if elapsed >= std::time::Duration::from_millis(250) || is_done {
+                        progress_cb(downloaded, total_size);
+                        last_emit_time = now;
+                        last_emit_bytes = downloaded;
+                        _ = last_emit_bytes; // used implicitly via closure captures
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Download stream error: {}", e);
+                return None;
+            }
+        }
+    }
+
+    Some(downloaded)
+}
+
+/// Move tmp_path to dest_path with rename + copy fallback.
+fn finalize_file(tmp_path: &Path, dest_path: &Path) -> bool {
+    if dest_path.exists() { let _ = fs::remove_file(dest_path); }
+    match fs::rename(tmp_path, dest_path) {
+        Ok(()) => true,
+        Err(_) => match fs::copy(tmp_path, dest_path) {
+            Ok(_) => { let _ = fs::remove_file(tmp_path); true }
+            Err(e) => { log::error!("Failed to move file: {}", e); let _ = fs::remove_file(tmp_path); false }
+        }
+    }
+}
+
 async fn download_single_file(
     app: &AppHandle,
     download_state: &Mutex<DownloadState>,
@@ -290,157 +420,28 @@ async fn download_single_file(
     let storage_dir = shellexpand::tilde(&model.storage_dir).to_string();
     let _ = fs::create_dir_all(&storage_dir);
 
-    let client = &*DOWNLOAD_CLIENT;
     let dest_path = model.local_path();
     let tmp_path = partial_path(model);
+    let model_id = model.id.clone();
 
-    // Check for existing partial download
-    let existing_size = fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
-
-    // Build request with Range header if resuming
-    let mut request = client.get(&model.url);
-    if existing_size > 0 {
-        log::info!("Resuming download for {} from {} bytes", model.id, existing_size);
-        request = request.header("Range", format!("bytes={}-", existing_size));
-    }
-
-    let response = match request.send().await {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("Download failed: {}", e);
-            return false;
-        }
+    let mut progress_cb = |downloaded: u64, total: u64| {
+        let elapsed = std::time::Instant::now();
+        _ = elapsed;
+        emit_progress(app, download_state, &model_id, downloaded, total, 0);
     };
 
-    let status = response.status();
+    let downloaded = download_one_file(&model.url, &tmp_path, cancel_flag, &mut progress_cb).await;
 
-    // 416 = Range not satisfiable (partial file corrupted or larger than remote)
-    if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
-        log::warn!("Server returned 416 for {}, deleting partial and retrying", model.id);
-        let _ = fs::remove_file(&tmp_path);
-        return Box::pin(download_single_file(app, download_state, model, cancel_flag)).await;
-    }
-
-    // 206 = partial content (resume accepted), 200 = full file (server ignores Range)
-    let (resumed, total_size) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
-        let remaining = response.content_length().unwrap_or(0);
-        log::info!("Resuming {} — server accepted Range ({} + {} bytes)", model.id, existing_size, remaining);
-        (true, existing_size + remaining)
-    } else {
-        if existing_size > 0 {
-            log::info!("Server does not support Range for {} — restarting download", model.id);
-        }
-        (false, response.content_length().unwrap_or(0))
-    };
-
-    let mut downloaded: u64 = if resumed { existing_size } else { 0 };
-
-    // Open file: append if resuming, create if fresh
-    let mut file = if resumed {
-        match fs::OpenOptions::new().append(true).open(&tmp_path) {
-            Ok(f) => f,
-            Err(e) => {
-                log::error!("Failed to open partial file for append: {}", e);
+    match downloaded {
+        Some(bytes) => {
+            if model.size > 0 && bytes < model.size / 2 {
+                log::error!("Downloaded size ({}) suspiciously small for {} (expected ~{})", bytes, model.id, model.size);
+                let _ = fs::remove_file(&tmp_path);
                 return false;
             }
+            finalize_file(&tmp_path, &dest_path)
         }
-    } else {
-        match fs::File::create(&tmp_path) {
-            Ok(f) => f,
-            Err(e) => {
-                log::error!("Failed to create temp file: {}", e);
-                return false;
-            }
-        }
-    };
-
-    // Emit helper — sends progress + size + speed
-    let emit_progress = |app: &AppHandle, download_state: &Mutex<DownloadState>, model_id: &str,
-                         downloaded: u64, total: u64, speed: u64| {
-        let progress = if total > 0 { downloaded as f64 / total as f64 } else { 0.0 };
-        if let Some(entry) = download_state.lock().unwrap().active.get_mut(model_id) {
-            entry.progress = progress;
-        }
-        let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
-            "model_id": model_id,
-            "progress": progress,
-            "downloaded": downloaded,
-            "total_size": total,
-            "speed": speed,
-        }));
-    };
-
-    // Emit initial progress if resuming
-    if resumed && total_size > 0 {
-        emit_progress(app, download_state, &model.id, downloaded, total_size, 0);
-    }
-
-    // Throttle: emit at most every 250ms
-    let mut last_emit_time = std::time::Instant::now();
-    let mut last_emit_bytes = downloaded;
-
-    let mut stream = response.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        if cancel_flag.load(Ordering::SeqCst) {
-            log::info!("Download cancelled for {}", model.id);
-            return false;
-        }
-        match chunk {
-            Ok(bytes) => {
-                if file.write_all(&bytes).is_err() {
-                    return false;
-                }
-                downloaded += bytes.len() as u64;
-                if total_size > 0 {
-                    let now = std::time::Instant::now();
-                    let elapsed = now.duration_since(last_emit_time);
-                    let is_done = downloaded >= total_size;
-                    if elapsed >= std::time::Duration::from_millis(250) || is_done {
-                        let speed = if elapsed.as_secs_f64() > 0.0 {
-                            ((downloaded - last_emit_bytes) as f64 / elapsed.as_secs_f64()) as u64
-                        } else { 0 };
-                        emit_progress(app, download_state, &model.id, downloaded, total_size, speed);
-                        last_emit_time = now;
-                        last_emit_bytes = downloaded;
-                    }
-                }
-            }
-            Err(e) => {
-                log::error!("Download stream error: {}", e);
-                // Keep partial file for resume on next attempt
-                return false;
-            }
-        }
-    }
-
-    // Verify size if known from model catalog
-    if model.size > 0 && downloaded < model.size / 2 {
-        log::error!("Downloaded size ({}) is suspiciously small for model {} (expected ~{})",
-            downloaded, model.id, model.size);
-        let _ = fs::remove_file(&tmp_path);
-        return false;
-    }
-
-    // Move to final destination, remove partial file
-    if dest_path.exists() {
-        let _ = fs::remove_file(&dest_path);
-    }
-    match fs::rename(&tmp_path, &dest_path) {
-        Ok(()) => true,
-        Err(_) => {
-            // rename might fail across filesystems, try copy
-            match fs::copy(&tmp_path, &dest_path) {
-                Ok(_) => {
-                    let _ = fs::remove_file(&tmp_path);
-                    true
-                }
-                Err(e) => {
-                    log::error!("Failed to move downloaded file: {}", e);
-                    let _ = fs::remove_file(&tmp_path);
-                    false
-                }
-            }
-        }
+        None => false,
     }
 }
 
@@ -457,147 +458,38 @@ async fn download_multi_file(
     let _ = fs::create_dir_all(&model_dir);
 
     let total_size: u64 = files.iter().map(|f| f.size).sum();
-
-    // Emit helper for overall multi-file progress
-    let emit_multi_progress = |app: &AppHandle, download_state: &Mutex<DownloadState>, model_id: &str,
-                                overall_downloaded: u64, total: u64, speed: u64| {
-        let progress = if total > 0 { overall_downloaded as f64 / total as f64 } else { 0.0 };
-        if let Some(entry) = download_state.lock().unwrap().active.get_mut(model_id) {
-            entry.progress = progress;
-        }
-        let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
-            "model_id": model_id,
-            "progress": progress,
-            "downloaded": overall_downloaded,
-            "total_size": total,
-            "speed": speed,
-        }));
-    };
-
-    // Bytes already completed from previous files
     let mut cumulative_completed: u64 = 0;
 
     for df in files {
         let dest_path = model_dir.join(&df.filename);
 
-        // Skip already-completed files
         if dest_path.exists() {
             cumulative_completed += df.size;
-            emit_multi_progress(app, download_state, &model.id, cumulative_completed, total_size, 0);
+            emit_progress(app, download_state, &model.id, cumulative_completed, total_size, 0);
             continue;
         }
 
         let tmp_path = multi_file_partial_path(model, &df.filename);
-        let existing_size = fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
+        let base = cumulative_completed;
+        let model_id = model.id.clone();
 
-        let client = &*DOWNLOAD_CLIENT;
-        let mut request = client.get(&df.url);
-        if existing_size > 0 {
-            log::info!("Resuming multi-file {} from {} bytes", df.filename, existing_size);
-            request = request.header("Range", format!("bytes={}-", existing_size));
-        }
-
-        let response = match request.send().await {
-            Ok(r) => r,
-            Err(e) => {
-                log::error!("Download failed for {}: {}", df.filename, e);
-                return false;
-            }
+        let mut progress_cb = |file_downloaded: u64, _file_total: u64| {
+            emit_progress(app, download_state, &model_id, base + file_downloaded, total_size, 0);
         };
 
-        let status = response.status();
+        let result = download_one_file(&df.url, &tmp_path, cancel_flag, &mut progress_cb).await;
 
-        if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
-            log::warn!("Server returned 416 for {}, restarting", df.filename);
-            let _ = fs::remove_file(&tmp_path);
-            // Retry this file by recursing (rare case)
-            return Box::pin(download_multi_file(app, download_state, model, files, cancel_flag)).await;
-        }
-
-        let (resumed, file_total) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
-            let remaining = response.content_length().unwrap_or(0);
-            (true, existing_size + remaining)
-        } else {
-            (false, response.content_length().unwrap_or(df.size))
-        };
-
-        let mut file_downloaded: u64 = if resumed { existing_size } else { 0 };
-
-        let mut file = if resumed {
-            match fs::OpenOptions::new().append(true).open(&tmp_path) {
-                Ok(f) => f,
-                Err(e) => {
-                    log::error!("Failed to open partial file for append: {}", e);
-                    return false;
-                }
+        match result {
+            Some(_) => {
+                if !finalize_file(&tmp_path, &dest_path) { return false; }
             }
-        } else {
-            match fs::File::create(&tmp_path) {
-                Ok(f) => f,
-                Err(e) => {
-                    log::error!("Failed to create temp file: {}", e);
-                    return false;
-                }
-            }
-        };
-
-        // Emit initial progress
-        emit_multi_progress(app, download_state, &model.id, cumulative_completed + file_downloaded, total_size, 0);
-
-        let mut last_emit_time = std::time::Instant::now();
-        let mut last_emit_bytes = cumulative_completed + file_downloaded;
-
-        let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            if cancel_flag.load(Ordering::SeqCst) {
-                log::info!("Download cancelled for {} (file: {})", model.id, df.filename);
-                return false;
-            }
-            match chunk {
-                Ok(bytes) => {
-                    if file.write_all(&bytes).is_err() {
-                        return false;
-                    }
-                    file_downloaded += bytes.len() as u64;
-
-                    let overall = cumulative_completed + file_downloaded;
-                    let now = std::time::Instant::now();
-                    let elapsed = now.duration_since(last_emit_time);
-                    let is_done = file_downloaded >= file_total;
-                    if elapsed >= std::time::Duration::from_millis(250) || is_done {
-                        let speed = if elapsed.as_secs_f64() > 0.0 {
-                            ((overall - last_emit_bytes) as f64 / elapsed.as_secs_f64()) as u64
-                        } else { 0 };
-                        emit_multi_progress(app, download_state, &model.id, overall, total_size, speed);
-                        last_emit_time = now;
-                        last_emit_bytes = overall;
-                    }
-                }
-                Err(e) => {
-                    log::error!("Download stream error for {}: {}", df.filename, e);
-                    return false;
-                }
-            }
-        }
-
-        // Move partial to final
-        if let Err(e) = fs::rename(&tmp_path, &dest_path) {
-            // Try copy fallback
-            match fs::copy(&tmp_path, &dest_path) {
-                Ok(_) => { let _ = fs::remove_file(&tmp_path); }
-                Err(e2) => {
-                    log::error!("Failed to finalize {}: rename={}, copy={}", df.filename, e, e2);
-                    let _ = fs::remove_file(&tmp_path);
-                    return false;
-                }
-            }
+            None => return false,
         }
 
         cumulative_completed += df.size;
         log::info!("Completed file {}/{}: {}", files.iter().position(|x| x.filename == df.filename).unwrap_or(0) + 1, files.len(), df.filename);
     }
 
-    // Write completion marker
     if let Some(marker) = &model.download_marker {
         let marker_path = model_dir.join(marker);
         if let Err(e) = fs::write(&marker_path, "") {
@@ -606,8 +498,7 @@ async fn download_multi_file(
         }
     }
 
-    // Final 100% progress
-    emit_multi_progress(app, download_state, &model.id, total_size, total_size, 0);
+    emit_progress(app, download_state, &model.id, total_size, total_size, 0);
     log::info!("All {} files downloaded for {}", files.len(), model.id);
     true
 }
