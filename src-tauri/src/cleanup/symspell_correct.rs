@@ -200,23 +200,29 @@ fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeSt
 
 /// Get (or lazily load) the SymSpell instance for a language.
 /// Returns None if the dict is not downloaded.
+/// Loading happens OUTSIDE the lock to avoid blocking other transcriptions.
 fn get_ss(language: &str) -> bool {
     let code = lang_to_code(language);
 
+    // Quick check under lock
+    {
+        let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        if guard.as_ref().is_some_and(|c| c.contains_key(&code)) {
+            return true;
+        }
+    }
+
+    // Load outside the lock (can take seconds for large dicts)
+    let dir = dict_dir(language);
+    let Some(ss) = load_from_dir(&dir, &code) else {
+        return false;
+    };
+
+    // Insert under lock
     let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let cache = guard.get_or_insert_with(HashMap::new);
-
-    if cache.contains_key(&code) {
-        return true;
-    }
-
-    let dir = dict_dir(language);
-    if let Some(ss) = load_from_dir(&dir, &code) {
-        cache.insert(code, ss);
-        true
-    } else {
-        false
-    }
+    cache.entry(code).or_insert(ss);
+    true
 }
 
 /// Run a closure with the SymSpell instance for the given language.
@@ -232,34 +238,39 @@ fn with_ss<T>(language: &str, f: impl FnOnce(&SymSpell<UnicodeStringStrategy>) -
 
 /// Get (or lazily load) the KenLM model for a language.
 /// Returns true if the model is available.
+/// Loading happens OUTSIDE the lock to avoid blocking other transcriptions.
 fn get_lm(language: &str) -> bool {
     let code = lang_to_code(language);
     let base_code = code.split('-').next().unwrap_or(&code);
 
-    let mut guard = LM_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-    let cache = guard.get_or_insert_with(HashMap::new);
-
-    if cache.contains_key(base_code) {
-        return true;
+    // Quick check under lock
+    {
+        let guard = LM_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+        if guard.as_ref().is_some_and(|c| c.contains_key(base_code)) {
+            return true;
+        }
     }
 
-    // Look for the KenLM binary model file
+    // Load outside the lock
     let model_dir = jona_types::models_dir().join("lm").join(base_code);
     let model_path = model_dir.join(format!("{base_code}.binary"));
     if !model_path.exists() {
         return false;
     }
 
-    match KenLMModel::load(&model_path) {
-        Ok(lm) => {
-            cache.insert(base_code.to_string(), lm);
-            true
-        }
+    let lm = match KenLMModel::load(&model_path) {
+        Ok(lm) => lm,
         Err(e) => {
             log::warn!("KenLM {}: load failed: {}", base_code, e);
-            false
+            return false;
         }
-    }
+    };
+
+    // Insert under lock
+    let mut guard = LM_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.get_or_insert_with(HashMap::new);
+    cache.entry(base_code.to_string()).or_insert(lm);
+    true
 }
 
 /// Run a closure with the KenLM model for the given language.
@@ -386,6 +397,25 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
                 // Word is known — keep as-is
                 result.push_str(word);
                 continue;
+            }
+
+            // French plural guard: if word ends in 's' and the stem is known, it's a valid plural
+            if lower.ends_with('s') && lower.len() > 3 {
+                let stem = &lower[..lower.len() - 1];
+                if !ss.lookup(stem, Verbosity::Top, 0).is_empty() {
+                    result.push_str(word);
+                    continue;
+                }
+            }
+
+            // French elision guard: split on apostrophe and check the main part
+            // e.g. "j'avais" → check "avais", "l'homme" → check "homme"
+            if let Some(apos_pos) = lower.find('\'').or_else(|| lower.find('\u{2019}')) {
+                let after = &lower[apos_pos + 1..];
+                if after.len() >= 2 && !ss.lookup(after, Verbosity::Top, 0).is_empty() {
+                    result.push_str(word);
+                    continue;
+                }
             }
 
             // Word is unknown — generate correction candidates
@@ -646,12 +676,19 @@ mod tests {
     const RELEASE_BASE: &str =
         "https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download";
 
-    /// Download real production dictionaries from GitHub Releases.
-    /// Returns true if dicts are available, false if download failed (no network, etc.).
-    /// Tests that need dicts should call this and `return` early if false.
+    /// Ensure spellcheck dicts are loaded into SS_CACHE for testing.
+    ///
+    /// Resolution order per language:
+    /// 1. If already cached in SS_CACHE → done
+    /// 2. If production dict exists (models_dir) → load from there (read-only fallback)
+    /// 3. Download to a temp directory and load from there
+    ///
+    /// IMPORTANT: Tests NEVER write to the production models directory.
     fn ensure_test_dicts() -> bool {
         *DICTS_READY.get_or_init(|| {
-            let model_base = jona_types::models_dir().join("spellcheck");
+            let prod_base = jona_types::models_dir().join("spellcheck");
+            let tmp_base = std::env::temp_dir().join("jonawhisper-test-spellcheck");
+
             let client = reqwest::blocking::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
@@ -662,12 +699,37 @@ mod tests {
                 ("fr", vec!["fr-freq.txt", "fr-bigram.txt"]),
                 ("en", vec!["en-freq.txt", "en-bigram.txt"]),
             ] {
-                let dest = model_base.join(lang);
-                std::fs::create_dir_all(&dest).ok();
+                // Already cached? Skip.
+                {
+                    let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                    if guard.as_ref().is_some_and(|c| c.contains_key(lang)) {
+                        continue;
+                    }
+                }
 
-                // Skip download if freq.txt already exists (from app usage or previous test run)
-                if dest.join("freq.txt").exists() {
-                    continue;
+                // Try production dir first (read-only fallback)
+                let prod_dir = prod_base.join(lang);
+                if prod_dir.join("freq.txt").exists() {
+                    if let Some(ss) = load_from_dir(&prod_dir, lang) {
+                        let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                        let cache = guard.get_or_insert_with(HashMap::new);
+                        cache.entry(lang.to_string()).or_insert(ss);
+                        continue;
+                    }
+                }
+
+                // Download to temp directory (never touches production)
+                let tmp_dir = tmp_base.join(lang);
+                std::fs::create_dir_all(&tmp_dir).ok();
+
+                // Check if already downloaded in tmp
+                if tmp_dir.join("freq.txt").exists() {
+                    if let Some(ss) = load_from_dir(&tmp_dir, lang) {
+                        let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                        let cache = guard.get_or_insert_with(HashMap::new);
+                        cache.entry(lang.to_string()).or_insert(ss);
+                        continue;
+                    }
                 }
 
                 let Some(ref client) = client else {
@@ -675,6 +737,7 @@ mod tests {
                     continue;
                 };
 
+                let mut download_ok = true;
                 for file in &files {
                     let url = format!("{RELEASE_BASE}/{file}");
                     let local_name = if file.contains("freq") {
@@ -685,19 +748,25 @@ mod tests {
                     match client.get(&url).send().and_then(|r| r.error_for_status()) {
                         Ok(resp) => {
                             if let Ok(bytes) = resp.bytes() {
-                                std::fs::write(dest.join(local_name), &bytes).ok();
+                                std::fs::write(tmp_dir.join(local_name), &bytes).ok();
                             }
                         }
                         Err(_) => {
-                            all_ok = false;
+                            download_ok = false;
                         }
                     }
                 }
-            }
 
-            // Clear cached instances so they reload from freshly downloaded dicts
-            let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-            *guard = None;
+                if download_ok {
+                    if let Some(ss) = load_from_dir(&tmp_dir, lang) {
+                        let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+                        let cache = guard.get_or_insert_with(HashMap::new);
+                        cache.entry(lang.to_string()).or_insert(ss);
+                    }
+                } else {
+                    all_ok = false;
+                }
+            }
 
             all_ok
         })

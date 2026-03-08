@@ -138,7 +138,7 @@ const UNIT_SYMBOLS: &[&str] = &[
 fn is_unit_word(word: &str, lang_units: &[&str]) -> bool {
     let lower = word.to_lowercase();
     lang_units.iter().any(|u| lower == *u)
-        || UNIT_SYMBOLS.iter().any(|u| word == *u)
+        || UNIT_SYMBOLS.contains(&word)
 }
 
 /// Split text into words, try to parse number sequences, replace with digits.
