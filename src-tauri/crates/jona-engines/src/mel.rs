@@ -219,12 +219,12 @@ fn build_mel_filterbank(n_fft: usize, n_mels: usize, sample_rate: f32, scale: Me
         let center = mel_points[m + 1];
         let right = mel_points[m + 2];
 
-        for k in 0..freq_bins {
+        for (k, filter_val) in filters[m].iter_mut().enumerate().take(freq_bins) {
             let freq = k as f32 * freq_bin_width;
             if freq >= left && freq <= center {
-                filters[m][k] = (freq - left) / (center - left);
+                *filter_val = (freq - left) / (center - left);
             } else if freq > center && freq <= right {
-                filters[m][k] = (right - freq) / (right - center);
+                *filter_val = (right - freq) / (right - center);
             }
         }
 
@@ -233,8 +233,8 @@ fn build_mel_filterbank(n_fft: usize, n_mels: usize, sample_rate: f32, scale: Me
             let width = right - left;
             if width > 0.0 {
                 let enorm = 2.0 / width;
-                for k in 0..freq_bins {
-                    filters[m][k] *= enorm;
+                for filter_val in filters[m].iter_mut().take(freq_bins) {
+                    *filter_val *= enorm;
                 }
             }
         }
