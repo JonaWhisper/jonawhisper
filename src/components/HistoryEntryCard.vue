@@ -319,7 +319,7 @@ watch(() => props.entry.timestamp, () => {
               <TooltipTrigger as-child>
                 <span
                   class="cursor-default rounded-sm transition-colors duration-150 hover:bg-muted"
-                  :class="ws.score >= 0 && ws.score < 0.7 ? 'border-b border-dotted border-amber-500/60' : ''"
+                  :class="ws.score >= 0 && ws.score < 0.7 ? 'border-b-2 border-dotted border-amber-500' : ''"
                 >{{ ws.word }}</span>
               </TooltipTrigger>
               <TooltipContent side="bottom" :side-offset="2" :style="ws.score >= 0 ? { backgroundColor: confidenceColor(ws.score), color: 'white' } : {}">
