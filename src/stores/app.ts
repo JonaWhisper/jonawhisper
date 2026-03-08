@@ -84,6 +84,8 @@ export const useAppStore = defineStore('app', () => {
           spellcheck: event.payload.spellcheck ?? false,
           disfluency_removal: event.payload.disfluency_removal ?? false,
           itn: event.payload.itn ?? false,
+          raw_text: event.payload.raw_text ?? '',
+          word_scores: event.payload.word_scores ?? '',
         })
       }
     })

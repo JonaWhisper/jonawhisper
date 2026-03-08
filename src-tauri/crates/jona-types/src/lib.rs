@@ -118,6 +118,12 @@ pub struct HistoryEntry {
     pub disfluency_removal: bool,
     #[serde(default)]
     pub itn: bool,
+    /// Raw text before any post-processing (as returned by ASR engine).
+    #[serde(default)]
+    pub raw_text: String,
+    /// Per-word confidence scores as JSON (e.g. [["word", 0.95], ["hello", 0.8]]).
+    #[serde(default)]
+    pub word_scores: String,
 }
 
 // -- Typed settings enums --
@@ -1098,6 +1104,7 @@ mod tests {
             spellcheck: false,
             disfluency_removal: true,
             itn: true,
+            ..Default::default()
         };
         let json = serde_json::to_string(&entry).unwrap();
         let deserialized: HistoryEntry = serde_json::from_str(&json).unwrap();

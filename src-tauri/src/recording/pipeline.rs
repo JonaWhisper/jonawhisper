@@ -166,6 +166,27 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         return;
     }
 
+    // Store raw ASR output before any post-processing
+    let raw_text = trimmed.to_string();
+
+    // Log and serialize word confidence scores
+    let word_scores_json = if !word_confidences.is_empty() {
+        let scores: Vec<(&str, f32)> = word_confidences.iter()
+            .filter_map(|wc| wc.confidence.map(|c| (wc.word.as_str(), c)))
+            .collect();
+        if !scores.is_empty() {
+            log::info!("Confidence scores: {}", scores.iter()
+                .map(|(w, c)| format!("{}={:.2}", w, c))
+                .collect::<Vec<_>>().join(" "));
+        }
+        serde_json::to_string(&word_confidences.iter()
+            .map(|wc| (wc.word.as_str(), wc.confidence.unwrap_or(-1.0)))
+            .collect::<Vec<_>>()
+        ).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
     // Read settings once
     let (model_id, lang, hall_filter, disfluency_removal, itn_enabled,
          spellcheck_enabled, punctuation_model_id, text_cleanup_enabled,
@@ -331,6 +352,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         spellcheck: spellcheck_enabled,
         disfluency_removal,
         itn: itn_enabled,
+        raw_text: raw_text.clone(),
+        word_scores: word_scores_json.clone(),
     });
     platform::play_sound("Glass");
 
@@ -345,6 +368,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             "spellcheck": spellcheck_enabled,
             "disfluency_removal": disfluency_removal,
             "itn": itn_enabled,
+            "raw_text": raw_text,
+            "word_scores": word_scores_json,
         }),
     );
 }

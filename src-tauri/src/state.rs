@@ -45,6 +45,8 @@ fn open_history_db() -> Connection {
     let _ = conn.execute("ALTER TABLE history ADD COLUMN spellcheck INTEGER NOT NULL DEFAULT 0", []);
     let _ = conn.execute("ALTER TABLE history ADD COLUMN disfluency_removal INTEGER NOT NULL DEFAULT 0", []);
     let _ = conn.execute("ALTER TABLE history ADD COLUMN itn INTEGER NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN raw_text TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE history ADD COLUMN word_scores TEXT NOT NULL DEFAULT ''", []);
 
     // Migrate legacy history.json if it exists
     let json_path = dir.join(HISTORY_JSON_LEGACY);
@@ -152,8 +154,8 @@ impl AppState {
             .as_secs();
         let db = self.history_db.lock().unwrap();
         if let Err(e) = db.execute(
-            "INSERT INTO history (timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            rusqlite::params![timestamp, entry.text, entry.model_id, entry.language, entry.cleanup_model_id, entry.hallucination_filter, entry.vad_trimmed, entry.punctuation_model_id, entry.spellcheck, entry.disfluency_removal, entry.itn],
+            "INSERT INTO history (timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn, raw_text, word_scores) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            rusqlite::params![timestamp, entry.text, entry.model_id, entry.language, entry.cleanup_model_id, entry.hallucination_filter, entry.vad_trimmed, entry.punctuation_model_id, entry.spellcheck, entry.disfluency_removal, entry.itn, entry.raw_text, entry.word_scores],
         ) {
             log::error!("Failed to insert history entry: {}", e);
         }
@@ -161,7 +163,7 @@ impl AppState {
 
     pub fn get_history(&self, query: &str, limit: u32, cursor: Option<u64>) -> Result<Vec<HistoryEntry>, rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
-        const COLS: &str = "timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn";
+        const COLS: &str = "timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn, raw_text, word_scores";
         let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match (query.is_empty(), cursor) {
             (true, None) => (
                 format!("SELECT {COLS} FROM history ORDER BY timestamp DESC LIMIT ?1"),
@@ -201,6 +203,8 @@ impl AppState {
                 spellcheck: row.get(8)?,
                 disfluency_removal: row.get(9)?,
                 itn: row.get(10)?,
+                raw_text: row.get(11)?,
+                word_scores: row.get(12)?,
             })
         })?.filter_map(|r| r.ok()).collect();
         Ok(entries)
@@ -256,7 +260,9 @@ impl AppState {
                  punctuation_model_id TEXT NOT NULL DEFAULT '',
                  spellcheck INTEGER NOT NULL DEFAULT 0,
                  disfluency_removal INTEGER NOT NULL DEFAULT 0,
-                 itn INTEGER NOT NULL DEFAULT 0
+                 itn INTEGER NOT NULL DEFAULT 0,
+                 raw_text TEXT NOT NULL DEFAULT '',
+                 word_scores TEXT NOT NULL DEFAULT ''
              );
              CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);"
         ).unwrap();
@@ -490,6 +496,7 @@ mod tests {
             spellcheck: true,
             disfluency_removal: true,
             itn: true,
+            ..Default::default()
         });
 
         let results = state.get_history("", 10, None).unwrap();

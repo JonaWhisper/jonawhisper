@@ -53,6 +53,9 @@ export interface HistoryEntry {
   spellcheck: boolean
   disfluency_removal: boolean
   itn: boolean
+  raw_text: string
+  /** Per-word confidence scores as JSON array of [word, score] tuples */
+  word_scores: string
 }
 
 export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom' | 'Groq' | 'Cerebras' | 'Gemini' | 'Mistral' | 'Fireworks' | 'Together' | 'DeepSeek'
@@ -117,6 +120,8 @@ export interface TranscriptionCompletePayload {
   spellcheck?: boolean
   disfluency_removal?: boolean
   itn?: boolean
+  raw_text?: string
+  word_scores?: string
 }
 
 export interface DownloadProgressPayload {
