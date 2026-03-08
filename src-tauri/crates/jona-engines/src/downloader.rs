@@ -654,8 +654,11 @@ pub fn check_model_update(model: &ASRModel) -> UpdateStatus {
     let mut url_etags: Vec<(String, String)> = Vec::new();
 
     if let Some(files) = local.get("files").and_then(|v| v.as_object()) {
-        // Multi-file model
-        for (_filename, entry) in files {
+        // Multi-file model: only check model files (skip config.json, tokenizer.json etc.)
+        for (filename, entry) in files {
+            if filename == "config.json" || filename == "tokenizer.json" {
+                continue;
+            }
             let url = match entry.get("url").and_then(|v| v.as_str()) {
                 Some(u) => u.to_string(),
                 None => continue,
