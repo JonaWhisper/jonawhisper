@@ -172,6 +172,7 @@
   "models.filter.correction": "Correction",
   "models.filter.llm": "Rewriting",
   "models.filter.spellcheck": "Dictionaries",
+  "models.filter.languagemodel": "Language Models",
   "units.bytes": "B",
   "units.kb": "KB",
   "units.mb": "MB",

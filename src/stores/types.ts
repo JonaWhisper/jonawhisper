@@ -10,7 +10,7 @@ export interface EngineInfo {
   id: string
   name: string
   description: string
-  category: 'asr' | 'llm' | 'punctuation' | 'correction' | 'spellcheck'
+  category: 'asr' | 'llm' | 'punctuation' | 'correction' | 'spellcheck' | 'languagemodel'
   available: boolean
   supported_language_codes: string[]
 }

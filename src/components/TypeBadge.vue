@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Type, SpellCheck, MessageSquare, Cloud, Cpu, Scissors, ShieldCheck, BookA, Eraser, Hash } from 'lucide-vue-next'
+import { Type, SpellCheck, MessageSquare, Cloud, Cpu, Scissors, ShieldCheck, BookA, Eraser, Hash, BookText } from 'lucide-vue-next'
 
 defineProps<{
-  type: 'local' | 'cloud' | 'bert' | 'punctuation' | 'correction' | 'llm' | 'vad' | 'hallucination' | 'spellcheck' | 'disfluency' | 'itn'
+  type: 'local' | 'cloud' | 'bert' | 'punctuation' | 'correction' | 'llm' | 'vad' | 'hallucination' | 'spellcheck' | 'disfluency' | 'itn' | 'languagemodel'
 }>()
 
 const config = {
@@ -17,6 +17,7 @@ const config = {
   spellcheck:    { bg: 'bg-lime-500/10 text-lime-600 dark:text-lime-400', icon: BookA },
   disfluency:    { bg: 'bg-pink-500/10 text-pink-600 dark:text-pink-400', icon: Eraser },
   itn:           { bg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400', icon: Hash },
+  languagemodel: { bg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400', icon: BookText },
 }
 </script>
 

@@ -172,6 +172,7 @@
   "models.filter.correction": "Correction",
   "models.filter.llm": "Reformulation",
   "models.filter.spellcheck": "Dictionnaires",
+  "models.filter.languagemodel": "Mod\u00e8les de langue",
   "units.bytes": "o",
   "units.kb": "Ko",
   "units.mb": "Mo",

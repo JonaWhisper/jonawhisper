@@ -42,6 +42,7 @@ export const useEnginesStore = defineStore('engines', () => {
     const ids = new Set(spellcheckEngines.value.map(e => e.id))
     return models.value.some(m => ids.has(m.engine_id) && m.is_downloaded)
   })
+  const languageModelEngines = computed(() => engines.value.filter(e => e.category === 'languagemodel'))
   const punctuationModels = computed<CleanupModel[]>(() => {
     return downloadedPunctuationModels.value.map(m => ({
       id: m.id, label: m.label, group: 'punctuation' as const,
@@ -191,7 +192,7 @@ export const useEnginesStore = defineStore('engines', () => {
     downloadedModels, asrEngines, llmEngines,
     punctuationEngines,
     correctionEngines,
-    spellcheckEngines, hasSpellcheckDict,
+    spellcheckEngines, hasSpellcheckDict, languageModelEngines,
     punctuationModels, cleanupModels, asrModels,
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     updatableModelIds, hasUpdate, dismissUpdate,

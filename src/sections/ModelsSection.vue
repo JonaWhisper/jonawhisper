@@ -7,13 +7,13 @@ import { useDownloadStore } from '@/stores/downloads'
 import type { ASRModel } from '@/stores/types'
 import ModelCell from '@/components/ModelCell.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { AudioLines, Type, SpellCheck, MessageSquare, BookA } from 'lucide-vue-next'
+import { AudioLines, Type, SpellCheck, MessageSquare, BookA, BookText } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const engines = useEnginesStore()
 const downloads = useDownloadStore()
 
-type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm' | 'spellcheck'
+type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm' | 'spellcheck' | 'languagemodel'
 const activeFilter = ref<FilterKey>('all')
 
 const filters: { key: FilterKey; label: string; icon: any; iconColor: string; activeBg: string; activeText: string }[] = [
@@ -23,6 +23,7 @@ const filters: { key: FilterKey; label: string; icon: any; iconColor: string; ac
   { key: 'correction', label: 'models.filter.correction', icon: SpellCheck, iconColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', activeBg: 'bg-amber-500/10 dark:bg-amber-900/50', activeText: 'text-amber-700 dark:text-amber-300' },
   { key: 'llm', label: 'models.filter.llm', icon: MessageSquare, iconColor: 'bg-teal-500/15 text-teal-600 dark:text-teal-400', activeBg: 'bg-teal-500/10 dark:bg-teal-900/50', activeText: 'text-teal-700 dark:text-teal-300' },
   { key: 'spellcheck', label: 'models.filter.spellcheck', icon: BookA, iconColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400', activeBg: 'bg-emerald-500/10 dark:bg-emerald-900/50', activeText: 'text-emerald-700 dark:text-emerald-300' },
+  { key: 'languagemodel', label: 'models.filter.languagemodel', icon: BookText, iconColor: 'bg-orange-500/15 text-orange-600 dark:text-orange-400', activeBg: 'bg-orange-500/10 dark:bg-orange-900/50', activeText: 'text-orange-700 dark:text-orange-300' },
 ]
 
 const engineIdsByCategory = computed(() => {
@@ -33,6 +34,7 @@ const engineIdsByCategory = computed(() => {
     correction: new Set(engines.correctionEngines.map(e => e.id)),
     llm: new Set(engines.llmEngines.map(e => e.id)),
     spellcheck: new Set(engines.spellcheckEngines.map(e => e.id)),
+    languagemodel: new Set(engines.languageModelEngines.map(e => e.id)),
   }
   return map
 })
