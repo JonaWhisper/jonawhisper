@@ -16,6 +16,20 @@ static RE_FILLERS_FR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\b(euh|heu|hum|bah|ben|beh)\b").unwrap());
 static RE_FILLERS_EN: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\b(uh|um|hmm)\b").unwrap());
+static RE_FILLERS_DE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(äh|ähm|hm|hmm|tja|naja)\b").unwrap());
+static RE_FILLERS_ES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(eh|em|este|pues)\b").unwrap());
+static RE_FILLERS_PT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(hum|tipo|né)\b").unwrap());
+static RE_FILLERS_IT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(ehm|allora|cioè|ecco)\b").unwrap());
+static RE_FILLERS_NL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(eh|ehm|uhm|nou)\b").unwrap());
+static RE_FILLERS_PL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(yyy|eee|no|jakby)\b").unwrap());
+static RE_FILLERS_RU: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(э|эм|ну|вот|типа|как бы)\b").unwrap());
 static RE_MULTI_SPACES: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"  +").unwrap());
 
@@ -72,31 +86,74 @@ pub fn process(text: &str, language: &str, opts: &PostProcessOptions) -> String 
 }
 
 /// Known Whisper hallucination phrases that appear on silence/noise.
+/// Organized by language, checked case-insensitively.
 const HALLUCINATIONS: &[&str] = &[
+    // -- Cross-language --
+    "amara.org",
+    "www.",
+    "http",
+    "♪",
+    "♫",
+    "...",
+    "…",
+    // -- French --
     "sous-titrage société radio-canada",
     "sous-titrage st",
     "sous titrage société radio canada",
     "soustitrage société radio-canada",
     "sous-titrage",
     "sous-titres par",
-    "subtitles by",
-    "amara.org",
-    "thank you for watching",
-    "thanks for watching",
+    "sous-titres réalisés par",
+    "par soustitreur.com",
     "merci d'avoir regardé",
     "merci pour votre écoute",
+    "au revoir.",
+    "à bientôt.",
+    // -- English --
+    "subtitles by",
+    "thank you for watching",
+    "thanks for watching",
     "please subscribe",
     "like and subscribe",
-    "www.",
-    "http",
+    "don't forget to subscribe",
+    "see you in the next video",
     "bye.",
     "bye bye.",
     "bye-bye.",
-    "au revoir.",
-    "à bientôt.",
-    "♪",
-    "...",
-    "…",
+    // -- German --
+    "untertitel im auftrag des zdf",
+    "untertitel der amara.org-community",
+    "vielen dank fürs zuschauen",
+    "danke fürs zuschauen",
+    "bis zum nächsten mal",
+    "tschüss",
+    // -- Spanish --
+    "subtítulos realizados por",
+    "subtitulado por",
+    "gracias por ver",
+    "suscríbete al canal",
+    "no olvides suscribirte",
+    // -- Portuguese --
+    "legendas pela comunidade",
+    "obrigado por assistir",
+    "tchau",
+    // -- Italian --
+    "sottotitoli creati dalla comunità",
+    "sottotitoli a cura di",
+    "grazie per la visione",
+    "grazie per aver guardato",
+    // -- Dutch --
+    "ondertiteld door",
+    "ondertiteling door",
+    "bedankt voor het kijken",
+    // -- Polish --
+    "napisy stworzone przez",
+    "dziękuję za obejrzenie",
+    "dziękuję za uwagę",
+    // -- Russian --
+    "субтитры сделаны сообществом",
+    "спасибо за просмотр",
+    "подписывайтесь на канал",
 ];
 
 // Pre-compiled regexes for hallucination removal (case-insensitive)
@@ -107,19 +164,35 @@ static HALLUCINATION_REGEXES: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         .collect()
 });
 
+// Music/symbol-only output
+static RE_MUSIC_ONLY: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[\s♪♫🎵.\u{2026}]+$").unwrap());
+
 /// Strip known Whisper hallucination phrases from text.
 /// If only hallucinations remain, returns empty string.
 fn strip_hallucinations(text: &str) -> String {
     let mut result = text.to_string();
     let lower = result.to_lowercase();
+    let trimmed_lower = lower.trim().trim_matches('.').trim();
+
+    // Music/symbol-only output
+    if RE_MUSIC_ONLY.is_match(trimmed_lower) {
+        log::info!("Filtered hallucination (music/symbols): {:?}", text.trim());
+        return String::new();
+    }
 
     // If the entire text (trimmed, case-insensitive) matches a hallucination, discard it
-    let trimmed_lower = lower.trim().trim_matches('.').trim();
     for h in HALLUCINATIONS {
-        if trimmed_lower == *h {
+        if trimmed_lower == *h || trimmed_lower.starts_with(h) {
             log::info!("Filtered hallucination: {:?}", text.trim());
             return String::new();
         }
+    }
+
+    // Repetition detection: same word 3+ times in a row → likely looping
+    if has_excessive_repetition(trimmed_lower) {
+        log::info!("Filtered hallucination (repetition): {:?}", text.trim());
+        return String::new();
     }
 
     // Remove hallucination phrases embedded in longer text
@@ -217,14 +290,60 @@ fn apply_dictation_commands(text: &str, language: &str) -> String {
 
 /// Strip pure hesitation fillers (euh, uh, um, etc.) — no semantic ambiguity.
 fn strip_fillers(text: &str, language: &str) -> String {
-    let re = if language.starts_with("fr") {
-        &*RE_FILLERS_FR
-    } else {
-        &*RE_FILLERS_EN
+    let re = match lang_base(language) {
+        "fr" => &*RE_FILLERS_FR,
+        "de" => &*RE_FILLERS_DE,
+        "es" => &*RE_FILLERS_ES,
+        "pt" => &*RE_FILLERS_PT,
+        "it" => &*RE_FILLERS_IT,
+        "nl" => &*RE_FILLERS_NL,
+        "pl" => &*RE_FILLERS_PL,
+        "ru" => &*RE_FILLERS_RU,
+        _ => &*RE_FILLERS_EN,
     };
     let result = re.replace_all(text, "").to_string();
     let result = RE_MULTI_SPACES.replace_all(&result, " ").to_string();
     result.trim().to_string()
+}
+
+/// Extract base language code: "fr-CA" → "fr", "en" → "en"
+fn lang_base(language: &str) -> &str {
+    language.split(&['-', '_'][..]).next().unwrap_or(language)
+}
+
+/// Detect excessive repetition (same word 3+ times in a row, or text is mostly one word).
+/// Whisper hallucinates by looping the same word/phrase on silence.
+fn has_excessive_repetition(text: &str) -> bool {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() < 3 {
+        return false;
+    }
+
+    // Check for same word repeated 3+ times consecutively
+    let mut run_count = 1;
+    for i in 1..words.len() {
+        if words[i].eq_ignore_ascii_case(words[i - 1]) {
+            run_count += 1;
+            if run_count >= 3 {
+                return true;
+            }
+        } else {
+            run_count = 1;
+        }
+    }
+
+    // Check if a single word dominates (>70% of all words, at least 4 occurrences)
+    let mut counts = std::collections::HashMap::new();
+    for w in &words {
+        *counts.entry(w.to_lowercase()).or_insert(0u32) += 1;
+    }
+    if let Some(&max_count) = counts.values().max() {
+        if max_count >= 4 && (max_count as f32 / words.len() as f32) > 0.7 {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn fix_punctuation_spacing(text: &str) -> String {
@@ -416,5 +535,64 @@ mod tests {
         assert!(result.contains("achet"), "Real words should survive: {}", result);
         assert!(result.contains("pain"), "Real words should survive: {}", result);
         assert!(!result.to_lowercase().contains("euh"), "Fillers should be removed");
+    }
+
+    // --- Multilingual hallucinations ---
+
+    #[test]
+    fn test_hallucination_german() {
+        let opts = default_opts();
+        assert_eq!(process("Untertitel im Auftrag des ZDF", "de", &opts), "");
+        assert_eq!(process("Vielen Dank fürs Zuschauen", "de", &opts), "");
+    }
+
+    #[test]
+    fn test_hallucination_spanish() {
+        let opts = default_opts();
+        assert_eq!(process("Gracias por ver", "es", &opts), "");
+        assert_eq!(process("Suscríbete al canal", "es", &opts), "");
+    }
+
+    #[test]
+    fn test_hallucination_russian() {
+        let opts = default_opts();
+        assert_eq!(process("Спасибо за просмотр", "ru", &opts), "");
+    }
+
+    #[test]
+    fn test_hallucination_repetition() {
+        let opts = default_opts();
+        // Same word repeated 3+ times → hallucination loop
+        assert_eq!(process("okay okay okay okay", "en", &opts), "");
+        assert_eq!(process("the the the the the", "en", &opts), "");
+    }
+
+    #[test]
+    fn test_hallucination_music_symbols() {
+        let opts = default_opts();
+        assert_eq!(process("♪ ♪ ♪", "en", &opts), "");
+        assert_eq!(process("♫", "en", &opts), "");
+    }
+
+    // --- Multilingual fillers ---
+
+    #[test]
+    fn test_fillers_german() {
+        let result = process("äh ich habe ähm das gemacht", "de", &default_opts());
+        assert!(!result.to_lowercase().contains("äh"), "German fillers should be removed");
+        assert!(result.contains("gemacht"));
+    }
+
+    #[test]
+    fn test_fillers_spanish() {
+        let result = process("eh pues hola mundo", "es", &default_opts());
+        assert!(!result.to_lowercase().contains(" eh "));
+        assert!(result.contains("ola")); // Hola capitalized
+    }
+
+    #[test]
+    fn test_fillers_russian() {
+        let result = process("ну вот привет мир", "ru", &default_opts());
+        assert!(!result.to_lowercase().contains("ну "));
     }
 }
