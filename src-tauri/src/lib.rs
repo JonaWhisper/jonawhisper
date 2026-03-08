@@ -233,12 +233,12 @@ pub fn run() {
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
-                    jona_engines::downloader::migrate_download_markers();
+                    jona_engines::migrations::migrate_download_markers();
                     refresh_spellcheck_manifest(&handle);
 
                     let catalog = jona_engines::EngineCatalog::global();
                     let downloaded = catalog.downloaded_models();
-                    jona_engines::downloader::migrate_version_json(&downloaded);
+                    jona_engines::migrations::migrate_version_json(&downloaded);
 
                     check_model_updates(&handle);
                 });
