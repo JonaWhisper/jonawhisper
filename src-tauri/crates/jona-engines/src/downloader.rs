@@ -11,6 +11,23 @@ use tauri::{AppHandle, Emitter};
 
 static DOWNLOAD_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
+/// Blocking client that does NOT follow redirects (for x-linked-etag on HuggingFace).
+static ETAG_CLIENT_NO_REDIRECT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
+    reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .expect("failed to build no-redirect client")
+});
+
+/// Blocking client that follows redirects (for standard etag).
+static ETAG_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .expect("failed to build etag client")
+});
+
 pub const DOWNLOAD_PROGRESS_EVENT: &str = "download-progress";
 
 fn pending_download_path() -> PathBuf {
@@ -109,16 +126,8 @@ fn sha256_file(path: &Path) -> Option<String> {
 /// 2. If absent, HEAD with redirects → check standard `etag`
 /// 3. If neither → None
 fn fetch_etag(url: &str) -> Option<String> {
-    let timeout = std::time::Duration::from_secs(5);
-
     // Step 1: no-redirect HEAD for x-linked-etag (HuggingFace)
-    let no_redirect_client = reqwest::blocking::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(timeout)
-        .build()
-        .ok()?;
-
-    if let Ok(resp) = no_redirect_client.head(url).send() {
+    if let Ok(resp) = ETAG_CLIENT_NO_REDIRECT.head(url).send() {
         if let Some(val) = resp.headers().get("x-linked-etag") {
             if let Ok(s) = val.to_str() {
                 return Some(s.to_string());
@@ -127,12 +136,7 @@ fn fetch_etag(url: &str) -> Option<String> {
     }
 
     // Step 2: follow redirects, check standard etag
-    let client = reqwest::blocking::Client::builder()
-        .timeout(timeout)
-        .build()
-        .ok()?;
-
-    if let Ok(resp) = client.head(url).send() {
+    if let Ok(resp) = ETAG_CLIENT.head(url).send() {
         if let Some(val) = resp.headers().get("etag") {
             if let Ok(s) = val.to_str() {
                 return Some(s.to_string());
