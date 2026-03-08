@@ -37,6 +37,10 @@ impl ContextMap {
     /// Get-or-load the context for `engine_id`, then run `action` on it.
     /// If the stored context_key differs from the requested one, the old context
     /// is dropped and `loader` creates a fresh one.
+    ///
+    /// The lock is NOT held during `loader()` or `action()` — only brief lock
+    /// acquisitions to check/insert/remove entries. This prevents engines from
+    /// blocking each other during inference.
     pub fn run_with<R>(
         &self,
         engine_id: &str,
@@ -44,28 +48,46 @@ impl ContextMap {
         loader: impl FnOnce() -> Result<Box<dyn Any + Send>, EngineError>,
         action: impl FnOnce(&mut dyn Any) -> Result<R, EngineError>,
     ) -> Result<R, EngineError> {
-        let mut map = self.entries.lock().unwrap();
-        let needs_load = map.get(engine_id)
-            .is_none_or(|e| e.key != context_key);
+        // Phase 1: check if load needed (short lock)
+        let needs_load = {
+            let map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+            map.get(engine_id).is_none_or(|e| e.key != context_key)
+        };
+
+        // Phase 2: load outside lock
         if needs_load {
             let ctx = loader()?;
+            let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
             map.insert(engine_id.to_string(), ContextEntry {
                 key: context_key.to_string(),
                 ctx,
             });
         }
-        let entry = map.get_mut(engine_id).unwrap();
-        action(&mut *entry.ctx)
+
+        // Phase 3: remove entry → run action without lock → insert back
+        let mut entry = {
+            let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+            map.remove(engine_id)
+                .ok_or_else(|| EngineError::LaunchFailed("context disappeared".into()))?
+        };
+
+        let result = action(&mut *entry.ctx);
+
+        // Re-insert even on error (context is still valid)
+        let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+        map.insert(engine_id.to_string(), entry);
+
+        result
     }
 
     /// Drop all cached contexts (e.g. on model deletion).
     pub fn invalidate_all(&self) {
-        self.entries.lock().unwrap().clear();
+        self.entries.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     /// Drop the context for a specific engine.
     pub fn invalidate(&self, engine_id: &str) {
-        self.entries.lock().unwrap().remove(engine_id);
+        self.entries.lock().unwrap_or_else(|e| e.into_inner()).remove(engine_id);
     }
 }
 
