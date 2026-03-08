@@ -43,7 +43,7 @@ Every dependency has a reason. This document explains **what** each one does and
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD | LSTM state and ONNX inputs/outputs for Silero VAD. Required by ort's tensor API |
 | [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizer library | Used for PCS punctuation (SentencePiece Unigram). Built programmatically from protobuf model, cached as tokenizer.json |
 | [`prost`](https://github.com/tokio-rs/prost) | Protobuf decoding | Parses SentencePiece `.model` files to extract Unigram vocabulary. Lighter than protobuf crate |
-| [`spellbook`](https://github.com/helix-editor/spellbook) | Spell-check (Hunspell-compatible) | Auto-correct via `check()` + `suggest()` with bundled LibreOffice dictionaries (FR/EN). Pure Rust, no C dependencies. From the Helix editor team |
+| [`symspell`](https://crates.io/crates/symspell) | Spell-check (symmetric delete) | Sub-millisecond correction via `lookup_compound()`. Downloadable frequency + bigram dictionaries from GitHub Releases (6 variants: fr, fr-be, fr-ca, fr-ch, en, en-gb). Pure Rust, WASM-compatible |
 | [`encoding_rs`](https://github.com/nickel-org/encoding_rs) | Incremental UTF-8 decoding | LLM token-by-token streaming output. Handles partial multi-byte sequences at token boundaries |
 
 ### Network / IO

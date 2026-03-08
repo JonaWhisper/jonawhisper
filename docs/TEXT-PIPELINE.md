@@ -152,22 +152,24 @@ Texte → SentencePiece tokenize (Unigram, NFC+Lowercase+Metaspace)
 
 ## Étape 5 — Spell-check (✅ Implémenté)
 
-**Fichier** : `cleanup/spellcheck.rs` — fonction `auto_correct()`
+**Fichier** : `cleanup/symspell_correct.rs` — fonction `symspell_correct()`
 
 **But** : corriger les fautes d'orthographe évidentes avant la correction grammaticale.
 
 **Mécanisme** :
-- **spellbook** (pure Rust, Hunspell-compatible) avec dictionnaires LibreOffice bundlés
-- FR : `fr.dic`/`fr.aff` (~1.4 MB, LibreOffice)
-- EN : `en_US.dic`/`en_US.aff` (~550 KB, LibreOffice)
-- Dictionnaires chargés une seule fois via `OnceLock` (lazy init)
-- Itère sur chaque mot, vérifie via `dict.check()`, remplace par la première suggestion si incorrect
-- Préserve la casse originale (Title Case, ALL CAPS, lowercase)
-- Skip : mots ≤1 char, nombres, acronymes (ALL CAPS), mots avec apostrophes FR
+- **SymSpell** (algorithme symmetric delete) avec dictionnaires téléchargeables depuis GitHub Releases
+- Dictionnaires construits par `JonaWhisper/jonawhisper-spellcheck-dicts` (Ruby, CI mensuel)
+- 6 variantes : fr, fr-be, fr-ca, fr-ch, en, en-gb
+- Fréquences + bigrams par langue (FR : DELA 683K formes + Leipzig Corpora 100K bigrams)
+- Chargement lazy depuis disque, cache par langue via `Mutex<HashMap>`
+- `lookup_compound` pour les erreurs de frontières de mots (fréquentes en ASR)
+- Résolution langue : essaie locale complète (fr-ca), puis langue de base (fr)
 
 **Toggle** : `spellcheck_enabled` dans Preferences (défaut : désactivé).
 
-**Latence** : ~5-10ms par phrase (lookup Hunspell).
+**Latence** : <1ms par phrase (SymSpell symmetric delete).
+
+**RAM** : FR ~100 MB, EN ~30 MB (lazy-loaded à la première utilisation).
 
 ---
 
@@ -201,10 +203,10 @@ Le décodage T5 autorégressif peut halluciner (répétitions, divergence). Prot
 
 | Modèle | Params | Taille | Langues | Spécialité | Vitesse |
 |---|---|---|---|---|---|
-| **GEC T5 Small** | 60M | 242 MB | 11 langues | GEC multilingue | ~200ms |
-| T5 Spell FR | 220M | 892 MB | FR | Orthographe FR | ~500ms |
-| FlanEC Base | 250M | 990 MB | EN | Post-ASR correction | ~500ms |
-| FlanEC Large | 800M | 3.1 GB | EN | Post-ASR correction | ~1s |
+| **GEC T5 Small** | 60M | 96 MB | 11 langues | GEC multilingue | ~200ms |
+| T5 Spell FR | 220M | 276 MB | FR | Orthographe FR | ~500ms |
+| FlanEC Base | 250M | 276 MB | EN | Post-ASR correction | ~500ms |
+| FlanEC Large | 800M | 821 MB | EN | Post-ASR correction | ~1s |
 
 **Dispatch** : dynamique via `ASREngine::cleanup()` trait, routé dans `recording/pipeline.rs` via `EngineCatalog`.
 
@@ -304,7 +306,7 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 | `recording/pipeline.rs` | Orchestration : `handle_transcription_result()` appelle les étapes dans l'ordre |
 | `cleanup/post_processor.rs` | Étapes 1 (hallucinations), 2 (dictée), 3 (disfluences), 7 (finalize) |
 | `cleanup/itn.rs` | Étape 8 : ITN (nombres, ordinaux, %, heures, devises, unités FR/EN) |
-| `cleanup/spellcheck.rs` | Étape 5 : spell-check Hunspell (spellbook, dictionnaires LibreOffice) |
+| `cleanup/symspell_correct.rs` | Étape 5 : spell-check SymSpell (dicts téléchargeables, GitHub Releases) |
 | `cleanup/llm_cloud.rs` | Cloud LLM cleanup (OpenAI/Anthropic API) |
 | `cleanup/vad.rs` | VAD Silero v5 (ONNX, pré-transcription) |
 | `crates/jona-engine-bert/` | Étape 4 : catalogue + inférence BERT punctuation (ort + Candle, 2 modèles) |
