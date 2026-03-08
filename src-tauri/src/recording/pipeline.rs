@@ -166,8 +166,10 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     // Read settings once
     let (model_id, lang, hall_filter, disfluency_removal, itn_enabled,
          spellcheck_enabled, punctuation_model_id, text_cleanup_enabled,
-         cleanup_model_id, llm_model, llm_max_tokens, providers) = {
+         cleanup_model_id, llm_model, llm_max_tokens, cleanup_provider) = {
         let s = state.settings.lock().unwrap();
+        let provider = s.cleanup_model_id.strip_prefix("cloud:")
+            .and_then(|pid| s.providers.iter().find(|p| p.id == pid).cloned());
         (
             s.selected_model_id.clone(),
             s.selected_language.clone(),
@@ -180,7 +182,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.cleanup_model_id.clone(),
             s.llm_model.clone(),
             s.llm_max_tokens,
-            s.providers.clone(),
+            provider,
         )
     };
 
@@ -232,7 +234,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             processed = cleanup::post_processor::finalize(&processed);
             finalized = true;
             let effective_max_tokens = effective_llm_tokens(processed.len(), llm_max_tokens);
-            let llm_result = if let Some(provider) = providers.iter().find(|p| p.id == provider_id) {
+            let llm_result = if let Some(ref provider) = cleanup_provider {
                 if !provider.has_llm() {
                     log::warn!("Cloud provider '{}' does not support LLM", provider.name);
                     Err(cleanup::LlmError::NotConfigured)
@@ -396,22 +398,23 @@ fn transcribe(
     state: &AppState,
     audio_path: &std::path::Path,
 ) -> Result<String, EngineError> {
-    let (model_id, language, gpu_mode, asr_cloud_model, providers) = {
+    let (model_id, language, gpu_mode, asr_cloud_model, asr_provider) = {
         let s = state.settings.lock().unwrap();
+        let provider = s.selected_model_id.strip_prefix("cloud:")
+            .and_then(|pid| s.providers.iter().find(|p| p.id == pid).cloned());
         (
             s.selected_model_id.clone(),
             s.selected_language.clone(),
             s.gpu_mode,
             s.asr_cloud_model.clone(),
-            s.providers.clone(),
+            provider,
         )
     };
 
     // Cloud dispatch: selected_model_id = "cloud:<provider_id>"
-    if let Some(provider_id) = model_id.strip_prefix("cloud:") {
-        let provider = providers.iter().find(|p| p.id == provider_id)
-            .ok_or_else(|| EngineError::ApiError(
-                format!("ASR provider '{}' not found", provider_id)
+    if model_id.starts_with("cloud:") {
+        let provider = asr_provider.ok_or_else(|| EngineError::ApiError(
+                format!("ASR provider not found for '{}'", model_id)
             ))?;
         if !provider.has_asr() {
             return Err(EngineError::ApiError(
@@ -419,7 +422,7 @@ fn transcribe(
             ));
         }
         return jona_provider::backend(provider.kind)
-            .transcribe(provider, &asr_cloud_model, audio_path, &language)
+            .transcribe(&provider, &asr_cloud_model, audio_path, &language)
             .map_err(|e| EngineError::ApiError(e.to_string()));
     }
 

@@ -42,7 +42,7 @@ async function handleUpdate() {
     if (deleted) {
       await downloads.downloadModel(props.model.id)
       // Remove from updatable set after successful update
-      engines.updatableModelIds.delete(props.model.id)
+      engines.dismissUpdate(props.model.id)
     }
   } finally {
     isUpdating.value = false

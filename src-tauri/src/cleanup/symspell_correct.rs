@@ -95,12 +95,12 @@ fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeSt
                 bi_count += 1;
             }
         }
-        log::info!(
+        log::debug!(
             "SymSpell {}: loaded {} words + {} bigrams from {}",
             lang, count, bi_count, dir.display()
         );
     } else {
-        log::info!(
+        log::debug!(
             "SymSpell {}: loaded {} words from {}",
             lang, count, dir.display()
         );

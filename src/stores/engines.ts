@@ -167,6 +167,10 @@ export const useEnginesStore = defineStore('engines', () => {
     return updatableModelIds.value.has(modelId)
   }
 
+  function dismissUpdate(modelId: string) {
+    updatableModelIds.value.delete(modelId)
+  }
+
   // Listeners
   function setupListeners() {
     listen('permission-changed', () => {
@@ -190,7 +194,7 @@ export const useEnginesStore = defineStore('engines', () => {
     spellcheckEngines, hasSpellcheckDict,
     punctuationModels, cleanupModels, asrModels,
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
-    updatableModelIds, hasUpdate,
+    updatableModelIds, hasUpdate, dismissUpdate,
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,
     fetchPermissions, fetchProviders,
     requestPermission, addProvider, removeProvider, updateProvider,
