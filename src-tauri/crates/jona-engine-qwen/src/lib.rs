@@ -1,6 +1,6 @@
 use jona_types::{
     ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
-    GpuMode, Language,
+    GpuMode, Language, TranscriptionResult,
 };
 use std::any::Any;
 use std::path::Path;
@@ -197,11 +197,12 @@ impl ASREngine for QwenEngine {
     }
 
     fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
-        -> Result<String, EngineError>
+        -> Result<TranscriptionResult, EngineError>
     {
         let ctx = ctx.downcast_mut::<QwenContext>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid qwen context".into()))?;
-        transcribe(ctx, audio_path, language)
+        let text = transcribe(ctx, audio_path, language)?;
+        Ok(TranscriptionResult::text_only(text))
     }
 }
 

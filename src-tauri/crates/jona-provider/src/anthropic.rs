@@ -1,5 +1,5 @@
 use crate::{CloudProvider, ProviderError};
-use jona_types::Provider;
+use jona_types::{Provider, TranscriptionResult};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
@@ -24,7 +24,7 @@ impl CloudProvider for AnthropicBackend {
         _model: &str,
         _audio_path: &Path,
         _language: &str,
-    ) -> Result<String, ProviderError> {
+    ) -> Result<TranscriptionResult, ProviderError> {
         Err(ProviderError::NotConfigured(format!(
             "Provider '{}' does not support ASR transcription",
             provider.name

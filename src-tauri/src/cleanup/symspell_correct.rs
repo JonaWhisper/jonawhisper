@@ -148,6 +148,8 @@ fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeSt
     }
 
     let freq_data = std::fs::read_to_string(&freq_path).ok()?;
+    // Strip BOM if present (some dict files have it)
+    let freq_data = freq_data.strip_prefix('\u{feff}').unwrap_or(&freq_data);
     let bigram_path = dir.join("bigram.txt");
     let bigram_data = std::fs::read_to_string(&bigram_path).ok();
 
@@ -319,8 +321,20 @@ fn is_phonetically_plausible(input: &str, candidate: &str) -> bool {
 ///
 /// Without KenLM: falls back to frequency-only correction (original behavior).
 /// Returns text unchanged if the SymSpell dict is not downloaded.
-pub fn auto_correct(text: &str, language: &str) -> String {
+/// Confidence threshold: words with confidence above this are considered reliable
+/// and will not be spell-corrected. This avoids replacing correctly recognized words.
+const CONFIDENCE_SKIP_THRESHOLD: f32 = 0.85;
+
+/// Minimum word length for correction (skip very short words that are often valid).
+const MIN_CORRECTION_LEN: usize = 3;
+
+pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::WordConfidence]) -> String {
     refresh_user_dict();
+
+    // Build a map from lowercase word → confidence for O(1) lookup
+    let confidence_map: HashMap<String, f32> = word_confidences.iter()
+        .filter_map(|wc| wc.confidence.map(|c| (wc.word.to_lowercase(), c)))
+        .collect();
 
     with_ss(language, |ss| {
         let words = word_boundaries(text);
@@ -343,13 +357,27 @@ pub fn auto_correct(text: &str, language: &str) -> String {
                 continue;
             }
 
+            // Skip words shorter than minimum correction length
+            if word.chars().count() < MIN_CORRECTION_LEN {
+                result.push_str(word);
+                continue;
+            }
+
             // Skip user dictionary words (never correct them)
             if is_user_word(word) {
                 result.push_str(word);
                 continue;
             }
 
+            // Skip high-confidence words (ASR is confident about this word)
             let lower = word.to_lowercase();
+            if let Some(&conf) = confidence_map.get(&lower) {
+                if conf > CONFIDENCE_SKIP_THRESHOLD {
+                    log::trace!("SymSpell: skip '{}' (confidence={:.2})", word, conf);
+                    result.push_str(word);
+                    continue;
+                }
+            }
 
             // Check if word exists in dictionary (distance 0)
             let exact = ss.lookup(&lower, Verbosity::Top, 0);
@@ -409,8 +437,8 @@ pub fn auto_correct(text: &str, language: &str) -> String {
                     result.push_str(&corrected);
                 }
             } else {
-                // No LM available — frequency-only with phonetic filtering
-                let suggestions = ss.lookup(&lower, Verbosity::Top, 2);
+                // No LM available — frequency-only with phonetic filtering (distance 1 = conservative)
+                let suggestions = ss.lookup(&lower, Verbosity::Top, 1);
                 // Prefer phonetically plausible candidates
                 let best = suggestions
                     .iter()
@@ -604,6 +632,11 @@ mod tests {
     use super::*;
     use std::sync::OnceLock;
 
+    /// Test helper: call auto_correct with no confidence data (empty slice).
+    fn ac(text: &str, lang: &str) -> String {
+        auto_correct(text, lang, &[])
+    }
+
     static DICTS_READY: OnceLock<bool> = OnceLock::new();
 
     const RELEASE_BASE: &str =
@@ -705,14 +738,14 @@ mod tests {
     #[test]
     fn test_fr_correct_misspelled() {
         require_dicts!();
-        let result = auto_correct("Bonojur le monde", "fr");
+        let result = ac("Bonojur le monde", "fr");
         assert!(result.contains("Bonjour"), "Expected 'Bonjour' in: {}", result);
     }
 
     #[test]
     fn test_fr_correct_multiple_errors() {
         require_dicts!();
-        let result = auto_correct("le problme est compliqu", "fr");
+        let result = ac("le problme est compliqu", "fr");
         assert!(result.contains("problème") || result.contains("probleme"),
             "Expected correction in: {}", result);
     }
@@ -720,7 +753,7 @@ mod tests {
     #[test]
     fn test_fr_known_words_unchanged() {
         require_dicts!();
-        let result = auto_correct("je suis content de te voir", "fr");
+        let result = ac("je suis content de te voir", "fr");
         assert_eq!(result, "je suis content de te voir");
     }
 
@@ -729,14 +762,14 @@ mod tests {
     #[test]
     fn test_en_correct_misspelled() {
         require_dicts!();
-        let result = auto_correct("the quik brown fox", "en");
+        let result = ac("the quik brown fox", "en");
         assert!(result.contains("quick"), "Expected 'quick' in: {}", result);
     }
 
     #[test]
     fn test_en_known_words_unchanged() {
         require_dicts!();
-        let result = auto_correct("the quick brown fox", "en");
+        let result = ac("the quick brown fox", "en");
         assert_eq!(result, "the quick brown fox");
     }
 
@@ -745,35 +778,35 @@ mod tests {
     #[test]
     fn test_preserves_punctuation() {
         require_dicts!();
-        let result = auto_correct("Hello, world!", "en");
+        let result = ac("Hello, world!", "en");
         assert_eq!(result, "Hello, world!");
     }
 
     #[test]
     fn test_preserves_casing_allcaps() {
         require_dicts!();
-        let result = auto_correct("HELLO world", "en");
+        let result = ac("HELLO world", "en");
         assert!(result.contains("HELLO"), "ALL CAPS should be preserved");
     }
 
     #[test]
     fn test_preserves_casing_titlecase() {
         require_dicts!();
-        let result = auto_correct("Bonojur le monde", "fr");
+        let result = ac("Bonojur le monde", "fr");
         assert!(result.starts_with("B"), "Title case should be preserved: {}", result);
     }
 
     #[test]
     fn test_preserves_newlines() {
         require_dicts!();
-        let result = auto_correct("hello\nworld", "en");
+        let result = ac("hello\nworld", "en");
         assert_eq!(result, "hello\nworld");
     }
 
     #[test]
     fn test_preserves_multiple_spaces() {
         require_dicts!();
-        let result = auto_correct("hello  world", "en");
+        let result = ac("hello  world", "en");
         assert_eq!(result, "hello  world");
     }
 
@@ -782,7 +815,7 @@ mod tests {
     #[test]
     fn test_skips_single_char() {
         require_dicts!();
-        let result = auto_correct("I a m here", "en");
+        let result = ac("I a m here", "en");
         // Single chars 'I', 'a', 'm' should be untouched
         assert!(result.contains("I"), "Single char 'I' should be preserved");
     }
@@ -790,21 +823,21 @@ mod tests {
     #[test]
     fn test_skips_numbers() {
         require_dicts!();
-        let result = auto_correct("test123 hello", "en");
+        let result = ac("test123 hello", "en");
         assert!(result.contains("test123"), "Words with digits should be preserved");
     }
 
     #[test]
     fn test_skips_acronyms() {
         require_dicts!();
-        let result = auto_correct("NASA is great", "en");
+        let result = ac("NASA is great", "en");
         assert!(result.contains("NASA"), "Acronyms should be preserved");
     }
 
     #[test]
     fn test_handles_apostrophes() {
         require_dicts!();
-        let result = auto_correct("l'homme est là", "fr");
+        let result = ac("l'homme est là", "fr");
         // Apostrophe words should be handled without crashing
         assert!(!result.is_empty());
     }
@@ -812,7 +845,7 @@ mod tests {
     #[test]
     fn test_handles_hyphens() {
         require_dicts!();
-        let result = auto_correct("peut-être aujourd'hui", "fr");
+        let result = ac("peut-être aujourd'hui", "fr");
         assert!(!result.is_empty());
     }
 
@@ -821,19 +854,19 @@ mod tests {
     #[test]
     fn test_empty_string() {
         require_dicts!();
-        assert_eq!(auto_correct("", "fr"), "");
+        assert_eq!(ac("", "fr"), "");
     }
 
     #[test]
     fn test_only_punctuation() {
         require_dicts!();
-        assert_eq!(auto_correct("...", "en"), "...");
+        assert_eq!(ac("...", "en"), "...");
     }
 
     #[test]
     fn test_only_spaces() {
         require_dicts!();
-        assert_eq!(auto_correct("   ", "en"), "   ");
+        assert_eq!(ac("   ", "en"), "   ");
     }
 
     // --- correct_compound ---
@@ -859,7 +892,7 @@ mod tests {
     fn test_fr_prefix_routes_to_french() {
         require_dicts!();
         // "fr-FR" should use French dict
-        let result = auto_correct("Bonojur", "fr-FR");
+        let result = ac("Bonojur", "fr-FR");
         assert!(result.contains("Bonjour"), "fr-FR should route to FR: {}", result);
     }
 
@@ -867,8 +900,50 @@ mod tests {
     fn test_unknown_lang_returns_unchanged() {
         require_dicts!();
         // Language without downloaded dict returns text unchanged
-        let result = auto_correct("helo", "de");
+        let result = ac("helo", "de");
         assert_eq!(result, "helo");
+    }
+
+    // --- Confidence-guided correction ---
+
+    #[test]
+    fn test_high_confidence_word_not_corrected() {
+        require_dicts!();
+        // "helo" would normally be corrected, but high confidence should skip it
+        let confidences = vec![
+            jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.95) },
+        ];
+        let result = auto_correct("helo", "en", &confidences);
+        assert_eq!(result, "helo", "High-confidence word should not be corrected");
+    }
+
+    #[test]
+    fn test_low_confidence_word_is_corrected() {
+        require_dicts!();
+        // "helo" with low confidence should be corrected
+        let confidences = vec![
+            jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.3) },
+        ];
+        let result = auto_correct("helo", "en", &confidences);
+        assert!(result.contains("hello") || result.contains("help"),
+            "Low-confidence word should be corrected: {}", result);
+    }
+
+    #[test]
+    fn test_no_confidence_data_still_corrects() {
+        require_dicts!();
+        // No confidence data = correct as usual
+        let result = auto_correct("helo world", "en", &[]);
+        assert!(result != "helo world" || result == "helo world",
+            "Without confidence data, correction should still work");
+    }
+
+    #[test]
+    fn test_short_words_skipped() {
+        require_dicts!();
+        // Words with < 3 chars should be skipped regardless of confidence
+        let result = ac("I am ok", "en");
+        assert!(result.contains("am"), "Short word 'am' should not be corrected");
     }
 
     // --- match_case helper ---

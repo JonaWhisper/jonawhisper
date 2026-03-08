@@ -1,6 +1,6 @@
 use jona_types::{
     ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
-    GpuMode, Language,
+    GpuMode, Language, TranscriptionResult,
 };
 use std::any::Any;
 use std::ffi::{c_char, c_int, c_void, CStr};
@@ -178,11 +178,12 @@ impl ASREngine for VoxtralEngine {
     }
 
     fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
-        -> Result<String, EngineError>
+        -> Result<TranscriptionResult, EngineError>
     {
         let ctx = ctx.downcast_mut::<VoxtralContext>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid voxtral context".into()))?;
-        transcribe(ctx, audio_path, language)
+        let text = transcribe(ctx, audio_path, language)?;
+        Ok(TranscriptionResult::text_only(text))
     }
 }
 

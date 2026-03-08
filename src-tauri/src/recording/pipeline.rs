@@ -5,6 +5,7 @@ use crate::platform;
 use crate::platform::paste;
 use crate::state::{AppState, HistoryEntry};
 use jona_engines::{EngineCatalog, EngineError};
+use jona_types::{TranscriptionResult, WordConfidence};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
@@ -128,12 +129,12 @@ async fn run_transcription(
     log::info!("Transcription total: {:.1}s", t0.elapsed().as_secs_f64());
 
     match result {
-        Ok(Ok(text)) => {
+        Ok(Ok(tr)) => {
             if state.runtime.lock().unwrap().transcription_cancelled {
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
             }
-            handle_transcription_result(app, state, &text, vad_trimmed).await;
+            handle_transcription_result(app, state, &tr.text, &tr.word_confidences, vad_trimmed).await;
             false
         }
         Ok(Err(e)) => {
@@ -157,7 +158,7 @@ async fn run_transcription(
     }
 }
 
-async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str, vad_trimmed: bool) {
+async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str, word_confidences: &[WordConfidence], vad_trimmed: bool) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         platform::play_sound("Basso");
@@ -220,7 +221,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     // Step 2b: spell-check (SymSpell) — runs after punctuation, before correction
     if spellcheck_enabled {
         let before = processed.clone();
-        processed = cleanup::symspell_correct::auto_correct(&processed, &lang);
+        processed = cleanup::symspell_correct::auto_correct(&processed, &lang, word_confidences);
         if processed != before {
             log::info!("SymSpell: «{}» → «{}»", before, processed);
         }
@@ -399,7 +400,7 @@ fn effective_llm_tokens(text_len: usize, max: u32) -> u32 {
 fn transcribe(
     state: &AppState,
     audio_path: &std::path::Path,
-) -> Result<String, EngineError> {
+) -> Result<TranscriptionResult, EngineError> {
     let (model_id, language, gpu_mode, asr_cloud_model, asr_provider) = {
         let s = state.settings.lock().unwrap();
         let provider = s.selected_model_id.strip_prefix("cloud:")

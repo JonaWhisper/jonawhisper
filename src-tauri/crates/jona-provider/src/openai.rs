@@ -1,5 +1,5 @@
 use crate::{CloudProvider, ProviderError};
-use jona_types::Provider;
+use jona_types::{Provider, TranscriptionResult};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
@@ -29,7 +29,7 @@ impl CloudProvider for OpenAICompatibleBackend {
         model: &str,
         audio_path: &Path,
         language: &str,
-    ) -> Result<String, ProviderError> {
+    ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
         let file_bytes = std::fs::read(audio_path)?;
@@ -70,10 +70,10 @@ impl CloudProvider for OpenAICompatibleBackend {
         let body = response.text().map_err(|e| ProviderError::Http(e.to_string()))?;
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
             if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
-                return Ok(text.to_string());
+                return Ok(TranscriptionResult::text_only(text.to_string()));
             }
         }
-        Ok(body)
+        Ok(TranscriptionResult::text_only(body))
     }
 
     fn chat_completion<'a>(

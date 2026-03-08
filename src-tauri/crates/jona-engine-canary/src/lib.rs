@@ -1,6 +1,6 @@
 use jona_types::{
     ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
-    GpuMode, Language,
+    GpuMode, Language, TranscriptionResult, tokens_to_word_confidences,
 };
 use ort::session::Session;
 use ort::value::Tensor;
@@ -110,7 +110,7 @@ pub fn load(model_dir: &Path) -> Result<CanaryContext, EngineError> {
 // -- Inference --
 
 /// Transcribe an audio file using a loaded CanaryContext.
-pub fn transcribe(ctx: &mut CanaryContext, audio_path: &Path, language: &str) -> Result<String, EngineError> {
+pub fn transcribe(ctx: &mut CanaryContext, audio_path: &Path, language: &str) -> Result<TranscriptionResult, EngineError> {
     let audio = jona_engines::audio::read_wav_f32(audio_path)?;
 
     // Compute mel spectrogram (Canary config: HTK mel scale)
@@ -136,9 +136,12 @@ pub fn transcribe(ctx: &mut CanaryContext, audio_path: &Path, language: &str) ->
     }
 
     let output_tokens = run_decoder(ctx, &prompt_tokens, &enc_result)?;
-    let text = decode_tokens(ctx, &output_tokens);
+    let text = decode_tokens_with_probs(ctx, &output_tokens);
 
-    Ok(text.trim().to_string())
+    Ok(TranscriptionResult {
+        text: text.0.trim().to_string(),
+        word_confidences: tokens_to_word_confidences(&text.1),
+    })
 }
 
 // -- Encoder --
@@ -197,13 +200,22 @@ fn run_encoder(
 
 // -- Decoder --
 
+/// Token ID with its softmax probability.
+type TokenWithProb = (i64, f32);
+
+fn softmax_prob(logits: &[f32], token_idx: usize) -> f32 {
+    let max_val = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let sum: f32 = logits.iter().map(|&x| (x - max_val).exp()).sum();
+    ((logits[token_idx] - max_val).exp()) / sum
+}
+
 fn run_decoder(
     ctx: &mut CanaryContext,
     prompt_tokens: &[i64],
     enc: &EncoderResult,
-) -> Result<Vec<i64>, EngineError> {
+) -> Result<Vec<TokenWithProb>, EngineError> {
     let eos_id = ctx.eos_id();
-    let mut output_tokens: Vec<i64> = Vec::new();
+    let mut output_tokens: Vec<TokenWithProb> = Vec::new();
 
     let num_layers = DEFAULT_NUM_LAYERS;
     let mut cache_data: Vec<f32> = Vec::new();
@@ -255,7 +267,8 @@ fn run_decoder(
             break;
         }
 
-        output_tokens.push(next_token);
+        let prob = softmax_prob(last_logits, next_token as usize);
+        output_tokens.push((next_token, prob));
 
         let (hidden_shape, hidden_data) = outputs["decoder_hidden_states"]
             .try_extract_tensor::<f32>()
@@ -282,10 +295,12 @@ fn run_decoder(
 
 // -- Detokenization --
 
-fn decode_tokens(ctx: &CanaryContext, tokens: &[i64]) -> String {
+/// Decode tokens into text + (token_text, probability) pairs for confidence scoring.
+fn decode_tokens_with_probs(ctx: &CanaryContext, tokens: &[TokenWithProb]) -> (String, Vec<(String, f32)>) {
     let mut text = String::new();
+    let mut token_probs: Vec<(String, f32)> = Vec::new();
 
-    for &id in tokens {
+    for &(id, prob) in tokens {
         let idx = id as usize;
         if idx >= ctx.vocab.len() {
             continue;
@@ -299,18 +314,22 @@ fn decode_tokens(ctx: &CanaryContext, tokens: &[i64]) -> String {
 
         if ctx.is_sentencepiece {
             let replaced = token.replace('\u{2581}', " ");
+            token_probs.push((replaced.clone(), prob));
             text.push_str(&replaced);
         } else if let Some(stripped) = token.strip_prefix("##") {
+            token_probs.push((stripped.to_string(), prob));
             text.push_str(stripped);
         } else if !text.is_empty() {
+            token_probs.push((format!(" {token}"), prob));
             text.push(' ');
             text.push_str(token);
         } else {
+            token_probs.push((token.clone(), prob));
             text.push_str(token);
         }
     }
 
-    text
+    (text, token_probs)
 }
 
 // -- Vocab parsing --
@@ -425,7 +444,7 @@ impl ASREngine for CanaryEngine {
     }
 
     fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
-        -> Result<String, EngineError>
+        -> Result<TranscriptionResult, EngineError>
     {
         let ctx = ctx.downcast_mut::<CanaryContext>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid canary context".into()))?;

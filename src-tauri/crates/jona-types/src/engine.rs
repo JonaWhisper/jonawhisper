@@ -119,6 +119,66 @@ pub struct Language {
     pub label: String,
 }
 
+// -- Transcription result with optional per-word confidence --
+
+/// Per-word confidence from ASR engine.
+#[derive(Debug, Clone)]
+pub struct WordConfidence {
+    /// The word as it appears in the transcription text.
+    pub word: String,
+    /// Probability \[0.0, 1.0\]. None means confidence unknown.
+    pub confidence: Option<f32>,
+}
+
+/// Result of ASR transcription, carrying optional per-word confidence scores.
+#[derive(Debug, Clone)]
+pub struct TranscriptionResult {
+    pub text: String,
+    /// Per-word confidences aligned to whitespace-delimited words in `text`.
+    /// Empty vec = no confidence data (engine doesn't support it).
+    pub word_confidences: Vec<WordConfidence>,
+}
+
+impl TranscriptionResult {
+    /// Create a result with no confidence data.
+    pub fn text_only(text: String) -> Self {
+        Self { text, word_confidences: Vec::new() }
+    }
+}
+
+/// Group sub-word tokens into word-level confidences.
+/// Tokens starting with a space (BPE) or `\u{2581}` (SentencePiece) begin a new word.
+/// For each word, confidence = minimum probability of its constituent tokens.
+pub fn tokens_to_word_confidences(tokens: &[(String, f32)]) -> Vec<WordConfidence> {
+    let mut result = Vec::new();
+    let mut current_word = String::new();
+    let mut min_prob: f32 = 1.0;
+
+    for (text, prob) in tokens {
+        let starts_new = text.starts_with(' ') || text.starts_with('\u{2581}');
+        if starts_new && !current_word.is_empty() {
+            result.push(WordConfidence {
+                word: current_word.clone(),
+                confidence: Some(min_prob),
+            });
+            current_word.clear();
+            min_prob = 1.0;
+        }
+        let clean = text.trim_start_matches([' ', '\u{2581}']);
+        current_word.push_str(clean);
+        min_prob = min_prob.min(*prob);
+    }
+
+    if !current_word.is_empty() {
+        result.push(WordConfidence {
+            word: current_word,
+            confidence: Some(min_prob),
+        });
+    }
+
+    result
+}
+
 // -- Engine trait --
 
 pub trait ASREngine: Send + Sync {
@@ -150,7 +210,7 @@ pub trait ASREngine: Send + Sync {
 
     /// Run ASR transcription using the given context.
     fn transcribe(&self, _ctx: &mut dyn Any, _audio_path: &Path, _language: &str)
-        -> Result<String, EngineError>
+        -> Result<TranscriptionResult, EngineError>
     {
         Err(EngineError::LaunchFailed("Transcription not supported".into()))
     }

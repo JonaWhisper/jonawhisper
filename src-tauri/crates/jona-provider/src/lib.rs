@@ -1,7 +1,7 @@
 mod openai;
 mod anthropic;
 
-use jona_types::{Provider, ProviderKind};
+use jona_types::{Provider, ProviderKind, TranscriptionResult};
 use std::path::Path;
 use std::pin::Pin;
 use std::future::Future;
@@ -30,7 +30,7 @@ pub trait CloudProvider: Send + Sync {
         model: &str,
         audio_path: &Path,
         language: &str,
-    ) -> Result<String, ProviderError>;
+    ) -> Result<TranscriptionResult, ProviderError>;
 
     /// Chat completion for text cleanup (async).
     fn chat_completion<'a>(

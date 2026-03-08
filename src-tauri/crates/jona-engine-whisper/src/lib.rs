@@ -1,6 +1,6 @@
 use jona_types::{
     ASREngine, ASRModel, DownloadType, EngineError, EngineRegistration, Language, GpuMode,
-    common_languages,
+    TranscriptionResult, tokens_to_word_confidences, common_languages,
 };
 use std::any::Any;
 use std::path::Path;
@@ -39,7 +39,7 @@ pub fn load(model_path: &Path, gpu_mode: GpuMode) -> Result<WhisperCtx, EngineEr
 }
 
 /// Transcribe an audio file using a loaded WhisperCtx.
-pub fn transcribe(ctx: &WhisperCtx, audio_path: &Path, language: &str) -> Result<String, EngineError> {
+pub fn transcribe(ctx: &WhisperCtx, audio_path: &Path, language: &str) -> Result<TranscriptionResult, EngineError> {
     let mut wstate = ctx.context.create_state()
         .map_err(|e| EngineError::LaunchFailed(format!("Failed to create whisper state: {}", e)))?;
 
@@ -65,16 +65,33 @@ pub fn transcribe(ctx: &WhisperCtx, audio_path: &Path, language: &str) -> Result
         .map_err(|e| EngineError::LaunchFailed(format!("Whisper transcription failed: {}", e)))?;
 
     let mut text = String::new();
+    let mut token_probs: Vec<(String, f32)> = Vec::new();
     let n_segments = wstate.full_n_segments();
     for i in 0..n_segments {
         if let Some(segment) = wstate.get_segment(i) {
             if let Ok(s) = segment.to_str() {
                 text.push_str(s);
             }
+            // Extract per-token probabilities
+            let n_tokens = segment.n_tokens();
+            for j in 0..n_tokens {
+                if let Some(token_data) = segment.get_token(j) {
+                    let token_text = token_data.to_str().unwrap_or("").to_string();
+                    let prob = token_data.token_probability();
+                    // Skip special tokens (starting with <| or [)
+                    if !token_text.starts_with("<|") && !token_text.starts_with('[') {
+                        token_probs.push((token_text, prob));
+                    }
+                }
+            }
         }
     }
 
-    Ok(text.trim().to_string())
+    let word_confidences = tokens_to_word_confidences(&token_probs);
+    Ok(TranscriptionResult {
+        text: text.trim().to_string(),
+        word_confidences,
+    })
 }
 
 // -- Engine (catalogue) --
@@ -246,7 +263,7 @@ impl ASREngine for WhisperEngine {
     }
 
     fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
-        -> Result<String, EngineError>
+        -> Result<TranscriptionResult, EngineError>
     {
         let ctx = ctx.downcast_ref::<WhisperCtx>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid whisper context".into()))?;

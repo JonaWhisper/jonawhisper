@@ -1,6 +1,6 @@
 use jona_types::{
     ASREngine, ASRModel, DownloadFile, DownloadType, EngineError, EngineRegistration,
-    GpuMode, Language,
+    GpuMode, Language, TranscriptionResult, tokens_to_word_confidences,
 };
 use ort::session::Session;
 use ort::value::Tensor;
@@ -88,7 +88,7 @@ pub fn load(model_dir: &Path) -> Result<ParakeetContext, EngineError> {
 // -- Inference --
 
 /// Transcribe an audio file using a loaded ParakeetContext.
-pub fn transcribe(ctx: &mut ParakeetContext, audio_path: &Path, _language: &str) -> Result<String, EngineError> {
+pub fn transcribe(ctx: &mut ParakeetContext, audio_path: &Path, _language: &str) -> Result<TranscriptionResult, EngineError> {
     let audio = jona_engines::audio::read_wav_f32(audio_path)?;
 
     // Compute mel spectrogram with Slaney scale + pre-emphasis (Parakeet config)
@@ -98,10 +98,13 @@ pub fn transcribe(ctx: &mut ParakeetContext, audio_path: &Path, _language: &str)
     );
 
     let (enc_out, enc_dim, time_steps) = run_encoder(ctx, &features, n_frames)?;
-    let token_ids = tdt_greedy_decode(ctx, &enc_out, enc_dim, time_steps)?;
-    let text = decode_tokens(ctx, &token_ids);
+    let tokens_with_probs = tdt_greedy_decode(ctx, &enc_out, enc_dim, time_steps)?;
+    let (text, token_probs) = decode_tokens_with_probs(ctx, &tokens_with_probs);
 
-    Ok(text.trim().to_string())
+    Ok(TranscriptionResult {
+        text: text.trim().to_string(),
+        word_confidences: tokens_to_word_confidences(&token_probs),
+    })
 }
 
 // -- Encoder --
@@ -138,12 +141,21 @@ fn run_encoder(
 
 // -- TDT Decoder --
 
+/// Token ID with its softmax probability.
+type TokenWithProb = (usize, f32);
+
+fn softmax_prob(logits: &[f32], token_idx: usize) -> f32 {
+    let max_val = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let sum: f32 = logits.iter().map(|&x| (x - max_val).exp()).sum();
+    ((logits[token_idx] - max_val).exp()) / sum
+}
+
 fn tdt_greedy_decode(
     ctx: &mut ParakeetContext,
     enc_out: &[f32],
     enc_dim: usize,
     time_steps: usize,
-) -> Result<Vec<usize>, EngineError> {
+) -> Result<Vec<TokenWithProb>, EngineError> {
     let blank_id = ctx.vocab_size - 1;
 
     let state_size = NUM_LSTM_LAYERS * LSTM_DIM;
@@ -151,7 +163,7 @@ fn tdt_greedy_decode(
     let mut state_c = vec![0.0f32; state_size];
 
     let mut last_token = blank_id as i32;
-    let mut tokens: Vec<usize> = Vec::new();
+    let mut tokens: Vec<TokenWithProb> = Vec::new();
     let mut t = 0usize;
     let mut total_emitted = 0usize;
 
@@ -221,7 +233,8 @@ fn tdt_greedy_decode(
                     .map_err(|e| EngineError::LaunchFailed(format!("State c: {e}")))?;
                 state_c = new_c.to_vec();
 
-                tokens.push(token_id);
+                let prob = softmax_prob(vocab_logits, token_id);
+                tokens.push((token_id, prob));
                 last_token = token_id as i32;
                 total_emitted += 1;
                 emitted_this_step += 1;
@@ -243,10 +256,12 @@ fn tdt_greedy_decode(
 
 // -- Detokenization --
 
-fn decode_tokens(ctx: &ParakeetContext, tokens: &[usize]) -> String {
+/// Decode tokens into text + (token_text, probability) pairs for confidence scoring.
+fn decode_tokens_with_probs(ctx: &ParakeetContext, tokens: &[TokenWithProb]) -> (String, Vec<(String, f32)>) {
     let mut text = String::new();
+    let mut token_probs: Vec<(String, f32)> = Vec::new();
 
-    for &id in tokens {
+    for &(id, prob) in tokens {
         if id >= ctx.vocab.len() {
             continue;
         }
@@ -257,10 +272,11 @@ fn decode_tokens(ctx: &ParakeetContext, tokens: &[usize]) -> String {
         }
 
         let replaced = token.replace('\u{2581}', " ");
+        token_probs.push((replaced.clone(), prob));
         text.push_str(&replaced);
     }
 
-    text
+    (text, token_probs)
 }
 
 // -- Vocab parsing --
@@ -410,7 +426,7 @@ impl ASREngine for ParakeetEngine {
     }
 
     fn transcribe(&self, ctx: &mut dyn Any, audio_path: &Path, language: &str)
-        -> Result<String, EngineError>
+        -> Result<TranscriptionResult, EngineError>
     {
         let ctx = ctx.downcast_mut::<ParakeetContext>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid parakeet context".into()))?;
