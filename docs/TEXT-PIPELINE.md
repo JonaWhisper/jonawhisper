@@ -495,7 +495,7 @@ BERT reste disponible comme alternative (certains utilisateurs le préfèrent po
 ### Phase 3 — Améliorations qualité (recherche)
 
 9. **Filtrage hallucinations par log-probabilité** — Token log-probs + compression ratio pour détecter les hallucinations de manière plus robuste que les listes statiques. Papers : "Whispering LLaMA" (2023), "Hallucination detection in neural ASR" (2024). Haut impact, effort modéré.
-10. **Dictionnaire utilisateur / biasing contextuel** — Mots/noms propres définis par l'utilisateur pour améliorer SymSpell et ITN. Faible effort, fort impact pour utilisateurs spécialisés.
+10. ~~**Dictionnaire utilisateur / biasing contextuel**~~ — ✅ Implémenté. Panneau "Dictionnaire" avec mots protégés + mappings ITN (`pattern=replacement`).
 11. **Filtrage phonétique SymSpell** — Score Soundex/Metaphone pour filtrer les faux positifs SymSpell. Les erreurs ASR sont phonétiquement proches → SymSpell ne le sait pas. Effort modéré.
 12. **Passe unique LLM** — Un seul appel LLM local (Qwen3 4B) remplaçant spell+punct+GEC. Cohérence globale, moins de passes. Risque : latence, hallucinations LLM. Évaluer sur benchmark avant migration.
 13. **Correction sélective par confiance** — Ne corriger que les segments à faible confiance ASR (Parakeet/Canary exposent des scores, Whisper non). Effort modéré.
