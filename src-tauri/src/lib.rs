@@ -133,7 +133,6 @@ pub fn run() {
             commands::audio::stop_mic_test,
             commands::engines::get_engines,
             commands::engines::get_models,
-            commands::engines::get_downloaded_models,
             commands::engines::download_model_cmd,
             commands::engines::delete_model_cmd,
             commands::engines::pause_download,

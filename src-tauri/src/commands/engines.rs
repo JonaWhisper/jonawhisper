@@ -3,7 +3,7 @@ use crate::errors::AppError;
 use crate::events;
 use crate::state::AppState;
 use jona_engines::downloader;
-use jona_engines::{ASRModel, EngineInfo, Language};
+use jona_engines::{EngineInfo, Language};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -29,11 +29,6 @@ pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Val
         obj.insert("partial_progress".into(), serde_json::json!(partial));
         json
     }).collect()
-}
-
-#[tauri::command]
-pub fn get_downloaded_models() -> Vec<ASRModel> {
-    catalog().downloaded_models()
 }
 
 #[tauri::command]

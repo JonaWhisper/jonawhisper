@@ -37,10 +37,12 @@ Key directories:
 | Directory | Contents |
 |-----------|----------|
 | `src/` | Vue 3 frontend (views, sections, components, stores) |
-| `src-tauri/src/asr/` | ASR inference (whisper, canary, parakeet, qwen, voxtral) |
-| `src-tauri/src/cleanup/` | Text cleanup (punctuation, correction, VAD, LLM) |
-| `src-tauri/src/engines/` | Engine catalog, model downloads |
-| `src-tauri/src/platform/` | macOS-specific code (hotkeys, permissions, paste) |
+| `crates/jona-engine-*/` | ASR & cleanup engines (whisper, canary, parakeet, qwen, voxtral, bert, pcs, correction, llama, spellcheck) |
+| `crates/jona-engines/` | Engine catalog, model downloads, shared inference utilities |
+| `crates/jona-types/` | Shared types (ASREngine trait, ASRModel, Preferences, etc.) |
+| `crates/jona-platform/` | macOS-specific code (hotkeys, permissions, paste) |
+| `crates/jona-provider/` | Cloud provider backends (OpenAI-compatible, Anthropic) |
+| `src-tauri/src/cleanup/` | Text cleanup pipeline (VAD, post-processing, spellcheck, ITN, LLM) |
 | `src-tauri/src/ui/` | Native UI (tray, pill overlay, SDF icons) |
 | `src/stories/` | Histoire stories + Playwright capture script |
 | `docs/` | Pipeline docs, benchmarks, screenshots |

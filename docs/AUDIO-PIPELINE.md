@@ -59,7 +59,7 @@ Pipeline hybride proposé :
 | Énergie RMS | 0 | ~1ms | Limité (pas voix vs bruit) | Natif | Aucune |
 | NVIDIA MarbleNet v2 | ~400 KB | <1ms / 20ms | Bon | ONNX via `ort` | `ort` — licence NVIDIA OML restrictive |
 
-**Recommandation** : **Silero VAD v5** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/vad.rs`.
+**Recommandation** : **Silero VAD v5** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/cleanup/vad.rs`.
 - 4x moins d'erreurs que WebRTC VAD
 - <1ms par chunk, 2.3 MB de modèle, état LSTM [2,1,128] + contexte 64 samples
 - Inférence directe : `forward_chunk` → probabilité 0.0-1.0

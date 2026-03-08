@@ -20,10 +20,6 @@ export const useEnginesStore = defineStore('engines', () => {
   const updatableModelIds = ref<Set<string>>(new Set())
 
   // Computed
-  const selectedEngine = computed(() => {
-    const model = models.value.find(m => m.id === settingsStore.selectedModelId)
-    return model ? engines.value.find(e => e.id === model.engine_id) : null
-  })
   const downloadedModels = computed(() => models.value.filter(isModelAvailable))
   const asrEngines = computed(() => engines.value.filter(e => e.category === 'asr'))
   const llmEngines = computed(() => engines.value.filter(e => e.category === 'llm'))
@@ -46,7 +42,6 @@ export const useEnginesStore = defineStore('engines', () => {
     const ids = new Set(spellcheckEngines.value.map(e => e.id))
     return models.value.some(m => ids.has(m.engine_id) && m.is_downloaded)
   })
-  const bertModelReady = computed(() => downloadedPunctuationModels.value.length > 0)
   const punctuationModels = computed<CleanupModel[]>(() => {
     return downloadedPunctuationModels.value.map(m => ({
       id: m.id, label: m.label, group: 'punctuation' as const,
@@ -189,11 +184,11 @@ export const useEnginesStore = defineStore('engines', () => {
 
   return {
     engines, models, languages, audioDevices, providers, permissions,
-    selectedEngine, downloadedModels, asrEngines, llmEngines,
-    downloadedLlmModels, punctuationEngines, downloadedPunctuationModels,
-    correctionEngines, downloadedCorrectionModels,
+    downloadedModels, asrEngines, llmEngines,
+    punctuationEngines,
+    correctionEngines,
     spellcheckEngines, hasSpellcheckDict,
-    bertModelReady, punctuationModels, cleanupModels, asrModels,
+    punctuationModels, cleanupModels, asrModels,
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     updatableModelIds, hasUpdate,
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,
