@@ -106,7 +106,7 @@ const pipelineSteps = computed<PipelineStep[]>(() => {
 })
 
 // Substantive steps: ASR + steps that actually changed text
-const substantiveStepNames = new Set(['preprocess', 'punctuation', 'spellcheck', 'correction'])
+const substantiveStepNames = new Set(['preprocess', 'punctuation', 'spellcheck', 'correction', 'itn'])
 
 const substantiveSteps = computed(() => {
   const all = pipelineSteps.value
@@ -223,7 +223,7 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     id: 'itn',
     icon: Hash,
     active: !!e.itn,
-    hasDiff: false,
+    hasDiff: stepsWithDiff.value.has('itn'),
     tooltip: t('history.badge.itnTooltip'),
     color: 'text-cyan-500',
   })

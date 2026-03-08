@@ -143,7 +143,7 @@ static RE_HOURS_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
 });
 
 static RE_HEURE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bheures?\b").unwrap()
+    Regex::new(r"(?i)(\d)\s*heures?\b").unwrap()
 });
 
 static RE_CURRENCY_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
@@ -172,19 +172,20 @@ static RE_UNITS_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
 
 pub(super) fn apply_all(text: &str) -> String {
     let mut r = RE_PCT_FR.replace_all(text, "%").to_string();
-    // Hours
-    for (re, replacement) in RE_HOURS_FR.iter() {
-        r = re.replace_all(&r, *replacement).to_string();
-    }
-    r = RE_HEURE.replace_all(&r, "h").to_string();
     // Currencies
     r = super::apply_regex_list(&r, &RE_CURRENCY_FR);
     // Ordinals
     r = super::apply_regex_list(&r, &RE_ORDINAL_FR);
     // Units
     r = super::apply_regex_list(&r, &RE_UNITS_FR);
-    // Cardinals
-    super::replace_numbers(&r, parse_fr_number)
+    // Cardinals (must run before hours so "trois heures" → "3 heures")
+    r = super::replace_numbers(&r, parse_fr_number);
+    // Hours (after number conversion: "3 heures" → "3 h", but not standalone "heure")
+    for (re, replacement) in RE_HOURS_FR.iter() {
+        r = re.replace_all(&r, *replacement).to_string();
+    }
+    r = RE_HEURE.replace_all(&r, "${1} h").to_string();
+    r
 }
 
 #[cfg(test)]
@@ -276,5 +277,27 @@ mod tests {
     #[test]
     fn degrees() {
         assert_eq!(apply_itn("vingt degrés", "fr"), "20 \u{00B0}");
+    }
+
+    #[test]
+    fn standalone_heure_not_converted() {
+        // "heure" without a number before it should NOT be converted to "h"
+        assert_eq!(apply_itn("on va parler en heure", "fr"), "on va parler en heure");
+        assert_eq!(apply_itn("c'est l'heure de partir", "fr"), "c'est l'heure de partir");
+        // "une" standalone is not converted to "1" (too ambiguous with article)
+        assert_eq!(apply_itn("une heure de vol", "fr"), "une heure de vol");
+    }
+
+    #[test]
+    fn hours_with_digits() {
+        // Numbers already as digits should still work
+        assert_eq!(apply_itn("5 heures", "fr"), "5 h");
+        assert_eq!(apply_itn("14 heures 30", "fr"), "14 h 30");
+    }
+
+    #[test]
+    fn hours_complex() {
+        assert_eq!(apply_itn("quatorze heures trente", "fr"), "14 h 30");
+        assert_eq!(apply_itn("le rendez-vous est à trois heures", "fr"), "le rendez-vous est à 3 h");
     }
 }
