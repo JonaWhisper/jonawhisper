@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
-import { Plus, Trash2, ArrowRightLeft, Type } from 'lucide-vue-next'
+import { Plus, Trash2, ArrowRightLeft, ArrowRight, Type } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface UserDictEntry {
@@ -13,37 +13,54 @@ interface UserDictEntry {
 const { t } = useI18n()
 
 const entries = ref<UserDictEntry[]>([])
-const newValue = ref('')
+const newWord = ref('')
+const newPattern = ref('')
+const newReplacement = ref('')
 const newKind = ref<'word' | 'mapping'>('word')
-const dirty = ref(false)
 
 async function load() {
   entries.value = await invoke<UserDictEntry[]>('get_user_dict')
-  dirty.value = false
 }
 
 async function save() {
   await invoke('save_user_dict', { entries: entries.value })
-  dirty.value = false
 }
 
 function addEntry() {
-  const val = newValue.value.trim()
-  if (!val) return
-  // Detect kind from content: contains "=" → mapping
-  const kind = val.includes('=') ? 'mapping' : newKind.value
+  let val: string
+  let kind: 'word' | 'mapping'
+
+  if (newKind.value === 'mapping') {
+    const pattern = newPattern.value.trim()
+    const replacement = newReplacement.value.trim()
+    if (!pattern || !replacement) return
+    val = `${pattern}=${replacement}`
+    kind = 'mapping'
+  } else {
+    val = newWord.value.trim()
+    if (!val) return
+    kind = 'word'
+  }
+
   // Avoid duplicates
   if (entries.value.some(e => e.value === val)) return
   entries.value.push({ value: val, kind })
-  newValue.value = ''
-  dirty.value = true
+  newWord.value = ''
+  newPattern.value = ''
+  newReplacement.value = ''
   save()
 }
 
 function removeEntry(index: number) {
   entries.value.splice(index, 1)
-  dirty.value = true
   save()
+}
+
+/** Split a mapping value "pattern=replacement" for display */
+function mappingParts(value: string): [string, string] {
+  const idx = value.indexOf('=')
+  if (idx === -1) return [value, '']
+  return [value.slice(0, idx), value.slice(idx + 1)]
 }
 
 onMounted(load)
@@ -58,10 +75,11 @@ onMounted(load)
     <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('dictionary.add') }}</div>
 
-      <div class="flex items-center gap-2">
+      <!-- Word input -->
+      <div v-if="newKind === 'word'" class="flex items-center gap-2">
         <input
-          v-model="newValue"
-          :placeholder="newKind === 'word' ? t('dictionary.placeholder.word') : t('dictionary.placeholder.mapping')"
+          v-model="newWord"
+          :placeholder="t('dictionary.placeholder.word')"
           class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           @keydown.enter="addEntry"
         />
@@ -69,24 +87,57 @@ onMounted(load)
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground shrink-0 transition-colors"
-                :class="newKind === 'mapping' ? 'text-amber-500 border-amber-500/30' : 'text-blue-500 border-blue-500/30'"
+                class="inline-flex items-center justify-center rounded-md border h-8 w-8 hover:bg-accent hover:text-accent-foreground shrink-0 transition-colors text-blue-500 border-blue-500/30 bg-background"
                 :aria-label="t('dictionary.toggleKind')"
-                @click="newKind = newKind === 'word' ? 'mapping' : 'word'"
+                @click="newKind = 'mapping'"
               >
-                <ArrowRightLeft v-if="newKind === 'mapping'" class="h-3.5 w-3.5" />
-                <Type v-else class="h-3.5 w-3.5" />
+                <Type class="h-3.5 w-3.5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="top">
-              <span v-if="newKind === 'word'">{{ t('dictionary.kind.word') }}</span>
-              <span v-else>{{ t('dictionary.kind.mapping') }}</span>
-            </TooltipContent>
+            <TooltipContent side="top">{{ t('dictionary.kind.word') }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         <button
           class="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-8 w-8 hover:bg-primary/90 shrink-0 transition-colors disabled:opacity-40"
-          :disabled="!newValue.trim()"
+          :disabled="!newWord.trim()"
+          :aria-label="t('dictionary.add')"
+          @click="addEntry"
+        >
+          <Plus class="h-4 w-4" />
+        </button>
+      </div>
+
+      <!-- Mapping inputs (pattern → replacement) -->
+      <div v-else class="flex items-center gap-2">
+        <input
+          v-model="newPattern"
+          :placeholder="t('dictionary.placeholder.pattern')"
+          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <ArrowRight class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <input
+          v-model="newReplacement"
+          :placeholder="t('dictionary.placeholder.replacement')"
+          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          @keydown.enter="addEntry"
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="inline-flex items-center justify-center rounded-md border h-8 w-8 hover:bg-accent hover:text-accent-foreground shrink-0 transition-colors text-amber-500 border-amber-500/30 bg-background"
+                :aria-label="t('dictionary.toggleKind')"
+                @click="newKind = 'word'"
+              >
+                <ArrowRightLeft class="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{{ t('dictionary.kind.mapping') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <button
+          class="inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground h-8 w-8 hover:bg-primary/90 shrink-0 transition-colors disabled:opacity-40"
+          :disabled="!newPattern.trim() || !newReplacement.trim()"
           :aria-label="t('dictionary.add')"
           @click="addEntry"
         >
@@ -135,7 +186,13 @@ onMounted(load)
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <span class="text-[13px] text-foreground truncate">{{ entry.value }}</span>
+            <!-- Word: simple text. Mapping: pattern → replacement -->
+            <template v-if="entry.kind === 'mapping'">
+              <span class="text-[13px] text-foreground truncate">{{ mappingParts(entry.value)[0] }}</span>
+              <ArrowRight class="h-3 w-3 text-muted-foreground shrink-0" />
+              <span class="text-[13px] text-foreground truncate">{{ mappingParts(entry.value)[1] }}</span>
+            </template>
+            <span v-else class="text-[13px] text-foreground truncate">{{ entry.value }}</span>
           </div>
           <button
             class="inline-flex items-center justify-center rounded-md h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all shrink-0"
