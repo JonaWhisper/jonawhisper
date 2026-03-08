@@ -19,7 +19,7 @@
       }
     },
     "de-at": {
-      "label": "Deutsch (\u00d6sterreich)",
+      "label": "Deutsch (Österreich)",
       "files": {
         "freq.txt": {
           "filename": "de-at-freq.txt",
@@ -87,7 +87,7 @@
       }
     },
     "es": {
-      "label": "Espa\u00f1ol",
+      "label": "Español",
       "files": {
         "freq.txt": {
           "filename": "es-freq.txt",
@@ -104,7 +104,7 @@
       }
     },
     "es-mx": {
-      "label": "Espa\u00f1ol (M\u00e9xico)",
+      "label": "Español (México)",
       "files": {
         "freq.txt": {
           "filename": "es-mx-freq.txt",
@@ -121,7 +121,7 @@
       }
     },
     "fr": {
-      "label": "Fran\u00e7ais",
+      "label": "Français",
       "files": {
         "freq.txt": {
           "filename": "fr-freq.txt",
@@ -138,7 +138,7 @@
       }
     },
     "fr-be": {
-      "label": "Fran\u00e7ais (Belgique)",
+      "label": "Français (Belgique)",
       "files": {
         "freq.txt": {
           "filename": "fr-be-freq.txt",
@@ -155,7 +155,7 @@
       }
     },
     "fr-ca": {
-      "label": "Fran\u00e7ais (Qu\u00e9bec)",
+      "label": "Français (Québec)",
       "files": {
         "freq.txt": {
           "filename": "fr-ca-freq.txt",
@@ -172,7 +172,7 @@
       }
     },
     "fr-ch": {
-      "label": "Fran\u00e7ais (Suisse)",
+      "label": "Français (Suisse)",
       "files": {
         "freq.txt": {
           "filename": "fr-ch-freq.txt",
@@ -223,7 +223,7 @@
       }
     },
     "nl-be": {
-      "label": "Nederlands (Belgi\u00eb)",
+      "label": "Nederlands (België)",
       "files": {
         "freq.txt": {
           "filename": "nl-be-freq.txt",
@@ -257,7 +257,7 @@
       }
     },
     "pt": {
-      "label": "Portugu\u00eas",
+      "label": "Português",
       "files": {
         "freq.txt": {
           "filename": "pt-freq.txt",
@@ -274,7 +274,7 @@
       }
     },
     "pt-br": {
-      "label": "Portugu\u00eas (Brasil)",
+      "label": "Português (Brasil)",
       "files": {
         "freq.txt": {
           "filename": "pt-br-freq.txt",
@@ -291,7 +291,7 @@
       }
     },
     "pt-pt": {
-      "label": "Portugu\u00eas (Portugal)",
+      "label": "Português (Portugal)",
       "files": {
         "freq.txt": {
           "filename": "pt-pt-freq.txt",
@@ -308,7 +308,7 @@
       }
     },
     "ru": {
-      "label": "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
+      "label": "Русский",
       "files": {
         "freq.txt": {
           "filename": "ru-freq.txt",
