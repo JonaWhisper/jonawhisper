@@ -3,14 +3,23 @@
 //! Dictionaries are downloaded as "spellcheck" engine models (freq.txt + bigram.txt).
 //! Stored in ~/Library/Application Support/JonaWhisper/models/spellcheck/{lang}/
 //!
+//! When a KenLM language model is available for the language, corrections are scored
+//! in trigram context to avoid replacing valid words with frequency-based alternatives.
+//! Without KenLM, falls back to frequency-only correction (original behavior).
+//!
 //! Features:
 //! - Frequency-weighted suggestions (prefers common words)
+//! - Context-aware reranking via KenLM n-gram scoring (when model available)
 //! - `lookup_compound` for phrase-level correction (handles word boundary errors)
 //! - Sub-millisecond per-word lookup
 
+use jona_engine_lm::KenLMModel;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
+
+/// Global cache of loaded KenLM instances keyed by language code.
+static LM_CACHE: Mutex<Option<HashMap<String, KenLMModel>>> = Mutex::new(None);
 
 /// Global cache of loaded SymSpell instances keyed by language code.
 static SS_CACHE: Mutex<Option<HashMap<String, SymSpell<UnicodeStringStrategy>>>> =
@@ -141,17 +150,71 @@ fn with_ss<T>(language: &str, f: impl FnOnce(&SymSpell<UnicodeStringStrategy>) -
     cache.get(&code).map(f)
 }
 
-/// Correct text using SymSpell with frequency-weighted suggestions.
+/// Get (or lazily load) the KenLM model for a language.
+/// Returns true if the model is available.
+fn get_lm(language: &str) -> bool {
+    let code = lang_to_code(language);
+    let base_code = code.split('-').next().unwrap_or(&code);
+
+    let mut guard = LM_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.get_or_insert_with(HashMap::new);
+
+    if cache.contains_key(base_code) {
+        return true;
+    }
+
+    // Look for the KenLM binary model file
+    let model_dir = jona_types::models_dir().join("lm").join(base_code);
+    let model_path = model_dir.join(format!("{base_code}.binary"));
+    if !model_path.exists() {
+        return false;
+    }
+
+    match KenLMModel::load(&model_path) {
+        Ok(lm) => {
+            cache.insert(base_code.to_string(), lm);
+            true
+        }
+        Err(e) => {
+            log::warn!("KenLM {}: load failed: {}", base_code, e);
+            false
+        }
+    }
+}
+
+/// Run a closure with the KenLM model for the given language.
+fn with_lm<T>(language: &str, f: impl FnOnce(&KenLMModel) -> T) -> Option<T> {
+    if !get_lm(language) {
+        return None;
+    }
+    let code = lang_to_code(language);
+    let base_code = code.split('-').next().unwrap_or(&code);
+    let guard = LM_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let cache = guard.as_ref()?;
+    cache.get(base_code).map(f)
+}
+
+/// Correct text using SymSpell with context-aware KenLM reranking.
 ///
-/// Uses per-word `lookup` (edit distance ≤ 2) with casing preservation.
-/// Returns text unchanged if the dict for the language is not downloaded.
+/// When a KenLM model is available for the language:
+/// 1. Only corrects words that are NOT in the SymSpell dictionary (distance > 0)
+/// 2. Generates multiple candidates for unknown words
+/// 3. Scores each candidate in trigram context via KenLM
+/// 4. Picks the candidate with the highest language model probability
+///
+/// Without KenLM: falls back to frequency-only correction (original behavior).
+/// Returns text unchanged if the SymSpell dict is not downloaded.
 pub fn auto_correct(text: &str, language: &str) -> String {
     with_ss(language, |ss| {
+        let words = word_boundaries(text);
+        let have_lm = get_lm(language);
         let mut result = String::with_capacity(text.len());
         let mut last_end = 0;
+        // Collect lowercase words for LM context window
+        let word_lowers: Vec<String> = words.iter().map(|(_, w)| w.to_lowercase()).collect();
 
-        for (start, word) in word_boundaries(text) {
-            result.push_str(&text[last_end..start]);
+        for (idx, (start, word)) in words.iter().enumerate() {
+            result.push_str(&text[last_end..*start]);
             last_end = start + word.len();
 
             // Skip short words, numbers, acronyms
@@ -164,21 +227,67 @@ pub fn auto_correct(text: &str, language: &str) -> String {
             }
 
             let lower = word.to_lowercase();
-            let suggestions = ss.lookup(&lower, Verbosity::Top, 2);
 
-            if let Some(best) = suggestions.first() {
-                if best.term != lower {
-                    let corrected = match_case(word, &best.term);
+            // Check if word exists in dictionary (distance 0)
+            let exact = ss.lookup(&lower, Verbosity::Top, 0);
+            if !exact.is_empty() {
+                // Word is known — keep as-is
+                result.push_str(word);
+                continue;
+            }
+
+            // Word is unknown — generate correction candidates
+            if have_lm {
+                // Context-aware correction: get all candidates at minimum edit distance
+                let candidates = ss.lookup(&lower, Verbosity::Closest, 2);
+                if candidates.is_empty() {
+                    result.push_str(word);
+                    continue;
+                }
+
+                if candidates.len() == 1 {
+                    // Single candidate — use it directly
+                    let corrected = match_case(word, &candidates[0].term);
                     log::debug!(
-                        "SymSpell: {} → {} (freq={}, dist={})",
-                        word, corrected, best.count, best.distance
+                        "SymSpell+LM: {} → {} (single candidate, dist={})",
+                        word, corrected, candidates[0].distance
                     );
                     result.push_str(&corrected);
+                    continue;
+                }
+
+                // Multiple candidates — score each in trigram context via KenLM
+                let best = with_lm(language, |lm| {
+                    score_candidates_in_context(lm, &candidates, &word_lowers, idx)
+                })
+                .flatten();
+
+                if let Some(best_term) = best {
+                    let corrected = match_case(word, &best_term);
+                    log::debug!("SymSpell+LM: {} → {} (LM reranked)", word, corrected);
+                    result.push_str(&corrected);
+                } else {
+                    // LM scoring failed — fall back to frequency best
+                    let corrected = match_case(word, &candidates[0].term);
+                    result.push_str(&corrected);
+                }
+            } else {
+                // No LM available — original frequency-only behavior
+                let suggestions = ss.lookup(&lower, Verbosity::Top, 2);
+                if let Some(best) = suggestions.first() {
+                    if best.term != lower {
+                        let corrected = match_case(word, &best.term);
+                        log::debug!(
+                            "SymSpell: {} → {} (freq={}, dist={})",
+                            word, corrected, best.count, best.distance
+                        );
+                        result.push_str(&corrected);
+                    } else {
+                        result.push_str(word);
+                    }
                 } else {
                     result.push_str(word);
                 }
-            } else {
-                result.push_str(word);
             }
         }
 
@@ -186,6 +295,65 @@ pub fn auto_correct(text: &str, language: &str) -> String {
         result
     })
     .unwrap_or_else(|| text.to_string())
+}
+
+/// Score correction candidates using KenLM trigram context.
+/// Returns the term with the highest log probability in context.
+fn score_candidates_in_context(
+    lm: &KenLMModel,
+    candidates: &[symspell::Suggestion],
+    all_words: &[String],
+    target_idx: usize,
+) -> Option<String> {
+    // Build context: up to 2 words before and 1 word after
+    let prev2 = if target_idx >= 2 {
+        Some(all_words[target_idx - 2].as_str())
+    } else {
+        None
+    };
+    let prev1 = if target_idx >= 1 {
+        Some(all_words[target_idx - 1].as_str())
+    } else {
+        None
+    };
+    let next1 = all_words.get(target_idx + 1).map(|s| s.as_str());
+
+    let mut best_score = f32::NEG_INFINITY;
+    let mut best_term = None;
+
+    for candidate in candidates {
+        // Build a short phrase for scoring
+        let mut phrase_parts: Vec<&str> = Vec::with_capacity(4);
+        if let Some(w) = prev2 {
+            phrase_parts.push(w);
+        }
+        if let Some(w) = prev1 {
+            phrase_parts.push(w);
+        }
+        phrase_parts.push(&candidate.term);
+        if let Some(w) = next1 {
+            phrase_parts.push(w);
+        }
+
+        let phrase = phrase_parts.join(" ");
+        let score = lm.score_sentence(&phrase);
+
+        if score > best_score {
+            best_score = score;
+            best_term = Some(candidate.term.clone());
+        }
+    }
+
+    if let Some(ref term) = best_term {
+        log::debug!(
+            "KenLM rerank: best={} (score={:.2}), {} candidates",
+            term,
+            best_score,
+            candidates.len()
+        );
+    }
+
+    best_term
 }
 
 /// Correct an entire phrase using SymSpell's compound lookup.
