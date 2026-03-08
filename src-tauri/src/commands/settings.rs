@@ -111,29 +111,51 @@ pub fn set_setting(
     let _ = app.emit(crate::events::SETTINGS_CHANGED, &key);
 }
 
+/// A user dictionary entry (word or ITN mapping).
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct UserDictEntry {
+    /// For words: the word. For mappings: "pattern=replacement".
+    pub value: String,
+    /// "word" or "mapping"
+    pub kind: String,
+}
+
 #[tauri::command]
-pub fn open_user_dict() -> Result<(), String> {
+pub fn get_user_dict() -> Vec<UserDictEntry> {
     let path = crate::cleanup::symspell_correct::user_dict_path();
-    if !path.exists() {
-        std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-        std::fs::write(
-            &path,
-            "# User Dictionary — JonaWhisper\n\
-             #\n\
-             # One entry per line:\n\
-             #   word            \u{2014} protected from spell-check correction\n\
-             #   word\\tfrequency  \u{2014} word with custom frequency (tab-separated)\n\
-             #   pattern=replacement \u{2014} ITN mapping (e.g. SNCF=S.N.C.F.)\n\
-             #\n\
-             # Lines starting with # are comments.\n\
-             # Changes are picked up automatically (no restart needed).\n",
-        )
-        .map_err(|e| e.to_string())?;
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+    content
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                return None;
+            }
+            if line.contains('=') {
+                Some(UserDictEntry { value: line.to_string(), kind: "mapping".to_string() })
+            } else {
+                // word or word\tfreq — extract word part
+                let word = line.split('\t').next().unwrap_or(line).trim();
+                Some(UserDictEntry { value: word.to_string(), kind: "word".to_string() })
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn save_user_dict(entries: Vec<UserDictEntry>) -> Result<(), String> {
+    let path = crate::cleanup::symspell_correct::user_dict_path();
+    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+
+    let mut content = String::new();
+    for entry in &entries {
+        if !entry.value.trim().is_empty() {
+            content.push_str(entry.value.trim());
+            content.push('\n');
+        }
     }
-    std::process::Command::new("open")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+    log::info!("User dict: saved {} entries", entries.len());
     Ok(())
 }
 
