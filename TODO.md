@@ -36,6 +36,6 @@
 
 ## Technique / Infra
 
-- [ ] **Système de mise à jour des modèles/dicts** — Mécanisme pour détecter les nouvelles versions de fichiers téléchargés (dicts spellcheck, modèles). Approche envisagée : fichier `version.json` dans chaque repo source, check au démarrage de l'app, notification ou re-téléchargement automatique si version locale < version distante. Concerne tous les modèles hébergés, pas seulement les dicts.
+- [x] **Syst\u00e8me de mise \u00e0 jour des mod\u00e8les/dicts** — Impl\u00e9ment\u00e9 via ETags HTTP. Au download : `version.json` stocke URL + ETag + SHA256 par fichier. Au d\u00e9marrage : HEAD requests comparent les ETags stock\u00e9s vs remote (HuggingFace `x-linked-etag` + fallback standard). Frontend affiche badge update via \u00e9v\u00e9nement `model-updates-available`.
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
 
