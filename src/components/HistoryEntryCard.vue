@@ -54,33 +54,6 @@ function formatModelLabel(id: string): string {
   return model ? model.label : id.split(':').pop() || id
 }
 
-// -- Word confidence scores --
-
-interface WordScore {
-  word: string
-  score: number // -1 = unknown
-}
-
-const wordScores = computed<WordScore[]>(() => {
-  if (!props.entry.word_scores) return []
-  try {
-    const parsed = JSON.parse(props.entry.word_scores) as [string, number][]
-    return parsed.map(([word, score]) => ({ word, score }))
-  } catch { return [] }
-})
-
-function confidenceLabel(score: number): string {
-  if (score < 0) return t('history.confidence.unknown')
-  return `${(score * 100).toFixed(0)}%`
-}
-
-function confidenceColor(score: number): string {
-  if (score < 0) return ''
-  if (score >= 0.9) return '#22c55e'
-  if (score >= 0.7) return '#eab308'
-  return '#ef4444'
-}
-
 // -- Pipeline steps diff --
 
 interface PipelineStep {
@@ -394,25 +367,7 @@ watch(() => props.entry.timestamp, () => {
           >{{ part.value }}</span>
         </p>
       </div>
-      <!-- Normal view with confidence hover -->
-      <TooltipProvider v-else-if="wordScores.length > 0" :delay-duration="200">
-        <p class="text-[13px] leading-snug mb-1">
-          <template v-for="(ws, i) in wordScores" :key="i">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span
-                  class="cursor-default rounded-sm transition-colors duration-150 hover:bg-muted"
-                  :class="ws.score >= 0 && ws.score < 0.7 ? 'border-b-2 border-dotted border-amber-500' : ''"
-                >{{ ws.word }}</span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" :side-offset="2" :style="ws.score >= 0 ? { backgroundColor: confidenceColor(ws.score), color: 'white' } : {}">
-                <span class="text-[11px] font-medium">{{ confidenceLabel(ws.score) }}</span>
-              </TooltipContent>
-            </Tooltip>{{ i < wordScores.length - 1 ? ' ' : '' }}
-          </template>
-        </p>
-      </TooltipProvider>
-      <!-- Fallback: plain text -->
+      <!-- Main text: always show the final corrected version -->
       <p v-else class="text-[13px] leading-snug mb-1">{{ entry.text }}</p>
     </div>
     <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
