@@ -56,7 +56,10 @@ impl ContextMap {
 
         // Phase 2: load outside lock
         if needs_load {
+            log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
+            let start = std::time::Instant::now();
             let ctx = loader()?;
+            log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
             let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
             map.insert(engine_id.to_string(), ContextEntry {
                 key: context_key.to_string(),

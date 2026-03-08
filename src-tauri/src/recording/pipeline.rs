@@ -120,10 +120,12 @@ async fn run_transcription(
 ) -> bool {
     let state_clone = Arc::clone(state);
     let path = audio_path.to_path_buf();
+    let t0 = std::time::Instant::now();
     let result = tokio::task::spawn_blocking(move || {
         transcribe(&state_clone, &path)
     })
     .await;
+    log::info!("Transcription total: {:.1}s", t0.elapsed().as_secs_f64());
 
     match result {
         Ok(Ok(text)) => {

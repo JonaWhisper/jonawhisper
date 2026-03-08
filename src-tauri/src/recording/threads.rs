@@ -155,6 +155,10 @@ pub fn spawn_spectrum_emitter(
         }
 
         let spectrum = spectrum_data.lock().unwrap().clone();
+        let is_flat = spectrum.iter().all(|&v| v < 0.001);
+        if is_flat && !is_mic_testing && state.audio_flags.is_recording() {
+            log::trace!("Spectrum flat while recording (queue depth: {})", cmd_tx.len());
+        }
         let _ = cmd_tx.send(AudioCmd::GetSpectrum);
         if is_mic_testing {
             let _ = app.emit(events::MIC_TEST_SPECTRUM, &spectrum);
