@@ -23,9 +23,15 @@ pub struct ContextMap {
     entries: Mutex<HashMap<String, ContextEntry>>,
 }
 
+impl Default for ContextMap {
+    fn default() -> Self {
+        Self { entries: Mutex::new(HashMap::new()) }
+    }
+}
+
 impl ContextMap {
     pub fn new() -> Self {
-        Self { entries: Mutex::new(HashMap::new()) }
+        Self::default()
     }
 
     /// Get-or-load the context for `engine_id`, then run `action` on it.
@@ -40,7 +46,7 @@ impl ContextMap {
     ) -> Result<R, EngineError> {
         let mut map = self.entries.lock().unwrap();
         let needs_load = map.get(engine_id)
-            .map_or(true, |e| e.key != context_key);
+            .is_none_or(|e| e.key != context_key);
         if needs_load {
             let ctx = loader()?;
             map.insert(engine_id.to_string(), ContextEntry {
@@ -65,7 +71,7 @@ impl ContextMap {
 
 // -- History --
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub text: String,
     pub timestamp: u64,

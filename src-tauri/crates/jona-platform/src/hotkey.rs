@@ -359,8 +359,8 @@ pub struct CaptureControl {
     pub active: AtomicBool,
 }
 
-impl CaptureControl {
-    pub fn new() -> Self {
+impl Default for CaptureControl {
+    fn default() -> Self {
         Self {
             mode: AtomicBool::new(false),
             peak_modifiers: AtomicU64::new(0),
@@ -370,6 +370,12 @@ impl CaptureControl {
             mod_key_count: AtomicU8::new(0),
             active: AtomicBool::new(false),
         }
+    }
+}
+
+impl CaptureControl {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Enter capture mode: reset fields then set mode=true.
@@ -814,32 +820,30 @@ fn run_event_tap(
                         ShortcutKind::Combo => {
                             if packed_contains_all(pressed_p, pressed_c, rec_p, rec_c)
                                 && (mod_flags & rec.modifiers) == rec.modifiers
+                                && !state.rec_held.load(Ordering::SeqCst)
                             {
-                                if !state.rec_held.load(Ordering::SeqCst) {
-                                    state.rec_held.store(true, Ordering::SeqCst);
-                                    log::debug!(
-                                        "Hotkey KeyDown (Combo): key=0x{:02x} mods=0x{:x}",
-                                        key_code,
-                                        mod_flags
-                                    );
-                                    let _ =
-                                        state.event_tx.send(HotkeyEvent::KeyDown);
-                                }
+                                state.rec_held.store(true, Ordering::SeqCst);
+                                log::debug!(
+                                    "Hotkey KeyDown (Combo): key=0x{:02x} mods=0x{:x}",
+                                    key_code,
+                                    mod_flags
+                                );
+                                let _ =
+                                    state.event_tx.send(HotkeyEvent::KeyDown);
                             }
                         }
                         ShortcutKind::Key => {
                             if packed_contains_all(pressed_p, pressed_c, rec_p, rec_c)
                                 && mod_flags == 0
+                                && !state.rec_held.load(Ordering::SeqCst)
                             {
-                                if !state.rec_held.load(Ordering::SeqCst) {
-                                    state.rec_held.store(true, Ordering::SeqCst);
-                                    log::debug!(
-                                        "Hotkey KeyDown (Key): key=0x{:02x}",
-                                        key_code
-                                    );
-                                    let _ =
-                                        state.event_tx.send(HotkeyEvent::KeyDown);
-                                }
+                                state.rec_held.store(true, Ordering::SeqCst);
+                                log::debug!(
+                                    "Hotkey KeyDown (Key): key=0x{:02x}",
+                                    key_code
+                                );
+                                let _ =
+                                    state.event_tx.send(HotkeyEvent::KeyDown);
                             }
                         }
                         _ => {}

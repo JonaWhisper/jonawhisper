@@ -234,3 +234,308 @@ impl AppState {
         let _ = db.execute("DELETE FROM history", []);
     }
 }
+
+#[cfg(test)]
+impl AppState {
+    /// Create an AppState with in-memory SQLite for testing.
+    fn test_instance() -> Self {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS history (
+                 timestamp INTEGER NOT NULL,
+                 text TEXT NOT NULL,
+                 model_id TEXT NOT NULL DEFAULT '',
+                 language TEXT NOT NULL DEFAULT '',
+                 cleanup_model_id TEXT NOT NULL DEFAULT '',
+                 hallucination_filter INTEGER NOT NULL DEFAULT 0,
+                 vad_trimmed INTEGER NOT NULL DEFAULT 0,
+                 punctuation_model_id TEXT NOT NULL DEFAULT '',
+                 spellcheck INTEGER NOT NULL DEFAULT 0,
+                 disfluency_removal INTEGER NOT NULL DEFAULT 0,
+                 itn INTEGER NOT NULL DEFAULT 0
+             );
+             CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);"
+        ).unwrap();
+        Self {
+            runtime: Mutex::new(RuntimeState::default()),
+            download: Arc::new(Mutex::new(DownloadState::default())),
+            settings: Mutex::new(Preferences::default()),
+            history_db: Mutex::new(conn),
+            tray_menu: Mutex::new(None),
+            contexts: ContextMap::new(),
+            audio_flags: AudioFlags::default(),
+        }
+    }
+
+    /// Insert a history entry with a specific timestamp (for test control).
+    fn add_history_at(&self, timestamp: u64, entry: HistoryEntry) {
+        let db = self.history_db.lock().unwrap();
+        let _ = db.execute(
+            "INSERT INTO history (timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![timestamp, entry.text, entry.model_id, entry.language, entry.cleanup_model_id, entry.hallucination_filter, entry.vad_trimmed, entry.punctuation_model_id, entry.spellcheck, entry.disfluency_removal, entry.itn],
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn entry(text: &str, model: &str, lang: &str) -> HistoryEntry {
+        HistoryEntry {
+            text: text.to_string(),
+            timestamp: 0, // overridden by add_history_at
+            model_id: model.to_string(),
+            language: lang.to_string(),
+            ..Default::default()
+        }
+    }
+
+    // =========================================================================
+    // History persistence — user's transcriptions must survive across sessions
+    // =========================================================================
+
+    #[test]
+    fn transcription_saved_and_retrieved() {
+        let state = AppState::test_instance();
+        state.add_history_at(1000, entry("Bonjour le monde", "whisper:large-v3", "fr"));
+
+        let results = state.get_history("", 10, None);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].text, "Bonjour le monde");
+        assert_eq!(results[0].model_id, "whisper:large-v3");
+        assert_eq!(results[0].language, "fr");
+    }
+
+    #[test]
+    fn history_ordered_most_recent_first() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("First", "whisper:tiny", "en"));
+        state.add_history_at(300, entry("Third", "whisper:tiny", "en"));
+        state.add_history_at(200, entry("Second", "whisper:tiny", "en"));
+
+        let results = state.get_history("", 10, None);
+        assert_eq!(results[0].text, "Third");
+        assert_eq!(results[1].text, "Second");
+        assert_eq!(results[2].text, "First");
+    }
+
+    #[test]
+    fn history_count_reflects_total() {
+        let state = AppState::test_instance();
+        assert_eq!(state.history_count(""), 0);
+
+        state.add_history_at(100, entry("One", "", ""));
+        state.add_history_at(200, entry("Two", "", ""));
+        state.add_history_at(300, entry("Three", "", ""));
+        assert_eq!(state.history_count(""), 3);
+    }
+
+    #[test]
+    fn history_limit_caps_results() {
+        let state = AppState::test_instance();
+        for i in 0..20 {
+            state.add_history_at(i, entry(&format!("Entry {}", i), "", ""));
+        }
+
+        let results = state.get_history("", 5, None);
+        assert_eq!(results.len(), 5);
+    }
+
+    // -- Cursor-based pagination (infinite scroll) --
+
+    #[test]
+    fn cursor_pagination_returns_older_entries() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("Old", "", ""));
+        state.add_history_at(200, entry("Middle", "", ""));
+        state.add_history_at(300, entry("Recent", "", ""));
+
+        // First page: most recent
+        let page1 = state.get_history("", 2, None);
+        assert_eq!(page1.len(), 2);
+        assert_eq!(page1[0].text, "Recent");
+        assert_eq!(page1[1].text, "Middle");
+
+        // Second page: cursor = timestamp of last entry on page 1
+        let cursor = page1[1].timestamp;
+        let page2 = state.get_history("", 2, Some(cursor));
+        assert_eq!(page2.len(), 1);
+        assert_eq!(page2[0].text, "Old");
+    }
+
+    #[test]
+    fn cursor_past_all_entries_returns_empty() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("Only one", "", ""));
+
+        let results = state.get_history("", 10, Some(50));
+        assert!(results.is_empty());
+    }
+
+    // -- Search --
+
+    #[test]
+    fn search_filters_by_text() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("Bonjour le monde", "", "fr"));
+        state.add_history_at(200, entry("Hello world", "", "en"));
+        state.add_history_at(300, entry("Bonsoir tout le monde", "", "fr"));
+
+        let results = state.get_history("monde", 10, None);
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|e| e.text.contains("monde")));
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("BONJOUR", "", ""));
+
+        // SQLite LIKE is case-insensitive for ASCII
+        let results = state.get_history("bonjour", 10, None);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn search_count_matches_results() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("Bonjour", "", ""));
+        state.add_history_at(200, entry("Hello", "", ""));
+        state.add_history_at(300, entry("Bon appétit", "", ""));
+
+        assert_eq!(state.history_count("Bon"), 2);
+        assert_eq!(state.history_count("Hello"), 1);
+        assert_eq!(state.history_count("xyz"), 0);
+    }
+
+    #[test]
+    fn search_with_cursor() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("Bonjour A", "", ""));
+        state.add_history_at(200, entry("Hello", "", ""));
+        state.add_history_at(300, entry("Bonjour B", "", ""));
+
+        let page1 = state.get_history("Bonjour", 1, None);
+        assert_eq!(page1.len(), 1);
+        assert_eq!(page1[0].text, "Bonjour B");
+
+        let page2 = state.get_history("Bonjour", 1, Some(page1[0].timestamp));
+        assert_eq!(page2.len(), 1);
+        assert_eq!(page2[0].text, "Bonjour A");
+    }
+
+    // -- Deletion --
+
+    #[test]
+    fn delete_single_entry() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, entry("Keep me", "", ""));
+        state.add_history_at(200, entry("Delete me", "", ""));
+
+        state.delete_history_entry(200);
+        let results = state.get_history("", 10, None);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].text, "Keep me");
+    }
+
+    #[test]
+    fn delete_day_removes_24h_window() {
+        let state = AppState::test_instance();
+        let day_start: u64 = 1700000000; // some day
+        state.add_history_at(day_start + 100, entry("Morning", "", ""));
+        state.add_history_at(day_start + 50000, entry("Afternoon", "", ""));
+        state.add_history_at(day_start + 86400 + 100, entry("Next day", "", ""));
+        state.add_history_at(day_start - 100, entry("Previous day", "", ""));
+
+        state.delete_history_day(day_start);
+
+        let results = state.get_history("", 10, None);
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|e| e.text == "Next day"));
+        assert!(results.iter().any(|e| e.text == "Previous day"));
+    }
+
+    #[test]
+    fn clear_history_removes_all() {
+        let state = AppState::test_instance();
+        for i in 0..10 {
+            state.add_history_at(i * 100, entry(&format!("Entry {}", i), "", ""));
+        }
+        assert_eq!(state.history_count(""), 10);
+
+        state.clear_history();
+        assert_eq!(state.history_count(""), 0);
+        assert!(state.get_history("", 10, None).is_empty());
+    }
+
+    // -- Metadata preservation --
+
+    #[test]
+    fn history_preserves_pipeline_metadata() {
+        let state = AppState::test_instance();
+        state.add_history_at(100, HistoryEntry {
+            text: "Test".to_string(),
+            timestamp: 0,
+            model_id: "whisper:large-v3".to_string(),
+            language: "fr".to_string(),
+            cleanup_model_id: "correction:gec-t5-small".to_string(),
+            hallucination_filter: true,
+            vad_trimmed: true,
+            punctuation_model_id: "punctuation:pcs".to_string(),
+            spellcheck: true,
+            disfluency_removal: true,
+            itn: true,
+        });
+
+        let results = state.get_history("", 10, None);
+        let e = &results[0];
+        assert_eq!(e.cleanup_model_id, "correction:gec-t5-small");
+        assert!(e.hallucination_filter);
+        assert!(e.vad_trimmed);
+        assert_eq!(e.punctuation_model_id, "punctuation:pcs");
+        assert!(e.spellcheck);
+        assert!(e.disfluency_removal);
+        assert!(e.itn);
+    }
+
+    // -- Queue (recording pipeline) --
+
+    #[test]
+    fn recording_queue_fifo_order() {
+        let state = AppState::test_instance();
+        state.enqueue(std::path::PathBuf::from("/tmp/a.wav"));
+        state.enqueue(std::path::PathBuf::from("/tmp/b.wav"));
+        state.enqueue(std::path::PathBuf::from("/tmp/c.wav"));
+
+        assert_eq!(state.queue_count(), 3);
+        assert_eq!(state.dequeue().unwrap(), std::path::PathBuf::from("/tmp/a.wav"));
+        assert_eq!(state.dequeue().unwrap(), std::path::PathBuf::from("/tmp/b.wav"));
+        assert_eq!(state.queue_count(), 1);
+    }
+
+    #[test]
+    fn empty_queue_returns_none() {
+        let state = AppState::test_instance();
+        assert_eq!(state.queue_count(), 0);
+        assert!(state.dequeue().is_none());
+    }
+
+    // -- Frontend JSON --
+
+    #[test]
+    fn frontend_json_reflects_runtime_state() {
+        let state = AppState::test_instance();
+        {
+            let mut rt = state.runtime.lock().unwrap();
+            rt.is_recording = true;
+            rt.is_transcribing = false;
+            rt.queue.push_back(std::path::PathBuf::from("/tmp/test.wav"));
+        }
+
+        let json = state.to_frontend_json();
+        assert_eq!(json["is_recording"], true);
+        assert_eq!(json["is_transcribing"], false);
+        assert_eq!(json["queue_count"], 1);
+    }
+}

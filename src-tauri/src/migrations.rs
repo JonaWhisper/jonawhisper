@@ -213,10 +213,9 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
     }
 
     // Finalize cloud cleanup_model_id: ensure "cloud:" prefix with provider ID
-    if prefs.text_cleanup_enabled && (prefs.cleanup_model_id.is_empty() || prefs.cleanup_model_id == "cloud") {
-        if !prefs.llm_provider_id.is_empty() {
+    if prefs.text_cleanup_enabled && (prefs.cleanup_model_id.is_empty() || prefs.cleanup_model_id == "cloud")
+        && !prefs.llm_provider_id.is_empty() {
             prefs.cleanup_model_id = format!("cloud:{}", prefs.llm_provider_id);
-        }
     }
 }
 
@@ -285,7 +284,7 @@ fn migrate_v2(raw: &mut Value, prefs: &mut Preferences) {
         }
 
         // Remove old directory if empty
-        if std::fs::read_dir(&old_dir).map_or(false, |mut d| d.next().is_none()) {
+        if std::fs::read_dir(&old_dir).is_ok_and(|mut d| d.next().is_none()) {
             let _ = std::fs::remove_dir(&old_dir);
             log::info!("Migration v2: removed empty dir {}", old_dir.display());
         }
@@ -293,11 +292,10 @@ fn migrate_v2(raw: &mut Value, prefs: &mut Preferences) {
 
     // Clean up ~/.local/share/whisper-dictate/ if empty
     let wd_dir = std::path::PathBuf::from(shellexpand::tilde("~/.local/share/whisper-dictate").as_ref());
-    if wd_dir.exists() {
-        if std::fs::read_dir(&wd_dir).map_or(false, |mut d| d.next().is_none()) {
+    if wd_dir.exists()
+        && std::fs::read_dir(&wd_dir).is_ok_and(|mut d| d.next().is_none()) {
             let _ = std::fs::remove_dir(&wd_dir);
             log::info!("Migration v2: removed empty dir {}", wd_dir.display());
-        }
     }
 }
 

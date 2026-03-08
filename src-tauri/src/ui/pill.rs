@@ -351,6 +351,7 @@ fn render_frame(p: &PillInner) -> Vec<u8> {
 
 /// Premultiplied alpha src-over compositing.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn over(dr: &mut f32, dg: &mut f32, db: &mut f32, da: &mut f32, sr: f32, sg: f32, sb: f32, sa: f32) {
     let inv = 1.0 - sa;
     *dr = sr + *dr * inv;
@@ -370,8 +371,8 @@ fn spectrum_alpha(px: f32, py: f32, spectrum: &[f32; 12], cw: f32, ch: f32) -> f
     let cy = ch / 2.0;
 
     let mut a = 0.0f32;
-    for i in 0..12 {
-        let bh = (spectrum[i] * max_h).max(2.0 * DPR);
+    for (i, &val) in spectrum.iter().enumerate().take(12) {
+        let bh = (val * max_h).max(2.0 * DPR);
         let cx = start_x + i as f32 * (bar_w + gap) + bar_w / 2.0;
         let d = sdf_rrect(px, py, cx, cy, bar_w / 2.0, bh / 2.0, bar_w / 2.0);
         a = a.max(sdf_aa(d));
@@ -458,10 +459,9 @@ fn badge_pixel(px: f32, py: f32, count: u32, cw: f32, ch: f32) -> (f32, f32, f32
 
     let lx = ((px - dx) / scale).floor() as i32;
     let ly = ((py - dy) / scale).floor() as i32;
-    if lx >= 0 && lx < 3 && ly >= 0 && ly < 5 {
-        if DIGITS[digit][(ly * 3 + lx) as usize] == 1 {
+    if (0..3).contains(&lx) && (0..5).contains(&ly)
+        && DIGITS[digit][(ly * 3 + lx) as usize] == 1 {
             over(&mut r, &mut g, &mut b, &mut a, 1.0, 1.0, 1.0, 1.0);
-        }
     }
 
     (r, g, b, a)

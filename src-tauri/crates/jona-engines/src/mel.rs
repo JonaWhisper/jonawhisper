@@ -51,7 +51,7 @@ pub const CANARY_CONFIG: MelConfig = MelConfig {
 pub const PARAKEET_CONFIG: MelConfig = MelConfig {
     mel_scale: MelScale::Slaney,
     preemphasis: Some(0.97),
-    log_guard: 5.960464477539063e-8, // 2^-24
+    log_guard: 5.960_465e-8, // 2^-24
     bessel_correction: true,
     slaney_norm: true,
 };
@@ -85,10 +85,9 @@ pub fn extract_features_with_config(audio: &[f32], config: &MelConfig) -> (Vec<f
     let n_frames = samples.len() / HOP_LENGTH + 1;
 
     // Hann window
-    let mut window = vec![0.0f32; WIN_LENGTH];
-    for i in 0..WIN_LENGTH {
-        window[i] = 0.5 - 0.5 * (2.0 * PI * i as f32 / (WIN_LENGTH - 1) as f32).cos();
-    }
+    let window: Vec<f32> = (0..WIN_LENGTH)
+        .map(|i| 0.5 - 0.5 * (2.0 * PI * i as f32 / (WIN_LENGTH - 1) as f32).cos())
+        .collect();
 
     let n_freqs = N_FFT / 2 + 1;
     let mel_filters = build_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE, config.mel_scale, config.slaney_norm);

@@ -306,7 +306,7 @@ fn strip_repetition(text: &str) -> String {
 
     // Sentence-level: split on sentence-ending punctuation
     let sentences: Vec<&str> = text
-        .split(|c: char| c == '.' || c == '!' || c == '?')
+        .split(['.', '!', '?'])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();
@@ -338,7 +338,7 @@ fn strip_repetition(text: &str) -> String {
             );
             let first_end = text.find(sentences[0]).unwrap_or(0) + sentences[0].len();
             let end = text[first_end..]
-                .find(|c: char| c == '.' || c == '!' || c == '?')
+                .find(['.', '!', '?'])
                 .map(|i| first_end + i + 1)
                 .unwrap_or(first_end);
             return text[..end].trim().to_string();

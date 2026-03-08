@@ -194,7 +194,7 @@ pub fn update_mic_submenu(app: &AppHandle) {
         let icon = menu_icons::transport_icon(&device.transport_type, is_selected);
         if let Ok(item) = IconMenuItem::with_id(
             app,
-            &format!("device_{}", device.uid),
+            format!("device_{}", device.uid),
             &label,
             true,
             Some(icon),

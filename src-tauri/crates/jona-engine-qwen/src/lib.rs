@@ -147,7 +147,6 @@ impl ASREngine for QwenEngine {
                 ]),
                 runtime: Some("accelerate".into()),
                 quantization: Some("BF16".into()),
-                ..Default::default()
             },
         ]
     }

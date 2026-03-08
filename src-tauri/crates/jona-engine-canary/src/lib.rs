@@ -300,15 +300,13 @@ fn decode_tokens(ctx: &CanaryContext, tokens: &[i64]) -> String {
         if ctx.is_sentencepiece {
             let replaced = token.replace('\u{2581}', " ");
             text.push_str(&replaced);
+        } else if let Some(stripped) = token.strip_prefix("##") {
+            text.push_str(stripped);
+        } else if !text.is_empty() {
+            text.push(' ');
+            text.push_str(token);
         } else {
-            if let Some(stripped) = token.strip_prefix("##") {
-                text.push_str(stripped);
-            } else if !text.is_empty() {
-                text.push(' ');
-                text.push_str(token);
-            } else {
-                text.push_str(token);
-            }
+            text.push_str(token);
         }
     }
 
@@ -402,7 +400,6 @@ impl ASREngine for CanaryEngine {
                 ram: Some(300_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "de".into(), "es".into()]),
                 runtime: Some("ort".into()),
-                ..Default::default()
             },
         ]
     }

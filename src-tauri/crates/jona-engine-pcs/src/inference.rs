@@ -6,6 +6,9 @@ use tokenizers::Tokenizer;
 
 use jona_engines::common;
 
+/// (pre_punctuation, post_punctuation, capitalization) predictions per token.
+type WindowPredictions = (Vec<usize>, Vec<usize>, Vec<Vec<bool>>);
+
 // -- SentencePiece protobuf parsing (prost) --
 
 #[derive(prost::Message)]
@@ -159,7 +162,7 @@ pub fn restore_punctuation_and_case(ctx: &mut PcsContext, text: &str) -> Result<
 fn infer_window(
     ctx: &mut PcsContext,
     content_ids: &[i64],
-) -> Result<(Vec<usize>, Vec<usize>, Vec<Vec<bool>>), String> {
+) -> Result<WindowPredictions, String> {
     let seq_len = content_ids.len() + 2;
 
     let mut input_ids = Vec::with_capacity(seq_len);

@@ -90,11 +90,11 @@ impl ASREngine for BertPunctuationEngine {
     {
         if let Some(ctx) = ctx.downcast_mut::<BertContext>() {
             return ort_bert::restore_punctuation(ctx, text)
-                .map_err(|e| EngineError::LaunchFailed(e));
+                .map_err(EngineError::LaunchFailed);
         }
         if let Some(ctx) = ctx.downcast_ref::<CandlePunctContext>() {
             return candle_bert::restore_punctuation(ctx, text)
-                .map_err(|e| EngineError::LaunchFailed(e));
+                .map_err(EngineError::LaunchFailed);
         }
         Err(EngineError::LaunchFailed("Invalid BERT context type".into()))
     }

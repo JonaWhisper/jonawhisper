@@ -113,7 +113,7 @@ fn forward_chunk(vad: &mut VadState, chunk: &[f32]) -> Result<f32, String> {
         state_data,
     )
     .map_err(|e| format!("VAD reshape state: {e}"))?;
-    if let Some(s3) = state_view.into_dimensionality::<ndarray::Ix3>().ok() {
+    if let Ok(s3) = state_view.into_dimensionality::<ndarray::Ix3>() {
         vad.state.assign(&s3);
     }
 

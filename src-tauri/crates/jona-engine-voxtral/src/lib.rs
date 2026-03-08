@@ -144,7 +144,6 @@ impl ASREngine for VoxtralEngine {
                 ]),
                 runtime: Some("metal".into()),
                 quantization: Some("BF16".into()),
-                ..Default::default()
             },
         ]
     }

@@ -70,7 +70,7 @@ impl ASREngine for PcsPunctuationEngine {
         let ctx = ctx.downcast_mut::<PcsContext>()
             .ok_or_else(|| EngineError::LaunchFailed("Invalid PCS context".into()))?;
         restore_punctuation_and_case(ctx, text)
-            .map_err(|e| EngineError::LaunchFailed(e))
+            .map_err(EngineError::LaunchFailed)
     }
 }
 

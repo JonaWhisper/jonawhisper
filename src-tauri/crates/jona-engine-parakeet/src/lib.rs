@@ -364,7 +364,6 @@ impl ASREngine for ParakeetEngine {
                     "el".into(), "lt".into(), "lv".into(), "et".into(), "mt".into(),
                 ]),
                 runtime: Some("ort".into()),
-                ..Default::default()
             },
         ]
     }

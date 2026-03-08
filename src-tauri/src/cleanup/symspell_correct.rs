@@ -41,10 +41,9 @@ fn lang_to_code(lang: &str) -> String {
         if let Some(sys) = sys_locale::get_locale() {
             let sys_norm = sys.replace('_', "-").to_lowercase();
             // Only use system locale if it matches the same base language
-            if sys_norm.starts_with(&format!("{base_code}-")) {
-                if base.join(&sys_norm).join("freq.txt").exists() {
+            if sys_norm.starts_with(&format!("{base_code}-"))
+                && base.join(&sys_norm).join("freq.txt").exists() {
                     return sys_norm;
-                }
             }
         }
     }
@@ -254,7 +253,7 @@ fn word_boundaries(text: &str) -> Vec<(usize, &str)> {
         } else if let Some(s) = start {
             let word = &text[s..i];
             let trimmed =
-                word.trim_end_matches(|c: char| c == '-' || c == '\'' || c == '\u{2019}');
+                word.trim_end_matches(['-', '\'', '\u{2019}']);
             if !trimmed.is_empty() {
                 words.push((s, trimmed));
             }
@@ -264,7 +263,7 @@ fn word_boundaries(text: &str) -> Vec<(usize, &str)> {
 
     if let Some(s) = start {
         let word = &text[s..];
-        let trimmed = word.trim_end_matches(|c: char| c == '-' || c == '\'' || c == '\u{2019}');
+        let trimmed = word.trim_end_matches(['-', '\'', '\u{2019}']);
         if !trimmed.is_empty() {
             words.push((s, trimmed));
         }
