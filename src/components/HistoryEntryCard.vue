@@ -330,9 +330,9 @@ watch(() => props.entry.timestamp, () => {
                   :disabled="!step.hasDiff"
                   @click="step.hasDiff && toggleDiffStep(step.id)"
                 >
-                  <component :is="step.icon" class="h-3 w-3" :class="step.hasError ? 'opacity-50' : ''" />
+                  <component :is="step.icon" class="h-3 w-3" :class="step.hasError ? 'opacity-60' : ''" />
                   <!-- Error: small red X overlaid on the icon -->
-                  <X v-if="step.hasError" class="absolute h-3 w-3 text-destructive/70 stroke-[2]" />
+                  <X v-if="step.hasError" class="absolute h-2.5 w-2.5 text-destructive/50 stroke-[2]" />
                   <!-- No change: diagonal slash through icon -->
                   <Slash v-if="step.noChange" class="absolute h-3.5 w-3.5 text-muted-foreground/50 stroke-[1.5]" />
                 </button>
