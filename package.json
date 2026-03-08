@@ -11,7 +11,9 @@
     "tauri": "tauri",
     "story:dev": "histoire dev",
     "story:build": "histoire build",
-    "story:screenshots": "npx tsx src/stories/capture.ts"
+    "story:screenshots": "npx tsx src/stories/capture.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tanstack/vue-virtual": "^3.13.19",
@@ -34,8 +36,10 @@
     "@tauri-apps/cli": "^2.10.0",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.2",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10",
+    "happy-dom": "^20.8.3",
     "histoire": "^1.0.0-beta.1",
     "playwright": "^1.58.2",
     "postcss": "^8",
@@ -43,6 +47,7 @@
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
+    "vitest": "^4.0.18",
     "vue-tsc": "^3.1.5"
   }
 }

@@ -178,3 +178,66 @@ impl ASREngine for SpellCheckEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(SpellCheckEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::{ASREngine, DownloadType};
+
+    #[test]
+    fn engine_registers_as_spellcheck() {
+        let engine = SpellCheckEngine;
+        assert_eq!(engine.engine_id(), "spellcheck");
+        assert_eq!(engine.category(), jona_types::EngineCategory::SpellCheck);
+    }
+
+    #[test]
+    fn spellcheck_does_not_pollute_language_selector() {
+        let engine = SpellCheckEngine;
+        assert!(engine.supported_languages().is_empty());
+    }
+
+    #[test]
+    fn manifest_provides_downloadable_dictionaries() {
+        // The embedded manifest should produce at least one dictionary model
+        // that the user can download for spellchecking.
+        let models = parse_manifest(EMBEDDED_MANIFEST);
+        assert!(!models.is_empty(), "User must have at least one spellcheck dictionary to download");
+    }
+
+    #[test]
+    fn no_duplicate_dictionaries() {
+        let engine = SpellCheckEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate dictionaries would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = SpellCheckEngine;
+        for model in engine.models() {
+            if let DownloadType::MultiFile { files } = &model.download_type {
+                for file in files {
+                    assert!(file.url.starts_with("https://"),
+                        "Dict {} file {} has insecure download URL: {}", model.id, file.filename, file.url);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn dictionaries_include_french_and_english() {
+        // The two primary languages of the app must have dictionaries available.
+        let engine = SpellCheckEngine;
+        let models = engine.models();
+        let ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        assert!(ids.iter().any(|id| id.contains("fr")),
+            "French spellcheck dictionary must be available");
+        assert!(ids.iter().any(|id| id.contains("en")),
+            "English spellcheck dictionary must be available");
+    }
+}

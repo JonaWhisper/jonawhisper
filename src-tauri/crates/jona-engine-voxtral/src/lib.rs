@@ -190,3 +190,63 @@ impl ASREngine for VoxtralEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(VoxtralEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::{ASREngine, DownloadType};
+
+    #[test]
+    fn engine_registers_as_asr() {
+        let engine = VoxtralEngine;
+        assert_eq!(engine.engine_id(), "voxtral");
+        assert_eq!(engine.category(), jona_types::EngineCategory::ASR);
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = VoxtralEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one Voxtral model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = VoxtralEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = VoxtralEngine;
+        for model in engine.models() {
+            if let DownloadType::MultiFile { files } = &model.download_type {
+                for file in files {
+                    assert!(file.url.starts_with("https://"),
+                        "Model {} file {} has insecure download URL: {}", model.id, file.filename, file.url);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = VoxtralEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn voxtral_supports_multiple_languages() {
+        // Voxtral supports 13 languages.
+        let engine = VoxtralEngine;
+        let langs = engine.supported_languages();
+        assert!(langs.len() >= 10, "Voxtral should support at least 10 languages, got {}", langs.len());
+    }
+}

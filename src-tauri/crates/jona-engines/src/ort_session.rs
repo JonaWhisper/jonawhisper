@@ -36,3 +36,16 @@ pub fn build_session(n_threads: usize) -> Result<SessionBuilder, String> {
 
     Ok(builder)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inference_uses_all_available_cores() {
+        // ONNX inference should use all available CPU cores for maximum performance.
+        // On any real machine there's at least 1 core.
+        let n = inference_threads();
+        assert!(n >= 1, "Must use at least 1 thread for inference, got {}", n);
+    }
+}

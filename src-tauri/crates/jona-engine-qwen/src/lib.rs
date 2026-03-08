@@ -209,3 +209,63 @@ impl ASREngine for QwenEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(QwenEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::{ASREngine, DownloadType};
+
+    #[test]
+    fn engine_registers_as_asr() {
+        let engine = QwenEngine;
+        assert_eq!(engine.engine_id(), "qwen-asr");
+        assert_eq!(engine.category(), jona_types::EngineCategory::ASR);
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = QwenEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one Qwen model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = QwenEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = QwenEngine;
+        for model in engine.models() {
+            if let DownloadType::MultiFile { files } = &model.download_type {
+                for file in files {
+                    assert!(file.url.starts_with("https://"),
+                        "Model {} file {} has insecure download URL: {}", model.id, file.filename, file.url);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = QwenEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn qwen_supports_many_languages() {
+        // Qwen3-ASR supports 30 languages.
+        let engine = QwenEngine;
+        let langs = engine.supported_languages();
+        assert!(langs.len() >= 20, "Qwen should support at least 20 languages, got {}", langs.len());
+    }
+}

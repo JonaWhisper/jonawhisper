@@ -77,3 +77,60 @@ impl ASREngine for PcsPunctuationEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(PcsPunctuationEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::ASREngine;
+
+    #[test]
+    fn engine_registers_as_punctuation() {
+        // PCS is a punctuation cleanup engine, not ASR.
+        let engine = PcsPunctuationEngine;
+        assert_eq!(engine.engine_id(), "pcs-punctuation");
+        assert_eq!(engine.category(), jona_types::EngineCategory::Punctuation);
+    }
+
+    #[test]
+    fn punctuation_engine_does_not_pollute_language_selector() {
+        let engine = PcsPunctuationEngine;
+        assert!(engine.supported_languages().is_empty());
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = PcsPunctuationEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one PCS model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = PcsPunctuationEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = PcsPunctuationEngine;
+        for model in engine.models() {
+            if !model.url.is_empty() {
+                assert!(model.url.starts_with("https://"),
+                    "Model {} has insecure download URL: {}", model.id, model.url);
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = PcsPunctuationEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+}

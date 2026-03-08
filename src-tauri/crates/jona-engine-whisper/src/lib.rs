@@ -257,3 +257,75 @@ impl ASREngine for WhisperEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(WhisperEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::ASREngine;
+
+    #[test]
+    fn engine_registers_as_asr() {
+        let engine = WhisperEngine;
+        assert_eq!(engine.engine_id(), "whisper");
+        assert_eq!(engine.category(), jona_types::EngineCategory::ASR);
+    }
+
+    #[test]
+    fn user_can_pick_from_multiple_model_sizes() {
+        // Whisper offers multiple model sizes (tiny, base, small, medium, large)
+        // so the user can trade quality vs speed.
+        let engine = WhisperEngine;
+        let models = engine.models();
+        assert!(models.len() >= 3, "Whisper should offer multiple model size options, got {}", models.len());
+    }
+
+    #[test]
+    fn default_model_exists_in_catalog() {
+        // The default preference is "whisper:large-v3-turbo-q8" — it must be in the catalog.
+        let engine = WhisperEngine;
+        let models = engine.models();
+        assert!(models.iter().any(|m| m.id == "whisper:large-v3-turbo-q8"),
+            "Default model whisper:large-v3-turbo-q8 must exist in the catalog");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = WhisperEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = WhisperEngine;
+        for model in engine.models() {
+            if !model.url.is_empty() {
+                assert!(model.url.starts_with("https://"),
+                    "Model {} has insecure download URL: {}", model.id, model.url);
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = WhisperEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn whisper_supports_french_and_english() {
+        // The primary languages of the app must be available for selection.
+        let engine = WhisperEngine;
+        let langs = engine.supported_languages();
+        let codes: Vec<&str> = langs.iter().map(|l| l.code.as_str()).collect();
+        assert!(codes.contains(&"fr"), "Whisper must support French");
+        assert!(codes.contains(&"en"), "Whisper must support English");
+    }
+}

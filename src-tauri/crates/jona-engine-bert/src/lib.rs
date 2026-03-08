@@ -103,3 +103,67 @@ impl ASREngine for BertPunctuationEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(BertPunctuationEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::ASREngine;
+
+    #[test]
+    fn engine_registers_as_punctuation() {
+        // BERT punctuation is a cleanup engine, not ASR — it must register under
+        // the Punctuation category so the UI places it in the cleanup section.
+        let engine = BertPunctuationEngine;
+        assert_eq!(engine.engine_id(), "bert-punctuation");
+        assert_eq!(engine.category(), jona_types::EngineCategory::Punctuation);
+    }
+
+    #[test]
+    fn punctuation_engine_does_not_pollute_language_selector() {
+        // Punctuation engines should NOT list supported languages, otherwise
+        // they would appear in the ASR language dropdown.
+        let engine = BertPunctuationEngine;
+        assert!(engine.supported_languages().is_empty());
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = BertPunctuationEngine;
+        let models = engine.models();
+        assert!(!models.is_empty(), "User must be able to choose at least one BERT model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = BertPunctuationEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        // Security: models must be downloaded over HTTPS to prevent MITM attacks.
+        let engine = BertPunctuationEngine;
+        for model in engine.models() {
+            if !model.url.is_empty() {
+                assert!(model.url.starts_with("https://"),
+                    "Model {} has insecure download URL: {}", model.id, model.url);
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        // The download UI shows progress (bytes downloaded / total size).
+        // A zero-size model would break percentage calculations.
+        let engine = BertPunctuationEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+}

@@ -439,3 +439,64 @@ impl ASREngine for CanaryEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(CanaryEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::{ASREngine, DownloadType};
+
+    #[test]
+    fn engine_registers_as_asr() {
+        // Canary is a speech recognition engine that appears in the ASR model picker.
+        let engine = CanaryEngine;
+        assert_eq!(engine.engine_id(), "canary");
+        assert_eq!(engine.category(), jona_types::EngineCategory::ASR);
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = CanaryEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one Canary model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = CanaryEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = CanaryEngine;
+        for model in engine.models() {
+            if let DownloadType::MultiFile { files } = &model.download_type {
+                for file in files {
+                    assert!(file.url.starts_with("https://"),
+                        "Model {} file {} has insecure download URL: {}", model.id, file.filename, file.url);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = CanaryEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn canary_supports_multiple_languages() {
+        // Canary is a multilingual ASR engine; the user expects to select languages.
+        let engine = CanaryEngine;
+        let langs = engine.supported_languages();
+        assert!(langs.len() > 1, "Canary should support multiple languages for user selection");
+    }
+}

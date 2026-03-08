@@ -85,3 +85,138 @@ pub fn system_prompt(language: &str) -> String {
          - Do NOT use <think> or reasoning tags"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- strip_think_blocks --
+
+    #[test]
+    fn strip_think_blocks_no_blocks() {
+        assert_eq!(strip_think_blocks("Hello world"), "Hello world");
+    }
+
+    #[test]
+    fn strip_think_blocks_single_block() {
+        assert_eq!(
+            strip_think_blocks("before<think>reasoning</think>after"),
+            "beforeafter"
+        );
+    }
+
+    #[test]
+    fn strip_think_blocks_multiple_blocks() {
+        assert_eq!(
+            strip_think_blocks("a<think>x</think>b<think>y</think>c"),
+            "abc"
+        );
+    }
+
+    #[test]
+    fn strip_think_blocks_unclosed() {
+        // Unclosed think block discards the rest
+        assert_eq!(strip_think_blocks("before<think>unclosed"), "before");
+    }
+
+    #[test]
+    fn strip_think_blocks_empty_block() {
+        assert_eq!(strip_think_blocks("a<think></think>b"), "ab");
+    }
+
+    // -- sanitize_output --
+
+    #[test]
+    fn sanitize_output_normal() {
+        let result = sanitize_output("Hello world", 11).unwrap();
+        assert_eq!(result, "Hello world");
+    }
+
+    #[test]
+    fn sanitize_output_trims_whitespace() {
+        let result = sanitize_output("  Hello world  ", 11).unwrap();
+        assert_eq!(result, "Hello world");
+    }
+
+    #[test]
+    fn sanitize_output_strips_think_blocks() {
+        let result = sanitize_output("<think>reasoning</think>Cleaned text", 20).unwrap();
+        assert_eq!(result, "Cleaned text");
+    }
+
+    #[test]
+    fn sanitize_output_hallucination() {
+        let result = sanitize_output("HALLUCINATION", 10);
+        assert!(matches!(result, Err(LlmError::Hallucination)));
+    }
+
+    #[test]
+    fn sanitize_output_empty() {
+        let result = sanitize_output("", 10);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sanitize_output_empty_after_think_strip() {
+        let result = sanitize_output("<think>all reasoning no output</think>", 10);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sanitize_output_too_long() {
+        let input_len = 10;
+        // max_len = max(10*3, 200) = 200
+        let long_output = "a".repeat(201);
+        let result = sanitize_output(&long_output, input_len);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sanitize_output_just_within_limit() {
+        let input_len = 10;
+        // max_len = max(10*3, 200) = 200
+        let output = "a".repeat(200);
+        let result = sanitize_output(&output, input_len);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn sanitize_output_large_input_scales_limit() {
+        let input_len = 100;
+        // max_len = max(100*3, 200) = 300
+        let output = "a".repeat(300);
+        let result = sanitize_output(&output, input_len);
+        assert!(result.is_ok());
+
+        let output = "a".repeat(301);
+        let result = sanitize_output(&output, input_len);
+        assert!(result.is_err());
+    }
+
+    // -- system_prompt --
+
+    #[test]
+    fn system_prompt_french() {
+        let prompt = system_prompt("fr");
+        assert!(prompt.contains("French"));
+        assert!(prompt.contains("dictation"));
+    }
+
+    #[test]
+    fn system_prompt_english() {
+        let prompt = system_prompt("en");
+        assert!(prompt.contains("English"));
+    }
+
+    #[test]
+    fn system_prompt_unknown_language() {
+        let prompt = system_prompt("ja");
+        assert!(prompt.contains("the same language as the input"));
+    }
+
+    #[test]
+    fn system_prompt_contains_hallucination_instruction() {
+        let prompt = system_prompt("en");
+        assert!(prompt.contains("HALLUCINATION"));
+    }
+}

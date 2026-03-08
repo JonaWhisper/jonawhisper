@@ -184,3 +184,64 @@ impl ASREngine for LlamaEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(LlamaEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::ASREngine;
+
+    #[test]
+    fn engine_registers_as_llm() {
+        // Llama is a local LLM for text cleanup, shown in the cleanup model picker.
+        let engine = LlamaEngine;
+        assert_eq!(engine.engine_id(), "llama");
+        assert_eq!(engine.category(), jona_types::EngineCategory::LLM);
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = LlamaEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one Llama model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = LlamaEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = LlamaEngine;
+        for model in engine.models() {
+            if !model.url.is_empty() {
+                assert!(model.url.starts_with("https://"),
+                    "Model {} has insecure download URL: {}", model.id, model.url);
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = LlamaEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn models_report_ram_requirement() {
+        // The UI shows RAM requirements so the user can pick a model that fits their machine.
+        let engine = LlamaEngine;
+        for model in engine.models() {
+            assert!(model.ram.is_some() && model.ram.unwrap() > 0,
+                "Model {} should report RAM requirement for the UI", model.id);
+        }
+    }
+}

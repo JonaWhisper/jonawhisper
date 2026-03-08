@@ -422,3 +422,66 @@ impl ASREngine for ParakeetEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(ParakeetEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::{ASREngine, DownloadType};
+
+    #[test]
+    fn engine_registers_as_asr() {
+        let engine = ParakeetEngine;
+        assert_eq!(engine.engine_id(), "parakeet");
+        assert_eq!(engine.category(), jona_types::EngineCategory::ASR);
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = ParakeetEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one Parakeet model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = ParakeetEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = ParakeetEngine;
+        for model in engine.models() {
+            if let DownloadType::MultiFile { files } = &model.download_type {
+                for file in files {
+                    assert!(file.url.starts_with("https://"),
+                        "Model {} file {} has insecure download URL: {}", model.id, file.filename, file.url);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = ParakeetEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn parakeet_supports_european_languages() {
+        // Parakeet-TDT supports 25 European languages including French and English.
+        let engine = ParakeetEngine;
+        let langs = engine.supported_languages();
+        assert!(langs.len() >= 10, "Parakeet should support many European languages");
+        let codes: Vec<&str> = langs.iter().map(|l| l.code.as_str()).collect();
+        assert!(codes.contains(&"fr"), "Parakeet must support French");
+        assert!(codes.contains(&"en"), "Parakeet must support English");
+    }
+}

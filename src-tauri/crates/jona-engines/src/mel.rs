@@ -243,3 +243,170 @@ fn build_mel_filterbank(n_fft: usize, n_mels: usize, sample_rate: f32, scale: Me
 
     filters
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mel_config_canary_defaults() {
+        assert!(matches!(CANARY_CONFIG.mel_scale, MelScale::HTK));
+        assert!(CANARY_CONFIG.preemphasis.is_none());
+        assert!(!CANARY_CONFIG.bessel_correction);
+        assert!(!CANARY_CONFIG.slaney_norm);
+    }
+
+    #[test]
+    fn mel_config_parakeet_defaults() {
+        assert!(matches!(PARAKEET_CONFIG.mel_scale, MelScale::Slaney));
+        assert_eq!(PARAKEET_CONFIG.preemphasis, Some(0.97));
+        assert!(PARAKEET_CONFIG.bessel_correction);
+        assert!(PARAKEET_CONFIG.slaney_norm);
+    }
+
+    #[test]
+    fn extract_features_empty_audio() {
+        let (features, n_frames) = extract_features(&[]);
+        assert_eq!(n_frames, 1);
+        assert_eq!(features.len(), N_MELS);
+        // All zeros for empty input
+        for &v in &features {
+            assert!((v - 0.0).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn extract_features_output_shape() {
+        // 16000 samples = 1 second at 16kHz
+        let audio = vec![0.0f32; 16000];
+        let (features, n_frames) = extract_features(&audio);
+        // n_frames = samples / HOP_LENGTH + 1 = 16000/160 + 1 = 101
+        assert_eq!(n_frames, 101);
+        assert_eq!(features.len(), N_MELS * n_frames);
+    }
+
+    #[test]
+    fn extract_features_with_config_parakeet_shape() {
+        let audio = vec![0.0f32; 16000];
+        let (features, n_frames) = extract_features_with_config(&audio, &PARAKEET_CONFIG);
+        assert_eq!(n_frames, 101);
+        assert_eq!(features.len(), N_MELS * n_frames);
+    }
+
+    #[test]
+    fn extract_features_normalized() {
+        // A sine wave should produce non-trivial features.
+        // Use enough audio to have many frames for meaningful statistics.
+        let n = 48000; // 3 seconds
+        let audio: Vec<f32> = (0..n)
+            .map(|i| (2.0 * PI * 440.0 * i as f32 / 16000.0).sin() * 0.5)
+            .collect();
+        let (features, n_frames) = extract_features(&audio);
+        assert!(n_frames > 10);
+
+        // Check z-normalization: mean should be near zero for bands with variance.
+        // Some bands (especially edge bands) may have constant values after log,
+        // so we check that MOST bands have near-zero mean.
+        let mut near_zero_count = 0;
+        for m in 0..N_MELS {
+            let mut sum = 0.0f64;
+            for t in 0..n_frames {
+                sum += features[m * n_frames + t] as f64;
+            }
+            let mean = sum / n_frames as f64;
+            if mean.abs() < 0.1 {
+                near_zero_count += 1;
+            }
+        }
+        assert!(near_zero_count > N_MELS / 2,
+            "Expected most mel bands to have near-zero mean after normalization, got {}/{}", near_zero_count, N_MELS);
+    }
+
+    #[test]
+    fn apply_preemphasis_correctness() {
+        let input = vec![1.0f32, 2.0, 3.0, 4.0];
+        let result = apply_preemphasis(&input, 0.97);
+        assert_eq!(result.len(), 4);
+        assert!((result[0] - 1.0).abs() < 1e-6); // first sample unchanged
+        assert!((result[1] - (2.0 - 0.97 * 1.0)).abs() < 1e-5);
+        assert!((result[2] - (3.0 - 0.97 * 2.0)).abs() < 1e-5);
+        assert!((result[3] - (4.0 - 0.97 * 3.0)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn apply_preemphasis_empty() {
+        let result = apply_preemphasis(&[], 0.97);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn mel_filterbank_shape() {
+        let filters = build_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE, MelScale::HTK, false);
+        assert_eq!(filters.len(), N_MELS);
+        let n_freqs = N_FFT / 2 + 1;
+        for f in &filters {
+            assert_eq!(f.len(), n_freqs);
+        }
+    }
+
+    #[test]
+    fn mel_filterbank_non_negative() {
+        for scale in [MelScale::HTK, MelScale::Slaney] {
+            let filters = build_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE, scale, false);
+            for (m, f) in filters.iter().enumerate() {
+                for (k, &v) in f.iter().enumerate() {
+                    assert!(v >= 0.0, "Negative filter value at mel={}, freq_bin={}: {}", m, k, v);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mel_filterbank_triangular_shape() {
+        // Most filters should have a triangular shape with peak <= 1.0.
+        // Skip filter 0 which may be all zeros (starts at 0 Hz, very narrow).
+        let filters = build_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE, MelScale::HTK, false);
+        let mut nonzero_count = 0;
+        for (_m, f) in filters.iter().enumerate().skip(1) {
+            let max_val = f.iter().cloned().fold(0.0f32, f32::max);
+            if max_val > 0.0 {
+                nonzero_count += 1;
+                assert!(max_val <= 1.01, "Filter {} peak {} > 1.0", _m, max_val);
+            }
+        }
+        // Most filters should be non-zero
+        assert!(nonzero_count > N_MELS / 2, "Too few non-zero filters: {}", nonzero_count);
+    }
+
+    #[test]
+    fn mel_filterbank_slaney_norm_changes_values() {
+        let unnormed = build_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE, MelScale::Slaney, false);
+        let normed = build_mel_filterbank(N_FFT, N_MELS, SAMPLE_RATE, MelScale::Slaney, true);
+
+        // Slaney normalization should change the filter values
+        let mut diff_sum = 0.0f64;
+        for m in 0..N_MELS {
+            for k in 0..unnormed[m].len() {
+                diff_sum += (normed[m][k] - unnormed[m][k]).abs() as f64;
+            }
+        }
+        assert!(diff_sum > 0.0, "Slaney normalization should change filter values");
+    }
+
+    #[test]
+    fn canary_vs_parakeet_different_output() {
+        // Same audio should produce different features with different configs
+        let audio: Vec<f32> = (0..8000)
+            .map(|i| (2.0 * PI * 440.0 * i as f32 / 16000.0).sin() * 0.3)
+            .collect();
+        let (canary_feat, canary_frames) = extract_features_with_config(&audio, &CANARY_CONFIG);
+        let (parakeet_feat, parakeet_frames) = extract_features_with_config(&audio, &PARAKEET_CONFIG);
+
+        assert_eq!(canary_frames, parakeet_frames);
+        // Features should differ due to different mel scale, pre-emphasis, etc.
+        let diff: f32 = canary_feat.iter().zip(parakeet_feat.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(diff > 0.0, "Canary and Parakeet features should differ");
+    }
+}

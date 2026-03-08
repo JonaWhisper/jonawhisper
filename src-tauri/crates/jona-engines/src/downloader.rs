@@ -716,3 +716,130 @@ pub fn delete_model(model: &ASRModel) -> bool {
 fn clear_pending_state(_model: &ASRModel) {
     let _ = fs::remove_file(pending_download_path());
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_status_equality() {
+        assert_eq!(UpdateStatus::UpToDate, UpdateStatus::UpToDate);
+        assert_eq!(UpdateStatus::UpdateAvailable, UpdateStatus::UpdateAvailable);
+        assert_eq!(UpdateStatus::Unknown, UpdateStatus::Unknown);
+        assert_ne!(UpdateStatus::UpToDate, UpdateStatus::UpdateAvailable);
+    }
+
+    #[test]
+    fn update_status_serde() {
+        let json = serde_json::to_string(&UpdateStatus::UpToDate).unwrap();
+        assert!(json.contains("up_to_date"));
+
+        let json = serde_json::to_string(&UpdateStatus::UpdateAvailable).unwrap();
+        assert!(json.contains("update_available"));
+
+        let json = serde_json::to_string(&UpdateStatus::Unknown).unwrap();
+        assert!(json.contains("unknown"));
+    }
+
+    #[test]
+    fn partial_path_deterministic() {
+        let model = ASRModel {
+            id: "whisper:tiny".to_string(),
+            storage_dir: "/tmp/test_storage".to_string(),
+            filename: "model.bin".to_string(),
+            ..Default::default()
+        };
+        let p1 = partial_path(&model);
+        let p2 = partial_path(&model);
+        assert_eq!(p1, p2);
+        assert!(p1.to_string_lossy().contains(".partial"));
+    }
+
+    #[test]
+    fn partial_path_sanitizes_id() {
+        let model = ASRModel {
+            id: "engine:model/variant".to_string(),
+            storage_dir: "/tmp/test".to_string(),
+            filename: "m.bin".to_string(),
+            ..Default::default()
+        };
+        let p = partial_path(&model);
+        let name = p.file_name().unwrap().to_string_lossy();
+        // Colons and slashes should be replaced with underscores
+        assert!(!name.contains(':'));
+        assert!(!name.contains('/'));
+    }
+
+    #[test]
+    fn partial_progress_no_partial_file() {
+        let model = ASRModel {
+            id: "test:nonexistent".to_string(),
+            storage_dir: "/tmp/jona_test_no_partial".to_string(),
+            filename: "model.bin".to_string(),
+            size: 1000,
+            ..Default::default()
+        };
+        assert!(partial_progress(&model).is_none());
+    }
+
+    #[test]
+    fn partial_progress_zero_size_model() {
+        let model = ASRModel {
+            id: "test:zero".to_string(),
+            size: 0,
+            ..Default::default()
+        };
+        assert!(partial_progress(&model).is_none());
+    }
+
+    #[test]
+    fn delete_model_not_downloaded() {
+        let model = ASRModel {
+            storage_dir: "/tmp/jona_test_delete_nonexistent".to_string(),
+            filename: "model.bin".to_string(),
+            ..Default::default()
+        };
+        assert!(!delete_model(&model));
+    }
+
+    #[test]
+    fn delete_model_single_file() {
+        let dir = std::env::temp_dir().join("jona_test_delete_single");
+        let _ = std::fs::create_dir_all(&dir);
+        let file = dir.join("model.bin");
+        std::fs::write(&file, b"test data").unwrap();
+
+        let model = ASRModel {
+            storage_dir: dir.to_string_lossy().to_string(),
+            filename: "model.bin".to_string(),
+            ..Default::default()
+        };
+        assert!(model.is_downloaded());
+        assert!(delete_model(&model));
+        assert!(!file.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn delete_model_directory() {
+        let dir = std::env::temp_dir().join("jona_test_delete_dir");
+        let model_dir = dir.join("my_model");
+        let _ = std::fs::create_dir_all(&model_dir);
+        std::fs::write(model_dir.join(".complete"), "").unwrap();
+        std::fs::write(model_dir.join("weights.bin"), b"data").unwrap();
+
+        let model = ASRModel {
+            storage_dir: dir.to_string_lossy().to_string(),
+            filename: "my_model".to_string(),
+            download_marker: Some(".complete".to_string()),
+            download_type: DownloadType::MultiFile { files: vec![] },
+            ..Default::default()
+        };
+        assert!(model.is_downloaded());
+        assert!(delete_model(&model));
+        assert!(!model_dir.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

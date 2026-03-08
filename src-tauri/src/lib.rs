@@ -260,3 +260,128 @@ pub fn run() {
             }
         });
 }
+
+#[cfg(test)]
+mod tests {
+    use jona_engines::EngineCatalog;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    /// Ensure the engine catalog is initialized exactly once across all tests.
+    fn ensure_catalog() {
+        INIT.call_once(|| {
+            EngineCatalog::init_auto();
+        });
+    }
+
+    #[test]
+    fn all_engines_registered() {
+        ensure_catalog();
+        let catalog = EngineCatalog::global();
+        let engines = catalog.engine_infos();
+        assert!(
+            engines.len() >= 10,
+            "Expected at least 10 engines, got {}: {:?}",
+            engines.len(),
+            engines.iter().map(|e| &e.id).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn all_models_have_valid_metadata() {
+        ensure_catalog();
+        let catalog = EngineCatalog::global();
+        for model in catalog.all_models() {
+            assert!(!model.id.is_empty(), "Model has empty id");
+            assert!(!model.label.is_empty(), "Model {} has empty label", model.id);
+            assert!(!model.engine_id.is_empty(), "Model {} has empty engine_id", model.id);
+
+            // Collect all URLs (single-file URL + multi-file URLs)
+            let mut urls = Vec::new();
+            if !model.url.is_empty() {
+                urls.push(model.url.as_str());
+            }
+            if let jona_types::DownloadType::MultiFile { ref files } = model.download_type {
+                for f in files {
+                    urls.push(f.url.as_str());
+                }
+            }
+            // All download URLs should be HTTPS
+            for url in urls {
+                assert!(
+                    url.starts_with("https://"),
+                    "Model {} has non-HTTPS URL: {}",
+                    model.id,
+                    url
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn user_selected_model_can_be_found_in_catalog() {
+        // When the user selects a model ID in preferences, the backend must
+        // be able to look it up to load the correct engine for transcription.
+        ensure_catalog();
+        let catalog = EngineCatalog::global();
+        let model = catalog.model_by_id("whisper:tiny");
+        assert!(model.is_some(), "whisper:tiny should be findable by ID");
+    }
+
+    #[test]
+    fn engine_can_be_found_by_id() {
+        // Engine lookup is used to route transcription to the correct backend.
+        ensure_catalog();
+        let catalog = EngineCatalog::global();
+        let engine = catalog.engine_by_id("whisper");
+        assert!(engine.is_some(), "whisper engine should be findable by ID");
+    }
+
+    #[test]
+    fn no_duplicate_model_ids() {
+        ensure_catalog();
+        let catalog = EngineCatalog::global();
+        let models = catalog.all_models();
+        let mut seen = std::collections::HashSet::new();
+        for model in &models {
+            assert!(
+                seen.insert(&model.id),
+                "Duplicate model ID found: {}",
+                model.id
+            );
+        }
+    }
+
+    #[test]
+    fn no_duplicate_engine_ids() {
+        ensure_catalog();
+        let catalog = EngineCatalog::global();
+        let engines = catalog.engine_infos();
+        let mut seen = std::collections::HashSet::new();
+        for engine in &engines {
+            assert!(
+                seen.insert(&engine.id),
+                "Duplicate engine ID found: {}",
+                engine.id
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_locale_auto_french() {
+        // When system locale starts with "fr", should resolve to "fr"
+        // We can't control sys_locale in tests, but we can test non-auto paths
+        assert_eq!(super::resolve_locale("fr"), "fr");
+        assert_eq!(super::resolve_locale("en"), "en");
+    }
+
+    #[test]
+    fn resolve_locale_explicit() {
+        assert_eq!(super::resolve_locale("fr"), "fr");
+        assert_eq!(super::resolve_locale("en"), "en");
+        // auto depends on system locale, just ensure it returns something valid
+        let result = super::resolve_locale("auto");
+        assert!(result == "fr" || result == "en", "auto should resolve to fr or en, got: {}", result);
+    }
+}

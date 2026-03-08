@@ -217,3 +217,74 @@ impl ASREngine for CorrectionEngine {
 inventory::submit! {
     EngineRegistration { factory: || Box::new(CorrectionEngine) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jona_types::{ASREngine, DownloadType};
+
+    #[test]
+    fn engine_registers_as_correction() {
+        // T5 correction is a cleanup engine, placed in the correction section of the UI.
+        let engine = CorrectionEngine;
+        assert_eq!(engine.engine_id(), "correction");
+        assert_eq!(engine.category(), jona_types::EngineCategory::Correction);
+    }
+
+    #[test]
+    fn correction_engine_does_not_pollute_language_selector() {
+        // Correction engines should NOT list supported languages.
+        let engine = CorrectionEngine;
+        assert!(engine.supported_languages().is_empty());
+    }
+
+    #[test]
+    fn user_can_pick_at_least_one_model() {
+        let engine = CorrectionEngine;
+        assert!(!engine.models().is_empty(), "User must be able to choose at least one correction model");
+    }
+
+    #[test]
+    fn no_duplicate_models_in_picker() {
+        let engine = CorrectionEngine;
+        let models = engine.models();
+        let mut ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        let count = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), count, "Duplicate models would confuse the user");
+    }
+
+    #[test]
+    fn all_download_urls_are_secure() {
+        let engine = CorrectionEngine;
+        for model in engine.models() {
+            if let DownloadType::MultiFile { files } = &model.download_type {
+                for file in files {
+                    assert!(file.url.starts_with("https://"),
+                        "Model {} file {} has insecure download URL: {}", model.id, file.filename, file.url);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn models_report_size_for_download_progress() {
+        let engine = CorrectionEngine;
+        for model in engine.models() {
+            assert!(model.size > 0,
+                "Model {} reports zero size, download progress UI would be broken", model.id);
+        }
+    }
+
+    #[test]
+    fn some_models_have_language_recommendations() {
+        // Correction models specify recommended_for languages so the UI can
+        // highlight which model to use for French vs English.
+        let engine = CorrectionEngine;
+        let models = engine.models();
+        let has_recommendations = models.iter().any(|m| m.recommended_for.is_some());
+        assert!(has_recommendations,
+            "At least some correction models should have language recommendations");
+    }
+}
