@@ -49,6 +49,9 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --workspace -- -D warnings
 
+      - name: Frontend tests
+        run: npx vitest run
+
       - name: Cargo test
         working-directory: src-tauri
         run: cargo test --workspace
