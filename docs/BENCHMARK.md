@@ -388,7 +388,7 @@ Voir `docs/AUDIO-PIPELINE.md` pour l'architecture complète du pipeline.
 
 **Pipeline actuel** :
 ```
-Micro (cpal) → WAV 16 kHz → VAD (Silero v5) → Trim silence → ASR
+Micro (cpal) → WAV 16 kHz → VAD (Silero v6.2) → Trim silence → ASR
 ```
 
 **Pipeline hybride proposé** (denoising ciblé) :
@@ -408,8 +408,7 @@ L'idée : le dénoisé sert à améliorer la détection VAD et le confort d'éco
 
 | Modèle | Architecture | Taille | Mémoire | RTF | Précision | Licence | Statut |
 |---|---|---|---|---|---|---|---|
-| **Silero VAD v5** | LSTM ONNX | 2.3 MB | ~5 MB | 0.006 | ROC-AUC : AliMeeting 0.96, AISHELL-4 0.94 | MIT | **✓ Intégré** (`vad.rs`) |
-| **Silero VAD v6.2** | LSTM ONNX | 2 MB | ~5 MB | 0.006 | +16% vs v5 sur bruit réel, child/muted voice | MIT | **Upgrade candidat** — drop-in |
+| **Silero VAD v6.2** | LSTM ONNX | 2.3 MB | ~5 MB | 0.006 | ROC-AUC : AliMeeting 0.96, AISHELL-4 0.94. +16% vs v5 sur bruit réel, voix enfants/étouffées | MIT | **✓ Intégré** (`vad.rs`) |
 | **Earshot** | WebRTC NN (Rust pur) | **75 KB** | 8 KiB | **0.0007** | Non publié (base WebRTC NN) | MIT/Apache-2.0 | **À évaluer** — pyke.io (équipe ort), v1.0 |
 | **TEN VAD** | ONNX | 2.2 MB | ~5 MB | 0.016 | Non publié, claims meilleures transitions | Apache 2.0 + **non-compete** | Écarté — clause non-compete |
 | Picovoice Cobra v2.1 | Propriétaire | N/A | N/A | 0.005 | **98.9% TPR** @ 5% FPR | Propriétaire $899/mois | Écarté — coût |
@@ -423,15 +422,15 @@ L'idée : le dénoisé sert à améliorer la détection VAD et le confort d'éco
 | Crate | Version | Modèle | Deps | Compatible ort 2.0.0-rc.11 | Notes |
 |---|---|---|---|---|---|
 | **`earshot`** | 1.0.0 | WebRTC NN | aucune | N/A (pas d'ort) | **75 KB, no_std, même équipe que ort** |
-| `voice_activity_detector` | 0.2.1 | Silero v5 | ort rc.10 | ✗ conflit ndarray | Licence custom |
+| `voice_activity_detector` | 0.2.1 | Silero v6 | ort rc.10 | ✗ conflit ndarray | Licence custom |
 | `silero-vad-rust` | — | Silero v4/v5 | ort 1.22.x | ✗ | ORT version incompatible |
 | `ten-vad-rs` | 0.1.5 | TEN VAD | ort | Potentiel | Clause non-compete |
 | `webrtc-vad` | 0.4.0 | GMM | C FFI | N/A | Abandonné (2019) |
-| **Direct `ort`** | 2.0.0-rc.11 | Silero | ort | ✓ | **Approche actuelle** (pas de crate VAD — conflits ndarray) |
+| **Direct `ort`** | 2.0.0-rc.11 | Silero v6.2 | ort | ✓ | **Approche actuelle** (pas de crate VAD — conflits ndarray) |
 
 ### VAD — Prochaines étapes
 
-1. **Immédiat** : Upgrade Silero v5 → v6.2 — swap ONNX, même API, CoreML pré-converti disponible.
+1. ~~**Immédiat** : Upgrade Silero v5 → v6.2~~ — **✓ Fait** (modèle ONNX déjà v6.2, même API).
 2. **Court terme** : Évaluer `earshot` — 30x plus petit, 20x plus rapide, zéro dépendance.
 3. **Optionnel** : Double-VAD (earshot pré-filtre rapide + Silero confirme si ambigu).
 
@@ -500,8 +499,7 @@ La VAD neuronale est sans égale. Les techniques classiques ne sont pertinentes 
 
 | Priorité | Action | Effort | Impact |
 |---|---|---|---|
-| **1 — Immédiat** | Upgrade Silero v5 → v6.2 | Très faible (swap .onnx) | -16% erreurs VAD, meilleure gestion voix difficiles |
-| **1 — Immédiat** | Corriger documentation v5/v6 | Trivial | Cohérence code/docs |
+| ~~**1 — Immédiat**~~ | ~~Upgrade Silero → v6.2~~ | ~~Très faible~~ | **✓ Fait** — modèle ONNX déjà v6.2, docs mises à jour |
 | **2 — Court terme** | Évaluer Earshot sur audio réel | Faible (add crate, A/B test) | Potentiel : -95% taille VAD, +20x vitesse |
 | **3 — Moyen terme** | Pipeline hybride denoise-for-VAD | Modéré | Meilleur trimming en environnement bruité |
 | **4 — Optionnel** | Denoising pour playback historique | Modéré | UX : audio propre en relecture |

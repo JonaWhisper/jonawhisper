@@ -95,7 +95,7 @@ Text post-processing pipeline: VAD, punctuation, correction, LLM cleanup.
 | File | Role |
 |------|------|
 | `cleanup/mod.rs` | Re-exports (`LlmError` from `jona_engines::llm_prompt`) |
-| `cleanup/vad.rs` | Voice Activity Detection using Silero VAD v5 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly. Provides `has_speech()` and `trim_silence()`. Fallback: always proceeds on error. |
+| `cleanup/vad.rs` | Voice Activity Detection using Silero VAD v6.2 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly. Provides `has_speech()` and `trim_silence()`. Fallback: always proceeds on error. |
 | `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, disfluency removal (filler word stripping FR/EN), finalize (spacing, capitalization) |
 | `cleanup/symspell_correct.rs` | Spell-check via SymSpell with downloadable frequency dictionaries (FR/EN + regional variants). Lazy-loaded per language via `Mutex<HashMap>`. |
 | `cleanup/itn.rs` | Inverse Text Normalization — numbers, ordinals, percentages, hours, currencies, units (FR/EN). Compositional parser. |

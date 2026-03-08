@@ -71,7 +71,7 @@ All GGUF Q4 quantized, run via llama.cpp with Metal GPU. 11 models available tot
 ### Audio pipeline
 
 ```
-Mic (cpal) → WAV 16 kHz → VAD (Silero v5) → Trim silence → ASR
+Mic (cpal) → WAV 16 kHz → VAD (Silero v6.2) → Trim silence → ASR
 ```
 
 | Stage | Status | Description |

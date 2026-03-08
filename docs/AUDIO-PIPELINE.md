@@ -27,7 +27,7 @@ Sources : [arXiv:2512.17562](https://arxiv.org/abs/2512.17562), [Whisper discuss
 
 ```
 Pipeline actuel :
-  Micro (cpal) → WAV 16 kHz → [1. VAD (Silero v5)] → Trim → ASR
+  Micro (cpal) → WAV 16 kHz → [1. VAD (Silero v6.2)] → Trim → ASR
 
 Pipeline hybride proposé :
   Micro (cpal) → WAV 16 kHz ──┬──► [Denoise copie] → VAD (meilleurs boundaries)
@@ -50,8 +50,7 @@ Pipeline hybride proposé :
 
 | Solution | Taille | Latence | Précision (TPR @ 5% FPR) | Rust | Dépendances |
 |---|---|---|---|---|---|
-| **Silero VAD v5** | 2.3 MB | <1ms / 30ms chunk | ROC-AUC : AliMeeting 0.96, AISHELL-4 0.94 | Direct `ort` (pas de crate VAD — conflits ndarray) | `ort` (ONNX Runtime) |
-| **Silero VAD v6.2** | 2 MB | <1ms / 30ms chunk | +16% vs v5 sur bruit réel | Direct `ort` (drop-in) | `ort` |
+| **Silero VAD v6.2** | 2.3 MB | <1ms / 30ms chunk | ROC-AUC : AliMeeting 0.96, AISHELL-4 0.94. +16% vs v5 sur bruit réel, voix enfants/étouffées | Direct `ort` (pas de crate VAD — conflits ndarray) | `ort` (ONNX Runtime) |
 | **Earshot** | **75 KB** | <0.1ms / chunk | Non publié (base WebRTC NN) | `earshot` crate (Rust pur, no_std) | Aucune |
 | **TEN VAD** | 2.2 MB | Ultra-faible | Non publié, claims meilleures transitions | ONNX via `ort` | `ort` — **⚠ clause non-compete** |
 | RNNoise/nnnoiseless VAD | ~85 KB | <1ms / 10ms frame | Correct (~70%) | Natif (inclus dans nnnoiseless) | Aucune |
@@ -59,13 +58,11 @@ Pipeline hybride proposé :
 | Énergie RMS | 0 | ~1ms | Limité (pas voix vs bruit) | Natif | Aucune |
 | NVIDIA MarbleNet v2 | ~400 KB | <1ms / 20ms | Bon | ONNX via `ort` | `ort` — licence NVIDIA OML restrictive |
 
-**Recommandation** : **Silero VAD v5** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/cleanup/vad.rs`.
+**Recommandation** : **Silero VAD v6.2** — ✅ **Implémenté** via `ort` directement (pas de crate VAD dédiée : `silero-vad-rust`, `silero-vad-rs`, `voice_activity_detector` ont tous des conflits ndarray avec ort 2.0.0-rc.11). Modèle ONNX (~2.3 MB) embarqué via `include_bytes!`. Voir `src-tauri/src/cleanup/vad.rs`.
 - 4x moins d'erreurs que WebRTC VAD
 - <1ms par chunk, 2.3 MB de modèle, état LSTM [2,1,128] + contexte 64 samples
 - Inférence directe : `forward_chunk` → probabilité 0.0-1.0
 - L'app utilise déjà `ort` pour BERT/PCS punctuation + ASR → pas de nouvelle dépendance
-
-**Upgrade ciblé** : Silero v6.2 est un drop-in (+16% précision sur bruit réel, voix enfants/étouffées). CoreML pré-converti disponible.
 
 **Alternative légère** : `earshot` (pyke.io, même équipe que `ort`) — 75 KB, Rust pur, no_std, ~20x plus rapide. À évaluer sur audio réel JonaWhisper.
 
@@ -180,13 +177,12 @@ Ces modèles sont en **16 kHz natif** (pas de resampling nécessaire — notre p
 
 ```
 Phase 1 — VAD seul (haute valeur, effort faible) ✅ DONE
-├── Silero VAD v5 ONNX embarqué, inférence via ort (pas de crate VAD — conflits ndarray)
+├── Silero VAD v6.2 ONNX embarqué, inférence via ort (pas de crate VAD — conflits ndarray)
 ├── Discard si pas de parole (son Basso + pas de transcription)
 ├── Trimming silences début/fin avant Whisper
 └── Toggle vad_enabled dans Settings > Post-traitement (activé par défaut)
 
 Phase 1.5 — Améliorations VAD (haute valeur, effort faible)
-├── Upgrade Silero v5 → v6.2 (swap .onnx, même API, CoreML dispo)
 └── Évaluer earshot (75 KB, Rust pur, 20x plus rapide) — A/B test sur audio réel
 
 Phase 2 — Pipeline hybride denoising (valeur conditionnelle, effort modéré)
@@ -230,7 +226,7 @@ Phase 3 — Presets device (polish UX)
 
 | Crate | Version | Usage | Taille |
 |---|---|---|---|
-| `ort` | 2.0.0-rc.11 | ONNX Runtime — Silero VAD + BERT punctuation | Partagé |
+| `ort` | 2.0.0-rc.11 | ONNX Runtime — Silero VAD v6.2 + BERT punctuation | Partagé |
 | `ndarray` | 0.17 | Tensors pour VAD (état LSTM) | Partagé |
 | `nnnoiseless` | 0.5.2 | Denoising optionnel | ~85 KB embarqué |
 | `deep_filter` | Git | Denoising haute qualité (Phase 2+) | ~8 MB modèle |

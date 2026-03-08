@@ -308,7 +308,7 @@ Le helper `run_local_engine()` factorise le dispatch (catalog lookup → spawn_b
 | `cleanup/itn.rs` | Étape 8 : ITN (nombres, ordinaux, %, heures, devises, unités FR/EN) |
 | `cleanup/symspell_correct.rs` | Étape 5 : spell-check SymSpell (dicts téléchargeables, GitHub Releases) |
 | `cleanup/llm_cloud.rs` | Cloud LLM cleanup (OpenAI/Anthropic API) |
-| `cleanup/vad.rs` | VAD Silero v5 (ONNX, pré-transcription) |
+| `cleanup/vad.rs` | VAD Silero v6.2 (ONNX, pré-transcription) |
 | `crates/jona-engine-bert/` | Étape 4 : catalogue + inférence BERT punctuation (ort + Candle, 2 modèles) |
 | `crates/jona-engine-pcs/` | Étape 4 : catalogue + inférence PCS punctuation (ort, 1 modèle, 47 langues) |
 | `crates/jona-engine-correction/` | Étape 6 : catalogue + inférence T5 correction (ort ONNX, 4 modèles, décodage autorégressif) |
