@@ -14,7 +14,7 @@ pub fn get_engines() -> Vec<EngineInfo> {
 }
 
 #[tauri::command]
-pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Value> {
+pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<serde_json::Value>, AppError> {
     let cat = catalog();
     let language = state.settings.lock().unwrap().selected_language.clone();
     let recommended_ids = cat.recommended_model_ids(&language);
@@ -22,12 +22,13 @@ pub fn get_models(state: tauri::State<'_, Arc<AppState>>) -> Vec<serde_json::Val
         let downloaded = m.is_downloaded();
         let recommended = recommended_ids.contains(&m.id);
         let partial = if downloaded { None } else { downloader::partial_progress(&m) };
-        let mut json = serde_json::to_value(&m).unwrap();
+        let mut json = serde_json::to_value(&m)
+            .map_err(|e| AppError::Other(e.to_string()))?;
         let obj = json.as_object_mut().unwrap();
         obj.insert("is_downloaded".into(), downloaded.into());
         obj.insert("recommended".into(), recommended.into());
         obj.insert("partial_progress".into(), serde_json::json!(partial));
-        json
+        Ok(json)
     }).collect()
 }
 
@@ -47,14 +48,14 @@ pub async fn download_model_cmd(
 }
 
 #[tauri::command]
-pub async fn delete_model_cmd(app: AppHandle, id: String) -> bool {
+pub async fn delete_model_cmd(app: AppHandle, id: String) -> Result<bool, AppError> {
     let result = tokio::task::spawn_blocking(move || {
         catalog()
             .model_by_id(&id)
             .is_some_and(|m| downloader::delete_model(&m))
-    }).await.unwrap_or(false);
+    }).await.map_err(|e| AppError::Other(e.to_string()))?;
     let _ = app.emit(events::MODELS_CHANGED, ());
-    result
+    Ok(result)
 }
 
 #[tauri::command]

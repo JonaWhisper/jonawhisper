@@ -1,3 +1,4 @@
+use crate::errors::AppError;
 use crate::events;
 use crate::state::{AppState, Provider};
 use std::sync::Arc;
@@ -51,8 +52,8 @@ pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
 }
 
 #[tauri::command]
-pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, String> {
-    provider.validate_url().map_err(|e| e.to_string())?;
+pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, AppError> {
+    provider.validate_url().map_err(|e| AppError::Other(e.to_string()))?;
 
     // If api_key is masked (editing mode), use the stored key
     let mut resolved = provider.clone();
@@ -66,5 +67,5 @@ pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, A
     jona_provider::backend(resolved.kind)
         .list_models(&resolved)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| AppError::Other(e.to_string()))
 }

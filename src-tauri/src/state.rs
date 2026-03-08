@@ -216,23 +216,26 @@ impl AppState {
         }
     }
 
-    pub fn delete_history_entry(&self, timestamp: u64) {
+    pub fn delete_history_entry(&self, timestamp: u64) -> Result<(), rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
-        let _ = db.execute("DELETE FROM history WHERE timestamp = ?1", [timestamp]);
+        db.execute("DELETE FROM history WHERE timestamp = ?1", [timestamp])?;
+        Ok(())
     }
 
-    pub fn delete_history_day(&self, day_timestamp: u64) {
+    pub fn delete_history_day(&self, day_timestamp: u64) -> Result<(), rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
         let day_end = day_timestamp + 86400;
-        let _ = db.execute(
+        db.execute(
             "DELETE FROM history WHERE timestamp >= ?1 AND timestamp < ?2",
             [day_timestamp, day_end],
-        );
+        )?;
+        Ok(())
     }
 
-    pub fn clear_history(&self) {
+    pub fn clear_history(&self) -> Result<(), rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
-        let _ = db.execute("DELETE FROM history", []);
+        db.execute("DELETE FROM history", [])?;
+        Ok(())
     }
 }
 
@@ -434,7 +437,7 @@ mod tests {
         state.add_history_at(100, entry("Keep me", "", ""));
         state.add_history_at(200, entry("Delete me", "", ""));
 
-        state.delete_history_entry(200);
+        state.delete_history_entry(200).unwrap();
         let results = state.get_history("", 10, None).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].text, "Keep me");
@@ -449,7 +452,7 @@ mod tests {
         state.add_history_at(day_start + 86400 + 100, entry("Next day", "", ""));
         state.add_history_at(day_start - 100, entry("Previous day", "", ""));
 
-        state.delete_history_day(day_start);
+        state.delete_history_day(day_start).unwrap();
 
         let results = state.get_history("", 10, None).unwrap();
         assert_eq!(results.len(), 2);
@@ -465,7 +468,7 @@ mod tests {
         }
         assert_eq!(state.history_count("").unwrap(), 10);
 
-        state.clear_history();
+        state.clear_history().unwrap();
         assert_eq!(state.history_count("").unwrap(), 0);
         assert!(state.get_history("", 10, None).unwrap().is_empty());
     }

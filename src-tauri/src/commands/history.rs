@@ -17,16 +17,19 @@ pub fn get_history(query: String, limit: u32, cursor: Option<u64>, state: tauri:
 }
 
 #[tauri::command]
-pub fn delete_history_entry(timestamp: u64, state: tauri::State<'_, Arc<AppState>>) {
-    state.delete_history_entry(timestamp);
+pub fn delete_history_entry(timestamp: u64, state: tauri::State<'_, Arc<AppState>>) -> Result<(), AppError> {
+    state.delete_history_entry(timestamp)?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn delete_history_day(day_timestamp: u64, state: tauri::State<'_, Arc<AppState>>) {
-    state.delete_history_day(day_timestamp);
+pub fn delete_history_day(day_timestamp: u64, state: tauri::State<'_, Arc<AppState>>) -> Result<(), AppError> {
+    state.delete_history_day(day_timestamp)?;
+    Ok(())
 }
 
 #[tauri::command]
-pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) {
-    state.clear_history();
+pub fn clear_history(state: tauri::State<'_, Arc<AppState>>) -> Result<(), AppError> {
+    state.clear_history()?;
+    Ok(())
 }
