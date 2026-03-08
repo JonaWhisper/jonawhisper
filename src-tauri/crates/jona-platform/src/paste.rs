@@ -11,7 +11,10 @@ pub fn paste_text(app: &AppHandle, text: &str) {
     // Small delay to ensure clipboard is ready
     std::thread::sleep(std::time::Duration::from_millis(50));
 
-    simulate_paste();
+    if let Err(e) = simulate_paste() {
+        log::error!("Failed to simulate paste: {}", e);
+        return;
+    }
 
     // Allow paste to complete before next operation
     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -19,35 +22,38 @@ pub fn paste_text(app: &AppHandle, text: &str) {
 
 /// Simulate Cmd+V on macOS.
 #[cfg(target_os = "macos")]
-fn simulate_paste() {
+fn simulate_paste() -> Result<(), String> {
     use core_graphics::event::{CGEvent, CGEventFlags};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
     let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
-        .expect("Failed to create event source");
+        .ok_or("Failed to create CGEventSource")?;
 
     // Key code 9 = 'V'
     let key_down = CGEvent::new_keyboard_event(source.clone(), 9, true)
-        .expect("Failed to create key down event");
+        .ok_or("Failed to create key down event")?;
     key_down.set_flags(CGEventFlags::CGEventFlagCommand);
 
     let key_up = CGEvent::new_keyboard_event(source, 9, false)
-        .expect("Failed to create key up event");
+        .ok_or("Failed to create key up event")?;
     key_up.set_flags(CGEventFlags::CGEventFlagCommand);
 
     key_down.post(core_graphics::event::CGEventTapLocation::HID);
     key_up.post(core_graphics::event::CGEventTapLocation::HID);
+    Ok(())
 }
 
 /// Simulate Ctrl+V on Windows.
 #[cfg(target_os = "windows")]
-fn simulate_paste() {
+fn simulate_paste() -> Result<(), String> {
     // TODO: implement with SendInput
     log::warn!("Paste simulation not yet implemented for Windows");
+    Ok(())
 }
 
 /// Stub for unsupported platforms.
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn simulate_paste() {
+fn simulate_paste() -> Result<(), String> {
     log::warn!("Paste simulation not implemented for this platform");
+    Ok(())
 }

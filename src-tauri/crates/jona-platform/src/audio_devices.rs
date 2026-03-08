@@ -291,8 +291,10 @@ pub fn start_device_change_listener(callback: impl Fn() + Send + 'static) {
             _id: u32, _count: u32, _addresses: *const ca::AudioObjectPropertyAddress,
             _client_data: *mut c_void,
         ) -> i32 {
-            if let Some(ref cb) = *DEVICE_CHANGE_CALLBACK.lock().unwrap() {
-                cb();
+            if let Some(guard) = DEVICE_CHANGE_CALLBACK.lock().ok() {
+                if let Some(ref cb) = *guard {
+                    cb();
+                }
             }
             0
         }
