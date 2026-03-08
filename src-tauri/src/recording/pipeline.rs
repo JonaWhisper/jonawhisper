@@ -255,12 +255,18 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     // Step 2b: spell-check (SymSpell) — runs after punctuation, before correction
     if spellcheck_enabled {
         let before = processed.clone();
-        processed = cleanup::symspell_correct::auto_correct(&processed, &lang, word_confidences);
+        let (corrected, protected_words) = cleanup::symspell_correct::auto_correct(&processed, &lang, word_confidences);
+        processed = corrected;
         if processed != before {
             log::debug!("SymSpell: «{}» → «{}»", before, processed);
             pipeline_steps.push(("spellcheck", processed.clone()));
         } else {
             pipeline_steps.push(("spellcheck:nochange", String::new()));
+        }
+        if !protected_words.is_empty() {
+            if let Ok(json) = serde_json::to_string(&protected_words) {
+                pipeline_steps.push(("spellcheck:protected", json));
+            }
         }
     }
 

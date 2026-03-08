@@ -151,6 +151,33 @@ const stepsError = computed(() => {
   return names
 })
 
+// Protected words from spellcheck guards
+interface ProtectedWord {
+  word: string
+  reason: string
+}
+
+const protectedWords = computed<ProtectedWord[]>(() => {
+  for (const s of pipelineSteps.value) {
+    if (s.step === 'spellcheck:protected' && s.text) {
+      try {
+        return JSON.parse(s.text) as ProtectedWord[]
+      } catch { return [] }
+    }
+  }
+  return []
+})
+
+function formatProtectedReason(reason: string): string {
+  if (reason === 'user-dict') return t('history.badge.protectedUserDict')
+  if (reason.startsWith('cross-lang:')) return t('history.badge.protectedCrossLang')
+  if (reason.startsWith('confidence:')) {
+    const score = reason.split(':')[1]
+    return t('history.badge.protectedConfidence', { score })
+  }
+  return reason
+}
+
 // -- Pipeline stepper UI --
 
 interface PipelineIcon {
@@ -232,6 +259,14 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
   })
 
   // 6. Spellcheck
+  const pw = protectedWords.value
+  let spellTooltip = t('history.badge.spellcheckTooltip')
+  if (stepsNoChange.value.has('spellcheck')) spellTooltip += ` (${t('history.badge.noChange')})`
+  if (stepsError.value.has('spellcheck')) spellTooltip += ` (${t('history.badge.error')})`
+  if (pw.length > 0) {
+    spellTooltip += `\n${t('history.badge.protected', { count: pw.length })}: `
+      + pw.map(p => `${p.word} (${formatProtectedReason(p.reason)})`).join(', ')
+  }
   icons.push({
     id: 'spellcheck',
     icon: BookA,
@@ -239,7 +274,7 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     hasDiff: stepsWithDiff.value.has('spellcheck'),
     noChange: stepsNoChange.value.has('spellcheck'),
     hasError: stepsError.value.has('spellcheck'),
-    tooltip: t('history.badge.spellcheckTooltip') + (stepsNoChange.value.has('spellcheck') ? ` (${t('history.badge.noChange')})` : '') + (stepsError.value.has('spellcheck') ? ` (${t('history.badge.error')})` : ''),
+    tooltip: spellTooltip,
     color: 'text-lime-600',
   })
 
@@ -338,7 +373,7 @@ watch(() => props.entry.timestamp, () => {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" :side-offset="4">
-                <span class="text-[11px]">{{ step.tooltip }}</span>
+                <span class="text-[11px] whitespace-pre-line">{{ step.tooltip }}</span>
               </TooltipContent>
             </Tooltip>
           </template>

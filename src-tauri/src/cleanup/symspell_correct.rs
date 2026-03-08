@@ -15,10 +15,18 @@
 
 use jona_engine_lm::KenLMModel;
 use rphonetic::DoubleMetaphone;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::{LazyLock, Mutex};
 use std::time::SystemTime;
 use symspell::{SymSpell, UnicodeStringStrategy, Verbosity};
+
+/// A word that was protected (kept as-is) by a guard during spell-check.
+#[derive(Debug, Clone, Serialize)]
+pub struct ProtectedWord {
+    pub word: String,
+    pub reason: String,
+}
 
 /// Double Metaphone encoder for phonetic similarity scoring.
 /// Works reasonably well across European languages for ASR error patterns.
@@ -373,7 +381,7 @@ const CONFIDENCE_SKIP_THRESHOLD: f32 = 0.85;
 /// Bumped from 3→4 to avoid false positives on common short words ("vois"→"vous", etc.)
 const MIN_CORRECTION_LEN: usize = 4;
 
-pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::WordConfidence]) -> String {
+pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::WordConfidence]) -> (String, Vec<ProtectedWord>) {
     refresh_user_dict();
 
     // Build a map from lowercase word → confidence for O(1) lookup
@@ -385,6 +393,7 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
         let words = word_boundaries(text);
         let have_lm = get_lm(language);
         let mut result = String::with_capacity(text.len());
+        let mut protected = Vec::new();
         let mut last_end = 0;
         // Collect lowercase words for LM context window
         let word_lowers: Vec<String> = words.iter().map(|(_, w)| w.to_lowercase()).collect();
@@ -410,6 +419,10 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
 
             // Skip user dictionary words (never correct them)
             if is_user_word(word) {
+                protected.push(ProtectedWord {
+                    word: word.to_string(),
+                    reason: "user-dict".to_string(),
+                });
                 result.push_str(word);
                 continue;
             }
@@ -419,6 +432,10 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
             if let Some(&conf) = confidence_map.get(&lower) {
                 if conf > CONFIDENCE_SKIP_THRESHOLD {
                     log::trace!("SymSpell: skip '{}' (confidence={:.2})", word, conf);
+                    protected.push(ProtectedWord {
+                        word: word.to_string(),
+                        reason: format!("confidence:{:.2}", conf),
+                    });
                     result.push_str(word);
                     continue;
                 }
@@ -455,6 +472,10 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
             // it's likely a valid loanword/anglicism (e.g. "scoring" in French).
             // Only check EN when correcting non-EN, since English loanwords are ubiquitous.
             if is_cross_language_word(&lower, language) {
+                protected.push(ProtectedWord {
+                    word: word.to_string(),
+                    reason: "cross-lang:en".to_string(),
+                });
                 result.push_str(word);
                 continue;
             }
@@ -535,9 +556,9 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
         }
 
         result.push_str(&text[last_end..]);
-        result
+        (result, protected)
     })
-    .unwrap_or_else(|| text.to_string())
+    .unwrap_or_else(|| (text.to_string(), Vec::new()))
 }
 
 /// Score correction candidates using KenLM trigram context.
@@ -709,7 +730,7 @@ mod tests {
 
     /// Test helper: call auto_correct with no confidence data (empty slice).
     fn ac(text: &str, lang: &str) -> String {
-        auto_correct(text, lang, &[])
+        auto_correct(text, lang, &[]).0
     }
 
     static DICTS_READY: OnceLock<bool> = OnceLock::new();
@@ -1027,8 +1048,10 @@ mod tests {
         let confidences = vec![
             jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.95) },
         ];
-        let result = auto_correct("helo", "en", &confidences);
+        let (result, protected) = auto_correct("helo", "en", &confidences);
         assert_eq!(result, "helo", "High-confidence word should not be corrected");
+        assert!(protected.iter().any(|p| p.word == "helo" && p.reason.starts_with("confidence:")),
+            "High-confidence word should be in protected list");
     }
 
     #[test]
@@ -1038,7 +1061,7 @@ mod tests {
         let confidences = vec![
             jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.3) },
         ];
-        let result = auto_correct("helo", "en", &confidences);
+        let (result, _) = auto_correct("helo", "en", &confidences);
         assert!(result.contains("hello") || result.contains("help"),
             "Low-confidence word should be corrected: {}", result);
     }
@@ -1047,7 +1070,7 @@ mod tests {
     fn test_no_confidence_data_still_corrects() {
         require_dicts!();
         // No confidence data = correct as usual
-        let result = auto_correct("helo world", "en", &[]);
+        let (result, _) = auto_correct("helo world", "en", &[]);
         assert!(result != "helo world" || result == "helo world",
             "Without confidence data, correction should still work");
     }
@@ -1068,7 +1091,7 @@ mod tests {
             jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.3) },
             jona_types::WordConfidence { word: "world".into(), confidence: Some(0.95) },
         ];
-        let result = auto_correct("helo world", "en", &confidences);
+        let (result, _) = auto_correct("helo world", "en", &confidences);
         assert!(result.contains("world"), "High-confidence 'world' should be preserved");
     }
 
@@ -1079,7 +1102,7 @@ mod tests {
         let confidences = vec![
             jona_types::WordConfidence { word: "helo".into(), confidence: None },
         ];
-        let result = auto_correct("helo", "en", &confidences);
+        let (result, _) = auto_correct("helo", "en", &confidences);
         // Should still attempt correction since confidence is unknown
         assert!(result != "helo" || result == "helo",
             "With None confidence, normal correction rules apply");
@@ -1092,7 +1115,7 @@ mod tests {
         let confidences = vec![
             jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.85) },
         ];
-        let result = auto_correct("helo", "en", &confidences);
+        let (result, _) = auto_correct("helo", "en", &confidences);
         // At exactly 0.85, word should still be corrected (threshold is >0.85)
         assert!(result != "helo" || result == "helo");
     }
@@ -1104,7 +1127,7 @@ mod tests {
         let confidences = vec![
             jona_types::WordConfidence { word: "helo".into(), confidence: Some(0.86) },
         ];
-        let result = auto_correct("helo", "en", &confidences);
+        let (result, _) = auto_correct("helo", "en", &confidences);
         assert_eq!(result, "helo", "Word above confidence threshold should not be corrected");
     }
 
@@ -1115,7 +1138,7 @@ mod tests {
         let confidences = vec![
             jona_types::WordConfidence { word: "hello".into(), confidence: Some(0.2) },
         ];
-        let result = auto_correct("hello", "en", &confidences);
+        let (result, _) = auto_correct("hello", "en", &confidences);
         assert_eq!(result, "hello", "Known word should never be corrected");
     }
 
@@ -1123,7 +1146,7 @@ mod tests {
     fn test_empty_confidences_corrects_unknown_words() {
         require_dicts!();
         // No confidence data at all = correct unknown words normally
-        let result = auto_correct("Bonojur le monde", "fr", &[]);
+        let (result, _) = auto_correct("Bonojur le monde", "fr", &[]);
         assert!(result.contains("Bonjour"), "Without confidence data, unknown words should be corrected: {}", result);
     }
 
