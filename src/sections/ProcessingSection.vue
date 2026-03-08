@@ -5,13 +5,13 @@ import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getLlmModels } from '@/config/providers'
-import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
 import ModelOption from '@/components/ModelOption.vue'
+import SettingToggle from '@/components/SettingToggle.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -88,6 +88,10 @@ function onMaxTokensSliderCommit(v: number[]) {
   const val = v[0] ?? settings.llmMaxTokens
   settings.setSetting('llm_max_tokens', String(val))
 }
+
+function onToggle(v: boolean, key: string) {
+  settings.setSetting(key, String(v))
+}
 </script>
 
 <template>
@@ -97,15 +101,13 @@ function onMaxTokensSliderCommit(v: number[]) {
     <!-- Pre-processing card -->
     <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.postProcessing.vad') }}</div>
-      <div class="flex items-center justify-between py-2 gap-3">
-        <div>
-          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.vad') }}</div>
-        </div>
-        <Switch
-          :model-value="settings.vadEnabled"
-          @update:model-value="(v: boolean) => settings.setSetting('vad_enabled', String(v))"
-        />
-      </div>
+      <SettingToggle
+        setting-key="vad_enabled"
+        :model-value="settings.vadEnabled"
+        :label="t('settings.postProcessing.vad')"
+        :border-top="false"
+        @update:model-value="onToggle"
+      />
     </div>
 
     <!-- Post-processing card -->
@@ -113,52 +115,39 @@ function onMaxTokensSliderCommit(v: number[]) {
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.postProcessing.textCleanup') }}</div>
 
       <!-- Hallucination filter -->
-      <div class="flex items-center justify-between py-2 gap-3">
-        <div>
-          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.hallucinations') }}</div>
-        </div>
-        <Switch
-          :model-value="settings.hallucinationFilterEnabled"
-          @update:model-value="(v: boolean) => settings.setSetting('hallucination_filter_enabled', String(v))"
-        />
-      </div>
+      <SettingToggle
+        setting-key="hallucination_filter_enabled"
+        :model-value="settings.hallucinationFilterEnabled"
+        :label="t('settings.postProcessing.hallucinations')"
+        :border-top="false"
+        @update:model-value="onToggle"
+      />
 
       <!-- Disfluency removal -->
-      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
-        <div>
-          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.disfluencyRemoval') }}</div>
-        </div>
-        <Switch
-          :model-value="settings.disfluencyRemovalEnabled"
-          @update:model-value="(v: boolean) => settings.setSetting('disfluency_removal_enabled', String(v))"
-        />
-      </div>
+      <SettingToggle
+        setting-key="disfluency_removal_enabled"
+        :model-value="settings.disfluencyRemovalEnabled"
+        :label="t('settings.postProcessing.disfluencyRemoval')"
+        @update:model-value="onToggle"
+      />
 
       <!-- ITN (Inverse Text Normalization) -->
-      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
-        <div>
-          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.itn') }}</div>
-        </div>
-        <Switch
-          :model-value="settings.itnEnabled"
-          @update:model-value="(v: boolean) => settings.setSetting('itn_enabled', String(v))"
-        />
-      </div>
+      <SettingToggle
+        setting-key="itn_enabled"
+        :model-value="settings.itnEnabled"
+        :label="t('settings.postProcessing.itn')"
+        @update:model-value="onToggle"
+      />
 
       <!-- Spell-check -->
-      <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider" :class="{ 'opacity-40': !engines.hasSpellcheckDict }">
-        <div>
-          <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.spellcheck') }}</div>
-          <div v-if="!engines.hasSpellcheckDict" class="text-[11px] text-muted-foreground">
-            {{ t('settings.postProcessing.spellcheckNoDict') }}
-          </div>
-        </div>
-        <Switch
-          :model-value="settings.spellcheckEnabled"
-          :disabled="!engines.hasSpellcheckDict"
-          @update:model-value="(v: boolean) => settings.setSetting('spellcheck_enabled', String(v))"
-        />
-      </div>
+      <SettingToggle
+        setting-key="spellcheck_enabled"
+        :model-value="settings.spellcheckEnabled"
+        :label="t('settings.postProcessing.spellcheck')"
+        :description="!engines.hasSpellcheckDict ? t('settings.postProcessing.spellcheckNoDict') : undefined"
+        :disabled="!engines.hasSpellcheckDict"
+        @update:model-value="onToggle"
+      />
 
       <!-- Punctuation dropdown -->
       <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
