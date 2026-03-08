@@ -128,8 +128,21 @@ fn apply_regex_list(text: &str, rules: &[(Regex, &str)]) -> String {
     result
 }
 
+/// Symbols that are always recognized as units (language-independent, after regex replacement).
+const UNIT_SYMBOLS: &[&str] = &[
+    "$", "\u{20ac}", "\u{00a3}", "%", "km", "kg", "g", "L", "mL", "m", "cm", "mm", "mi", "\u{00b0}",
+    "h", "min", "s",
+];
+
+/// Check if a word is a known unit, using the language-specific list + universal symbols.
+fn is_unit_word(word: &str, lang_units: &[&str]) -> bool {
+    let lower = word.to_lowercase();
+    lang_units.iter().any(|u| lower == *u)
+        || UNIT_SYMBOLS.iter().any(|u| word == *u)
+}
+
 /// Split text into words, try to parse number sequences, replace with digits.
-fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>) -> String {
+fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>, lang_units: &[&str]) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.is_empty() {
         return text.to_string();
@@ -144,12 +157,16 @@ fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>) -> S
         result.push_str(&text[text_pos..word_pos]);
 
         if let Some((value, consumed)) = parser(&words[i..]) {
-            // Don't convert standalone "un"/"une"/"a"/"one" — too ambiguous
+            // Don't convert standalone "un"/"une"/"a"/"one" — too ambiguous as article
+            // UNLESS the next word is a known unit (heure, euro, kilo, etc.)
             if consumed == 1 && value <= 1 {
-                result.push_str(words[i]);
-                text_pos = word_pos + words[i].len();
-                i += 1;
-                continue;
+                let next_is_unit = words.get(i + 1).is_some_and(|w| is_unit_word(w, lang_units));
+                if !next_is_unit {
+                    result.push_str(words[i]);
+                    text_pos = word_pos + words[i].len();
+                    i += 1;
+                    continue;
+                }
             }
 
             result.push_str(&value.to_string());

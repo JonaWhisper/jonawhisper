@@ -144,13 +144,23 @@ regex_rules!(RE_UNITS_PT, [
     (r"(?i)\bgraus?\b", "\u{00B0}")
 ]);
 
+const UNITS_PT: &[&str] = &[
+    "hora", "horas", "minuto", "minutos", "segundo", "segundos",
+    "euro", "euros", "d\u{00f3}lar", "d\u{00f3}lares", "libra", "libras",
+    "quilo", "quilos", "quilograma", "quilogramas", "grama", "gramas",
+    "litro", "litros", "metro", "metros",
+    "quil\u{00f3}metro", "quil\u{00f3}metros", "quil\u{00f4}metro", "quil\u{00f4}metros",
+    "cent\u{00ed}metro", "cent\u{00ed}metros", "mil\u{00ed}metro", "mil\u{00ed}metros",
+    "grau", "graus", "porcento",
+];
+
 pub(super) fn apply_all(text: &str) -> String {
     let mut r = super::apply_regex_list(text, &RE_PCT_PT);
     r = super::apply_regex_list(&r, &RE_HOURS_PT);
     r = super::apply_regex_list(&r, &RE_CURRENCY_PT);
     r = super::apply_regex_list(&r, &RE_ORDINAL_PT);
     r = super::apply_regex_list(&r, &RE_UNITS_PT);
-    super::replace_numbers(&r, parse_pt_number)
+    super::replace_numbers(&r, parse_pt_number, UNITS_PT)
 }
 
 #[cfg(test)]

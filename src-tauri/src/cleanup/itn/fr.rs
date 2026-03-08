@@ -170,6 +170,17 @@ static RE_UNITS_FR: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
     ]
 });
 
+/// French unit words for "un/une" disambiguation.
+const UNITS_FR: &[&str] = &[
+    "heure", "heures", "minute", "minutes", "seconde", "secondes",
+    "euro", "euros", "dollar", "dollars", "livre", "livres",
+    "kilo", "kilos", "kilogramme", "kilogrammes", "gramme", "grammes",
+    "litre", "litres", "millilitre", "millilitres",
+    "m\u{00e8}tre", "m\u{00e8}tres", "kilom\u{00e8}tre", "kilom\u{00e8}tres",
+    "centim\u{00e8}tre", "centim\u{00e8}tres", "millim\u{00e8}tre", "millim\u{00e8}tres",
+    "degr\u{00e9}", "degr\u{00e9}s", "pourcent",
+];
+
 pub(super) fn apply_all(text: &str) -> String {
     let mut r = RE_PCT_FR.replace_all(text, "%").to_string();
     // Currencies
@@ -179,7 +190,7 @@ pub(super) fn apply_all(text: &str) -> String {
     // Units
     r = super::apply_regex_list(&r, &RE_UNITS_FR);
     // Cardinals (must run before hours so "trois heures" → "3 heures")
-    r = super::replace_numbers(&r, parse_fr_number);
+    r = super::replace_numbers(&r, parse_fr_number, UNITS_FR);
     // Hours (after number conversion: "3 heures" → "3 h", but not standalone "heure")
     for (re, replacement) in RE_HOURS_FR.iter() {
         r = re.replace_all(&r, *replacement).to_string();
@@ -284,8 +295,10 @@ mod tests {
         // "heure" without a number before it should NOT be converted to "h"
         assert_eq!(apply_itn("on va parler en heure", "fr"), "on va parler en heure");
         assert_eq!(apply_itn("c'est l'heure de partir", "fr"), "c'est l'heure de partir");
-        // "une" standalone is not converted to "1" (too ambiguous with article)
-        assert_eq!(apply_itn("une heure de vol", "fr"), "une heure de vol");
+        // "une" before a unit IS converted to "1"
+        assert_eq!(apply_itn("une heure de vol", "fr"), "1 h de vol");
+        // "une" before a non-unit stays as article
+        assert_eq!(apply_itn("une pomme", "fr"), "une pomme");
     }
 
     #[test]

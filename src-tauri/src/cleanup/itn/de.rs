@@ -168,13 +168,20 @@ regex_rules!(RE_UNITS_DE, [
     (r"(?i)\bGrad\b", "\u{00B0}")
 ]);
 
+const UNITS_DE: &[&str] = &[
+    "stunde", "stunden", "minute", "minuten", "sekunde", "sekunden",
+    "euro", "dollar", "pfund", "kilo", "kilogramm", "gramm",
+    "liter", "meter", "kilometer", "zentimeter", "millimeter",
+    "grad", "prozent",
+];
+
 pub(super) fn apply_all(text: &str) -> String {
     let mut r = super::apply_regex_list(text, &RE_PCT_DE);
     r = super::apply_regex_list(&r, &RE_HOURS_DE);
     r = super::apply_regex_list(&r, &RE_CURRENCY_DE);
     r = super::apply_regex_list(&r, &RE_ORDINAL_DE);
     r = super::apply_regex_list(&r, &RE_UNITS_DE);
-    super::replace_numbers(&r, parse_de_number)
+    super::replace_numbers(&r, parse_de_number, UNITS_DE)
 }
 
 #[cfg(test)]

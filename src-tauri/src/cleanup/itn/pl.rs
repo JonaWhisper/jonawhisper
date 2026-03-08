@@ -137,13 +137,20 @@ regex_rules!(RE_UNITS_PL, [
     (r"(?i)\bstopie\u{0144}\b", "\u{00B0}")
 ]);
 
+const UNITS_PL: &[&str] = &[
+    "godzina", "godziny", "godzin", "minuta", "minuty", "minut",
+    "sekunda", "sekundy", "sekund", "euro", "dolar", "funt",
+    "kilogram", "gram", "litr", "metr", "kilometr", "centymetr", "milimetr",
+    "stopie\u{0144}", "stopni", "procent",
+];
+
 pub(super) fn apply_all(text: &str) -> String {
     let mut r = super::apply_regex_list(text, &RE_PCT_PL);
     r = super::apply_regex_list(&r, &RE_HOURS_PL);
     r = super::apply_regex_list(&r, &RE_CURRENCY_PL);
     r = super::apply_regex_list(&r, &RE_ORDINAL_PL);
     r = super::apply_regex_list(&r, &RE_UNITS_PL);
-    super::replace_numbers(&r, parse_pl_number)
+    super::replace_numbers(&r, parse_pl_number, UNITS_PL)
 }
 
 #[cfg(test)]

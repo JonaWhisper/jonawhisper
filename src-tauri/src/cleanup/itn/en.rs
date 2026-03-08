@@ -176,13 +176,22 @@ static RE_UNITS_EN: LazyLock<Vec<(Regex, &str)>> = LazyLock::new(|| {
     ]
 });
 
+const UNITS_EN: &[&str] = &[
+    "hour", "hours", "minute", "minutes", "second", "seconds",
+    "dollar", "dollars", "pound", "pounds", "euro", "euros",
+    "kilogram", "kilograms", "gram", "grams", "liter", "liters",
+    "milliliter", "milliliters", "meter", "meters", "kilometer", "kilometers",
+    "centimeter", "centimeters", "millimeter", "millimeters",
+    "degree", "degrees", "percent", "mile", "miles",
+];
+
 pub(super) fn apply_all(text: &str) -> String {
     let mut r = RE_PCT_EN.replace_all(text, "%").to_string();
     r = super::apply_regex_list(&r, &RE_HOURS_EN);
     r = super::apply_regex_list(&r, &RE_CURRENCY_EN);
     r = super::apply_regex_list(&r, &RE_ORDINAL_EN);
     r = super::apply_regex_list(&r, &RE_UNITS_EN);
-    super::replace_numbers(&r, parse_en_number)
+    super::replace_numbers(&r, parse_en_number, UNITS_EN)
 }
 
 #[cfg(test)]
@@ -264,5 +273,15 @@ mod tests {
     #[test]
     fn degrees() {
         assert_eq!(apply_itn("seventy degrees", "en"), "70 \u{00B0}");
+    }
+
+    #[test]
+    fn one_before_unit() {
+        // "one" before a unit should be converted to "1"
+        assert_eq!(apply_itn("one hour later", "en"), "1 hour later");
+        assert_eq!(apply_itn("one dollar", "en"), "1 $");
+        // "one" before a non-unit stays as text — but "one" consumed=1 value=1
+        // so it won't be converted (article ambiguity)
+        assert_eq!(apply_itn("one cat", "en"), "one cat");
     }
 }
