@@ -47,10 +47,10 @@ All processing happens on your machine — no data leaves your Mac unless you ch
 
 | Engine | Params | Size | Languages | Speed |
 |--------|--------|------|-----------|-------|
-| **GEC T5 Small** | 60M | 242 MB | 11 (multilingual) | ~200ms |
-| T5 Spell FR | 220M | 892 MB | FR | ~500ms |
-| FlanEC Base | 250M | 990 MB | EN | ~500ms |
-| FlanEC Large | 800M | 3.1 GB | EN | ~1s |
+| **GEC T5 Small** | 60M | 96 MB | 11 (multilingual) | ~200ms |
+| T5 Spell FR | 220M | 276 MB | FR | ~500ms |
+| FlanEC Base | 250M | 276 MB | EN | ~500ms |
+| FlanEC Large | 800M | 821 MB | EN | ~1s |
 
 All run via ONNX Runtime with CoreML, autoregressive decoding with repeat penalty and n-gram blocking.
 

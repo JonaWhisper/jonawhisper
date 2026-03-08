@@ -280,10 +280,10 @@ Pipeline texte actuel (8 étapes) :
 
 | Modèle | ID | Params | Taille | Langues | Vitesse | Anti-hallucination | Statut |
 |---|---|---|---|---|---|---|---|
-| **GEC T5 Small** | `correction:gec-t5-small` | 60M | 242 MB | Multilingue (11 langues) | ~200ms | Repeat penalty 1.5, n-gram block | **Intégré** — **Recommandé** |
-| T5 Spell FR | `correction:t5-spell-fr` | 220M | 892 MB | FR | ~500ms | Repeat penalty 1.5, n-gram block | **Intégré** |
-| FlanEC Base | `correction:flanec-base` | 250M | 990 MB | EN | ~500ms | Repeat penalty 1.5, n-gram block | **Intégré** |
-| FlanEC Large | `correction:flanec-large` | 800M | 3.1 GB | EN | ~1s | Repeat penalty 1.5, n-gram block | **Intégré** |
+| **GEC T5 Small** | `correction:gec-t5-small` | 60M | 96 MB | Multilingue (11 langues) | ~200ms | Repeat penalty 1.5, n-gram block | **Intégré** — **Recommandé** |
+| T5 Spell FR | `correction:t5-spell-fr` | 220M | 276 MB | FR | ~500ms | Repeat penalty 1.5, n-gram block | **Intégré** |
+| FlanEC Base | `correction:flanec-base` | 250M | 276 MB | EN | ~500ms | Repeat penalty 1.5, n-gram block | **Intégré** |
+| FlanEC Large | `correction:flanec-large` | 800M | 821 MB | EN | ~1s | Repeat penalty 1.5, n-gram block | **Intégré** |
 
 Tous utilisent le runtime **ort** (ONNX Runtime + CoreML) avec décodage autorégressif, repeat penalty 1.5, n-gram blocking (taille 4), détection de boucle live. Sortie sanitisée : vide → garder l'original, >3x longueur input → garder l'original (protection anti-hallucination).
 
@@ -363,7 +363,7 @@ Convertit les nombres et entités textuelles en forme écrite canonique.
 | 2 | Commandes dictée | Substitution FR/EN ("virgule" → ",") | ~0ms | `post_processor.rs` | ✅ Implémenté |
 | 3 | Suppression disfluences | Regex fillers FR/EN | ~0ms | `post_processor.rs` | ✅ Implémenté |
 | 4 | Ponctuation + Capitalisation | BERT/PCS token classification | ~50-100ms | `crates/jona-engine-bert/`, `crates/jona-engine-pcs/` | ✅ Implémenté |
-| 5 | Spell-check | Hunspell (spellbook) dictionnaires FR/EN | ~5-10ms | `cleanup/spellcheck.rs` | ✅ Implémenté |
+| 5 | Spell-check | SymSpell (downloadable dicts FR/EN) | ~5-10ms | `cleanup/symspell_correct.rs` | ✅ Implémenté |
 | 6 | Correction gram/ortho | T5 encoder-decoder autorégressif (ONNX) | ~200ms-1s | `crates/jona-engine-correction/` | ✅ Implémenté |
 | 7 | Finalize | Espacement ponctuation + capitalisation initiale | ~0ms | `post_processor.rs` | ✅ Implémenté |
 | 8 | ITN | Regex nombres/dates/heures FR/EN | ~0ms | `cleanup/itn.rs` | ✅ Implémenté |
