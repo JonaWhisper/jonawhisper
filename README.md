@@ -164,7 +164,7 @@ Models are downloaded and managed from within the app. All models are stored in 
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum), CoreAudio FFI (ducking) |
 | ASR | [whisper-rs](https://github.com/tazz4843/whisper-rs) (Metal), [ort](https://github.com/pykeIO/ort) + CoreML (Canary, Parakeet), [qwen-asr](https://github.com/huanglizhuo/QwenASR) (AMX), [voxtral.c](https://github.com/antirez/voxtral.c) (Metal) |
-| Text cleanup | [candle](https://github.com/huggingface/candle) (T5, BERT Metal), [ort](https://github.com/pykeIO/ort) (BERT, PCS CoreML), [llama-cpp-2](https://github.com/utilityai/llama-cpp-rs) (local LLM Metal) |
+| Text cleanup | [ort](https://github.com/pykeIO/ort) + CoreML (BERT, PCS, T5 correction), [candle](https://github.com/huggingface/candle) (BERT Metal), [llama-cpp-2](https://github.com/utilityai/llama-cpp-rs) (local LLM Metal) |
 | Icons | SDF (Signed Distance Field) in Rust, RGBA bitmaps — zero image dependencies |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap (CoreGraphics FFI) |
 | Permissions | [objc2](https://github.com/madsmtm/objc2) (AVFoundation, CoreGraphics, ApplicationServices) |
@@ -176,7 +176,7 @@ See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for the full dependency list wi
 
 JonaWhisper follows a **thin orchestrator** design. The main Tauri crate (`src-tauri/src/`) contains no engine logic nor model definitions — it orchestrates infrastructure crates and independent engine crates via dynamic dispatch.
 
-**Workspace crates** (14 total):
+**Workspace crates** (15 total):
 
 | Crate | Role |
 |-------|------|
@@ -184,7 +184,7 @@ JonaWhisper follows a **thin orchestrator** design. The main Tauri crate (`src-t
 | `jona-engines` | Infrastructure: `EngineCatalog`, downloader, ort session builder, mel features |
 | `jona-platform` | OS-specific code: hotkey (CGEvent tap), permissions, paste, audio devices, ducking |
 | `jona-provider` | Cloud provider backends (OpenAI-compatible, Anthropic) |
-| `jona-engine-*` (9) | One crate per engine: whisper, canary, parakeet, qwen, voxtral, llama, bert, pcs, correction |
+| `jona-engine-*` (10) | One crate per engine: whisper, canary, parakeet, qwen, voxtral, llama, bert, pcs, correction, spellcheck |
 
 **Plug-and-play engines**: each engine crate registers itself via `inventory::submit!` at link time. The main crate calls `EngineCatalog::init_auto()` at startup — no hardcoded engine list, no re-exports. Adding an engine = add a crate + `cargo` dependency, zero changes to the orchestrator.
 

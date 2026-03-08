@@ -97,7 +97,7 @@ Text post-processing pipeline: VAD, punctuation, correction, LLM cleanup.
 | `cleanup/mod.rs` | Re-exports (`LlmError` from `jona_engines::llm_prompt`) |
 | `cleanup/vad.rs` | Voice Activity Detection using Silero VAD v5 ONNX model (~2.3 MB, embedded via `include_bytes!`). Runs inference via `ort` directly. Provides `has_speech()` and `trim_silence()`. Fallback: always proceeds on error. |
 | `cleanup/post_processor.rs` | Regex-based text cleanup: hallucination filtering, dictation commands, disfluency removal (filler word stripping FR/EN), finalize (spacing, capitalization) |
-| `cleanup/spellcheck.rs` | Spell-check via spellbook (Hunspell-compatible) with bundled LibreOffice dictionaries (FR/EN). Lazy-loaded via `OnceLock`. |
+| `cleanup/symspell_correct.rs` | Spell-check via SymSpell with downloadable frequency dictionaries (FR/EN + regional variants). Lazy-loaded per language via `Mutex<HashMap>`. |
 | `cleanup/itn.rs` | Inverse Text Normalization — numbers, ordinals, percentages, hours, currencies, units (FR/EN). Compositional parser. |
 | `cleanup/llm_cloud.rs` | Cloud LLM text cleanup via OpenAI or Anthropic API (30s timeout). Uses `jona_engines::llm_prompt` for prompt templates and output sanitization. |
 
@@ -124,7 +124,7 @@ Defines the `ASREngine` trait, `ASRModel`, `EngineError`, `Preferences`, `Provid
 | Module | Role |
 |--------|------|
 | `EngineCatalog` | Collects all `ASREngine` implementations via `inventory`, provides model lookup, language listing, recommended model IDs. |
-| `downloader` | Streaming HTTP downloads with resume (Range headers), per-model state, 250ms-throttled progress events, HuggingFace repos, ZIP extraction. |
+| `downloader` | Streaming HTTP downloads with resume (Range headers), per-model state, 250ms-throttled progress events, HuggingFace repos. Writes `version.json` after download (URL + ETag + SHA256 per file). Update detection via HTTP HEAD ETag comparison (HuggingFace `x-linked-etag` + standard fallback). |
 | `ort_session` | Shared `build_session()` helper — adds CoreML EP to all ort sessions (Canary, Parakeet, BERT, PCS). Automatic dispatch to Metal GPU or Apple Neural Engine. |
 | `mel` | Mel feature extraction with configurable `MelConfig` (HTK/Slaney scales, pre-emphasis, Bessel correction). Presets for Canary and Parakeet. |
 | `llm_prompt` | LLM prompt templates, `LlmError` enum, `sanitize_output` (think-block stripping). |
@@ -138,7 +138,7 @@ macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future 
 
 `CloudProvider` trait + OpenAI-compatible and Anthropic backends. Handles ASR transcription, LLM chat completion, and model listing via cloud APIs.
 
-#### Engine crates (9)
+#### Engine crates (10)
 
 Each crate implements `ASREngine`, registers itself via `inventory::submit!`, and is fully self-contained (catalog + inference).
 
@@ -152,6 +152,7 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-bert` | BERT punctuation | ort (ONNX + CoreML) or Candle (safetensors + Metal GPU) |
 | `jona-engine-pcs` | PCS punctuation (47 lang) | ort (ONNX + CoreML), SentencePiece tokenizer |
 | `jona-engine-correction` | T5 grammar correction | ort (ONNX + CoreML), autoregressive decoding, repeat penalty 1.5, n-gram blocking, live loop detection |
+| `jona-engine-spellcheck` | SymSpell dictionaries | Data-only (no inference), manifest-driven from GitHub Releases |
 | `jona-engine-llama` | Local LLM (llama.cpp) | llama-cpp-2, Metal GPU offload, GGUF Q4 models |
 
 ### Platform (`platform/`)
