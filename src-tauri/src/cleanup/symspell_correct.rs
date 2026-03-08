@@ -115,7 +115,7 @@ fn load_from_dir(dir: &std::path::Path, lang: &str) -> Option<SymSpell<UnicodeSt
 fn get_ss(language: &str) -> bool {
     let code = lang_to_code(language);
 
-    let mut guard = SS_CACHE.lock().unwrap();
+    let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let cache = guard.get_or_insert_with(HashMap::new);
 
     if cache.contains_key(&code) {
@@ -137,7 +137,7 @@ fn with_ss<T>(language: &str, f: impl FnOnce(&SymSpell<UnicodeStringStrategy>) -
         return None;
     }
     let code = lang_to_code(language);
-    let guard = SS_CACHE.lock().unwrap();
+    let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let cache = guard.as_ref()?;
     cache.get(&code).map(f)
 }
@@ -295,40 +295,85 @@ fn match_case(original: &str, suggestion: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Once;
+    use std::sync::OnceLock;
 
-    static SETUP: Once = Once::new();
+    static DICTS_READY: OnceLock<bool> = OnceLock::new();
 
-    /// Copy bundled dicts from src-tauri/dicts/ to the model directory
-    /// so that the disk-based loader finds them during tests.
-    fn ensure_test_dicts() {
-        SETUP.call_once(|| {
-            let dicts_src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("dicts");
+    const RELEASE_BASE: &str =
+        "https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download";
+
+    /// Download real production dictionaries from GitHub Releases.
+    /// Returns true if dicts are available, false if download failed (no network, etc.).
+    /// Tests that need dicts should call this and `return` early if false.
+    fn ensure_test_dicts() -> bool {
+        *DICTS_READY.get_or_init(|| {
             let model_base = jona_types::models_dir().join("spellcheck");
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .ok();
 
-            for (lang, freq_name, bigram_name) in [
-                ("fr", "fr_freq.txt", "fr_bigram.txt"),
-                ("en", "en_freq.txt", "en_bigram.txt"),
+            let mut all_ok = true;
+            for (lang, files) in [
+                ("fr", vec!["fr-freq.txt", "fr-bigram.txt"]),
+                ("en", vec!["en-freq.txt", "en-bigram.txt"]),
             ] {
                 let dest = model_base.join(lang);
                 std::fs::create_dir_all(&dest).ok();
-                let freq_src = dicts_src.join(freq_name);
-                let bi_src = dicts_src.join(bigram_name);
-                if freq_src.exists() {
-                    std::fs::copy(&freq_src, dest.join("freq.txt")).ok();
+
+                // Skip download if freq.txt already exists (from app usage or previous test run)
+                if dest.join("freq.txt").exists() {
+                    continue;
                 }
-                if bi_src.exists() {
-                    std::fs::copy(&bi_src, dest.join("bigram.txt")).ok();
+
+                let Some(ref client) = client else {
+                    all_ok = false;
+                    continue;
+                };
+
+                for file in &files {
+                    let url = format!("{RELEASE_BASE}/{file}");
+                    let local_name = if file.contains("freq") {
+                        "freq.txt"
+                    } else {
+                        "bigram.txt"
+                    };
+                    match client.get(&url).send().and_then(|r| r.error_for_status()) {
+                        Ok(resp) => {
+                            if let Ok(bytes) = resp.bytes() {
+                                std::fs::write(dest.join(local_name), &bytes).ok();
+                            }
+                        }
+                        Err(_) => {
+                            all_ok = false;
+                        }
+                    }
                 }
             }
-        });
+
+            // Clear cached instances so they reload from freshly downloaded dicts
+            let mut guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+            *guard = None;
+
+            all_ok
+        })
+    }
+
+    /// Helper: skip test if dicts are not available (no network, CI without internet).
+    macro_rules! require_dicts {
+        () => {
+            if !ensure_test_dicts() {
+                eprintln!("SKIPPED: spellcheck dicts not available (no network?)");
+                return;
+            }
+        };
     }
 
     // --- Dictionary loading ---
 
     #[test]
     fn test_fr_lookup_known_word() {
-        ensure_test_dicts();
+        require_dicts!();
         let loaded = with_ss("fr", |ss| {
             let results = ss.lookup("bonjour", Verbosity::Top, 2);
             assert!(!results.is_empty());
@@ -339,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_en_lookup_known_word() {
-        ensure_test_dicts();
+        require_dicts!();
         let loaded = with_ss("en", |ss| {
             let results = ss.lookup("hello", Verbosity::Top, 2);
             assert!(!results.is_empty());
@@ -352,14 +397,14 @@ mod tests {
 
     #[test]
     fn test_fr_correct_misspelled() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("Bonojur le monde", "fr");
         assert!(result.contains("Bonjour"), "Expected 'Bonjour' in: {}", result);
     }
 
     #[test]
     fn test_fr_correct_multiple_errors() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("le problme est compliqu", "fr");
         assert!(result.contains("problème") || result.contains("probleme"),
             "Expected correction in: {}", result);
@@ -367,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_fr_known_words_unchanged() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("je suis content de te voir", "fr");
         assert_eq!(result, "je suis content de te voir");
     }
@@ -376,14 +421,14 @@ mod tests {
 
     #[test]
     fn test_en_correct_misspelled() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("the quik brown fox", "en");
         assert!(result.contains("quick"), "Expected 'quick' in: {}", result);
     }
 
     #[test]
     fn test_en_known_words_unchanged() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("the quick brown fox", "en");
         assert_eq!(result, "the quick brown fox");
     }
@@ -392,35 +437,35 @@ mod tests {
 
     #[test]
     fn test_preserves_punctuation() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("Hello, world!", "en");
         assert_eq!(result, "Hello, world!");
     }
 
     #[test]
     fn test_preserves_casing_allcaps() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("HELLO world", "en");
         assert!(result.contains("HELLO"), "ALL CAPS should be preserved");
     }
 
     #[test]
     fn test_preserves_casing_titlecase() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("Bonojur le monde", "fr");
         assert!(result.starts_with("B"), "Title case should be preserved: {}", result);
     }
 
     #[test]
     fn test_preserves_newlines() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("hello\nworld", "en");
         assert_eq!(result, "hello\nworld");
     }
 
     #[test]
     fn test_preserves_multiple_spaces() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("hello  world", "en");
         assert_eq!(result, "hello  world");
     }
@@ -429,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_skips_single_char() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("I a m here", "en");
         // Single chars 'I', 'a', 'm' should be untouched
         assert!(result.contains("I"), "Single char 'I' should be preserved");
@@ -437,21 +482,21 @@ mod tests {
 
     #[test]
     fn test_skips_numbers() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("test123 hello", "en");
         assert!(result.contains("test123"), "Words with digits should be preserved");
     }
 
     #[test]
     fn test_skips_acronyms() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("NASA is great", "en");
         assert!(result.contains("NASA"), "Acronyms should be preserved");
     }
 
     #[test]
     fn test_handles_apostrophes() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("l'homme est là", "fr");
         // Apostrophe words should be handled without crashing
         assert!(!result.is_empty());
@@ -459,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_handles_hyphens() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = auto_correct("peut-être aujourd'hui", "fr");
         assert!(!result.is_empty());
     }
@@ -468,16 +513,19 @@ mod tests {
 
     #[test]
     fn test_empty_string() {
+        require_dicts!();
         assert_eq!(auto_correct("", "fr"), "");
     }
 
     #[test]
     fn test_only_punctuation() {
+        require_dicts!();
         assert_eq!(auto_correct("...", "en"), "...");
     }
 
     #[test]
     fn test_only_spaces() {
+        require_dicts!();
         assert_eq!(auto_correct("   ", "en"), "   ");
     }
 
@@ -485,7 +533,7 @@ mod tests {
 
     #[test]
     fn test_compound_en() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = correct_compound("the bigest problem", "en");
         assert!(result.contains("biggest") || result.contains("bigest"),
             "Expected compound correction in: {}", result);
@@ -493,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_compound_preserves_punctuation() {
-        ensure_test_dicts();
+        require_dicts!();
         let result = correct_compound("hello world.", "en");
         assert!(result.contains("."), "Sentence-final dot should be preserved");
     }
@@ -502,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_fr_prefix_routes_to_french() {
-        ensure_test_dicts();
+        require_dicts!();
         // "fr-FR" should use French dict
         let result = auto_correct("Bonojur", "fr-FR");
         assert!(result.contains("Bonjour"), "fr-FR should route to FR: {}", result);
@@ -510,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_unknown_lang_returns_unchanged() {
-        ensure_test_dicts();
+        require_dicts!();
         // Language without downloaded dict returns text unchanged
         let result = auto_correct("helo", "de");
         assert_eq!(result, "helo");
