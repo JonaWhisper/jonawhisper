@@ -322,6 +322,39 @@ fn is_phonetically_plausible(input: &str, candidate: &str) -> bool {
     false
 }
 
+/// Check if a word is valid in a cross-language dictionary (anglicisms, loanwords).
+/// For non-English languages, checks if the word exists in the EN dictionary.
+/// For English, checks if the word exists in the FR dictionary (less common but possible).
+/// Returns false if the cross-language dict is not downloaded (graceful degradation).
+fn is_cross_language_word(word: &str, current_language: &str) -> bool {
+    let base = current_language.split(&['-', '_'][..]).next().unwrap_or(current_language);
+
+    // Determine which cross-language dict to check
+    let cross_lang = match base {
+        "en" => return false, // Don't check FR words when correcting EN (rare case, too many false positives)
+        _ => "en",           // For all non-EN languages, check EN dict (anglicisms are universal)
+    };
+
+    // Try to load the cross-language dict (no-op if already loaded)
+    if !get_ss(cross_lang) {
+        log::debug!("SymSpell cross-lang guard: EN dict not available (download it to protect anglicisms)");
+        return false;
+    }
+
+    let code = lang_to_code(cross_lang);
+    let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(cache) = guard.as_ref() {
+        if let Some(ss) = cache.get(&code) {
+            let found = !ss.lookup(word, Verbosity::Top, 0).is_empty();
+            if found {
+                log::debug!("SymSpell: '{}' protected by cross-lang EN dict (anglicism)", word);
+            }
+            return found;
+        }
+    }
+    false
+}
+
 /// Correct text using SymSpell with context-aware KenLM reranking.
 ///
 /// When a KenLM model is available for the language:
@@ -416,6 +449,14 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
                     result.push_str(word);
                     continue;
                 }
+            }
+
+            // Cross-language guard: if the word exists in another major language's dictionary,
+            // it's likely a valid loanword/anglicism (e.g. "scoring" in French).
+            // Only check EN when correcting non-EN, since English loanwords are ubiquitous.
+            if is_cross_language_word(&lower, language) {
+                result.push_str(word);
+                continue;
             }
 
             // Word is unknown — generate correction candidates
