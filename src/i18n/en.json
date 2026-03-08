@@ -122,6 +122,8 @@
   "history.deleteDay": "Delete day",
   "history.deleteDayConfirm": "Delete all entries for this day?",
   "history.copy": "Copy",
+  "history.diff": "Show corrections",
+  "history.confidence.unknown": "Unknown",
   "history.delete": "Delete",
   "history.empty": "No transcription history",
   "history.emptySearch": "No results for \"{0}\"",

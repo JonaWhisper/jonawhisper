@@ -10,7 +10,7 @@ pub const OVERLAP: usize = 5;
 /// Strip existing punctuation and split into words.
 pub fn strip_and_split(text: &str) -> Vec<String> {
     text.chars()
-        .filter(|c| !matches!(c, '.' | ',' | '?' | ':' | '-' | ';' | '!'))
+        .filter(|c| !matches!(c, '.' | ',' | '?' | ':' | ';' | '!'))
         .collect::<String>()
         .split_whitespace()
         .map(|s| s.to_string())
@@ -130,8 +130,14 @@ mod tests {
 
     #[test]
     fn strip_and_split_removes_all_punct_types() {
-        let words = strip_and_split("a. b, c? d: e- f; g!");
-        assert_eq!(words, vec!["a", "b", "c", "d", "e", "f", "g"]);
+        let words = strip_and_split("a. b, c? d: f; g!");
+        assert_eq!(words, vec!["a", "b", "c", "d", "f", "g"]);
+    }
+
+    #[test]
+    fn strip_and_split_preserves_hyphens() {
+        let words = strip_and_split("peut-être qu'est-ce");
+        assert_eq!(words, vec!["peut-être", "qu'est-ce"]);
     }
 
     #[test]

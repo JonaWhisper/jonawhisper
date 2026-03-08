@@ -166,8 +166,9 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         return;
     }
 
-    // Store raw ASR output before any post-processing
-    let raw_text = trimmed.to_string();
+    // Pipeline step snapshots: capture text after each processing stage
+    let mut pipeline_steps: Vec<(&str, String)> = Vec::new();
+    pipeline_steps.push(("asr", trimmed.to_string()));
 
     // Log and serialize word confidence scores
     let word_scores_json = if !word_confidences.is_empty() {
@@ -218,6 +219,9 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         };
         cleanup::post_processor::preprocess(trimmed, &lang, &opts)
     };
+    if processed != trimmed {
+        pipeline_steps.push(("preprocess", processed.clone()));
+    }
 
     if processed.trim().is_empty() {
         platform::play_sound("Basso");
@@ -233,7 +237,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         match run_local_engine(state, &punctuation_model_id, &processed, &lang, gpu, 0).await {
             Ok(cleaned) => {
                 log::info!("Punctuation: {} → {}", processed.len(), cleaned.len());
-                processed = cleaned;
+                if cleaned != processed {
+                    processed = cleaned;
+                    pipeline_steps.push(("punctuation", processed.clone()));
+                } else {
+                    processed = cleaned;
+                }
             }
             Err(e) => log::warn!("Punctuation failed, continuing: {}", e),
         }
@@ -244,7 +253,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         let before = processed.clone();
         processed = cleanup::symspell_correct::auto_correct(&processed, &lang, word_confidences);
         if processed != before {
-            log::info!("SymSpell: «{}» → «{}»", before, processed);
+            log::debug!("SymSpell: «{}» → «{}»", before, processed);
+            pipeline_steps.push(("spellcheck", processed.clone()));
         }
     }
 
@@ -255,8 +265,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     if has_cleanup {
         // Cloud LLM: special async path (provider-based, not an engine crate)
         if let Some(provider_id) = cleanup_model_id.strip_prefix("cloud:") {
+            let before_finalize = processed.clone();
             processed = cleanup::post_processor::finalize(&processed);
             finalized = true;
+            if processed != before_finalize {
+                pipeline_steps.push(("finalize", processed.clone()));
+            }
             let effective_max_tokens = effective_llm_tokens(processed.len(), llm_max_tokens);
             let llm_result = if let Some(ref provider) = cleanup_provider {
                 if !provider.has_llm() {
@@ -272,8 +286,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             match llm_result {
                 Ok(cleaned) => {
                     log::info!("Cloud LLM cleanup: {} → {}", processed.len(), cleaned.len());
+                    let changed = cleaned != processed;
                     processed = cleaned;
                     effective_cleanup_model_id = cleanup_model_id.clone();
+                    if changed {
+                        pipeline_steps.push(("correction", processed.clone()));
+                    }
                 }
                 Err(e) => log::warn!("Cloud LLM cleanup failed (fallback to raw): {}", e),
             }
@@ -284,8 +302,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                 if let Some(engine) = catalog.engine_by_id(&model.engine_id) {
                     let finalize_before = engine.finalize_before_cleanup();
                     if finalize_before {
+                        let before_finalize = processed.clone();
                         processed = cleanup::post_processor::finalize(&processed);
                         finalized = true;
+                        if processed != before_finalize {
+                            pipeline_steps.push(("finalize", processed.clone()));
+                        }
                     }
 
                     let max_tok = if finalize_before {
@@ -297,8 +319,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     match run_local_engine(state, &cleanup_model_id, &processed, &lang, gpu, max_tok).await {
                         Ok(cleaned) => {
                             log::info!("{} cleanup: {} → {}", model.engine_id, processed.len(), cleaned.len());
+                            let changed = cleaned != processed;
                             processed = cleaned;
                             effective_cleanup_model_id = cleanup_model_id.clone();
+                            if changed {
+                                pipeline_steps.push(("correction", processed.clone()));
+                            }
                         }
                         Err(e) => log::warn!("{} cleanup failed, using preprocessed result: {}", model.engine_id, e),
                     }
@@ -312,13 +338,28 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     if !finalized {
+        let before = processed.clone();
         processed = cleanup::post_processor::finalize(&processed);
+        if processed != before {
+            pipeline_steps.push(("finalize", processed.clone()));
+        }
     }
 
     // Step 3: ITN (Inverse Text Normalization) — numbers, ordinals, currencies, units
     if itn_enabled {
+        let before = processed.clone();
         processed = cleanup::itn::apply_itn(&processed, &lang);
+        if processed != before {
+            pipeline_steps.push(("itn", processed.clone()));
+        }
     }
+
+    // Serialize pipeline steps as raw_text (JSON array of [step, text] tuples)
+    let raw_text = if pipeline_steps.len() > 1 {
+        serde_json::to_string(&pipeline_steps).unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     // Check cancel flag before pasting (cancel may arrive during LLM cleanup)
     if state.runtime.lock().unwrap().transcription_cancelled {

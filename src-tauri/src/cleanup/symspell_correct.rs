@@ -326,7 +326,8 @@ fn is_phonetically_plausible(input: &str, candidate: &str) -> bool {
 const CONFIDENCE_SKIP_THRESHOLD: f32 = 0.85;
 
 /// Minimum word length for correction (skip very short words that are often valid).
-const MIN_CORRECTION_LEN: usize = 3;
+/// Bumped from 3→4 to avoid false positives on common short words ("vois"→"vous", etc.)
+const MIN_CORRECTION_LEN: usize = 4;
 
 pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::WordConfidence]) -> String {
     refresh_user_dict();
@@ -388,9 +389,12 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
             }
 
             // Word is unknown — generate correction candidates
+            // For short words (< 6 chars), limit to distance 1 to avoid spurious corrections
+            let max_distance = if word.chars().count() < 6 { 1 } else { 2 };
+
             if have_lm {
                 // Context-aware correction: get all candidates at minimum edit distance
-                let all_candidates = ss.lookup(&lower, Verbosity::Closest, 2);
+                let all_candidates = ss.lookup(&lower, Verbosity::Closest, max_distance);
                 if all_candidates.is_empty() {
                     result.push_str(word);
                     continue;
@@ -437,8 +441,8 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
                     result.push_str(&corrected);
                 }
             } else {
-                // No LM available — frequency-only with phonetic filtering (distance 1 = conservative)
-                let suggestions = ss.lookup(&lower, Verbosity::Top, 1);
+                // No LM available — frequency-only with phonetic filtering
+                let suggestions = ss.lookup(&lower, Verbosity::Top, max_distance);
                 // Prefer phonetically plausible candidates
                 let best = suggestions
                     .iter()

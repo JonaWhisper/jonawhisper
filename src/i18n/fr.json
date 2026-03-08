@@ -122,6 +122,8 @@
   "history.deleteDay": "Supprimer le jour",
   "history.deleteDayConfirm": "Supprimer toutes les entrées de ce jour ?",
   "history.copy": "Copier",
+  "history.diff": "Voir les corrections",
+  "history.confidence.unknown": "Inconnu",
   "history.delete": "Supprimer",
   "history.empty": "Aucun historique de transcription",
   "history.emptySearch": "Aucun résultat pour \u00ab {0} \u00bb",
