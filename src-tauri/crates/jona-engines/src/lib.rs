@@ -1,5 +1,4 @@
 pub mod downloader;
-pub mod migrations;
 pub mod ort_session;
 pub mod mel;
 pub mod audio;

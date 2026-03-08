@@ -149,7 +149,7 @@ fn fetch_etag(url: &str) -> Option<String> {
 
 /// Write a `version.json` alongside the model after successful download.
 /// Includes URL, ETag (from HTTP HEAD), and SHA256 (computed locally) for each file.
-pub fn write_version_json(model: &ASRModel) {
+fn write_version_json(model: &ASRModel) {
     let model_path = model.local_path();
     let now = chrono::Utc::now().to_rfc3339();
 
