@@ -223,7 +223,7 @@ pub fn run() {
             // Check permissions and show setup if needed
             let report = platform::check_permissions();
             if report.all_granted() {
-                monitor_enabled.store(true, Ordering::SeqCst);
+                monitor_enabled.store(true, Ordering::Relaxed);
             } else {
                 ui::tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
             }

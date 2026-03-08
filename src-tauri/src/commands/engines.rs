@@ -61,7 +61,7 @@ pub async fn delete_model_cmd(app: AppHandle, id: String) -> bool {
 pub fn pause_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
     if let Some(entry) = dl.active.get(&id) {
-        entry.cancel_requested.store(true, Ordering::SeqCst);
+        entry.cancel_requested.store(true, Ordering::Relaxed);
     }
 }
 
@@ -70,8 +70,8 @@ pub fn cancel_download(app: AppHandle, id: String, state: tauri::State<'_, Arc<A
     let dl = state.download.lock().unwrap();
     let is_active = dl.active.contains_key(&id);
     if let Some(entry) = dl.active.get(&id) {
-        entry.cancel_requested.store(true, Ordering::SeqCst);
-        entry.delete_partial.store(true, Ordering::SeqCst);
+        entry.cancel_requested.store(true, Ordering::Relaxed);
+        entry.delete_partial.store(true, Ordering::Relaxed);
     }
     drop(dl);
 

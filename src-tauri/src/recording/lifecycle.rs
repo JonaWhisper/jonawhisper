@@ -28,7 +28,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         rt.transcription_cancelled = false;
     }
     rec.key_down_time = Some(std::time::Instant::now());
-    PILL_CLOSE_GENERATION.fetch_add(1, Ordering::SeqCst);
+    PILL_CLOSE_GENERATION.fetch_add(1, Ordering::Relaxed);
 
     // Show pill immediately in Preparing mode (before stream starts)
     crate::ui::pill::open(app, crate::ui::pill::PillMode::Preparing);

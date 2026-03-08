@@ -58,12 +58,12 @@ pub fn new_recording_state(
 
 fn show_error_then_close(app: &tauri::AppHandle) {
     crate::ui::pill::set_mode(crate::ui::pill::PillMode::Error);
-    let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
+    let gen = PILL_CLOSE_GENERATION.load(Ordering::Relaxed);
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_millis(ERROR_DISPLAY_MS)).await;
         // Only close if no new recording started since the error
-        if PILL_CLOSE_GENERATION.load(Ordering::SeqCst) == gen {
+        if PILL_CLOSE_GENERATION.load(Ordering::Relaxed) == gen {
             crate::ui::tray::close_pill_window(&app_clone);
         }
     });

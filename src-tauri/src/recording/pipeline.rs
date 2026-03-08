@@ -101,10 +101,10 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         if had_content {
             // Show success checkmark briefly before closing
             crate::ui::pill::set_mode(crate::ui::pill::PillMode::Success);
-            let gen = PILL_CLOSE_GENERATION.load(Ordering::SeqCst);
+            let gen = PILL_CLOSE_GENERATION.load(Ordering::Relaxed);
             tokio::time::sleep(Duration::from_millis(600)).await;
             // Abort if a new recording started during the sleep
-            if PILL_CLOSE_GENERATION.load(Ordering::SeqCst) != gen {
+            if PILL_CLOSE_GENERATION.load(Ordering::Relaxed) != gen {
                 return;
             }
         }

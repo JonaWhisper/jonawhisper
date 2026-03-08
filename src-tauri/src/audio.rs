@@ -149,7 +149,7 @@ impl AudioRecorder {
         *self.writer.lock().unwrap() = Some(writer);
         *self.spectrum.lock().unwrap() = vec![0.0; NUM_BANDS];
         *self.fft_buffer.lock().unwrap() = Vec::with_capacity(FFT_SIZE);
-        self.stream_error.store(false, Ordering::SeqCst);
+        self.stream_error.store(false, Ordering::Relaxed);
 
         let writer_clone = Arc::clone(&self.writer);
         let fft_buffer_clone = Arc::clone(&self.fft_buffer);
@@ -174,7 +174,7 @@ impl AudioRecorder {
                     },
                     move |err| {
                         log::error!("Audio stream error: {}", err);
-                        error_flag.store(true, Ordering::SeqCst);
+                        error_flag.store(true, Ordering::Relaxed);
                     },
                     None,
                 )
@@ -194,7 +194,7 @@ impl AudioRecorder {
                     },
                     move |err| {
                         log::error!("Audio stream error: {}", err);
-                        error_flag.store(true, Ordering::SeqCst);
+                        error_flag.store(true, Ordering::Relaxed);
                     },
                     None,
                 )

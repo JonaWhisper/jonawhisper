@@ -23,8 +23,8 @@ pub fn start_monitoring(
     enabled: tauri::State<'_, Arc<AtomicBool>>,
     state: tauri::State<'_, Arc<AppState>>,
 ) {
-    if !enabled.load(Ordering::SeqCst) {
-        enabled.store(true, Ordering::SeqCst);
+    if !enabled.load(Ordering::Relaxed) {
+        enabled.store(true, Ordering::Relaxed);
         log::info!("Monitoring enabled");
     }
     if let Some(win) = app.get_webview_window("setup") {
@@ -47,8 +47,8 @@ pub fn start_monitoring(
 /// Called when permissions are granted so that shortcut capture works in setup step 2.
 #[tauri::command]
 pub fn enable_monitoring(enabled: tauri::State<'_, Arc<AtomicBool>>) {
-    if !enabled.load(Ordering::SeqCst) {
-        enabled.store(true, Ordering::SeqCst);
+    if !enabled.load(Ordering::Relaxed) {
+        enabled.store(true, Ordering::Relaxed);
         log::info!("Monitoring enabled (pre-start)");
     }
 }

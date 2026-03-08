@@ -139,11 +139,11 @@ pub fn spawn_spectrum_emitter(
         let is_mic_testing = state.audio_flags.is_mic_testing();
 
         // Detect audio stream error (e.g. device disconnected)
-        if stream_error.load(Ordering::SeqCst) {
+        if stream_error.load(Ordering::Relaxed) {
             log::warn!("Audio stream error detected (device disconnected?), forcing stop");
             state.runtime.lock().unwrap().is_recording = false;
             state.audio_flags.set_recording(false);
-            stream_error.store(false, Ordering::SeqCst);
+            stream_error.store(false, Ordering::Relaxed);
 
             // Actually stop the cpal stream — without this the mic stays active
             let _ = cmd_tx.send(AudioCmd::StopRecording);
