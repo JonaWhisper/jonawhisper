@@ -2,10 +2,13 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 // Filler word regexes (pure hesitation markers — no semantic ambiguity)
+// FR fillers include EN hesitations (uh, um) — ASR often transcribes French
+// hesitations as English. These are not valid French words so safe to strip.
 static RE_FILLERS_FR: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(euh|heu|hum|bah|ben|beh)\b").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)\b(euh|heu|hum|bah|ben|beh|uh|um|hmm)\b").unwrap());
+// EN fillers include FR hesitations (euh, heu) — same cross-language ASR issue.
 static RE_FILLERS_EN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(uh|um|hmm)\b").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)\b(uh|um|hmm|euh|heu)\b").unwrap());
 static RE_FILLERS_DE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\b(\u{00E4}h|\u{00E4}hm|hm|hmm|tja|naja)\b").unwrap());
 static RE_FILLERS_ES: LazyLock<Regex> =
