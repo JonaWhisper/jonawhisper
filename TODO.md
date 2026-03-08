@@ -41,7 +41,7 @@
 - [ ] **Filtrage phonétique des candidats SymSpell** — Intégrer un score de similarité phonétique (Soundex/Metaphone) pour filtrer les faux positifs SymSpell. Les erreurs ASR sont phonétiquement proches de la cible — SymSpell ne le sait pas et propose parfois des corrections aberrantes. Effort modéré (crate `rphonetic` déjà évalué dans GEC-RESEARCH.md).
 - [ ] **Passe unique LLM remplaçant spell+punct+GEC** — À terme, un seul appel LLM local (Qwen3 4B ou équivalent) pourrait remplacer la chaîne SymSpell → PCS → T5. Avantage : cohérence globale de la correction, moins de passes, gestion du contexte. Risque : latence (~1s), hallucinations LLM. Évaluer sur un benchmark FR/EN avant migration. Paper : "LLM-based post-editing for ASR" (2024).
 - [ ] **Ponctuation domain-adapted** — Fine-tuner PCS ou BERT sur un corpus ASR (transcriptions orales avec ponctuation de référence) plutôt que du texte écrit. Les modèles actuels sont entraînés sur texte formel, pas sur de l'oral transcrit. Impact modéré, effort élevé (besoin de données annotées).
-- [ ] **Correction sélective guidée par confiance** — Ne corriger que les segments à faible confiance ASR (si l'engine expose un score de confiance par mot). Évite de "corriger" des mots déjà corrects. Parakeet et Canary exposent des scores, Whisper non. Effort modéré.
+- [x] **Correction sélective guidée par confiance** — Implémenté dans `symspell_correct.rs` : les mots avec un score ASR > 0.85 sont ignorés par le spell-check (`CONFIDENCE_SKIP_THRESHOLD`). Parakeet et Canary fournissent les scores, Whisper non (tous les mots sont corrigés). La correction T5 ne filtre pas encore par confiance (piste d'amélioration).
 
 ## Technique / Infra
 
