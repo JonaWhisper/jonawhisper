@@ -172,6 +172,18 @@
   "models.filter.correction": "Correction",
   "models.filter.llm": "Reformulation",
   "models.filter.spellcheck": "Dictionnaires",
+  "units.bytes": "o",
+  "units.kb": "Ko",
+  "units.mb": "Mo",
+  "units.gb": "Go",
+  "aria.pause": "Mettre en pause",
+  "aria.cancel": "Annuler",
+  "aria.resume": "Reprendre",
+  "aria.update": "Mettre \u00e0 jour",
+  "aria.delete": "Supprimer",
+  "aria.edit": "Modifier",
+  "aria.add": "Ajouter",
+  "aria.copy": "Copier",
   "menu.panel": "R\u00e9glages\u2026",
   "window.panel": "JonaWhisper"
 }

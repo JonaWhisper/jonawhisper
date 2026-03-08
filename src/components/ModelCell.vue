@@ -100,6 +100,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
                 <Button
                   variant="ghost" size="icon-sm"
                   class="cursor-pointer"
+                  :aria-label="t('aria.update')"
                   :disabled="isUpdating"
                   @click="handleUpdate"
                 >
@@ -127,6 +128,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
                 <Button
                   variant="ghost" size="icon-sm"
                   class="cursor-pointer"
+                  :aria-label="t('aria.delete')"
                   @click="emit('delete', model)"
                 >
                   <Trash2 class="w-4 h-4" />

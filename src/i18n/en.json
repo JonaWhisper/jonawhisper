@@ -172,6 +172,18 @@
   "models.filter.correction": "Correction",
   "models.filter.llm": "Rewriting",
   "models.filter.spellcheck": "Dictionaries",
+  "units.bytes": "B",
+  "units.kb": "KB",
+  "units.mb": "MB",
+  "units.gb": "GB",
+  "aria.pause": "Pause",
+  "aria.cancel": "Cancel",
+  "aria.resume": "Resume",
+  "aria.update": "Update",
+  "aria.delete": "Delete",
+  "aria.edit": "Edit",
+  "aria.add": "Add",
+  "aria.copy": "Copy",
   "menu.panel": "Settings\u2026",
   "window.panel": "JonaWhisper"
 }

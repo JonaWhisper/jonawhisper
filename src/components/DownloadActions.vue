@@ -55,7 +55,7 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
       <TooltipProvider v-else :delay-duration="300">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon-sm" @click="downloads.pauseDownload(model.id)">
+            <Button variant="ghost" size="icon-sm" :aria-label="t('aria.pause')" @click="downloads.pauseDownload(model.id)">
               <Pause class="w-3.5 h-3.5" />
             </Button>
           </TooltipTrigger>
@@ -63,7 +63,7 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)">
+            <Button variant="ghost" size="icon-sm" :aria-label="t('aria.cancel')" @click="downloads.cancelDownload(model.id)">
               <X class="w-3.5 h-3.5" />
             </Button>
           </TooltipTrigger>
@@ -85,7 +85,7 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
       <TooltipProvider :delay-duration="300">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon-sm" @click="emit('download', model)">
+            <Button variant="ghost" size="icon-sm" :aria-label="t('aria.resume')" @click="emit('download', model)">
               <Play class="w-3.5 h-3.5" />
             </Button>
           </TooltipTrigger>
@@ -93,7 +93,7 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon-sm" @click="downloads.cancelDownload(model.id)">
+            <Button variant="ghost" size="icon-sm" :aria-label="t('aria.cancel')" @click="downloads.cancelDownload(model.id)">
               <X class="w-3.5 h-3.5" />
             </Button>
           </TooltipTrigger>

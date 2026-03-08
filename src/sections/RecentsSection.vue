@@ -341,7 +341,7 @@ function headerAt(index: number) {
                   <TooltipProvider :delay-duration="300">
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <button class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="copyEntry(entryAt(vItem.index))">
+                        <button :aria-label="t('aria.copy')" class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="copyEntry(entryAt(vItem.index))">
                           <Check v-if="copiedTimestamp === entryAt(vItem.index).timestamp" class="h-3.5 w-3.5 text-green-600" />
                           <Copy v-else class="h-3.5 w-3.5" />
                           <Transition name="copied-toast">
@@ -356,7 +356,7 @@ function headerAt(index: number) {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger as-child>
-                        <button class="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted/50" @click="deleteEntry(entryAt(vItem.index))">
+                        <button :aria-label="t('aria.delete')" class="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted/50" @click="deleteEntry(entryAt(vItem.index))">
                           <Trash2 class="h-3.5 w-3.5" />
                         </button>
                       </TooltipTrigger>

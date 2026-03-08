@@ -1,4 +1,22 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// Mock i18n module before importing format utils
+vi.mock('@/i18n', () => {
+  const translations: Record<string, string> = {
+    'units.bytes': 'o',
+    'units.kb': 'Ko',
+    'units.mb': 'Mo',
+    'units.gb': 'Go',
+  }
+  return {
+    default: {
+      global: {
+        t: (key: string) => translations[key] ?? key,
+      },
+    },
+  }
+})
+
 import { formatBytes, formatSize, formatSpeed, formatRam } from './format'
 
 describe('formatBytes', () => {

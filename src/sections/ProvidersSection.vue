@@ -123,10 +123,10 @@ const kindGradients: Record<string, string> = {
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
-          <Button variant="outline" size="icon" class="h-7 w-7" @click="openEditDialog(provider)">
+          <Button variant="outline" size="icon" class="h-7 w-7" :aria-label="t('aria.edit')" @click="openEditDialog(provider)">
             <Pencil class="w-3.5 h-3.5" />
           </Button>
-          <Button variant="destructive" size="icon" class="h-7 w-7" @click="requestRemoveProvider(provider)">
+          <Button variant="destructive" size="icon" class="h-7 w-7" :aria-label="t('aria.delete')" @click="requestRemoveProvider(provider)">
             <X class="w-3.5 h-3.5" />
           </Button>
         </div>
