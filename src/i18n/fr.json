@@ -75,6 +75,7 @@
   "settings.postProcessing.spellcheckNoDict": "T\u00e9l\u00e9chargez un dictionnaire dans Mod\u00e8les",
   "settings.postProcessing.userDict": "Dictionnaire personnel",
   "settings.postProcessing.userDictDescription": "Mots prot\u00e9g\u00e9s de la correction + abr\u00e9viations ITN",
+  "settings.postProcessing.userDictOpen": "\u00c9diter",
   "settings.postProcessing.punctuation": "Ponctuation",
   "settings.postProcessing.textCleanup": "Nettoyage du texte",
   "settings.cleanup.recommended": "Recommandé",

@@ -75,6 +75,7 @@
   "settings.postProcessing.spellcheckNoDict": "Download a dictionary in Models",
   "settings.postProcessing.userDict": "User dictionary",
   "settings.postProcessing.userDictDescription": "Words protected from correction + ITN abbreviations",
+  "settings.postProcessing.userDictOpen": "Edit",
   "settings.postProcessing.punctuation": "Punctuation",
   "settings.postProcessing.textCleanup": "Text cleanup",
   "settings.cleanup.recommended": "Recommended",

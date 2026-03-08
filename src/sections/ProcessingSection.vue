@@ -13,7 +13,6 @@ import CloudModelPicker from '@/components/CloudModelPicker.vue'
 import ModelOption from '@/components/ModelOption.vue'
 import SettingToggle from '@/components/SettingToggle.vue'
 import { BookOpen } from 'lucide-vue-next'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -157,18 +156,13 @@ function onToggle(v: boolean, key: string) {
           <div class="text-[13px] text-foreground">{{ t('settings.postProcessing.userDict') }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('settings.postProcessing.userDictDescription') }}</div>
         </div>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 px-3 text-xs hover:bg-accent hover:text-accent-foreground"
-              :aria-label="t('settings.postProcessing.userDict')"
-              @click="invoke('open_user_dict')"
-            >
-              <BookOpen class="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('settings.postProcessing.userDict') }}</TooltipContent>
-        </Tooltip>
+        <button
+          class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background h-8 px-3 text-xs hover:bg-accent hover:text-accent-foreground shrink-0"
+          @click="invoke('open_user_dict')"
+        >
+          <BookOpen class="h-3.5 w-3.5" />
+          <span>{{ t('settings.postProcessing.userDictOpen') }}</span>
+        </button>
       </div>
 
       <!-- Punctuation dropdown -->
