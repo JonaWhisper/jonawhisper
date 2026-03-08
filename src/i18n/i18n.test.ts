@@ -36,10 +36,10 @@ describe('i18n completeness', () => {
 
   it('no translation value is empty', () => {
     for (const key of enKeys) {
-      expect((en as Record<string, string>)[key], `en.${key} is empty`).toBeTruthy()
+      expect((en as unknown as Record<string, string>)[key], `en.${key} is empty`).toBeTruthy()
     }
     for (const key of frKeys) {
-      expect((fr as Record<string, string>)[key], `fr.${key} is empty`).toBeTruthy()
+      expect((fr as unknown as Record<string, string>)[key], `fr.${key} is empty`).toBeTruthy()
     }
   })
 

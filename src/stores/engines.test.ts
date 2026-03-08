@@ -124,8 +124,8 @@ describe('engines store computed properties', () => {
       makeModel({ id: 'bert-large', engine_id: 'bert', is_downloaded: false }),
     ]
     expect(store.punctuationModels).toHaveLength(1)
-    expect(store.punctuationModels[0].id).toBe('bert-base')
-    expect(store.punctuationModels[0].group).toBe('punctuation')
+    expect(store.punctuationModels[0]!.id).toBe('bert-base')
+    expect(store.punctuationModels[0]!.group).toBe('punctuation')
   })
 
   it('cleanupModels includes correction, llm, and cloud providers', () => {
@@ -145,9 +145,9 @@ describe('engines store computed properties', () => {
 
     const cleanup = store.cleanupModels
     expect(cleanup.map(m => m.id)).toEqual(['gec-t5', 'llama-7b', 'cloud:openai'])
-    expect(cleanup[0].group).toBe('correction')
-    expect(cleanup[1].group).toBe('llm')
-    expect(cleanup[2].group).toBe('cloud')
+    expect(cleanup[0]!.group).toBe('correction')
+    expect(cleanup[1]!.group).toBe('llm')
+    expect(cleanup[2]!.group).toBe('cloud')
   })
 
   it('asrModels includes local downloaded + cloud ASR providers', () => {
@@ -164,8 +164,8 @@ describe('engines store computed properties', () => {
 
     const asr = store.asrModels
     expect(asr.map(m => m.id)).toEqual(['whisper-large', 'cloud:openai'])
-    expect(asr[0].group).toBe('local')
-    expect(asr[1].group).toBe('cloud')
+    expect(asr[0]!.group).toBe('local')
+    expect(asr[1]!.group).toBe('cloud')
   })
 
   it('isCloudAsr detects cloud: prefix in selectedModelId', () => {
