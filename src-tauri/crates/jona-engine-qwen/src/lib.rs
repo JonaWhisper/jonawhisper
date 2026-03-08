@@ -5,35 +5,6 @@ use jona_types::{
 use std::any::Any;
 use std::path::Path;
 
-// -- Audio utility (inline, avoids dependency on jona-engines) --
-
-fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
-    let reader = hound::WavReader::open(path)
-        .map_err(|e| EngineError::LaunchFailed(format!("Failed to open WAV: {}", e)))?;
-    let spec = reader.spec();
-    let channels = spec.channels as usize;
-    let samples_f32: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Int => {
-            let bits = spec.bits_per_sample;
-            let max_val = (1u32 << (bits - 1)) as f32;
-            reader.into_samples::<i32>()
-                .filter_map(|s| s.ok())
-                .map(|s| s as f32 / max_val)
-                .collect()
-        }
-        hound::SampleFormat::Float => {
-            reader.into_samples::<f32>()
-                .filter_map(|s| s.ok())
-                .collect()
-        }
-    };
-    if channels > 1 {
-        Ok(samples_f32.chunks(channels).map(|c| c.iter().sum::<f32>() / channels as f32).collect())
-    } else {
-        Ok(samples_f32)
-    }
-}
-
 // -- Language mapping --
 
 /// Language code (ISO 639-1) to Qwen3-ASR language name mapping.
@@ -107,7 +78,7 @@ pub fn transcribe(ctx: &mut QwenContext, audio_path: &Path, language: &str) -> R
         let _ = ctx.ctx.set_force_language("");
     }
 
-    let audio = read_wav_f32(audio_path)?;
+    let audio = jona_engines::audio::read_wav_f32(audio_path)?;
 
     let text = qwen_asr::transcribe::transcribe_audio(&mut ctx.ctx, &audio)
         .ok_or_else(|| EngineError::LaunchFailed("Qwen3-ASR transcription failed".into()))?;
@@ -127,10 +98,6 @@ pub fn transcribe(ctx: &mut QwenContext, audio_path: &Path, language: &str) -> R
 
 pub struct QwenEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir().join("qwen-asr").to_string_lossy().to_string()
-}
-
 impl ASREngine for QwenEngine {
     fn engine_id(&self) -> &str { "qwen-asr" }
     fn display_name(&self) -> &str { "Qwen3-ASR" }
@@ -144,7 +111,7 @@ impl ASREngine for QwenEngine {
                 filename: "0.6b".into(),
                 url: String::new(),
                 size: 1_880_000_000 + 2_780_000 + 1_670_000,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("qwen-asr"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {

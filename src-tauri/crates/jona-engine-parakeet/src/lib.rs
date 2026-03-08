@@ -7,35 +7,6 @@ use ort::value::Tensor;
 use std::any::Any;
 use std::path::Path;
 
-// -- Audio utility (inline) --
-
-fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
-    let reader = hound::WavReader::open(path)
-        .map_err(|e| EngineError::LaunchFailed(format!("Failed to open WAV: {}", e)))?;
-    let spec = reader.spec();
-    let channels = spec.channels as usize;
-    let samples_f32: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Int => {
-            let bits = spec.bits_per_sample;
-            let max_val = (1u32 << (bits - 1)) as f32;
-            reader.into_samples::<i32>()
-                .filter_map(|s| s.ok())
-                .map(|s| s as f32 / max_val)
-                .collect()
-        }
-        hound::SampleFormat::Float => {
-            reader.into_samples::<f32>()
-                .filter_map(|s| s.ok())
-                .collect()
-        }
-    };
-    if channels > 1 {
-        Ok(samples_f32.chunks(channels).map(|c| c.iter().sum::<f32>() / channels as f32).collect())
-    } else {
-        Ok(samples_f32)
-    }
-}
-
 // -- Constants --
 
 const LSTM_DIM: usize = 640;
@@ -118,7 +89,7 @@ pub fn load(model_dir: &Path) -> Result<ParakeetContext, EngineError> {
 
 /// Transcribe an audio file using a loaded ParakeetContext.
 pub fn transcribe(ctx: &mut ParakeetContext, audio_path: &Path, _language: &str) -> Result<String, EngineError> {
-    let audio = read_wav_f32(audio_path)?;
+    let audio = jona_engines::audio::read_wav_f32(audio_path)?;
 
     // Compute mel spectrogram with Slaney scale + pre-emphasis (Parakeet config)
     let (features, n_frames) = jona_engines::mel::extract_features_with_config(
@@ -345,10 +316,6 @@ fn find_file(dir: &Path, candidates: &[&str]) -> Option<std::path::PathBuf> {
 
 pub struct ParakeetEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir().join("parakeet").to_string_lossy().to_string()
-}
-
 impl ASREngine for ParakeetEngine {
     fn engine_id(&self) -> &str { "parakeet" }
     fn display_name(&self) -> &str { "Parakeet" }
@@ -363,7 +330,7 @@ impl ASREngine for ParakeetEngine {
                 filename: "tdt-0.6b-v3-int8".into(),
                 url: String::new(),
                 size: 683_574_784 + 19_078_554 + 96_153,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("parakeet"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {

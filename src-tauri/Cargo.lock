@@ -2788,7 +2788,6 @@ dependencies = [
 name = "jona-engine-canary"
 version = "0.1.0"
 dependencies = [
- "hound",
  "inventory",
  "jona-engines",
  "jona-types",
@@ -2826,7 +2825,6 @@ dependencies = [
 name = "jona-engine-parakeet"
 version = "0.1.0"
 dependencies = [
- "hound",
  "inventory",
  "jona-engines",
  "jona-types",
@@ -2851,8 +2849,8 @@ dependencies = [
 name = "jona-engine-qwen"
 version = "0.1.0"
 dependencies = [
- "hound",
  "inventory",
+ "jona-engines",
  "jona-types",
  "log",
  "qwen-asr",
@@ -2874,8 +2872,8 @@ name = "jona-engine-voxtral"
 version = "0.1.0"
 dependencies = [
  "cc",
- "hound",
  "inventory",
+ "jona-engines",
  "jona-types",
  "log",
 ]
@@ -2884,8 +2882,8 @@ dependencies = [
 name = "jona-engine-whisper"
 version = "0.1.0"
 dependencies = [
- "hound",
  "inventory",
+ "jona-engines",
  "jona-types",
  "log",
  "whisper-rs",

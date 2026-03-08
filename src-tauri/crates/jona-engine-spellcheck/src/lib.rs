@@ -8,13 +8,6 @@ use std::collections::HashMap;
 
 pub struct SpellCheckEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir()
-        .join("spellcheck")
-        .to_string_lossy()
-        .to_string()
-}
-
 /// GitHub Releases URL — `/releases/latest/download/` auto-redirects to the newest release.
 const GH_RELEASE: &str =
     "https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releases/latest/download";
@@ -81,7 +74,7 @@ fn model_from_manifest(code: &str, lang: &ManifestLang) -> ASRModel {
         filename: code.into(),
         url: String::new(),
         size: freq_size + bigram_size,
-        storage_dir: storage_dir(),
+        storage_dir: jona_types::engine_storage_dir("spellcheck"),
         download_type: DownloadType::MultiFile {
             files: vec![
                 DownloadFile {

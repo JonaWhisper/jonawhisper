@@ -7,7 +7,7 @@ license = "GPL-3.0-or-later"
 [dependencies]
 inventory = "0.3"
 jona-types = { path = "../jona-types" }
-hound = "3.5"
+jona-engines = { path = "../jona-engines" }
 log = "0.4"
 
 [build-dependencies]

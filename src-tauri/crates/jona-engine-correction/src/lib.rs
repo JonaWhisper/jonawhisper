@@ -10,10 +10,6 @@ pub use inference::{T5Context, correct};
 
 pub struct CorrectionEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir().join("correction").to_string_lossy().to_string()
-}
-
 const HF_BASE: &str = "https://huggingface.co/JonaWhisper";
 
 impl ASREngine for CorrectionEngine {
@@ -30,7 +26,7 @@ impl ASREngine for CorrectionEngine {
                 filename: "gec-t5-small".into(),
                 url: String::new(),
                 size: 96_391_294,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("correction"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
@@ -74,7 +70,7 @@ impl ASREngine for CorrectionEngine {
                 filename: "t5-spell-fr".into(),
                 url: String::new(),
                 size: 275_706_583,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("correction"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
@@ -115,7 +111,7 @@ impl ASREngine for CorrectionEngine {
                 filename: "flanec-large".into(),
                 url: String::new(),
                 size: 820_920_089,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("correction"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
@@ -156,7 +152,7 @@ impl ASREngine for CorrectionEngine {
                 filename: "flanec-base".into(),
                 url: String::new(),
                 size: 275_887_316,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("correction"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {

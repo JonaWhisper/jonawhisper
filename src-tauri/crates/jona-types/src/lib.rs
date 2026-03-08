@@ -376,6 +376,11 @@ pub fn models_dir() -> PathBuf {
     config_dir().join("models")
 }
 
+/// Storage directory for a specific engine's models.
+pub fn engine_storage_dir(engine_name: &str) -> String {
+    models_dir().join(engine_name).to_string_lossy().to_string()
+}
+
 pub fn prefs_path() -> PathBuf {
     config_dir().join(PREFS_FILE)
 }

@@ -12,10 +12,6 @@ pub use candle_bert::CandlePunctContext;
 
 pub struct BertPunctuationEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir().join("bert").to_string_lossy().to_string()
-}
-
 impl ASREngine for BertPunctuationEngine {
     fn engine_id(&self) -> &str { "bert-punctuation" }
     fn display_name(&self) -> &str { "BERT Punctuation" }
@@ -31,7 +27,7 @@ impl ASREngine for BertPunctuationEngine {
                 filename: "model_quantized.onnx".into(),
                 url: "https://huggingface.co/ldenoue/fullstop-punctuation-multilang-large/resolve/main/onnx/model_quantized.onnx".into(),
                 size: 562_000_000,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("bert"),
                 download_type: DownloadType::SingleFile,
                 download_marker: None,
                 recommended_for: None,
@@ -49,7 +45,7 @@ impl ASREngine for BertPunctuationEngine {
                 filename: "model.safetensors".into(),
                 url: "https://huggingface.co/oliverguhr/fullstop-punctuation-multilingual-base/resolve/main/model.safetensors".into(),
                 size: 1_112_000_000,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("bert"),
                 download_type: DownloadType::SingleFile,
                 download_marker: None,
                 recommended_for: None,

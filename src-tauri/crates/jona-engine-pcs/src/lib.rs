@@ -10,10 +10,6 @@ pub use inference::{PcsContext, restore_punctuation_and_case};
 
 pub struct PcsPunctuationEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir().join("pcs").to_string_lossy().to_string()
-}
-
 impl ASREngine for PcsPunctuationEngine {
     fn engine_id(&self) -> &str { "pcs-punctuation" }
     fn display_name(&self) -> &str { "PCS Punctuation" }
@@ -28,7 +24,7 @@ impl ASREngine for PcsPunctuationEngine {
                 filename: "punct_cap_seg_47lang.onnx".into(),
                 url: "https://huggingface.co/1-800-BAD-CODE/punct_cap_seg_47_language/resolve/main/punct_cap_seg_47lang.onnx".into(),
                 size: 232_900_000,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("pcs"),
                 download_type: DownloadType::SingleFile,
                 download_marker: None,
                 recommended_for: Some(vec![]),

@@ -6,35 +6,6 @@ use std::any::Any;
 use std::ffi::{c_char, c_int, c_void, CStr};
 use std::path::Path;
 
-// -- Audio utility (inline) --
-
-fn read_wav_f32(path: &Path) -> Result<Vec<f32>, EngineError> {
-    let reader = hound::WavReader::open(path)
-        .map_err(|e| EngineError::LaunchFailed(format!("Failed to open WAV: {}", e)))?;
-    let spec = reader.spec();
-    let channels = spec.channels as usize;
-    let samples_f32: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Int => {
-            let bits = spec.bits_per_sample;
-            let max_val = (1u32 << (bits - 1)) as f32;
-            reader.into_samples::<i32>()
-                .filter_map(|s| s.ok())
-                .map(|s| s as f32 / max_val)
-                .collect()
-        }
-        hound::SampleFormat::Float => {
-            reader.into_samples::<f32>()
-                .filter_map(|s| s.ok())
-                .collect()
-        }
-    };
-    if channels > 1 {
-        Ok(samples_f32.chunks(channels).map(|c| c.iter().sum::<f32>() / channels as f32).collect())
-    } else {
-        Ok(samples_f32)
-    }
-}
-
 // -- FFI declarations (voxtral.h / voxtral_metal.h) --
 
 #[repr(C)]
@@ -102,7 +73,7 @@ pub fn load(model_dir: &Path) -> Result<VoxtralContext, EngineError> {
 
 /// Transcribe an audio file using a loaded VoxtralContext.
 pub fn transcribe(ctx: &mut VoxtralContext, audio_path: &Path, _language: &str) -> Result<String, EngineError> {
-    let samples = read_wav_f32(audio_path)?;
+    let samples = jona_engines::audio::read_wav_f32(audio_path)?;
 
     let result_ptr = unsafe {
         vox_transcribe_audio(ctx.ctx, samples.as_ptr(), samples.len() as c_int)
@@ -125,10 +96,6 @@ pub fn transcribe(ctx: &mut VoxtralContext, audio_path: &Path, _language: &str) 
 
 pub struct VoxtralEngine;
 
-fn storage_dir() -> String {
-    jona_types::models_dir().join("voxtral").to_string_lossy().to_string()
-}
-
 const HF_BASE: &str = "https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602/resolve/main/";
 
 impl ASREngine for VoxtralEngine {
@@ -144,7 +111,7 @@ impl ASREngine for VoxtralEngine {
                 filename: "mini-4b-realtime".into(),
                 url: String::new(),
                 size: 8_859_462_744 + 14_910_348 + 1_343,
-                storage_dir: storage_dir(),
+                storage_dir: jona_types::engine_storage_dir("voxtral"),
                 download_type: DownloadType::MultiFile {
                     files: vec![
                         DownloadFile {
