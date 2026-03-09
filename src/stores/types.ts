@@ -180,4 +180,5 @@ export interface SettingsPayload {
   spellcheck_enabled: boolean
   theme: string
   log_level: string
+  log_retention: string
 }

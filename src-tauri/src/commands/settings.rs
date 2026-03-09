@@ -47,6 +47,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "spellcheck_enabled": s.spellcheck_enabled,
         "theme": s.theme,
         "log_level": s.log_level,
+        "log_retention": s.log_retention,
     })
 }
 
@@ -99,6 +100,7 @@ pub fn set_setting(
                 log::set_max_level(level);
                 log::info!("Log level set to {}", level);
             }
+            "log_retention" => s.log_retention = value.clone(),
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;

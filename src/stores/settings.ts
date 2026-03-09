@@ -27,6 +27,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const appLocale = ref('auto')
   const theme = ref('system')
   const logLevel = ref('info')
+  const logRetention = ref('previous')
 
   async function fetchSettings() {
     try {
@@ -54,6 +55,7 @@ export const useSettingsStore = defineStore('settings', () => {
       spellcheckEnabled.value = s.spellcheck_enabled ?? false
       theme.value = s.theme ?? 'system'
       logLevel.value = s.log_level ?? 'info'
+      logRetention.value = s.log_retention ?? 'previous'
     } catch (e) { console.error('fetchSettings failed:', e) }
   }
 
@@ -82,6 +84,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'spellcheck_enabled': return String(spellcheckEnabled.value)
       case 'theme': return theme.value
       case 'log_level': return logLevel.value
+      case 'log_retention': return logRetention.value
       default: return ''
     }
   }
@@ -111,6 +114,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'spellcheck_enabled': spellcheckEnabled.value = value === 'true'; break
       case 'theme': theme.value = value; break
       case 'log_level': logLevel.value = value; break
+      case 'log_retention': logRetention.value = value; break
     }
   }
 
@@ -138,7 +142,7 @@ export const useSettingsStore = defineStore('settings', () => {
     textCleanupEnabled, punctuationModelId, cleanupModelId, llmModel, llmMaxTokens,
     hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
-    hotkey, cancelShortcut, recordingMode, appLocale, theme, logLevel,
+    hotkey, cancelShortcut, recordingMode, appLocale, theme, logLevel, logRetention,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,
     selectModel, selectLanguageAction,
   }

@@ -481,6 +481,9 @@ pub struct Preferences {
     pub theme: String,
     #[serde(default = "default_log_level")]
     pub log_level: String,
+    /// Log retention mode: "previous" (current+prev), "3days", "7days", "30days", "all" (keep forever)
+    #[serde(default = "default_log_retention")]
+    pub log_retention: String,
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
@@ -494,6 +497,7 @@ fn default_llm_max_tokens() -> u32 { 4096 }
 fn default_ducking_level() -> f32 { 0.8 }
 fn default_theme() -> String { "system".to_string() }
 fn default_log_level() -> String { "info".to_string() }
+fn default_log_retention() -> String { "previous".to_string() }
 
 impl Preferences {
     pub fn save(&self) {

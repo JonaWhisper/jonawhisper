@@ -23,8 +23,7 @@ use tauri::{Emitter, Manager};
 
 /// Initialize logging: write to both stderr and a log file on disk.
 /// Log file: ~/Library/Application Support/JonaWhisper/logs/jona-whisper-{timestamp}.log
-/// All previous logs are preserved (timestamped filenames).
-fn init_logging() {
+fn init_logging(log_retention: &str) {
     use simplelog::*;
     use std::fs;
 
@@ -38,8 +37,7 @@ fn init_logging() {
         .as_secs();
     let log_path = log_dir.join(format!("jona-whisper-{}.log", ts));
 
-    // Prune old logs: keep last 10 files
-    prune_old_logs(&log_dir, 10);
+    prune_old_logs(&log_dir, log_retention);
 
     let config = ConfigBuilder::new()
         .set_time_format_rfc3339()
@@ -55,11 +53,18 @@ fn init_logging() {
     }
 
     let _ = CombinedLogger::init(loggers);
-    log::info!("Logging to {}", log_path.display());
+    log::info!("Logging to {} (retention: {})", log_path.display(), log_retention);
 }
 
-/// Remove old log files, keeping the most recent `keep` files.
-fn prune_old_logs(log_dir: &std::path::Path, keep: usize) {
+/// Remove old log files based on retention mode.
+/// - "previous": keep only the most recent 1 (current will be created after)
+/// - "3days"/"7days"/"30days": keep files from last N days
+/// - "all": never delete
+fn prune_old_logs(log_dir: &std::path::Path, retention: &str) {
+    if retention == "all" {
+        return;
+    }
+
     let mut logs: Vec<std::path::PathBuf> = std::fs::read_dir(log_dir)
         .into_iter()
         .flatten()
@@ -73,9 +78,37 @@ fn prune_old_logs(log_dir: &std::path::Path, keep: usize) {
         .map(|e| e.path())
         .collect();
     logs.sort();
-    if logs.len() > keep {
-        for old in &logs[..logs.len() - keep] {
-            let _ = std::fs::remove_file(old);
+
+    match retention {
+        "previous" => {
+            // Keep only the most recent file (the new one will be created after pruning)
+            if logs.len() > 1 {
+                for old in &logs[..logs.len() - 1] {
+                    let _ = std::fs::remove_file(old);
+                }
+            }
+        }
+        days_str => {
+            // Parse "3days", "7days", "30days" → keep files younger than N days
+            let days: u64 = days_str.trim_end_matches("days").parse().unwrap_or(7);
+            let cutoff = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .saturating_sub(days * 86400);
+
+            for path in &logs {
+                // Extract timestamp from filename: jona-whisper-{ts}.log
+                let dominated = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .and_then(|s| s.strip_prefix("jona-whisper-"))
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(u64::MAX);
+                if dominated < cutoff {
+                    let _ = std::fs::remove_file(path);
+                }
+            }
         }
     }
 }
@@ -165,15 +198,17 @@ pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::Ho
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    init_logging();
+    let app_state = Arc::new(AppState::default());
+
+    // Read log retention before initializing logging (needs prefs)
+    let log_retention = app_state.settings.lock().unwrap().log_retention.clone();
+    init_logging(&log_retention);
 
     // Initialize the engine catalog from inventory auto-registration.
     // Each engine crate registers itself via `inventory::submit!`.
     jona_engines::EngineCatalog::init_auto();
 
     recording::cleanup_orphan_audio_files();
-
-    let app_state = Arc::new(AppState::default());
 
     // Apply saved log level and locale from preferences
     {

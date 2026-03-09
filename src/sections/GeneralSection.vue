@@ -159,6 +159,23 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
           </TooltipProvider>
         </div>
       </div>
+      <div class="flex items-center justify-between py-2 gap-3">
+        <div>
+          <div class="text-[13px] text-foreground">{{ t('general.logRetention') }}</div>
+        </div>
+        <Select :model-value="settings.logRetention" @update:model-value="(v) => settings.setSetting('log_retention', String(v))">
+          <SelectTrigger class="w-auto min-w-[160px] h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="previous">{{ t('general.logRetention.previous') }}</SelectItem>
+            <SelectItem value="3days">{{ t('general.logRetention.3days') }}</SelectItem>
+            <SelectItem value="7days">{{ t('general.logRetention.7days') }}</SelectItem>
+            <SelectItem value="30days">{{ t('general.logRetention.30days') }}</SelectItem>
+            <SelectItem value="all">{{ t('general.logRetention.all') }}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
 
     <!-- About card -->
