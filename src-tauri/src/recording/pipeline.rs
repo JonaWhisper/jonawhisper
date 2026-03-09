@@ -11,6 +11,16 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
+/// RAII guard that resets `is_transcribing` to false when dropped.
+/// Prevents the pipeline from getting permanently stuck if any step panics.
+struct TranscribingGuard(Arc<AppState>);
+
+impl Drop for TranscribingGuard {
+    fn drop(&mut self) {
+        self.0.runtime.lock().unwrap().is_transcribing = false;
+    }
+}
+
 pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
     loop {
         {
@@ -23,10 +33,12 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
             }
             rt.is_transcribing = true;
         }
+        // RAII guard: resets is_transcribing on drop (panic safety)
+        let _guard = TranscribingGuard(Arc::clone(state));
+
         let audio_path = match state.dequeue() {
             Some(p) => p,
             None => {
-                state.runtime.lock().unwrap().is_transcribing = false;
                 return;
             }
         };
@@ -53,9 +65,9 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
                     log::info!("VAD: no speech detected, discarding");
                     platform::play_sound("Basso");
                     let _ = std::fs::remove_file(&audio_path);
-                    state.runtime.lock().unwrap().is_transcribing = false;
                     // If queue still has items, continue processing them
                     if state.queue_count() > 0 {
+                        drop(_guard); // reset is_transcribing before continuing
                         continue;
                     }
                     show_error_then_close(app);
@@ -74,7 +86,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
 
         let had_error = run_transcription(app, state, &audio_path, vad_trimmed).await;
         let _ = std::fs::remove_file(&audio_path);
-        state.runtime.lock().unwrap().is_transcribing = false;
+        drop(_guard); // reset is_transcribing
 
         if had_error {
             show_error_then_close(app);
