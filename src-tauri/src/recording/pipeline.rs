@@ -26,9 +26,11 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
         {
             let mut rt = state.runtime.lock().unwrap();
             if rt.is_transcribing {
+
                 return;
             }
             if rt.queue.is_empty() {
+
                 return;
             }
             rt.is_transcribing = true;

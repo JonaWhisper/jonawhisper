@@ -330,37 +330,14 @@ fn is_phonetically_plausible(input: &str, candidate: &str) -> bool {
     false
 }
 
-/// Check if a word is valid in a cross-language dictionary (anglicisms, loanwords).
-/// For non-English languages, checks if the word exists in the EN dictionary.
-/// For English, checks if the word exists in the FR dictionary (less common but possible).
-/// Returns false if the cross-language dict is not downloaded (graceful degradation).
-fn is_cross_language_word(word: &str, current_language: &str) -> bool {
+/// Determine the cross-language code to check for loanwords.
+/// Returns None for English (no cross-lang check needed).
+fn cross_language_code(current_language: &str) -> Option<&'static str> {
     let base = current_language.split(&['-', '_'][..]).next().unwrap_or(current_language);
-
-    // Determine which cross-language dict to check
-    let cross_lang = match base {
-        "en" => return false, // Don't check FR words when correcting EN (rare case, too many false positives)
-        _ => "en",           // For all non-EN languages, check EN dict (anglicisms are universal)
-    };
-
-    // Try to load the cross-language dict (no-op if already loaded)
-    if !get_ss(cross_lang) {
-        log::debug!("SymSpell cross-lang guard: EN dict not available (download it to protect anglicisms)");
-        return false;
+    match base {
+        "en" => None,
+        _ => Some("en"),
     }
-
-    let code = lang_to_code(cross_lang);
-    let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(cache) = guard.as_ref() {
-        if let Some(ss) = cache.get(&code) {
-            let found = !ss.lookup(word, Verbosity::Top, 0).is_empty();
-            if found {
-                log::debug!("SymSpell: '{}' protected by cross-lang EN dict (anglicism)", word);
-            }
-            return found;
-        }
-    }
-    false
 }
 
 /// Correct text using SymSpell with context-aware KenLM reranking.
@@ -384,14 +361,35 @@ const MIN_CORRECTION_LEN: usize = 4;
 pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::WordConfidence]) -> (String, Vec<ProtectedWord>) {
     refresh_user_dict();
 
+    // Pre-load all dicts BEFORE taking the SS_CACHE lock to avoid deadlock.
+    // The cross-language guard needs the EN dict, which is in the same SS_CACHE mutex.
+    if !get_ss(language) {
+        return (text.to_string(), Vec::new());
+    }
+    let cross_lang_code = cross_language_code(language);
+    let have_cross_lang = cross_lang_code.map_or(false, |cl| get_ss(cl));
+    let have_lm = get_lm(language);
+
     // Build a map from lowercase word → confidence for O(1) lookup
     let confidence_map: HashMap<String, f32> = word_confidences.iter()
         .filter_map(|wc| wc.confidence.map(|c| (wc.word.to_lowercase(), c)))
         .collect();
 
-    with_ss(language, |ss| {
+    // Now take the lock once — all dicts are already loaded in the cache
+    let code = lang_to_code(language);
+    let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(cache) = guard.as_ref() else {
+        return (text.to_string(), Vec::new());
+    };
+    let Some(ss) = cache.get(&code) else {
+        return (text.to_string(), Vec::new());
+    };
+    // Get cross-lang dict reference (same lock, no deadlock)
+    let cross_ss = cross_lang_code
+        .and_then(|cl| cache.get(&lang_to_code(cl)));
+
+    {
         let words = word_boundaries(text);
-        let have_lm = get_lm(language);
         let mut result = String::with_capacity(text.len());
         let mut protected = Vec::new();
         let mut last_end = 0;
@@ -468,16 +466,20 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
                 }
             }
 
-            // Cross-language guard: if the word exists in another major language's dictionary,
-            // it's likely a valid loanword/anglicism (e.g. "scoring" in French).
-            // Only check EN when correcting non-EN, since English loanwords are ubiquitous.
-            if is_cross_language_word(&lower, language) {
-                protected.push(ProtectedWord {
-                    word: word.to_string(),
-                    reason: "cross-lang:en".to_string(),
-                });
-                result.push_str(word);
-                continue;
+            // Cross-language guard: check EN dict for anglicisms (same lock, no deadlock)
+            if have_cross_lang {
+                if let Some(ref css) = cross_ss {
+                    let found = !css.lookup(&lower, Verbosity::Top, 0).is_empty();
+                    if found {
+                        log::debug!("SymSpell: '{}' protected by cross-lang EN dict (anglicism)", word);
+                        protected.push(ProtectedWord {
+                            word: word.to_string(),
+                            reason: "cross-lang:en".to_string(),
+                        });
+                        result.push_str(word);
+                        continue;
+                    }
+                }
             }
 
             // Word is unknown — generate correction candidates
@@ -556,9 +558,10 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
         }
 
         result.push_str(&text[last_end..]);
+        // Drop the SS_CACHE lock before returning
+        drop(guard);
         (result, protected)
-    })
-    .unwrap_or_else(|| (text.to_string(), Vec::new()))
+    }
 }
 
 /// Score correction candidates using KenLM trigram context.
