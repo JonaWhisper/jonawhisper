@@ -43,6 +43,11 @@
 - [ ] **Ponctuation domain-adapted** — Fine-tuner PCS ou BERT sur un corpus ASR (transcriptions orales avec ponctuation de référence) plutôt que du texte écrit. Les modèles actuels sont entraînés sur texte formel, pas sur de l'oral transcrit. Impact modéré, effort élevé (besoin de données annotées).
 - [x] **Correction sélective guidée par confiance** — Implémenté dans `symspell_correct.rs` : les mots avec un score ASR > 0.85 sont ignorés par le spell-check (`CONFIDENCE_SKIP_THRESHOLD`). Parakeet et Canary fournissent les scores, Whisper non (tous les mots sont corrigés). La correction T5 ne filtre pas encore par confiance (piste d'amélioration).
 
+## Audit / Qualité
+
+- [ ] **Persistance du contexte chargé par modèle** — Étudier si on peut persister le contexte (poids chargés en mémoire, état ONNX/CoreML, caches) de chaque modèle entre les lancements de l'app, pour éviter le cold-start à chaque démarrage. Actuellement le `ContextMap` recharge tout à la première utilisation (~5s pour Parakeet). Pistes : sérialisation des sessions ort, mmap des poids, cache CoreML compilé.
+- [ ] **Contexte conversationnel unifié entre modèles** — Maintenir un contexte grammatical/sémantique partagé entre les transcriptions successives. Actuellement chaque transcription est indépendante — le modèle ne sait pas ce qui a été dit avant. Pistes : (1) prompt contextuel avec les N dernières phrases pour les modèles qui supportent le conditioning (Whisper `initial_prompt`, Qwen, LLM cloud), (2) contexte partagé pour le post-processing (spell-check, ponctuation, correction) — le correcteur pourrait mieux désambiguïser avec le contexte précédent, (3) unifier ce contexte entre ASR et cleanup pour une cohérence globale. Impact : meilleure ponctuation inter-phrases, correction contextuelle, désambiguïsation des homophones.
+
 ## Technique / Infra
 
 - [ ] **Refonte du système de logging** — Le logging actuel est insuffisant pour diagnostiquer les bugs en production (pill grisé, latence aléatoire). Problèmes identifiés :
