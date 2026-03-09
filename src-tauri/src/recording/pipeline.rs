@@ -134,14 +134,16 @@ async fn run_transcription(
     let state_clone = Arc::clone(state);
     let path = audio_path.to_path_buf();
     let t0 = std::time::Instant::now();
-    let result = tokio::task::spawn_blocking(move || {
+
+    // Timeout: if transcription + cleanup takes more than 120s, abort
+    let task = tokio::task::spawn_blocking(move || {
         transcribe(&state_clone, &path)
-    })
-    .await;
+    });
+    let result = tokio::time::timeout(Duration::from_secs(120), task).await;
     log::info!("Transcription total: {:.1}s", t0.elapsed().as_secs_f64());
 
     match result {
-        Ok(Ok(tr)) => {
+        Ok(Ok(Ok(tr))) => {
             if state.runtime.lock().unwrap().transcription_cancelled {
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
@@ -149,7 +151,7 @@ async fn run_transcription(
             handle_transcription_result(app, state, &tr.text, &tr.word_confidences, vad_trimmed).await;
             false
         }
-        Ok(Err(e)) => {
+        Ok(Ok(Err(e))) => {
             log::error!("Transcription error: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -158,12 +160,21 @@ async fn run_transcription(
             );
             true
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             log::error!("Transcription task panicked: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
                 events::TRANSCRIPTION_ERROR,
                 serde_json::json!({ "error": "Internal error" }),
+            );
+            true
+        }
+        Err(_) => {
+            log::error!("Transcription timed out after 120s");
+            platform::play_sound("Basso");
+            let _ = app.emit(
+                events::TRANSCRIPTION_ERROR,
+                serde_json::json!({ "error": "Transcription timed out" }),
             );
             true
         }
