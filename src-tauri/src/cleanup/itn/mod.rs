@@ -141,11 +141,12 @@ fn is_unit_word(word: &str, lang_units: &[&str]) -> bool {
         || UNIT_SYMBOLS.contains(&word)
 }
 
-/// Strip trailing sentence-ending punctuation from a word for number parsing.
-/// Only strips sentence terminators (. ! ?), NOT structural separators (, ; :)
-/// which indicate clause boundaries where number sequences should stop.
+/// Strip trailing punctuation from a word for number parsing.
+/// ASR + punctuation models insert commas and periods that prevent number recognition
+/// (e.g. "Deux," "zéro," "quatre."). The number parser's own guards prevent
+/// cross-boundary combining of separate numbers.
 fn strip_trailing_punct(word: &str) -> &str {
-    word.trim_end_matches(|c: char| matches!(c, '.' | '!' | '?'))
+    word.trim_end_matches(|c: char| matches!(c, '.' | ',' | '!' | '?' | ';' | ':'))
 }
 
 /// Split text into words, try to parse number sequences, replace with digits.
