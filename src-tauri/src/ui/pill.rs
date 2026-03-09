@@ -51,8 +51,10 @@ pub fn open(app: &AppHandle, initial_mode: PillMode) {
     #[cfg(target_os = "macos")]
     {
         if PILL.lock().unwrap().is_some() {
+            log::debug!("Pill: open() called but already open, skipping");
             return;
         }
+        log::debug!("Pill: opening with mode {:?}", initial_mode);
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
             let (ns_win, image_view) = unsafe { create_pill_window() };
@@ -89,6 +91,7 @@ pub fn open(app: &AppHandle, initial_mode: PillMode) {
 pub fn close(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     {
+        log::debug!("Pill: closing");
         let ns_win_addr = {
             let mut pill = PILL.lock().unwrap();
             pill.take().map(|p| p.ns_window as usize)
@@ -106,8 +109,14 @@ pub fn close(app: &AppHandle) {
 
 pub fn set_mode(mode: PillMode) {
     #[cfg(target_os = "macos")]
-    if let Some(ref mut p) = *PILL.lock().unwrap() {
-        p.mode = mode;
+    {
+        let mut guard = PILL.lock().unwrap();
+        if let Some(ref mut p) = *guard {
+            log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
+            p.mode = mode;
+        } else {
+            log::warn!("Pill: set_mode({:?}) called but pill is not open", mode);
+        }
     }
     #[cfg(not(target_os = "macos"))]
     let _ = mode;
