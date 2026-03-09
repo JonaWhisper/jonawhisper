@@ -276,19 +276,33 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     // Step 2b: spell-check (SymSpell) — runs after punctuation, before correction
+    // Runs in spawn_blocking because dict loading (140k+ lines) blocks the async runtime
     if spellcheck_enabled {
         let before = processed.clone();
-        let (corrected, protected_words) = cleanup::symspell_correct::auto_correct(&processed, &lang, word_confidences);
-        processed = corrected;
-        if processed != before {
-            log::debug!("SymSpell: «{}» → «{}»", before, processed);
-            pipeline_steps.push(("spellcheck", processed.clone()));
-        } else {
-            pipeline_steps.push(("spellcheck:nochange", String::new()));
-        }
-        if !protected_words.is_empty() {
-            if let Ok(json) = serde_json::to_string(&protected_words) {
-                pipeline_steps.push(("spellcheck:protected", json));
+        let lang_owned = lang.clone();
+        let wc_owned: Vec<jona_types::WordConfidence> = word_confidences.to_vec();
+        let spell_result = tokio::task::spawn_blocking(move || {
+            cleanup::symspell_correct::auto_correct(&before, &lang_owned, &wc_owned)
+        }).await;
+        match spell_result {
+            Ok((corrected, protected_words)) => {
+                if corrected != processed {
+                    log::debug!("SymSpell: «{}» → «{}»", processed, corrected);
+                    processed = corrected;
+                    pipeline_steps.push(("spellcheck", processed.clone()));
+                } else {
+                    processed = corrected;
+                    pipeline_steps.push(("spellcheck:nochange", String::new()));
+                }
+                if !protected_words.is_empty() {
+                    if let Ok(json) = serde_json::to_string(&protected_words) {
+                        pipeline_steps.push(("spellcheck:protected", json));
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Spellcheck task panicked: {}", e);
+                pipeline_steps.push(("spellcheck:error", e.to_string()));
             }
         }
     }
