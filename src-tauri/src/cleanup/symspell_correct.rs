@@ -471,17 +471,24 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
             }
 
             // Cross-language guard: check EN dict for anglicisms (same lock, no deadlock)
+            // But don't protect if the word is close (dist 1) to a main-lang word —
+            // it's likely an ASR accent error (e.g. "zero" → "zéro"), not a real anglicism.
             if have_cross_lang {
                 if let Some(ref css) = cross_ss {
-                    let found = !css.lookup(&lower, Verbosity::Top, 0).is_empty();
-                    if found {
-                        log::debug!("SymSpell: '{}' protected by cross-lang EN dict (anglicism)", word);
-                        protected.push(ProtectedWord {
-                            word: word.to_string(),
-                            reason: "cross-lang:en".to_string(),
-                        });
-                        result.push_str(word);
-                        continue;
+                    let found_in_en = !css.lookup(&lower, Verbosity::Top, 0).is_empty();
+                    if found_in_en {
+                        let close_in_main = !ss.lookup(&lower, Verbosity::Top, 1).is_empty();
+                        if close_in_main {
+                            log::debug!("SymSpell: '{}' in EN dict but close to main-lang word, not protecting", word);
+                        } else {
+                            log::debug!("SymSpell: '{}' protected by cross-lang EN dict (anglicism)", word);
+                            protected.push(ProtectedWord {
+                                word: word.to_string(),
+                                reason: "cross-lang:en".to_string(),
+                            });
+                            result.push_str(word);
+                            continue;
+                        }
                     }
                 }
             }

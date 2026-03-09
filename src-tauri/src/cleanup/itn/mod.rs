@@ -141,12 +141,23 @@ fn is_unit_word(word: &str, lang_units: &[&str]) -> bool {
         || UNIT_SYMBOLS.contains(&word)
 }
 
+/// Strip trailing sentence-ending punctuation from a word for number parsing.
+/// Only strips sentence terminators (. ! ?), NOT structural separators (, ; :)
+/// which indicate clause boundaries where number sequences should stop.
+fn strip_trailing_punct(word: &str) -> &str {
+    word.trim_end_matches(|c: char| matches!(c, '.' | '!' | '?'))
+}
+
 /// Split text into words, try to parse number sequences, replace with digits.
 fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>, lang_units: &[&str]) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.is_empty() {
         return text.to_string();
     }
+
+    // Strip trailing sentence punctuation for number parsing
+    // (ASR output often has "quatre." at end of sentence)
+    let clean_words: Vec<&str> = words.iter().map(|w| strip_trailing_punct(w)).collect();
 
     let mut result = String::new();
     let mut i = 0;
@@ -156,12 +167,12 @@ fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>, lang
         let word_pos = text[text_pos..].find(words[i]).map(|p| text_pos + p).unwrap_or(text_pos);
         result.push_str(&text[text_pos..word_pos]);
 
-        if let Some((value, consumed)) = parser(&words[i..]) {
+        if let Some((value, consumed)) = parser(&clean_words[i..]) {
             // Don't convert standalone "un"/"une"/"a"/"one" — too ambiguous as article
             // UNLESS the next word is a known unit (heure, euro, kilo, etc.)
             // Note: value==0 ("zero") is never an article, always convert it.
             if consumed == 1 && value == 1 {
-                let next_is_unit = words.get(i + 1).is_some_and(|w| is_unit_word(w, lang_units));
+                let next_is_unit = clean_words.get(i + 1).is_some_and(|w| is_unit_word(w, lang_units));
                 if !next_is_unit {
                     result.push_str(words[i]);
                     text_pos = word_pos + words[i].len();
@@ -171,8 +182,11 @@ fn replace_numbers(text: &str, parser: fn(&[&str]) -> Option<(u64, usize)>, lang
             }
 
             result.push_str(&value.to_string());
-
+            // Preserve trailing punctuation from the last consumed word
             let last_word = i + consumed - 1;
+            let trailing = &words[last_word][clean_words[last_word].len()..];
+            result.push_str(trailing);
+
             text_pos = text[text_pos..].find(words[last_word])
                 .map(|p| text_pos + p + words[last_word].len())
                 .unwrap_or(word_pos + words[i].len());

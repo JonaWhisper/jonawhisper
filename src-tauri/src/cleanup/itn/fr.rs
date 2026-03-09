@@ -79,6 +79,11 @@ fn parse_fr_number(words: &[&str]) -> Option<(u64, usize)> {
         }
 
         if let Some(val) = fr_atom(w) {
+            // Don't combine zero with a following digit — it's a sequence, not a compound
+            // (e.g. "zéro quatre" in time = "0 4", "zéro six" in phone = "0 6")
+            if consumed_any && current_group == 0 && total == 0 && val > 0 {
+                break;
+            }
             current_group += val;
             pos += 1;
             consumed_any = true;
@@ -337,5 +342,24 @@ mod tests {
     fn hours_complex() {
         assert_eq!(apply_itn("quatorze heures trente", "fr"), "14 h 30");
         assert_eq!(apply_itn("le rendez-vous est à trois heures", "fr"), "le rendez-vous est à 3 h");
+    }
+
+    #[test]
+    fn trailing_punctuation() {
+        // ASR often outputs "quatre." — trailing period shouldn't block parsing
+        assert_eq!(apply_itn("j'ai cinq chats.", "fr"), "j'ai 5 chats.");
+        assert_eq!(apply_itn("trois!", "fr"), "3!");
+        assert_eq!(apply_itn("Deux heures zéro quatre.", "fr"), "2 h 0 4.");
+    }
+
+    #[test]
+    fn zero_does_not_combine() {
+        // "zéro + digit" is always a sequence (time, phone), not a compound number
+        assert_eq!(apply_itn("zéro quatre", "fr"), "0 4");
+        assert_eq!(apply_itn("zéro six", "fr"), "0 6");
+        // But zero alone is still converted
+        assert_eq!(apply_itn("j'ai zéro chance", "fr"), "j'ai 0 chance");
+        // Compound numbers with zero still work
+        assert_eq!(apply_itn("cent", "fr"), "100");
     }
 }

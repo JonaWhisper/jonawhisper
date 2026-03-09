@@ -6,7 +6,7 @@ import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, X, Slash,
+  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, Slash,
 } from 'lucide-vue-next'
 import { diffWords } from 'diff'
 
@@ -340,8 +340,8 @@ watch(() => props.entry.timestamp, () => {
                   @click="step.hasDiff && toggleDiffStep(step.id)"
                 >
                   <component :is="step.icon" class="h-3 w-3" :class="step.hasError ? 'opacity-60' : ''" />
-                  <!-- Error: small red X overlaid on the icon -->
-                  <X v-if="step.hasError" class="absolute h-2.5 w-2.5 text-destructive/50 stroke-[2]" />
+                  <!-- Error: small red bubble -->
+                  <span v-if="step.hasError" class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-destructive text-white text-[7px] font-bold flex items-center justify-center leading-none">!</span>
                   <!-- No change: diagonal slash through icon -->
                   <Slash v-if="step.noChange" class="absolute h-3.5 w-3.5 text-muted-foreground/50 stroke-[1.5]" />
                   <!-- Badge count (e.g. protected words) -->
