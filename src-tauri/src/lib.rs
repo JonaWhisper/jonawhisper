@@ -22,8 +22,8 @@ use std::sync::Arc;
 use tauri::{Emitter, Manager};
 
 /// Initialize logging: write to both stderr and a log file on disk.
-/// Log file: ~/Library/Application Support/JonaWhisper/logs/jona-whisper.log
-/// Old log is rotated to jona-whisper.prev.log on each launch.
+/// Log file: ~/Library/Application Support/JonaWhisper/logs/jona-whisper-{timestamp}.log
+/// All previous logs are preserved (timestamped filenames).
 fn init_logging() {
     use simplelog::*;
     use std::fs;
@@ -31,13 +31,15 @@ fn init_logging() {
     let log_dir = jona_types::config_dir().join("logs");
     let _ = fs::create_dir_all(&log_dir);
 
-    let log_path = log_dir.join("jona-whisper.log");
-    let prev_path = log_dir.join("jona-whisper.prev.log");
+    // Timestamped filename: jona-whisper-1741480800.log (Unix timestamp)
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let log_path = log_dir.join(format!("jona-whisper-{}.log", ts));
 
-    // Rotate: current → prev (keep one previous session)
-    if log_path.exists() {
-        let _ = fs::rename(&log_path, &prev_path);
-    }
+    // Prune old logs: keep last 10 files
+    prune_old_logs(&log_dir, 10);
 
     let config = ConfigBuilder::new()
         .set_time_format_rfc3339()
@@ -54,6 +56,28 @@ fn init_logging() {
 
     let _ = CombinedLogger::init(loggers);
     log::info!("Logging to {}", log_path.display());
+}
+
+/// Remove old log files, keeping the most recent `keep` files.
+fn prune_old_logs(log_dir: &std::path::Path, keep: usize) {
+    let mut logs: Vec<std::path::PathBuf> = std::fs::read_dir(log_dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.path()
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("jona-whisper-") && n.ends_with(".log"))
+        })
+        .map(|e| e.path())
+        .collect();
+    logs.sort();
+    if logs.len() > keep {
+        for old in &logs[..logs.len() - keep] {
+            let _ = std::fs::remove_file(old);
+        }
+    }
 }
 
 /// Resolve the effective locale ("fr" or "en") from preferences.
