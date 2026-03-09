@@ -162,6 +162,7 @@ interface PipelineIcon {
   hasError: boolean   // ran but failed
   tooltip: string
   color: string       // active color classes
+  badgeCount?: number // small count badge (e.g. protected words)
 }
 
 const pipelineIcons = computed<PipelineIcon[]>(() => {
@@ -236,19 +237,19 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
   let spellTooltip = t('history.badge.spellcheckTooltip')
   if (stepsNoChange.value.has('spellcheck')) spellTooltip += ` (${t('history.badge.noChange')})`
   if (stepsError.value.has('spellcheck')) spellTooltip += ` (${t('history.badge.error')})`
-  if (pw.length > 0) {
-    spellTooltip += `\n${t('history.badge.protected', { count: pw.length })}: `
-      + pw.map(p => `${p.word} (${formatProtectedReason(p.reason)})`).join(', ')
-  }
+  if (pw.length > 0) spellTooltip += `\n${t('history.badge.protected', { count: pw.length })}`
+  // Spellcheck is clickable if it has a diff OR protected words to show
+  const spellClickable = stepsWithDiff.value.has('spellcheck') || pw.length > 0
   icons.push({
     id: 'spellcheck',
     icon: BookA,
     active: !!e.spellcheck,
-    hasDiff: stepsWithDiff.value.has('spellcheck'),
-    noChange: stepsNoChange.value.has('spellcheck'),
+    hasDiff: spellClickable,
+    noChange: stepsNoChange.value.has('spellcheck') && !spellClickable,
     hasError: stepsError.value.has('spellcheck'),
     tooltip: spellTooltip,
     color: 'text-lime-600',
+    badgeCount: pw.length,
   })
 
   // 7. Correction / LLM cleanup
@@ -343,6 +344,8 @@ watch(() => props.entry.timestamp, () => {
                   <X v-if="step.hasError" class="absolute h-2.5 w-2.5 text-destructive/50 stroke-[2]" />
                   <!-- No change: diagonal slash through icon -->
                   <Slash v-if="step.noChange" class="absolute h-3.5 w-3.5 text-muted-foreground/50 stroke-[1.5]" />
+                  <!-- Badge count (e.g. protected words) -->
+                  <span v-if="step.badgeCount" class="absolute -top-1 -right-1 min-w-[12px] h-3 px-0.5 rounded-full bg-lime-600 text-white text-[8px] font-bold flex items-center justify-center leading-none">{{ step.badgeCount }}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" :side-offset="4">
@@ -354,9 +357,9 @@ watch(() => props.entry.timestamp, () => {
       </TooltipProvider>
 
       <!-- Diff view for selected pipeline step -->
-      <div v-if="activeDiffStep && diffForStep.length > 0" class="mb-1">
+      <div v-if="activeDiffStep && (diffForStep.length > 0 || (activeDiffStep === 'spellcheck' && protectedWords.length > 0))" class="mb-1">
         <span class="text-[10px] text-muted-foreground mb-0.5 block">{{ pipelineIcons.find(s => s.id === activeDiffStep)?.tooltip }}</span>
-        <p class="text-[13px] leading-snug">
+        <p v-if="diffForStep.length > 0" class="text-[13px] leading-snug">
           <span
             v-for="(part, i) in diffForStep"
             :key="i"
@@ -366,6 +369,23 @@ watch(() => props.entry.timestamp, () => {
             }"
           >{{ part.value }}</span>
         </p>
+        <!-- Protected words tags -->
+        <div v-if="activeDiffStep === 'spellcheck' && protectedWords.length > 0" class="flex flex-wrap gap-1 mt-1">
+          <span
+            v-for="(pw, i) in protectedWords"
+            :key="i"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-none"
+            :class="pw.reason === 'user-dict'
+              ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+              : pw.reason.startsWith('confidence:')
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                : 'bg-purple-500/15 text-purple-600 dark:text-purple-400'"
+          >
+            <ShieldCheck class="h-2.5 w-2.5" />
+            <span class="font-medium">{{ pw.word }}</span>
+            <span class="opacity-60">{{ formatProtectedReason(pw.reason) }}</span>
+          </span>
+        </div>
       </div>
       <!-- Main text: always show the final corrected version -->
       <p v-else class="text-[13px] leading-snug mb-1">{{ entry.text }}</p>
