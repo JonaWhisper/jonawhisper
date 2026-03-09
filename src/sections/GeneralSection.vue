@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 
 const { t } = useI18n()
@@ -142,13 +143,20 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
               <SelectItem value="debug">Debug</SelectItem>
             </SelectContent>
           </Select>
-          <button
-            :aria-label="t('general.openLogs')"
-            class="h-8 w-8 flex items-center justify-center rounded-md border border-input text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            @click="invoke('open_logs_folder')"
-          >
-            <FolderOpen class="w-4 h-4" />
-          </button>
+          <TooltipProvider :delay-duration="200">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  :aria-label="t('general.openLogs')"
+                  class="h-8 w-8 flex items-center justify-center rounded-md border border-input text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  @click="invoke('open_logs_folder')"
+                >
+                  <FolderOpen class="w-4 h-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" :side-offset="4">{{ t('general.openLogs') }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
     </div>

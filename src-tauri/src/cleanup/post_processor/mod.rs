@@ -25,8 +25,11 @@ pub struct PostProcessOptions {
 
 /// Phase 1: hallucination filter + dictation command substitution.
 pub fn preprocess(text: &str, language: &str, opts: &PostProcessOptions) -> String {
+    // Strip ASR unknown tokens (e.g. Parakeet outputs "<unk>" for unrecognized words)
+    let text = text.replace("<unk>", "");
+
     let mut result = if opts.hallucination_filter {
-        hallucinations::strip_hallucinations(text)
+        hallucinations::strip_hallucinations(&text)
     } else {
         text.to_string()
     };
