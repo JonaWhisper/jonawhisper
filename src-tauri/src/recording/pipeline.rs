@@ -237,10 +237,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     };
 
     // Step 1: preprocess (hallucination filter + dictation commands + disfluency removal)
+    // Dictation commands disabled when a punctuation model handles punctuation automatically
     let mut processed = {
         let opts = cleanup::post_processor::PostProcessOptions {
             hallucination_filter: hall_filter,
             disfluency_removal,
+            dictation_commands: punctuation_model_id.is_empty(),
         };
         cleanup::post_processor::preprocess(trimmed, &lang, &opts)
     };

@@ -18,6 +18,9 @@ static RE_CAPITALIZE_AFTER_SENTENCE: LazyLock<Regex> =
 pub struct PostProcessOptions {
     pub hallucination_filter: bool,
     pub disfluency_removal: bool,
+    /// Replace spoken punctuation words ("virgule" → ",", "period" → ".").
+    /// Disabled when a punctuation model is active (it handles this better).
+    pub dictation_commands: bool,
 }
 
 /// Phase 1: hallucination filter + dictation command substitution.
@@ -32,7 +35,10 @@ pub fn preprocess(text: &str, language: &str, opts: &PostProcessOptions) -> Stri
     }
 
     let lang = resolve_language(language, &result);
-    result = dictation::apply_dictation_commands(&result, &lang);
+
+    if opts.dictation_commands {
+        result = dictation::apply_dictation_commands(&result, &lang);
+    }
 
     if opts.disfluency_removal {
         result = fillers::strip_fillers(&result, &lang);
@@ -112,7 +118,7 @@ mod tests {
     use super::*;
 
     fn default_opts() -> PostProcessOptions {
-        PostProcessOptions { hallucination_filter: true, disfluency_removal: true }
+        PostProcessOptions { hallucination_filter: true, disfluency_removal: true, dictation_commands: true }
     }
 
     #[test]
@@ -150,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_hallucination_filter_disabled() {
-        let opts = PostProcessOptions { hallucination_filter: false, disfluency_removal: true };
+        let opts = PostProcessOptions { hallucination_filter: false, disfluency_removal: true, dictation_commands: true };
         let result = process("sous-titrage", "fr", &opts);
         assert!(!result.is_empty());
     }
@@ -169,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_filler_removal_disabled() {
-        let opts = PostProcessOptions { hallucination_filter: true, disfluency_removal: false };
+        let opts = PostProcessOptions { hallucination_filter: true, disfluency_removal: false, dictation_commands: true };
         let result = process("euh bonjour", "fr", &opts);
         assert!(result.to_lowercase().contains("euh"));
     }

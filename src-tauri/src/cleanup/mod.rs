@@ -20,6 +20,7 @@ pub fn text_cleanup_pipeline(
     let opts = post_processor::PostProcessOptions {
         hallucination_filter,
         disfluency_removal,
+        dictation_commands: true,
     };
 
     let preprocessed = post_processor::preprocess(raw_asr, language, &opts);
