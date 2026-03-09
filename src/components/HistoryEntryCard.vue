@@ -369,6 +369,8 @@ watch(() => props.entry.timestamp, () => {
             }"
           >{{ part.value }}</span>
         </p>
+        <!-- No text diff but step is open: show the final text -->
+        <p v-else class="text-[13px] leading-snug">{{ entry.text }}</p>
         <!-- Protected words tags -->
         <div v-if="activeDiffStep === 'spellcheck' && protectedWords.length > 0" class="flex flex-wrap gap-1 mt-1">
           <span
