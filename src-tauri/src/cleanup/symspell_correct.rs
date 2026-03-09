@@ -300,6 +300,10 @@ fn is_phonetically_plausible(input: &str, candidate: &str) -> bool {
     if input == candidate {
         return true;
     }
+    // DoubleMetaphone only handles ASCII — skip if either string has non-ASCII chars
+    if !input.is_ascii() || !candidate.is_ascii() {
+        return true; // allow through (don't filter on phonetics)
+    }
     let in_result = DMETA.double_metaphone(input);
     let cand_result = DMETA.double_metaphone(candidate);
 
