@@ -177,6 +177,8 @@
   "general.theme.light": "Light",
   "general.theme.dark": "Dark",
   "general.interfaceLanguage": "Interface Language",
+  "general.logging": "Logging",
+  "general.logLevel": "Log level",
   "models.filter.all": "All",
   "models.filter.asr": "Transcription",
   "models.filter.punctuation": "Punctuation",

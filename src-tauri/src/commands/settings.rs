@@ -3,6 +3,16 @@ use crate::state::AppState;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
+pub fn parse_log_level(s: &str) -> log::LevelFilter {
+    match s {
+        "error" => log::LevelFilter::Error,
+        "warn" => log::LevelFilter::Warn,
+        "debug" => log::LevelFilter::Debug,
+        "trace" => log::LevelFilter::Trace,
+        _ => log::LevelFilter::Info,
+    }
+}
+
 #[tauri::command]
 pub fn get_system_locale(state: tauri::State<'_, Arc<AppState>>) -> String {
     let locale = state.settings.lock().unwrap().app_locale.clone();
@@ -36,6 +46,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "itn_enabled": s.itn_enabled,
         "spellcheck_enabled": s.spellcheck_enabled,
         "theme": s.theme,
+        "log_level": s.log_level,
     })
 }
 
@@ -82,6 +93,12 @@ pub fn set_setting(
             "itn_enabled" => s.itn_enabled = value == "true",
             "spellcheck_enabled" => s.spellcheck_enabled = value == "true",
             "theme" => s.theme = value.clone(),
+            "log_level" => {
+                s.log_level = value.clone();
+                let level = parse_log_level(&value);
+                log::set_max_level(level);
+                log::info!("Log level set to {}", level);
+            }
             _ => {
                 log::warn!("Unknown setting key: {}", key);
                 return;

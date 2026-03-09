@@ -106,7 +106,8 @@ pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::Ho
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .init();
 
     // Initialize the engine catalog from inventory auto-registration.
     // Each engine crate registers itself via `inventory::submit!`.
@@ -116,10 +117,13 @@ pub fn run() {
 
     let app_state = Arc::new(AppState::default());
 
-    // Set Rust i18n locale from saved preferences
+    // Apply saved log level and locale from preferences
     {
-        let locale = app_state.settings.lock().unwrap().app_locale.clone();
-        rust_i18n::set_locale(&resolve_locale(&locale));
+        let s = app_state.settings.lock().unwrap();
+        let level = commands::settings::parse_log_level(&s.log_level);
+        log::set_max_level(level);
+        log::info!("Log level: {}", level);
+        rust_i18n::set_locale(&resolve_locale(&s.app_locale));
     }
 
     tauri::Builder::default()

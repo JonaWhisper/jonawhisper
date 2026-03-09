@@ -179,4 +179,5 @@ export interface SettingsPayload {
   itn_enabled: boolean
   spellcheck_enabled: boolean
   theme: string
+  log_level: string
 }

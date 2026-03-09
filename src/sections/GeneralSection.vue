@@ -122,6 +122,27 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
       </div>
     </div>
 
+    <!-- Log level card -->
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.logging') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
+        <div>
+          <div class="text-[13px] text-foreground">{{ t('general.logLevel') }}</div>
+        </div>
+        <Select :model-value="settings.logLevel" @update:model-value="(v) => settings.setSetting('log_level', String(v))">
+          <SelectTrigger class="w-auto min-w-[110px] h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="error">Error</SelectItem>
+            <SelectItem value="warn">Warning</SelectItem>
+            <SelectItem value="info">Info</SelectItem>
+            <SelectItem value="debug">Debug</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
     <!-- About card -->
     <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-5 mb-2.5">
       <div class="text-center">

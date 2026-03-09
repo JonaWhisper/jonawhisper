@@ -479,6 +479,8 @@ pub struct Preferences {
     pub spellcheck_enabled: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_log_level")]
+    pub log_level: String,
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
@@ -491,6 +493,7 @@ fn default_asr_cloud_model() -> String { "whisper-1".to_string() }
 fn default_llm_max_tokens() -> u32 { 4096 }
 fn default_ducking_level() -> f32 { 0.8 }
 fn default_theme() -> String { "system".to_string() }
+fn default_log_level() -> String { "info".to_string() }
 
 impl Preferences {
     pub fn save(&self) {
