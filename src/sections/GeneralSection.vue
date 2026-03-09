@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
+import { FolderOpen } from 'lucide-vue-next'
 import { useSettingsStore } from '@/stores/settings'
 import i18n from '@/i18n'
 import {
@@ -129,17 +130,26 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
         <div>
           <div class="text-[13px] text-foreground">{{ t('general.logLevel') }}</div>
         </div>
-        <Select :model-value="settings.logLevel" @update:model-value="(v) => settings.setSetting('log_level', String(v))">
-          <SelectTrigger class="w-auto min-w-[110px] h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="error">Error</SelectItem>
-            <SelectItem value="warn">Warning</SelectItem>
-            <SelectItem value="info">Info</SelectItem>
-            <SelectItem value="debug">Debug</SelectItem>
-          </SelectContent>
-        </Select>
+        <div class="flex items-center gap-2">
+          <Select :model-value="settings.logLevel" @update:model-value="(v) => settings.setSetting('log_level', String(v))">
+            <SelectTrigger class="w-auto min-w-[110px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="error">Error</SelectItem>
+              <SelectItem value="warn">Warning</SelectItem>
+              <SelectItem value="info">Info</SelectItem>
+              <SelectItem value="debug">Debug</SelectItem>
+            </SelectContent>
+          </Select>
+          <button
+            :aria-label="t('general.openLogs')"
+            class="h-8 w-8 flex items-center justify-center rounded-md border border-input text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            @click="invoke('open_logs_folder')"
+          >
+            <FolderOpen class="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
 

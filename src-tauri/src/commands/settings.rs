@@ -177,6 +177,13 @@ pub fn save_user_dict(entries: Vec<UserDictEntry>) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_logs_folder() {
+    let log_dir = jona_types::config_dir().join("logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+    let _ = std::process::Command::new("open").arg(&log_dir).spawn();
+}
+
+#[tauri::command]
 pub fn get_launch_at_login_status() -> String {
     platform::get_launch_at_login_status().to_string()
 }

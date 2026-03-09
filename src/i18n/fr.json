@@ -179,6 +179,7 @@
   "general.interfaceLanguage": "Langue de l'interface",
   "general.logging": "Journalisation",
   "general.logLevel": "Niveau de log",
+  "general.openLogs": "Ouvrir le dossier des logs",
   "models.filter.all": "Tous",
   "models.filter.asr": "Transcription",
   "models.filter.punctuation": "Ponctuation",

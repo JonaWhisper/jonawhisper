@@ -21,6 +21,41 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 
+/// Initialize logging: write to both stderr and a log file on disk.
+/// Log file: ~/Library/Application Support/JonaWhisper/logs/jona-whisper.log
+/// Old log is rotated to jona-whisper.prev.log on each launch.
+fn init_logging() {
+    use simplelog::*;
+    use std::fs;
+
+    let log_dir = jona_types::config_dir().join("logs");
+    let _ = fs::create_dir_all(&log_dir);
+
+    let log_path = log_dir.join("jona-whisper.log");
+    let prev_path = log_dir.join("jona-whisper.prev.log");
+
+    // Rotate: current → prev (keep one previous session)
+    if log_path.exists() {
+        let _ = fs::rename(&log_path, &prev_path);
+    }
+
+    let config = ConfigBuilder::new()
+        .set_time_format_rfc3339()
+        .set_target_level(LevelFilter::Off)
+        .build();
+
+    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![
+        TermLogger::new(LevelFilter::Info, config.clone(), TerminalMode::Stderr, ColorChoice::Auto),
+    ];
+
+    if let Ok(file) = fs::File::create(&log_path) {
+        loggers.push(WriteLogger::new(LevelFilter::Debug, config, file));
+    }
+
+    let _ = CombinedLogger::init(loggers);
+    log::info!("Logging to {}", log_path.display());
+}
+
 /// Resolve the effective locale ("fr" or "en") from preferences.
 pub fn resolve_locale(app_locale: &str) -> String {
     if app_locale != "auto" {
@@ -106,8 +141,7 @@ pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::Ho
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .init();
+    init_logging();
 
     // Initialize the engine catalog from inventory auto-registration.
     // Each engine crate registers itself via `inventory::submit!`.
@@ -158,6 +192,7 @@ pub fn run() {
             commands::settings::save_user_dict,
             commands::settings::get_launch_at_login_status,
             commands::settings::set_launch_at_login,
+            commands::settings::open_logs_folder,
             commands::permissions::get_permissions,
             commands::permissions::request_permission,
             commands::permissions::start_monitoring,
