@@ -365,14 +365,16 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use jona_engines::EngineCatalog;
+    use jona_provider::ProviderCatalog;
     use std::sync::Once;
 
     static INIT: Once = Once::new();
 
-    /// Ensure the engine catalog is initialized exactly once across all tests.
+    /// Ensure both catalogs are initialized exactly once across all tests.
     fn ensure_catalog() {
         INIT.call_once(|| {
             EngineCatalog::init_auto();
+            ProviderCatalog::init_auto();
         });
     }
 
@@ -467,6 +469,171 @@ mod tests {
                 engine.id
             );
         }
+    }
+
+    // -- Provider catalog tests --
+
+    #[test]
+    fn provider_catalog_has_backends() {
+        ensure_catalog();
+        let presets = jona_provider::presets();
+        // At least openai backend should be registered
+        let openai = jona_provider::preset("openai");
+        assert!(openai.is_some(), "openai preset should exist");
+        assert!(!presets.is_empty(), "Should have at least one preset");
+    }
+
+    #[test]
+    fn provider_presets_sorted_by_id() {
+        ensure_catalog();
+        let presets = jona_provider::presets();
+        for w in presets.windows(2) {
+            assert!(
+                w[0].id <= w[1].id,
+                "Presets not sorted: {} > {}",
+                w[0].id,
+                w[1].id
+            );
+        }
+    }
+
+    #[test]
+    fn no_duplicate_preset_ids() {
+        ensure_catalog();
+        let presets = jona_provider::presets();
+        let mut seen = std::collections::HashSet::new();
+        for p in presets {
+            assert!(
+                seen.insert(p.id),
+                "Duplicate preset ID: {}",
+                p.id
+            );
+        }
+    }
+
+    #[test]
+    fn preset_base_urls_are_https() {
+        ensure_catalog();
+        for p in jona_provider::presets() {
+            assert!(
+                p.base_url.starts_with("https://"),
+                "Preset {} has non-HTTPS URL: {}",
+                p.id,
+                p.base_url
+            );
+        }
+    }
+
+    #[test]
+    fn preset_backend_ids_resolve() {
+        ensure_catalog();
+        for p in jona_provider::presets() {
+            // backend() panics if not found — this validates referential integrity
+            let _ = jona_provider::backend(p.backend_id);
+        }
+    }
+
+    #[test]
+    fn asr_presets_have_default_models() {
+        ensure_catalog();
+        for p in jona_provider::presets() {
+            if p.supports_asr {
+                assert!(
+                    !p.default_asr_models.is_empty(),
+                    "Preset {} supports ASR but has no default ASR models",
+                    p.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn llm_presets_have_default_models() {
+        ensure_catalog();
+        for p in jona_provider::presets() {
+            if p.supports_llm && p.id != "openrouter" {
+                // OpenRouter is an aggregator with no default models
+                assert!(
+                    !p.default_llm_models.is_empty(),
+                    "Preset {} supports LLM but has no default LLM models",
+                    p.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn preset_gradients_are_valid_css() {
+        ensure_catalog();
+        for p in jona_provider::presets() {
+            assert!(
+                p.gradient.starts_with("linear-gradient("),
+                "Preset {} has invalid gradient: {}",
+                p.id,
+                p.gradient
+            );
+        }
+    }
+
+    #[test]
+    fn preset_lookup_nonexistent_returns_none() {
+        ensure_catalog();
+        assert!(jona_provider::preset("nonexistent_provider_xyz").is_none());
+    }
+
+    #[test]
+    fn backend_for_known_preset_provider() {
+        ensure_catalog();
+        let provider = jona_types::Provider {
+            id: "p1".into(),
+            name: "Test".into(),
+            kind: "openai".into(),
+            url: "https://api.openai.com/v1".into(),
+            api_key: String::new(),
+            allow_insecure: false,
+            cached_models: vec![],
+            supports_asr: true,
+            supports_llm: true,
+            api_format: None,
+        };
+        // Should not panic — resolves preset → backend
+        let _ = jona_provider::backend_for_provider(&provider);
+    }
+
+    #[test]
+    fn backend_for_custom_provider_uses_api_format() {
+        ensure_catalog();
+        let provider = jona_types::Provider {
+            id: "p2".into(),
+            name: "Custom".into(),
+            kind: "custom".into(),
+            url: "https://my-server.local/v1".into(),
+            api_key: String::new(),
+            allow_insecure: false,
+            cached_models: vec![],
+            supports_asr: true,
+            supports_llm: true,
+            api_format: Some("openai".into()),
+        };
+        let _ = jona_provider::backend_for_provider(&provider);
+    }
+
+    #[test]
+    fn sambanova_preset_supports_asr_and_llm() {
+        ensure_catalog();
+        let p = jona_provider::preset("sambanova").expect("sambanova preset should exist");
+        assert!(p.supports_asr);
+        assert!(p.supports_llm);
+        assert!(p.default_asr_models.contains(&"whisper-large-v3"));
+    }
+
+    #[test]
+    fn nebius_preset_supports_llm_only() {
+        ensure_catalog();
+        let p = jona_provider::preset("nebius").expect("nebius preset should exist");
+        assert!(!p.supports_asr);
+        assert!(p.supports_llm);
+        assert!(p.default_asr_models.is_empty());
     }
 
     #[test]
