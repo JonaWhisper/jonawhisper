@@ -33,9 +33,9 @@ jobs:
       - name: Tests
         run: npx vitest run
 
-  # ── Rust check + clippy ──────────────────────────────
-  rust-check:
-    name: Rust Check
+  # ── Rust (clippy + tests) ──────────────────────────────
+  rust:
+    name: Rust
     runs-on: macos-26
     timeout-minutes: 30
     env:
@@ -52,28 +52,9 @@ jobs:
           shared-key: macos-arm64
           cache-on-failure: true
 
-      - name: Clippy (includes cargo check)
+      - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --workspace -- -D warnings
-
-  # ── Rust tests ───────────────────────────────────────
-  rust-test:
-    name: Rust Tests
-    runs-on: macos-26
-    timeout-minutes: 30
-    env:
-      MACOSX_DEPLOYMENT_TARGET: "14.0"
-      CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/src-tauri/cmake/arm-ggml-fix.cmake
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: macos-arm64
-          cache-on-failure: true
 
       - name: Tests
         working-directory: src-tauri
