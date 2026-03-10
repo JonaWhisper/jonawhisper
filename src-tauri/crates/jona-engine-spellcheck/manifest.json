@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-08T16:06:22Z",
+  "generated_at": "2026-03-09T07:11:48Z",
   "languages": {
     "de": {
       "label": "Deutsch",
@@ -199,8 +199,8 @@
         },
         "bigram.txt": {
           "filename": "it-bigram.txt",
-          "size": 1571378,
-          "sha256": "f91bb4fd06c9d03aeec8305fecea1ea91397500ef8d7eca00d081a14b3e8276d",
+          "size": 1544337,
+          "sha256": "ca741ac8d0eccc6bde97378296d405b5b4ff282988960276ef3f793093b4fb48",
           "entries": 100000
         }
       }
