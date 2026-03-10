@@ -371,7 +371,7 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
         return (text.to_string(), Vec::new());
     }
     let cross_lang_code = cross_language_code(language);
-    let have_cross_lang = cross_lang_code.map_or(false, |cl| get_ss(cl));
+    let have_cross_lang = cross_lang_code.is_some_and(get_ss);
     let have_lm = get_lm(language);
 
     // Build a map from lowercase word → confidence for O(1) lookup
@@ -474,7 +474,7 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
             // But don't protect if the word is close (dist 1) to a main-lang word —
             // it's likely an ASR accent error (e.g. "zero" → "zéro"), not a real anglicism.
             if have_cross_lang {
-                if let Some(ref css) = cross_ss {
+                if let Some(css) = cross_ss.as_ref() {
                     let found_in_en = !css.lookup(&lower, Verbosity::Top, 0).is_empty();
                     if found_in_en {
                         let close_in_main = !ss.lookup(&lower, Verbosity::Top, 1).is_empty();

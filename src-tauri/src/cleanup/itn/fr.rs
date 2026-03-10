@@ -83,10 +83,10 @@ fn parse_fr_number(words: &[&str]) -> Option<(u64, usize)> {
             // e.g. "zéro quatre" = "0 4", "deux trois" = "2 3"
             // But allow: "vingt trois" = 23 (current_group ≥ 20),
             // "dix sept" = 17 (10 + 7/8/9 = teens), "cent deux" = 102 (via multiplier)
-            if consumed_any && current_group < 20 && val < 20 && total == 0 {
-                if !(current_group == 10 && matches!(val, 7 | 8 | 9)) {
-                    break;
-                }
+            if consumed_any && current_group < 20 && val < 20 && total == 0
+                && !(current_group == 10 && matches!(val, 7..=9))
+            {
+                break;
             }
             current_group += val;
             pos += 1;
