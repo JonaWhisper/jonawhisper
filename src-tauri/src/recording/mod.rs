@@ -39,6 +39,7 @@ pub struct RecordingState {
     last_short_tap_time: Option<Instant>,
     audio_tx: crossbeam_channel::Sender<AudioCmd>,
     audio_rx: crossbeam_channel::Receiver<AudioReply>,
+    pub(crate) spectrum_data: std::sync::Arc<std::sync::Mutex<Vec<f32>>>,
 }
 
 /// Wrapper around audio command sender for mic test (managed by Tauri).
@@ -47,12 +48,14 @@ pub struct MicTestSender(pub crossbeam_channel::Sender<AudioCmd>);
 pub fn new_recording_state(
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,
     reply_rx: crossbeam_channel::Receiver<AudioReply>,
+    spectrum_data: std::sync::Arc<std::sync::Mutex<Vec<f32>>>,
 ) -> RecordingState {
     RecordingState {
         key_down_time: None,
         last_short_tap_time: None,
         audio_tx: cmd_tx,
         audio_rx: reply_rx,
+        spectrum_data,
     }
 }
 

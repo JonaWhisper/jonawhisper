@@ -40,13 +40,34 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     };
     let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
     let _ = rec.audio_rx.recv();
+    log::debug!("Audio stream created, waiting for first samples");
+
     // Duck AFTER stream started: BT profile switch (A2DP→HFP) has already happened,
     // so we read/set volume in the actual audio state.
     if ducking_enabled {
         platform::audio_ducking::duck_volume(ducking_level);
     }
 
-    // Stream is ready — transition to Recording mode + audible cue
+    // Wait for first audio data before transitioning to Recording.
+    // Without this, the pill shows Recording with a flat/grey spectrum
+    // because cpal hasn't produced samples yet (~50-150ms delay).
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
+    loop {
+        let _ = rec.audio_tx.send(AudioCmd::GetSpectrum);
+        std::thread::sleep(std::time::Duration::from_millis(15));
+        let spectrum = rec.spectrum_data.lock().unwrap().clone();
+        let has_data = spectrum.iter().any(|&v| v >= 0.001);
+        if has_data {
+            log::debug!("First audio samples received, transitioning to Recording");
+            break;
+        }
+        if std::time::Instant::now() >= deadline {
+            log::warn!("Timeout waiting for first audio samples, transitioning to Recording anyway");
+            break;
+        }
+    }
+
+    // Stream has data — transition to Recording mode + audible cue
     platform::play_sound("Tink");
     crate::ui::pill::set_mode(crate::ui::pill::PillMode::Recording);
     let _ = app.emit(events::RECORDING_STARTED, ());

@@ -294,6 +294,7 @@ pub fn run() {
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
                 cmd_tx.clone(),
                 reply_rx,
+                spectrum_data.clone(),
             )));
 
             // Deferred monitoring flag — hotkey thread waits for this
