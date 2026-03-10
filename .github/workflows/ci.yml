@@ -52,11 +52,7 @@ jobs:
           shared-key: macos-arm64
           cache-on-failure: true
 
-      - name: Cargo check
-        working-directory: src-tauri
-        run: cargo check --release
-
-      - name: Clippy
+      - name: Clippy (includes cargo check)
         working-directory: src-tauri
         run: cargo clippy --workspace -- -D warnings
 
