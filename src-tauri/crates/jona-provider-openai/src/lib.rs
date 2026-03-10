@@ -282,3 +282,19 @@ inventory::submit! { ProviderPreset {
     default_asr_models: &[],
     default_llm_models: &["grok-2"],
 }}
+inventory::submit! { ProviderPreset {
+    id: "sambanova", display_name: "SambaNova",
+    base_url: "https://api.sambanova.ai/v1", backend_id: "openai",
+    supports_asr: true, supports_llm: true,
+    gradient: "linear-gradient(135deg, #f97316, #ea580c)",
+    default_asr_models: &["whisper-large-v3"],
+    default_llm_models: &["Meta-Llama-3.1-8B-Instant"],
+}}
+inventory::submit! { ProviderPreset {
+    id: "nebius", display_name: "Nebius AI",
+    base_url: "https://api.studio.nebius.com/v1", backend_id: "openai",
+    supports_asr: false, supports_llm: true,
+    gradient: "linear-gradient(135deg, #d946ef, #c026d3)",
+    default_asr_models: &[],
+    default_llm_models: &["meta-llama/Meta-Llama-3.1-8B-Instruct"],
+}}
