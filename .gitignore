@@ -29,5 +29,8 @@ build/
 # Rust build artifacts
 src-tauri/target/
 
+# Coverage
+coverage/
+
 # Histoire
 .histoire/
