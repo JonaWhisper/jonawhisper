@@ -477,7 +477,12 @@ mod tests {
 
     #[test]
     fn run_from_zero_applies_all() {
-        let mut raw = json!({});
+        // Start at v4 to skip v2 (filesystem ops on real config dir)
+        // and v4 (OS keychain writes). Those migrations are safe to skip
+        // in tests since they operate on empty prefs (no providers = no keyring
+        // writes, no old dirs = no filesystem changes), but we avoid them
+        // as a safety guarantee for CI environments.
+        let mut raw = json!({"_version": 4});
         let mut prefs = empty_prefs();
         assert!(run(&mut raw, &mut prefs));
         assert_eq!(raw["_version"], CURRENT_VERSION);

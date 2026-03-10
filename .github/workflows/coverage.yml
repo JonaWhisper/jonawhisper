@@ -1,0 +1,67 @@
+name: Coverage
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  coverage:
+    name: Test Coverage
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/src-tauri/cmake/arm-ggml-fix.cmake
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: macos-arm64-cov
+          cache-on-failure: true
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+
+      - name: Generate coverage (current branch)
+        working-directory: src-tauri
+        run: |
+          cargo llvm-cov --workspace --lcov --output-path ../coverage-pr.lcov
+
+      - name: Generate coverage (base branch)
+        run: |
+          git stash --include-untracked || true
+          git checkout ${{ github.event.pull_request.base.sha }}
+          cd src-tauri
+          cargo llvm-cov --workspace --lcov --output-path ../coverage-base.lcov 2>/dev/null || true
+          cd ..
+          git checkout -
+          git stash pop || true
+
+      - name: Generate report and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/coverage-report.sh coverage-base.lcov coverage-pr.lcov
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage-pr.lcov
+          retention-days: 7

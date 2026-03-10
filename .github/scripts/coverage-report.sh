@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# Generate a Markdown coverage report from two lcov files and post as PR comment.
+# Usage: coverage-report.sh <base.lcov> <pr.lcov>
+set -euo pipefail
+
+BASE_LCOV="${1:-}"
+PR_LCOV="${2:-}"
+
+# ── Parse lcov file → (lines_hit, lines_total) ──────────────────────────
+parse_lcov_totals() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then
+        echo "0 0"
+        return
+    fi
+    awk -F: '
+        /^LH:/ { hit  += $2 }
+        /^LF:/ { total += $2 }
+        END { print hit, total }
+    ' "$file"
+}
+
+# ── Parse lcov file → per-file coverage ─────────────────────────────────
+# Output: file_path hit total (one per source file)
+parse_lcov_files() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then return; fi
+    awk -F: '
+        /^SF:/ { sf = $2 }
+        /^LH:/ { lh = $2 }
+        /^LF:/ { lf = $2 }
+        /^end_of_record/ {
+            if (lf > 0) print sf, lh, lf
+            sf = ""; lh = 0; lf = 0
+        }
+    ' "$file"
+}
+
+# ── Percentage with color icon ──────────────────────────────────────────
+pct_icon() {
+    local pct="$1"
+    if (( $(echo "$pct >= 90" | bc -l) )); then echo "🟢"
+    elif (( $(echo "$pct >= 70" | bc -l) )); then echo "🟡"
+    else echo "🔴"
+    fi
+}
+
+progress_bar() {
+    local pct="$1"
+    local filled=$(printf "%.0f" "$(echo "$pct / 5" | bc -l)")
+    local empty=$((20 - filled))
+    printf '%0.s█' $(seq 1 $filled 2>/dev/null) || true
+    printf '%0.s░' $(seq 1 $empty 2>/dev/null) || true
+}
+
+# ── Compute totals ──────────────────────────────────────────────────────
+read -r pr_hit pr_total <<< "$(parse_lcov_totals "$PR_LCOV")"
+read -r base_hit base_total <<< "$(parse_lcov_totals "$BASE_LCOV")"
+
+if [[ "$pr_total" -eq 0 ]]; then
+    pr_pct="0.0"
+else
+    pr_pct=$(echo "scale=1; $pr_hit * 100 / $pr_total" | bc -l)
+fi
+
+if [[ "$base_total" -eq 0 ]]; then
+    base_pct="0.0"
+else
+    base_pct=$(echo "scale=1; $base_hit * 100 / $base_total" | bc -l)
+fi
+
+diff_pct=$(echo "scale=1; $pr_pct - $base_pct" | bc -l)
+
+# Format diff with sign
+if (( $(echo "$diff_pct > 0" | bc -l) )); then
+    diff_str="+${diff_pct}%"
+elif (( $(echo "$diff_pct < 0" | bc -l) )); then
+    diff_str="${diff_pct}%"
+else
+    diff_str="±0%"
+fi
+
+# ── Build per-file table for changed files ──────────────────────────────
+# Get list of changed files in the PR
+changed_files=""
+if [[ -n "${GITHUB_EVENT_PATH:-}" ]]; then
+    pr_number=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+    if [[ -n "$pr_number" ]]; then
+        changed_files=$(gh pr diff "$pr_number" --name-only 2>/dev/null || true)
+    fi
+fi
+
+# Build associative arrays of per-file coverage
+declare -A pr_files_hit pr_files_total
+
+while read -r sf lh lf; do
+    [[ -z "$sf" ]] && continue
+    # Normalize path (strip absolute prefix to get relative)
+    rel="${sf#*/src-tauri/}"
+    pr_files_hit["$rel"]=$lh
+    pr_files_total["$rel"]=$lf
+done <<< "$(parse_lcov_files "$PR_LCOV")"
+
+# ── Generate Markdown ───────────────────────────────────────────────────
+REPORT="<!-- coverage-report -->
+## $(pct_icon "$pr_pct") Code Coverage: ${pr_pct}% (${diff_str})
+
+$(progress_bar "$pr_pct") **${pr_pct}%** — ${pr_hit}/${pr_total} lines covered
+
+| | Base | PR | Diff |
+|---|---:|---:|---:|
+| **Lines** | ${base_hit}/${base_total} | ${pr_hit}/${pr_total} | |
+| **Coverage** | ${base_pct}% | ${pr_pct}% | ${diff_str} |
+"
+
+# Changed files table
+if [[ -n "$changed_files" ]]; then
+    has_changed_coverage=false
+    changed_table="
+<details><summary>📂 Changed files coverage</summary>
+
+| File | Lines | Coverage |
+|------|------:|--------:|"
+
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        # Match .rs files under src-tauri/
+        rel="${f#src-tauri/}"
+        if [[ -n "${pr_files_total[$rel]:-}" ]]; then
+            file_total="${pr_files_total[$rel]}"
+            file_hit="${pr_files_hit[$rel]}"
+            file_pct=$(echo "scale=1; $file_hit * 100 / $file_total" | bc -l)
+            icon=$(pct_icon "$file_pct")
+            changed_table+="
+| ${icon} \`${rel}\` | ${file_hit}/${file_total} | ${file_pct}% |"
+            has_changed_coverage=true
+        fi
+    done <<< "$changed_files"
+
+    changed_table+="
+</details>"
+
+    if $has_changed_coverage; then
+        REPORT+="$changed_table"
+    fi
+fi
+
+# Low-coverage files
+low_coverage_table=""
+for rel in "${!pr_files_total[@]}"; do
+    total="${pr_files_total[$rel]}"
+    hit="${pr_files_hit[$rel]}"
+    [[ "$total" -lt 10 ]] && continue
+    pct=$(echo "scale=1; $hit * 100 / $total" | bc -l)
+    if (( $(echo "$pct < 50" | bc -l) )); then
+        icon=$(pct_icon "$pct")
+        low_coverage_table+="
+| ${icon} \`${rel}\` | ${hit}/${total} | ${pct}% |"
+    fi
+done
+
+if [[ -n "$low_coverage_table" ]]; then
+    REPORT+="
+
+<details><summary>⚠️ Files below 50% coverage</summary>
+
+| File | Lines | Coverage |
+|------|------:|--------:|${low_coverage_table}
+</details>"
+fi
+
+REPORT+="
+
+---
+*Generated by [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)*"
+
+# ── Post or update PR comment ───────────────────────────────────────────
+echo "$REPORT"
+
+if [[ -n "${GITHUB_EVENT_PATH:-}" ]]; then
+    pr_number=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+    if [[ -n "$pr_number" ]]; then
+        # Find existing comment
+        existing_id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${pr_number}/comments" \
+            --jq '.[] | select(.body | contains("<!-- coverage-report -->")) | .id' \
+            2>/dev/null | head -1 || true)
+
+        if [[ -n "$existing_id" ]]; then
+            gh api "repos/${GITHUB_REPOSITORY}/issues/comments/${existing_id}" \
+                -X PATCH -f body="$REPORT" > /dev/null
+            echo "Updated existing coverage comment #${existing_id}"
+        else
+            gh pr comment "$pr_number" --body "$REPORT"
+            echo "Posted new coverage comment"
+        fi
+    fi
+fi
