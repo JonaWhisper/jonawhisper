@@ -198,16 +198,15 @@ pub struct HotkeyUpdateSender(pub crossbeam_channel::Sender<platform::hotkey::Ho
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize catalogs before AppState — migrations call jona_provider::preset().
+    jona_engines::EngineCatalog::init_auto();
+    jona_provider::ProviderCatalog::init_auto();
+
     let app_state = Arc::new(AppState::default());
 
     // Read log retention before initializing logging (needs prefs)
     let log_retention = app_state.settings.lock().unwrap().log_retention.clone();
     init_logging(&log_retention);
-
-    // Initialize catalogs from inventory auto-registration.
-    // Each engine/provider crate registers itself via `inventory::submit!`.
-    jona_engines::EngineCatalog::init_auto();
-    jona_provider::ProviderCatalog::init_auto();
 
     recording::cleanup_orphan_audio_files();
 
