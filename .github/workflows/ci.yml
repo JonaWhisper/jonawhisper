@@ -14,7 +14,7 @@ jobs:
   # ── Frontend (Node) ──────────────────────────────────
   frontend:
     name: Frontend
-    runs-on: macos-26
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
