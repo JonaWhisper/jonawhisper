@@ -61,17 +61,11 @@ function providerInitial(provider: Provider): string {
   return provider.name.charAt(0).toUpperCase()
 }
 
-const kindGradients: Record<string, string> = {
-  OpenAI: 'linear-gradient(135deg, #10a37f, #0d8c6d)',
-  Anthropic: 'linear-gradient(135deg, #d97706, #b45309)',
-  Groq: 'linear-gradient(135deg, #9333ea, #7c3aed)',
-  Cerebras: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-  Gemini: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-  Mistral: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-  Fireworks: 'linear-gradient(135deg, #ef4444, #dc2626)',
-  Together: 'linear-gradient(135deg, #14b8a6, #0d9488)',
-  DeepSeek: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-  Custom: 'linear-gradient(135deg, #636366, #48484a)',
+const CUSTOM_GRADIENT = 'linear-gradient(135deg, #636366, #48484a)'
+
+function providerGradient(provider: Provider): string {
+  const preset = engines.providerPresets.find(p => p.id === provider.kind)
+  return preset?.gradient ?? CUSTOM_GRADIENT
 }
 </script>
 
@@ -108,7 +102,7 @@ const kindGradients: Record<string, string> = {
       <div v-for="provider in engines.providers" :key="provider.id" class="flex items-center gap-3 py-2.5 [&+&]:border-t-[0.5px] [&+&]:border-panel-divider">
         <div
           class="flex items-center justify-center w-8 h-8 rounded-lg text-white text-base font-bold shrink-0"
-          :style="{ background: kindGradients[provider.kind] ?? kindGradients.Custom }"
+          :style="{ background: providerGradient(provider) }"
         >
           {{ providerInitial(provider) }}
         </div>

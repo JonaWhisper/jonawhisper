@@ -63,7 +63,7 @@ const llmSelectedProvider = computed(() =>
 
 const llmModelOptions = computed(() => {
   const provider = llmSelectedProvider.value
-  return provider ? getLlmModels(provider) : []
+  return provider ? getLlmModels(provider, engines.providerPresets) : []
 })
 
 const refreshingLlm = ref(false)

@@ -58,7 +58,18 @@ export interface HistoryEntry {
   word_scores: string
 }
 
-export type ProviderKind = 'OpenAI' | 'Anthropic' | 'Custom' | 'Groq' | 'Cerebras' | 'Gemini' | 'Mistral' | 'Fireworks' | 'Together' | 'DeepSeek'
+export type ProviderKind = string
+
+export interface ProviderPresetInfo {
+  id: string
+  display_name: string
+  base_url: string
+  supports_asr: boolean
+  supports_llm: boolean
+  gradient: string
+  default_asr_models: string[]
+  default_llm_models: string[]
+}
 
 export interface Provider {
   id: string
@@ -70,6 +81,7 @@ export interface Provider {
   cached_models: string[]
   supports_asr: boolean
   supports_llm: boolean
+  api_format?: 'open_ai' | 'anthropic' | null
 }
 
 export interface CleanupModel {

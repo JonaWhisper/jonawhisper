@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { hasAsrSupport, hasLlmSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
 import { isModelAvailable, parseCloudId } from './types'
-import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, PermissionReport, CleanupModel, AsrModelOption } from './types'
+import type { AudioDevice, EngineInfo, ASRModel, Language, Provider, ProviderPresetInfo, PermissionReport, CleanupModel, AsrModelOption } from './types'
 
 export const useEnginesStore = defineStore('engines', () => {
   const settingsStore = useSettingsStore()
@@ -17,6 +17,7 @@ export const useEnginesStore = defineStore('engines', () => {
   const audioDevices = ref<AudioDevice[]>([])
   const providers = ref<Provider[]>([])
   const permissions = ref<PermissionReport>({ microphone: 'Undetermined', accessibility: 'Denied', input_monitoring: 'Denied' })
+  const providerPresets = ref<ProviderPresetInfo[]>([])
   const updatableModelIds = ref<Set<string>>(new Set())
 
   // Computed
@@ -133,6 +134,11 @@ export const useEnginesStore = defineStore('engines', () => {
     catch (e) { console.error('fetchPermissions failed:', e) }
   }
 
+  async function fetchProviderPresets() {
+    try { providerPresets.value = await invoke('get_provider_presets') }
+    catch (e) { console.error('fetchProviderPresets failed:', e) }
+  }
+
   async function fetchProviders() {
     try { providers.value = await invoke('get_providers') }
     catch (e) { console.error('fetchProviders failed:', e) }
@@ -188,7 +194,7 @@ export const useEnginesStore = defineStore('engines', () => {
   }
 
   return {
-    engines, models, languages, audioDevices, providers, permissions,
+    engines, models, languages, audioDevices, providers, providerPresets, permissions,
     downloadedModels, asrEngines, llmEngines,
     punctuationEngines,
     correctionEngines,
@@ -197,7 +203,7 @@ export const useEnginesStore = defineStore('engines', () => {
     isCloudAsr, asrCloudProviderId, isCloudLlm, isLocalLlm, cleanupCloudProviderId,
     updatableModelIds, hasUpdate, dismissUpdate,
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,
-    fetchPermissions, fetchProviders,
+    fetchPermissions, fetchProviderPresets, fetchProviders,
     requestPermission, addProvider, removeProvider, updateProvider,
     setupListeners,
   }

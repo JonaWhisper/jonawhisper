@@ -1,6 +1,6 @@
 use jona_types::{
-    parse_model_ids_from_json, CloudProvider, Provider, ProviderError, ProviderKind,
-    ProviderRegistration, TranscriptionResult,
+    parse_model_ids_from_json, ApiFormat, CloudProvider, Provider, ProviderError,
+    ProviderPreset, ProviderRegistration, TranscriptionResult,
 };
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -142,9 +142,16 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
     Ok(response)
 }
 
-inventory::submit! {
-    ProviderRegistration {
-        kinds: &[ProviderKind::Anthropic],
-        factory: || Box::new(AnthropicBackend),
-    }
-}
+inventory::submit! { ProviderRegistration {
+    api_format: ApiFormat::Anthropic,
+    factory: || Box::new(AnthropicBackend),
+}}
+
+inventory::submit! { ProviderPreset {
+    id: "anthropic", display_name: "Anthropic",
+    base_url: "https://api.anthropic.com/v1", api_format: ApiFormat::Anthropic,
+    supports_asr: false, supports_llm: true,
+    gradient: "linear-gradient(135deg, #d97706, #b45309)",
+    default_asr_models: &[],
+    default_llm_models: &["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250514", "claude-opus-4-6-20250626"],
+}}

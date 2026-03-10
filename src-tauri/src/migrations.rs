@@ -1,8 +1,8 @@
 use serde_json::Value;
-use crate::state::{config_dir, default_model_id, Provider, ProviderKind, Preferences};
+use crate::state::{config_dir, default_model_id, Provider, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 7;
+const CURRENT_VERSION: u32 = 8;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
@@ -14,6 +14,7 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (5, "Add provider capability flags", migrate_v5),
     (6, "Split punctuation from cleanup model", migrate_v6),
     (7, "Clean up old Candle/safetensors correction models", migrate_v7),
+    (8, "Normalize provider kind to lowercase string IDs", migrate_v8),
 ];
 
 /// Rename data directory from WhisperDictate → JonaWhisper.
@@ -81,13 +82,14 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                     prefs.providers.push(Provider {
                         id: id.to_string(),
                         name: name.to_string(),
-                        kind: ProviderKind::Custom,
+                        kind: "custom".to_string(),
                         url: url.to_string(),
                         api_key: api_key.to_string(),
                         allow_insecure: false,
                         cached_models: Vec::new(),
                         supports_asr: true,
                         supports_llm: true,
+                        api_format: None,
                     });
                     // Migrate ASR model to settings
                     if !model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
@@ -117,22 +119,23 @@ fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                 if let Some(p) = existing {
                     prefs.llm_provider_id = p.id.clone();
                 } else {
-                    let kind = if provider_str == "anthropic" {
-                        ProviderKind::Anthropic
+                    let (kind_str, display, has_asr, has_llm) = if provider_str == "anthropic" {
+                        ("anthropic", "Anthropic", false, true)
                     } else {
-                        ProviderKind::OpenAI
+                        ("openai", "OpenAI", true, true)
                     };
                     let id = format!("provider-{}", provider_str);
                     prefs.providers.push(Provider {
                         id: id.clone(),
-                        name: kind.display_name().to_string(),
-                        kind,
+                        name: display.to_string(),
+                        kind: kind_str.to_string(),
                         url: api_url.to_string(),
                         api_key: api_key.to_string(),
                         allow_insecure: false,
                         cached_models: Vec::new(),
-                        supports_asr: kind.supports_asr(),
-                        supports_llm: kind.supports_llm(),
+                        supports_asr: has_asr,
+                        supports_llm: has_llm,
+                        api_format: None,
                     });
                     prefs.llm_provider_id = id;
                 }
@@ -393,6 +396,55 @@ fn migrate_v7(_raw: &mut Value, prefs: &mut Preferences) {
         log::info!("Migration v7: resetting cleanup_model_id from flan-t5-grammar");
         prefs.cleanup_model_id.clear();
         prefs.text_cleanup_enabled = false;
+    }
+}
+
+/// v8: Normalize provider kind from PascalCase enum variants to lowercase string IDs.
+/// Also fill in base_url from presets for providers that have an empty URL.
+fn migrate_v8(_raw: &mut Value, prefs: &mut Preferences) {
+    let kind_map: &[(&str, &str)] = &[
+        ("OpenAI", "openai"),
+        ("Anthropic", "anthropic"),
+        ("Custom", "custom"),
+        ("Groq", "groq"),
+        ("Cerebras", "cerebras"),
+        ("Gemini", "gemini"),
+        ("Mistral", "mistral"),
+        ("Fireworks", "fireworks"),
+        ("Together", "together"),
+        ("DeepSeek", "deepseek"),
+    ];
+
+    let mut migrated = 0;
+    for provider in &mut prefs.providers {
+        let old_kind = provider.kind.clone();
+        // Normalize known PascalCase → lowercase
+        if let Some(&(_, new)) = kind_map.iter().find(|&&(old, _)| old == old_kind) {
+            provider.kind = new.to_string();
+        } else if old_kind.chars().any(|c| c.is_uppercase()) {
+            // Fallback: lowercase any unknown PascalCase kind
+            provider.kind = old_kind.to_lowercase();
+        }
+
+        // Fill URL from preset if empty
+        if provider.url.is_empty() {
+            if let Some(preset) = jona_provider::preset(&provider.kind) {
+                provider.url = preset.base_url.to_string();
+            }
+        }
+
+        // Update capabilities from preset
+        if let Some(preset) = jona_provider::preset(&provider.kind) {
+            provider.supports_asr = preset.supports_asr;
+            provider.supports_llm = preset.supports_llm;
+        }
+
+        if provider.kind != old_kind {
+            migrated += 1;
+        }
+    }
+    if migrated > 0 {
+        log::info!("Migration v8: normalized {} provider kind(s) to lowercase", migrated);
     }
 }
 

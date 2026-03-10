@@ -555,7 +555,7 @@ fn transcribe(
                 format!("Provider '{}' does not support ASR transcription", provider.name)
             ));
         }
-        return jona_provider::backend(provider.kind)
+        return jona_provider::backend_for_provider(&provider)
             .transcribe(&provider, &asr_cloud_model, audio_path, &language)
             .map_err(|e| EngineError::ApiError(e.to_string()));
     }

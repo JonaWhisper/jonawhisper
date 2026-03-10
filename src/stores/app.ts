@@ -112,6 +112,7 @@ export const useAppStore = defineStore('app', () => {
       settingsStore.fetchSettings(),
       enginesStore.fetchEngines(),
       enginesStore.fetchModels(),
+      enginesStore.fetchProviderPresets(),
       enginesStore.fetchProviders(),
     ])
   }

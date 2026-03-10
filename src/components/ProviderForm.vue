@@ -2,8 +2,8 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
-import type { Provider, ProviderKind } from '@/stores/types'
-import { PROVIDER_PRESETS, PRESET_ENTRIES } from '@/config/providers'
+import type { Provider } from '@/stores/types'
+import { useEnginesStore } from '@/stores/engines'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,10 +27,11 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const engines = useEnginesStore()
 
 const isEditing = computed(() => !!props.provider)
 
-const kind = ref<ProviderKind>(props.provider?.kind ?? 'Custom')
+const kind = ref(props.provider?.kind ?? (engines.providerPresets[0]?.id ?? 'custom'))
 const name = ref(props.provider?.name ?? '')
 const url = ref(props.provider?.url ?? '')
 const apiKey = ref('')
@@ -44,17 +45,22 @@ const testStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 const testMessage = ref('')
 const fetchedModels = ref<string[]>(props.provider?.cached_models ?? [])
 
-const showUrl = computed(() => kind.value === 'Custom')
+const showUrl = computed(() => kind.value === 'custom')
 const canTest = computed(() => apiKey.value.trim().length > 0 || isEditing.value)
-const showInsecureToggle = computed(() => kind.value === 'Custom')
-const showCapabilities = computed(() => kind.value === 'Custom')
+const showInsecureToggle = computed(() => kind.value === 'custom')
+const showCapabilities = computed(() => kind.value === 'custom')
+
+const presetDisplayName = computed(() => {
+  const preset = engines.providerPresets.find(p => p.id === kind.value)
+  return preset?.display_name ?? kind.value
+})
 
 watch(kind, (newKind) => {
   if (isEditing.value) return
-  const preset = PROVIDER_PRESETS[newKind]
+  const preset = engines.providerPresets.find(p => p.id === newKind)
   if (preset) {
-    name.value = preset.label
-    url.value = preset.url
+    name.value = preset.display_name
+    url.value = preset.base_url
   } else {
     name.value = ''
     url.value = ''
@@ -69,7 +75,7 @@ watch(kind, (newKind) => {
 
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value === 'string') {
-    kind.value = value as ProviderKind
+    kind.value = value
   }
 }
 
@@ -105,7 +111,7 @@ async function testConnection() {
     testStatus.value = 'error'
     const msg = String(e)
     // Truncate long error messages
-    testMessage.value = msg.length > 120 ? msg.slice(0, 120) + '…' : msg
+    testMessage.value = msg.length > 120 ? msg.slice(0, 120) + '\u2026' : msg
     fetchedModels.value = []
   }
 }
@@ -113,9 +119,9 @@ async function testConnection() {
 function save() {
   if (!validate()) return
 
-  const isCustom = kind.value === 'Custom'
+  const isCustom = kind.value === 'custom'
   const provider: Provider = {
-    id: props.provider?.id ?? `provider-${kind.value.toLowerCase()}-${Date.now()}`,
+    id: props.provider?.id ?? `provider-${kind.value}-${Date.now()}`,
     name: name.value.trim(),
     kind: kind.value,
     url: url.value.trim(),
@@ -140,8 +146,8 @@ function save() {
           <SelectValue />
         </SelectTrigger>
         <SelectContent class="max-h-52">
-          <SelectItem v-for="[kind, preset] in PRESET_ENTRIES" :key="kind" :value="kind">{{ preset.label }}</SelectItem>
-          <SelectItem value="Custom">{{ t('provider.kind.custom') }}</SelectItem>
+          <SelectItem v-for="preset in engines.providerPresets" :key="preset.id" :value="preset.id">{{ preset.display_name }}</SelectItem>
+          <SelectItem value="custom">{{ t('provider.kind.custom') }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -149,7 +155,7 @@ function save() {
     <div class="space-y-2">
       <div class="flex items-center justify-between">
         <Label class="text-xs text-muted-foreground">{{ t('provider.name') }}</Label>
-        <span v-if="isEditing" class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{{ kind }}</span>
+        <span v-if="isEditing" class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{{ presetDisplayName }}</span>
       </div>
       <Input v-model="name" class="h-9 text-sm" />
       <p v-if="errors.name" class="text-xs text-destructive">{{ errors.name }}</p>

@@ -1,6 +1,6 @@
 //! Provider catalog — orchestrates cloud provider backends registered via inventory.
 
-use jona_types::{CloudProvider, ProviderKind, ProviderRegistration};
+use jona_types::{ApiFormat, CloudProvider, Provider, ProviderPreset, ProviderRegistration};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -10,7 +10,9 @@ pub use jona_types::ProviderError;
 static CATALOG: OnceLock<ProviderCatalog> = OnceLock::new();
 
 pub struct ProviderCatalog {
-    backends: HashMap<ProviderKind, Box<dyn CloudProvider>>,
+    backends: HashMap<ApiFormat, Box<dyn CloudProvider>>,
+    presets: Vec<&'static ProviderPreset>,
+    preset_map: HashMap<&'static str, &'static ProviderPreset>,
 }
 
 // Safety: CloudProvider is Send + Sync, HashMap is Send + Sync when K/V are.
@@ -18,36 +20,71 @@ unsafe impl Send for ProviderCatalog {}
 unsafe impl Sync for ProviderCatalog {}
 
 impl ProviderCatalog {
-    /// Initialize the catalog from all inventory-registered providers.
+    /// Initialize the catalog from all inventory-registered providers and presets.
     /// Must be called once at startup.
     pub fn init_auto() {
         let mut backends = HashMap::new();
 
         for reg in inventory::iter::<ProviderRegistration> {
-            for &kind in reg.kinds {
-                let backend = (reg.factory)();
-                log::debug!("ProviderCatalog: registered {:?}", kind);
-                backends.insert(kind, backend);
-            }
+            let backend = (reg.factory)();
+            log::debug!("ProviderCatalog: registered backend {:?}", reg.api_format);
+            backends.insert(reg.api_format, backend);
         }
 
-        log::info!("ProviderCatalog: {} provider kinds registered", backends.len());
-        CATALOG.set(ProviderCatalog { backends }).ok();
+        let mut presets: Vec<&'static ProviderPreset> =
+            inventory::iter::<ProviderPreset>.into_iter().collect();
+        presets.sort_by_key(|p| p.id);
+
+        let preset_map: HashMap<&'static str, &'static ProviderPreset> =
+            presets.iter().map(|p| (p.id, *p)).collect();
+
+        log::info!(
+            "ProviderCatalog: {} backends, {} presets registered",
+            backends.len(),
+            presets.len()
+        );
+        CATALOG
+            .set(ProviderCatalog {
+                backends,
+                presets,
+                preset_map,
+            })
+            .ok();
     }
 
     fn global() -> &'static ProviderCatalog {
-        CATALOG.get().expect("ProviderCatalog not initialized — call init_auto() first")
+        CATALOG
+            .get()
+            .expect("ProviderCatalog not initialized — call init_auto() first")
     }
 }
 
-/// Get the appropriate cloud provider backend for a given kind.
-pub fn backend(kind: ProviderKind) -> &'static dyn CloudProvider {
+/// Get the cloud provider backend for a given API format.
+pub fn backend(format: ApiFormat) -> &'static dyn CloudProvider {
     let catalog = ProviderCatalog::global();
     catalog
         .backends
-        .get(&kind)
+        .get(&format)
         .map(|b| &**b)
         .unwrap_or_else(|| {
-            panic!("No provider backend registered for {:?}", kind);
+            panic!("No provider backend registered for {:?}", format);
         })
+}
+
+/// Get the cloud provider backend for a given provider (resolves format from preset or provider).
+pub fn backend_for_provider(provider: &Provider) -> &'static dyn CloudProvider {
+    let format = preset(&provider.kind)
+        .map(|p| p.api_format)
+        .unwrap_or_else(|| provider.resolved_api_format());
+    backend(format)
+}
+
+/// Get all registered presets (sorted by ID).
+pub fn presets() -> &'static [&'static ProviderPreset] {
+    &ProviderCatalog::global().presets
+}
+
+/// Look up a preset by ID.
+pub fn preset(id: &str) -> Option<&'static ProviderPreset> {
+    ProviderCatalog::global().preset_map.get(id).copied()
 }

@@ -36,7 +36,7 @@ const asrSelectedProvider = computed(() =>
 
 const asrModelOptions = computed(() => {
   const provider = asrSelectedProvider.value
-  return provider ? getAsrModels(provider) : []
+  return provider ? getAsrModels(provider, engines.providerPresets) : []
 })
 
 const refreshingAsr = ref(false)

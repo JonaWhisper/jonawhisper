@@ -220,74 +220,20 @@ pub struct DownloadState {
 
 // -- Provider --
 
+/// API format used by a cloud provider backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ProviderKind {
-    OpenAI,
+#[serde(rename_all = "snake_case")]
+pub enum ApiFormat {
+    OpenAi,
     Anthropic,
-    Custom,
-    Groq,
-    Cerebras,
-    Gemini,
-    Mistral,
-    Fireworks,
-    Together,
-    DeepSeek,
-}
-
-impl ProviderKind {
-    pub fn is_anthropic_format(&self) -> bool {
-        matches!(self, Self::Anthropic)
-    }
-
-    pub fn display_name(&self) -> &str {
-        match self {
-            Self::OpenAI => "OpenAI",
-            Self::Anthropic => "Anthropic",
-            Self::Custom => "Custom",
-            Self::Groq => "Groq",
-            Self::Cerebras => "Cerebras",
-            Self::Gemini => "Google Gemini",
-            Self::Mistral => "Mistral",
-            Self::Fireworks => "Fireworks AI",
-            Self::Together => "Together AI",
-            Self::DeepSeek => "DeepSeek",
-        }
-    }
-
-    /// Whether this provider kind supports ASR (audio transcription).
-    pub fn supports_asr(&self) -> bool {
-        matches!(self, Self::OpenAI | Self::Groq | Self::Fireworks | Self::Together | Self::Custom)
-    }
-
-    /// Whether this provider kind supports LLM (chat completions).
-    pub fn supports_llm(&self) -> bool {
-        matches!(self, Self::OpenAI | Self::Anthropic | Self::Groq | Self::Cerebras
-            | Self::Gemini | Self::Mistral | Self::Together | Self::DeepSeek | Self::Custom)
-    }
-
-    /// Canonical base URL for known providers (includes version path).
-    /// Returns None for Custom — use provider.url instead.
-    pub fn base_url(&self) -> Option<&'static str> {
-        match self {
-            Self::OpenAI => Some("https://api.openai.com/v1"),
-            Self::Anthropic => Some("https://api.anthropic.com/v1"),
-            Self::Groq => Some("https://api.groq.com/openai/v1"),
-            Self::Cerebras => Some("https://api.cerebras.ai/v1"),
-            Self::Gemini => Some("https://generativelanguage.googleapis.com/v1beta/openai"),
-            Self::Mistral => Some("https://api.mistral.ai/v1"),
-            Self::Fireworks => Some("https://api.fireworks.ai/inference/v1"),
-            Self::Together => Some("https://api.together.xyz/v1"),
-            Self::DeepSeek => Some("https://api.deepseek.com/v1"),
-            Self::Custom => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Provider {
     pub id: String,
     pub name: String,
-    pub kind: ProviderKind,
+    /// Preset ID (e.g. "openai", "groq") or "custom".
+    pub kind: String,
     pub url: String,
     #[serde(default)]
     pub api_key: String,
@@ -299,30 +245,31 @@ pub struct Provider {
     pub supports_asr: bool,
     #[serde(default = "default_true")]
     pub supports_llm: bool,
+    /// Override API format for Custom providers (default: OpenAI-compatible).
+    #[serde(default)]
+    pub api_format: Option<ApiFormat>,
 }
 
 impl Provider {
-    /// Whether this provider supports ASR transcription.
-    /// Known providers: derived from kind. Custom: uses explicit field.
-    pub fn has_asr(&self) -> bool {
-        if self.kind == ProviderKind::Custom { self.supports_asr } else { self.kind.supports_asr() }
-    }
+    pub fn is_custom(&self) -> bool { self.kind == "custom" }
 
-    /// Whether this provider supports LLM chat completions.
-    /// Known providers: derived from kind. Custom: uses explicit field.
-    pub fn has_llm(&self) -> bool {
-        if self.kind == ProviderKind::Custom { self.supports_llm } else { self.kind.supports_llm() }
-    }
+    pub fn has_asr(&self) -> bool { self.supports_asr }
+    pub fn has_llm(&self) -> bool { self.supports_llm }
 
-    /// Resolved base URL: preset URL for known providers, stored URL for Custom.
+    /// Resolved base URL (stored URL, trimmed).
     pub fn base_url(&self) -> &str {
-        self.kind.base_url().unwrap_or_else(|| self.url.trim_end_matches('/'))
+        self.url.trim_end_matches('/')
+    }
+
+    /// Resolved API format: explicit override or default OpenAI.
+    pub fn resolved_api_format(&self) -> ApiFormat {
+        self.api_format.unwrap_or(ApiFormat::OpenAi)
     }
 
     /// Validate the provider URL scheme. Returns Err if Custom provider uses HTTP
     /// without `allow_insecure` enabled. Known providers always use HTTPS.
     pub fn validate_url(&self) -> Result<(), String> {
-        if self.kind != ProviderKind::Custom {
+        if !self.is_custom() {
             return Ok(());
         }
         let url = self.base_url();
@@ -811,57 +758,22 @@ mod tests {
         assert_eq!(GpuMode::parse("unknown"), GpuMode::Auto);
     }
 
-    // -- ProviderKind --
-
-    #[test]
-    fn provider_kind_display_name() {
-        assert_eq!(ProviderKind::OpenAI.display_name(), "OpenAI");
-        assert_eq!(ProviderKind::Anthropic.display_name(), "Anthropic");
-        assert_eq!(ProviderKind::Gemini.display_name(), "Google Gemini");
-        assert_eq!(ProviderKind::Fireworks.display_name(), "Fireworks AI");
-        assert_eq!(ProviderKind::Together.display_name(), "Together AI");
-    }
-
-    #[test]
-    fn provider_kind_is_anthropic_format() {
-        assert!(ProviderKind::Anthropic.is_anthropic_format());
-        assert!(!ProviderKind::OpenAI.is_anthropic_format());
-        assert!(!ProviderKind::Custom.is_anthropic_format());
-    }
-
-    #[test]
-    fn provider_kind_supports_asr() {
-        assert!(ProviderKind::OpenAI.supports_asr());
-        assert!(ProviderKind::Groq.supports_asr());
-        assert!(!ProviderKind::Anthropic.supports_asr());
-        assert!(!ProviderKind::Gemini.supports_asr());
-        assert!(ProviderKind::Custom.supports_asr());
-    }
-
-    #[test]
-    fn provider_kind_supports_llm() {
-        assert!(ProviderKind::OpenAI.supports_llm());
-        assert!(ProviderKind::Anthropic.supports_llm());
-        assert!(!ProviderKind::Fireworks.supports_llm());
-        assert!(ProviderKind::Custom.supports_llm());
-    }
-
-    #[test]
-    fn provider_kind_base_url() {
-        assert_eq!(ProviderKind::OpenAI.base_url(), Some("https://api.openai.com/v1"));
-        assert!(ProviderKind::Custom.base_url().is_none());
-        assert!(ProviderKind::Groq.base_url().unwrap().starts_with("https://"));
-    }
-
     // -- Provider --
+
+    fn test_provider(overrides: impl FnOnce(&mut Provider)) -> Provider {
+        let mut p = Provider {
+            id: "test".into(), name: "Test".into(), kind: "openai".into(),
+            url: "https://api.openai.com/v1".into(), api_key: String::new(),
+            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
+            api_format: None,
+        };
+        overrides(&mut p);
+        p
+    }
 
     #[test]
     fn provider_masked_api_key() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::OpenAI,
-            url: String::new(), api_key: "sk-1234567890abcdef".into(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+        let p = test_provider(|p| p.api_key = "sk-1234567890abcdef".into());
         let masked = p.masked_api_key();
         assert!(masked.starts_with("\u{2022}\u{2022}\u{2022}\u{2022}"));
         assert!(masked.ends_with("cdef"));
@@ -870,93 +782,62 @@ mod tests {
 
     #[test]
     fn provider_masked_api_key_empty() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::OpenAI,
-            url: String::new(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+        let p = test_provider(|_| {});
         assert!(p.masked_api_key().is_empty());
     }
 
     #[test]
     fn provider_masked_api_key_short() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::OpenAI,
-            url: String::new(), api_key: "abc".into(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+        let p = test_provider(|p| p.api_key = "abc".into());
         assert_eq!(p.masked_api_key(), "\u{2022}\u{2022}\u{2022}\u{2022}");
     }
 
     #[test]
     fn provider_validate_url_known_provider() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::OpenAI,
-            url: String::new(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+        let p = test_provider(|_| {});
         assert!(p.validate_url().is_ok());
     }
 
     #[test]
     fn provider_validate_url_custom_http_rejected() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::Custom,
-            url: "http://localhost:8080".into(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+        let p = test_provider(|p| { p.kind = "custom".into(); p.url = "http://localhost:8080".into(); });
         assert!(p.validate_url().is_err());
     }
 
     #[test]
     fn provider_validate_url_custom_http_allowed() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::Custom,
-            url: "http://localhost:8080".into(), api_key: String::new(),
-            allow_insecure: true, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+        let p = test_provider(|p| { p.kind = "custom".into(); p.url = "http://localhost:8080".into(); p.allow_insecure = true; });
         assert!(p.validate_url().is_ok());
     }
 
     #[test]
-    fn provider_base_url_known() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::OpenAI,
-            url: String::new(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
-        assert_eq!(p.base_url(), "https://api.openai.com/v1");
-    }
-
-    #[test]
-    fn provider_base_url_custom_trims_trailing_slash() {
-        let p = Provider {
-            id: "test".into(), name: "Test".into(), kind: ProviderKind::Custom,
-            url: "https://my-api.example.com/v1/".into(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-        };
+    fn provider_base_url_trims_trailing_slash() {
+        let p = test_provider(|p| p.url = "https://my-api.example.com/v1/".into());
         assert_eq!(p.base_url(), "https://my-api.example.com/v1");
     }
 
     #[test]
-    fn provider_has_asr_known_vs_custom() {
-        // Known provider derives from kind
-        let p = Provider {
-            id: "t".into(), name: "T".into(), kind: ProviderKind::Anthropic,
-            url: String::new(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![],
-            supports_asr: true, supports_llm: true, // ignored for non-Custom
-        };
-        assert!(!p.has_asr()); // Anthropic doesn't support ASR
-
-        // Custom uses explicit field
-        let p = Provider {
-            id: "t".into(), name: "T".into(), kind: ProviderKind::Custom,
-            url: "https://x.com".into(), api_key: String::new(),
-            allow_insecure: false, cached_models: vec![],
-            supports_asr: false, supports_llm: true,
-        };
+    fn provider_has_asr_uses_field() {
+        let p = test_provider(|p| p.supports_asr = false);
         assert!(!p.has_asr());
+
+        let p = test_provider(|p| p.supports_asr = true);
+        assert!(p.has_asr());
+    }
+
+    #[test]
+    fn provider_is_custom() {
+        assert!(!test_provider(|_| {}).is_custom());
+        assert!(test_provider(|p| p.kind = "custom".into()).is_custom());
+    }
+
+    #[test]
+    fn provider_resolved_api_format() {
+        let p = test_provider(|_| {});
+        assert_eq!(p.resolved_api_format(), ApiFormat::OpenAi);
+
+        let p = test_provider(|p| p.api_format = Some(ApiFormat::Anthropic));
+        assert_eq!(p.resolved_api_format(), ApiFormat::Anthropic);
     }
 
     // -- ContextMap --

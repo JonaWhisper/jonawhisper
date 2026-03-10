@@ -1,6 +1,6 @@
 //! Cloud provider types, trait, and auto-registration.
 
-use crate::{Provider, ProviderKind, TranscriptionResult};
+use crate::{ApiFormat, Provider, TranscriptionResult};
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
@@ -49,13 +49,29 @@ pub trait CloudProvider: Send + Sync {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>>;
 }
 
-/// Auto-registration entry for cloud provider backends.
+/// Auto-registration entry for cloud provider backends (one per ApiFormat).
 pub struct ProviderRegistration {
-    pub kinds: &'static [ProviderKind],
+    pub api_format: ApiFormat,
     pub factory: fn() -> Box<dyn CloudProvider>,
 }
 
 inventory::collect!(ProviderRegistration);
+
+/// Data-driven preset for a known cloud provider.
+/// Registered via `inventory::submit!` in provider crates.
+pub struct ProviderPreset {
+    pub id: &'static str,
+    pub display_name: &'static str,
+    pub base_url: &'static str,
+    pub api_format: ApiFormat,
+    pub supports_asr: bool,
+    pub supports_llm: bool,
+    pub gradient: &'static str,
+    pub default_asr_models: &'static [&'static str],
+    pub default_llm_models: &'static [&'static str],
+}
+
+inventory::collect!(ProviderPreset);
 
 /// Parse model IDs from an OpenAI-compatible JSON response.
 /// Handles both `{data:[...]}` and bare `[...]` formats.
