@@ -17,9 +17,9 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -42,7 +42,7 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "14.0"
       CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/src-tauri/cmake/arm-ggml-fix.cmake
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -65,7 +65,7 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "14.0"
       CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/src-tauri/cmake/arm-ggml-fix.cmake
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@stable
 
