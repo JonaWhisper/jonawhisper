@@ -1,5 +1,7 @@
-use crate::{CloudProvider, ProviderError};
-use jona_types::{Provider, TranscriptionResult};
+use jona_types::{
+    parse_model_ids_from_json, CloudProvider, Provider, ProviderError, ProviderKind,
+    ProviderRegistration, TranscriptionResult,
+};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
@@ -67,7 +69,9 @@ impl CloudProvider for OpenAICompatibleBackend {
             return Err(ProviderError::Api { status, body });
         }
 
-        let body = response.text().map_err(|e| ProviderError::Http(e.to_string()))?;
+        let body = response
+            .text()
+            .map_err(|e| ProviderError::Http(e.to_string()))?;
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
             if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
                 return Ok(TranscriptionResult::text_only(text.to_string()));
@@ -91,8 +95,14 @@ impl CloudProvider for OpenAICompatibleBackend {
             let request = ChatRequest {
                 model: model.to_string(),
                 messages: vec![
-                    ChatMessage { role: "system", content: system.to_string() },
-                    ChatMessage { role: "user", content: user_message.to_string() },
+                    ChatMessage {
+                        role: "system",
+                        content: system.to_string(),
+                    },
+                    ChatMessage {
+                        role: "user",
+                        content: user_message.to_string(),
+                    },
                 ],
                 temperature,
                 max_tokens,
@@ -132,7 +142,11 @@ impl CloudProvider for OpenAICompatibleBackend {
             }
 
             let response = send_and_check(req).await?;
-            parse_model_ids(response).await
+            let json: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
+            parse_model_ids_from_json(&json)
         })
     }
 }
@@ -168,10 +182,11 @@ struct ChatChoiceMessage {
     content: String,
 }
 
-// -- Shared helpers --
-
 async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Response, ProviderError> {
-    let response = req.send().await.map_err(|e| ProviderError::Http(e.to_string()))?;
+    let response = req
+        .send()
+        .await
+        .map_err(|e| ProviderError::Http(e.to_string()))?;
     if !response.status().is_success() {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_default();
@@ -180,27 +195,19 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
     Ok(response)
 }
 
-/// Parse model IDs from OpenAI-compatible response ({data:[...]} or bare [...]).
-pub(crate) async fn parse_model_ids(response: reqwest::Response) -> Result<Vec<String>, ProviderError> {
-    let json: serde_json::Value = response
-        .json()
-        .await
-        .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
-
-    let models_array = json.get("data").and_then(|d| d.as_array())
-        .or_else(|| json.as_array());
-
-    let ids: Vec<String> = models_array
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|m| m.get("id").and_then(|id| id.as_str()).map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    if ids.is_empty() {
-        return Err(ProviderError::InvalidResponse("No models found in response".into()));
+inventory::submit! {
+    ProviderRegistration {
+        kinds: &[
+            ProviderKind::OpenAI,
+            ProviderKind::Groq,
+            ProviderKind::Cerebras,
+            ProviderKind::Gemini,
+            ProviderKind::Mistral,
+            ProviderKind::Fireworks,
+            ProviderKind::Together,
+            ProviderKind::DeepSeek,
+            ProviderKind::Custom,
+        ],
+        factory: || Box::new(OpenAICompatibleBackend),
     }
-
-    Ok(ids)
 }

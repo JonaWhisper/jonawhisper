@@ -1,5 +1,7 @@
-use crate::{CloudProvider, ProviderError};
-use jona_types::{Provider, TranscriptionResult};
+use jona_types::{
+    parse_model_ids_from_json, CloudProvider, Provider, ProviderError, ProviderKind,
+    ProviderRegistration, TranscriptionResult,
+};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
@@ -84,14 +86,19 @@ impl CloudProvider for AnthropicBackend {
         Box::pin(async move {
             let url = format!("{}/models", provider.base_url());
 
-            let mut req = ASYNC_CLIENT.get(&url)
+            let mut req = ASYNC_CLIENT
+                .get(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION);
             if !provider.api_key.is_empty() {
                 req = req.header("x-api-key", &provider.api_key);
             }
 
             let response = send_and_check(req).await?;
-            crate::openai::parse_model_ids(response).await
+            let json: serde_json::Value = response
+                .json()
+                .await
+                .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
+            parse_model_ids_from_json(&json)
         })
     }
 }
@@ -123,11 +130,21 @@ struct AnthropicContent {
 }
 
 async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Response, ProviderError> {
-    let response = req.send().await.map_err(|e| ProviderError::Http(e.to_string()))?;
+    let response = req
+        .send()
+        .await
+        .map_err(|e| ProviderError::Http(e.to_string()))?;
     if !response.status().is_success() {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_default();
         return Err(ProviderError::Api { status, body });
     }
     Ok(response)
+}
+
+inventory::submit! {
+    ProviderRegistration {
+        kinds: &[ProviderKind::Anthropic],
+        factory: || Box::new(AnthropicBackend),
+    }
 }

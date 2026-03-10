@@ -1,5 +1,7 @@
 pub mod engine;
+pub mod provider;
 pub use engine::*;
+pub use provider::*;
 
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -218,7 +220,7 @@ pub struct DownloadState {
 
 // -- Provider --
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProviderKind {
     OpenAI,
     Anthropic,

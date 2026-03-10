@@ -1,59 +1,53 @@
-mod openai;
-mod anthropic;
+//! Provider catalog — orchestrates cloud provider backends registered via inventory.
 
-use jona_types::{Provider, ProviderKind, TranscriptionResult};
-use std::path::Path;
-use std::pin::Pin;
-use std::future::Future;
+use jona_types::{CloudProvider, ProviderKind, ProviderRegistration};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
-/// Errors returned by cloud provider operations.
-#[derive(Debug, thiserror::Error)]
-pub enum ProviderError {
-    #[error("HTTP error: {0}")]
-    Http(String),
-    #[error("API error: HTTP {status}: {body}")]
-    Api { status: u16, body: String },
-    #[error("Invalid response: {0}")]
-    InvalidResponse(String),
-    #[error("Not configured: {0}")]
-    NotConfigured(String),
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+// Re-export for call site compatibility
+pub use jona_types::ProviderError;
+
+static CATALOG: OnceLock<ProviderCatalog> = OnceLock::new();
+
+pub struct ProviderCatalog {
+    backends: HashMap<ProviderKind, Box<dyn CloudProvider>>,
 }
 
-/// Object-safe trait implemented by each cloud provider backend.
-pub trait CloudProvider: Send + Sync {
-    /// Transcribe audio via cloud ASR (blocking).
-    fn transcribe(
-        &self,
-        provider: &Provider,
-        model: &str,
-        audio_path: &Path,
-        language: &str,
-    ) -> Result<TranscriptionResult, ProviderError>;
+// Safety: CloudProvider is Send + Sync, HashMap is Send + Sync when K/V are.
+unsafe impl Send for ProviderCatalog {}
+unsafe impl Sync for ProviderCatalog {}
 
-    /// Chat completion for text cleanup (async).
-    fn chat_completion<'a>(
-        &'a self,
-        provider: &'a Provider,
-        model: &'a str,
-        system: &'a str,
-        user_message: &'a str,
-        temperature: f32,
-        max_tokens: u32,
-    ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>>;
+impl ProviderCatalog {
+    /// Initialize the catalog from all inventory-registered providers.
+    /// Must be called once at startup.
+    pub fn init_auto() {
+        let mut backends = HashMap::new();
 
-    /// List available models (async).
-    fn list_models<'a>(
-        &'a self,
-        provider: &'a Provider,
-    ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>>;
+        for reg in inventory::iter::<ProviderRegistration> {
+            for &kind in reg.kinds {
+                let backend = (reg.factory)();
+                log::debug!("ProviderCatalog: registered {:?}", kind);
+                backends.insert(kind, backend);
+            }
+        }
+
+        log::info!("ProviderCatalog: {} provider kinds registered", backends.len());
+        CATALOG.set(ProviderCatalog { backends }).ok();
+    }
+
+    fn global() -> &'static ProviderCatalog {
+        CATALOG.get().expect("ProviderCatalog not initialized — call init_auto() first")
+    }
 }
 
 /// Get the appropriate cloud provider backend for a given kind.
 pub fn backend(kind: ProviderKind) -> &'static dyn CloudProvider {
-    match kind {
-        ProviderKind::Anthropic => &anthropic::AnthropicBackend,
-        _ => &openai::OpenAICompatibleBackend,
-    }
+    let catalog = ProviderCatalog::global();
+    catalog
+        .backends
+        .get(&kind)
+        .map(|b| &**b)
+        .unwrap_or_else(|| {
+            panic!("No provider backend registered for {:?}", kind);
+        })
 }

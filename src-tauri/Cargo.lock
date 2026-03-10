@@ -2866,12 +2866,33 @@ dependencies = [
 name = "jona-provider"
 version = "0.1.0"
 dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+]
+
+[[package]]
+name = "jona-provider-anthropic"
+version = "0.1.0"
+dependencies = [
+ "inventory",
  "jona-types",
  "log",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "thiserror 2.0.18",
+]
+
+[[package]]
+name = "jona-provider-openai"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2915,6 +2936,8 @@ dependencies = [
  "jona-engines",
  "jona-platform",
  "jona-provider",
+ "jona-provider-anthropic",
+ "jona-provider-openai",
  "jona-types",
  "keyring",
  "llama-cpp-2",
