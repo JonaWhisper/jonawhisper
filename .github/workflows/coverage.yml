@@ -26,6 +26,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
@@ -36,32 +41,63 @@ jobs:
           shared-key: macos-arm64-cov
           cache-on-failure: true
 
-      - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov --locked
+      - name: Install dependencies
+        run: |
+          cargo install cargo-llvm-cov --locked
+          npm ci
 
-      - name: Generate coverage (current branch)
+      # ── Current branch coverage ──────────────────────
+      - name: Rust coverage (PR)
         working-directory: src-tauri
-        run: |
-          cargo llvm-cov --workspace --lcov --output-path ../coverage-pr.lcov
+        run: cargo llvm-cov --workspace --lcov --output-path ../coverage-rust-pr.lcov
 
-      - name: Generate coverage (base branch)
+      - name: Frontend coverage (PR)
+        run: npx vitest run --coverage
+        # Generates coverage/lcov.info via v8 provider
+
+      - name: Copy frontend lcov
+        run: cp coverage/lcov.info coverage-frontend-pr.lcov
+
+      # ── Base branch coverage ─────────────────────────
+      - name: Base branch coverage
         run: |
+          # Save PR coverage files
+          cp coverage-rust-pr.lcov /tmp/coverage-rust-pr.lcov
+          cp coverage-frontend-pr.lcov /tmp/coverage-frontend-pr.lcov
+
           git stash --include-untracked || true
           git checkout ${{ github.event.pull_request.base.sha }}
+
+          # Rust base
           cd src-tauri
-          cargo llvm-cov --workspace --lcov --output-path ../coverage-base.lcov 2>/dev/null || true
+          cargo llvm-cov --workspace --lcov --output-path ../coverage-rust-base.lcov 2>/dev/null || echo "LF:0" > ../coverage-rust-base.lcov
           cd ..
+
+          # Frontend base
+          npm ci --ignore-scripts 2>/dev/null || true
+          npx vitest run --coverage 2>/dev/null && cp coverage/lcov.info coverage-frontend-base.lcov || echo "LF:0" > coverage-frontend-base.lcov
+
           git checkout -
           git stash pop || true
 
+          # Restore PR coverage files
+          cp /tmp/coverage-rust-pr.lcov coverage-rust-pr.lcov
+          cp /tmp/coverage-frontend-pr.lcov coverage-frontend-pr.lcov
+
+      # ── Report ───────────────────────────────────────
       - name: Generate report and comment
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/coverage-report.sh coverage-base.lcov coverage-pr.lcov
+        run: |
+          bash .github/scripts/coverage-report.sh \
+            coverage-rust-base.lcov coverage-rust-pr.lcov \
+            coverage-frontend-base.lcov coverage-frontend-pr.lcov
 
-      - name: Upload coverage artifact
+      - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coverage-lcov
-          path: coverage-pr.lcov
+          path: |
+            coverage-rust-pr.lcov
+            coverage-frontend-pr.lcov
           retention-days: 7
