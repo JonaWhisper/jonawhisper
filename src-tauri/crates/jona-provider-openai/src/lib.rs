@@ -1,5 +1,5 @@
 use jona_types::{
-    parse_model_ids_from_json, ApiFormat, CloudProvider, Provider, ProviderError,
+    parse_model_ids_from_json, CloudProvider, Provider, ProviderError,
     ProviderPreset, ProviderRegistration, TranscriptionResult,
 };
 use serde::{Deserialize, Serialize};
@@ -197,14 +197,14 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
 
 // Backend registration (one instance handles all OpenAI-compatible providers)
 inventory::submit! { ProviderRegistration {
-    api_format: ApiFormat::OpenAi,
+    backend_id: "openai",
     factory: || Box::new(OpenAICompatibleBackend),
 }}
 
 // Provider presets
 inventory::submit! { ProviderPreset {
     id: "openai", display_name: "OpenAI",
-    base_url: "https://api.openai.com/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.openai.com/v1", backend_id: "openai",
     supports_asr: true, supports_llm: true,
     gradient: "linear-gradient(135deg, #10a37f, #0d8c6d)",
     default_asr_models: &["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"],
@@ -212,7 +212,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "groq", display_name: "Groq",
-    base_url: "https://api.groq.com/openai/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.groq.com/openai/v1", backend_id: "openai",
     supports_asr: true, supports_llm: true,
     gradient: "linear-gradient(135deg, #9333ea, #7c3aed)",
     default_asr_models: &["whisper-large-v3-turbo", "whisper-large-v3"],
@@ -220,7 +220,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "cerebras", display_name: "Cerebras",
-    base_url: "https://api.cerebras.ai/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.cerebras.ai/v1", backend_id: "openai",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #3b82f6, #2563eb)",
     default_asr_models: &[],
@@ -228,7 +228,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "gemini", display_name: "Google Gemini",
-    base_url: "https://generativelanguage.googleapis.com/v1beta/openai", api_format: ApiFormat::OpenAi,
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai", backend_id: "openai",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #0ea5e9, #0284c7)",
     default_asr_models: &[],
@@ -236,7 +236,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "mistral", display_name: "Mistral",
-    base_url: "https://api.mistral.ai/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.mistral.ai/v1", backend_id: "openai",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #6366f1, #4f46e5)",
     default_asr_models: &[],
@@ -244,7 +244,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "fireworks", display_name: "Fireworks AI",
-    base_url: "https://api.fireworks.ai/inference/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.fireworks.ai/inference/v1", backend_id: "openai",
     supports_asr: true, supports_llm: false,
     gradient: "linear-gradient(135deg, #ef4444, #dc2626)",
     default_asr_models: &["whisper-v3-turbo", "whisper-v3"],
@@ -252,7 +252,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "together", display_name: "Together AI",
-    base_url: "https://api.together.xyz/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.together.xyz/v1", backend_id: "openai",
     supports_asr: true, supports_llm: true,
     gradient: "linear-gradient(135deg, #14b8a6, #0d9488)",
     default_asr_models: &["openai/whisper-large-v3"],
@@ -260,7 +260,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "deepseek", display_name: "DeepSeek",
-    base_url: "https://api.deepseek.com/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.deepseek.com/v1", backend_id: "openai",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #06b6d4, #0891b2)",
     default_asr_models: &[],
@@ -268,7 +268,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "openrouter", display_name: "OpenRouter",
-    base_url: "https://openrouter.ai/api/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://openrouter.ai/api/v1", backend_id: "openai",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
     default_asr_models: &[],
@@ -276,7 +276,7 @@ inventory::submit! { ProviderPreset {
 }}
 inventory::submit! { ProviderPreset {
     id: "xai", display_name: "xAI",
-    base_url: "https://api.x.ai/v1", api_format: ApiFormat::OpenAi,
+    base_url: "https://api.x.ai/v1", backend_id: "openai",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #1d1d1f, #3a3a3c)",
     default_asr_models: &[],

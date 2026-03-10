@@ -220,14 +220,6 @@ pub struct DownloadState {
 
 // -- Provider --
 
-/// API format used by a cloud provider backend.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiFormat {
-    OpenAi,
-    Anthropic,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Provider {
     pub id: String,
@@ -247,7 +239,7 @@ pub struct Provider {
     pub supports_llm: bool,
     /// Override API format for Custom providers (default: OpenAI-compatible).
     #[serde(default)]
-    pub api_format: Option<ApiFormat>,
+    pub api_format: Option<String>,
 }
 
 impl Provider {
@@ -262,8 +254,8 @@ impl Provider {
     }
 
     /// Resolved API format: explicit override or default OpenAI.
-    pub fn resolved_api_format(&self) -> ApiFormat {
-        self.api_format.unwrap_or(ApiFormat::OpenAi)
+    pub fn resolved_api_format(&self) -> &str {
+        self.api_format.as_deref().unwrap_or("openai")
     }
 
     /// Validate the provider URL scheme. Returns Err if Custom provider uses HTTP
@@ -834,10 +826,10 @@ mod tests {
     #[test]
     fn provider_resolved_api_format() {
         let p = test_provider(|_| {});
-        assert_eq!(p.resolved_api_format(), ApiFormat::OpenAi);
+        assert_eq!(p.resolved_api_format(), "openai");
 
-        let p = test_provider(|p| p.api_format = Some(ApiFormat::Anthropic));
-        assert_eq!(p.resolved_api_format(), ApiFormat::Anthropic);
+        let p = test_provider(|p| p.api_format = Some("anthropic".to_string()));
+        assert_eq!(p.resolved_api_format(), "anthropic");
     }
 
     // -- ContextMap --

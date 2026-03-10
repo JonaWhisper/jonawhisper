@@ -1,5 +1,5 @@
 use jona_types::{
-    parse_model_ids_from_json, ApiFormat, CloudProvider, Provider, ProviderError,
+    parse_model_ids_from_json, CloudProvider, Provider, ProviderError,
     ProviderPreset, ProviderRegistration, TranscriptionResult,
 };
 use serde::{Deserialize, Serialize};
@@ -143,13 +143,13 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
 }
 
 inventory::submit! { ProviderRegistration {
-    api_format: ApiFormat::Anthropic,
+    backend_id: "anthropic",
     factory: || Box::new(AnthropicBackend),
 }}
 
 inventory::submit! { ProviderPreset {
     id: "anthropic", display_name: "Anthropic",
-    base_url: "https://api.anthropic.com/v1", api_format: ApiFormat::Anthropic,
+    base_url: "https://api.anthropic.com/v1", backend_id: "anthropic",
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #d97706, #b45309)",
     default_asr_models: &[],

@@ -1,6 +1,6 @@
 //! Provider catalog — orchestrates cloud provider backends registered via inventory.
 
-use jona_types::{ApiFormat, CloudProvider, Provider, ProviderPreset, ProviderRegistration};
+use jona_types::{CloudProvider, Provider, ProviderPreset, ProviderRegistration};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -10,7 +10,7 @@ pub use jona_types::ProviderError;
 static CATALOG: OnceLock<ProviderCatalog> = OnceLock::new();
 
 pub struct ProviderCatalog {
-    backends: HashMap<ApiFormat, Box<dyn CloudProvider>>,
+    backends: HashMap<&'static str, Box<dyn CloudProvider>>,
     presets: Vec<&'static ProviderPreset>,
     preset_map: HashMap<&'static str, &'static ProviderPreset>,
 }
@@ -27,8 +27,8 @@ impl ProviderCatalog {
 
         for reg in inventory::iter::<ProviderRegistration> {
             let backend = (reg.factory)();
-            log::debug!("ProviderCatalog: registered backend {:?}", reg.api_format);
-            backends.insert(reg.api_format, backend);
+            log::debug!("ProviderCatalog: registered backend {}", reg.backend_id);
+            backends.insert(reg.backend_id, backend);
         }
 
         let mut presets: Vec<&'static ProviderPreset> =
@@ -59,24 +59,24 @@ impl ProviderCatalog {
     }
 }
 
-/// Get the cloud provider backend for a given API format.
-pub fn backend(format: ApiFormat) -> &'static dyn CloudProvider {
+/// Get the cloud provider backend for a given backend ID.
+pub fn backend(id: &str) -> &'static dyn CloudProvider {
     let catalog = ProviderCatalog::global();
     catalog
         .backends
-        .get(&format)
+        .get(id)
         .map(|b| &**b)
         .unwrap_or_else(|| {
-            panic!("No provider backend registered for {:?}", format);
+            panic!("No provider backend registered for {}", id);
         })
 }
 
 /// Get the cloud provider backend for a given provider (resolves format from preset or provider).
 pub fn backend_for_provider(provider: &Provider) -> &'static dyn CloudProvider {
-    let format = preset(&provider.kind)
-        .map(|p| p.api_format)
+    let id = preset(&provider.kind)
+        .map(|p| p.backend_id)
         .unwrap_or_else(|| provider.resolved_api_format());
-    backend(format)
+    backend(id)
 }
 
 /// Get all registered presets (sorted by ID).

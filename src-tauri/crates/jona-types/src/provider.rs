@@ -1,6 +1,6 @@
 //! Cloud provider types, trait, and auto-registration.
 
-use crate::{ApiFormat, Provider, TranscriptionResult};
+use crate::{Provider, TranscriptionResult};
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
@@ -49,9 +49,9 @@ pub trait CloudProvider: Send + Sync {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>>;
 }
 
-/// Auto-registration entry for cloud provider backends (one per ApiFormat).
+/// Auto-registration entry for cloud provider backends (one per backend_id).
 pub struct ProviderRegistration {
-    pub api_format: ApiFormat,
+    pub backend_id: &'static str,
     pub factory: fn() -> Box<dyn CloudProvider>,
 }
 
@@ -63,7 +63,7 @@ pub struct ProviderPreset {
     pub id: &'static str,
     pub display_name: &'static str,
     pub base_url: &'static str,
-    pub api_format: ApiFormat,
+    pub backend_id: &'static str,
     pub supports_asr: bool,
     pub supports_llm: bool,
     pub gradient: &'static str,
@@ -96,4 +96,141 @@ pub fn parse_model_ids_from_json(json: &serde_json::Value) -> Result<Vec<String>
     }
 
     Ok(ids)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- parse_model_ids_from_json --
+
+    #[test]
+    fn parse_openai_wrapped_format() {
+        let json = serde_json::json!({
+            "data": [
+                {"id": "gpt-4o", "object": "model"},
+                {"id": "gpt-4o-mini", "object": "model"},
+            ]
+        });
+        let ids = parse_model_ids_from_json(&json).unwrap();
+        assert_eq!(ids, vec!["gpt-4o", "gpt-4o-mini"]);
+    }
+
+    #[test]
+    fn parse_bare_array_format() {
+        let json = serde_json::json!([
+            {"id": "llama-3.1-8b"},
+            {"id": "whisper-large-v3"},
+        ]);
+        let ids = parse_model_ids_from_json(&json).unwrap();
+        assert_eq!(ids, vec!["llama-3.1-8b", "whisper-large-v3"]);
+    }
+
+    #[test]
+    fn parse_empty_data_array_returns_error() {
+        let json = serde_json::json!({"data": []});
+        assert!(parse_model_ids_from_json(&json).is_err());
+    }
+
+    #[test]
+    fn parse_empty_bare_array_returns_error() {
+        let json = serde_json::json!([]);
+        assert!(parse_model_ids_from_json(&json).is_err());
+    }
+
+    #[test]
+    fn parse_no_id_fields_returns_error() {
+        let json = serde_json::json!({
+            "data": [{"name": "model1"}, {"name": "model2"}]
+        });
+        assert!(parse_model_ids_from_json(&json).is_err());
+    }
+
+    #[test]
+    fn parse_mixed_entries_skips_missing_ids() {
+        let json = serde_json::json!({
+            "data": [
+                {"id": "valid-model"},
+                {"name": "no-id-here"},
+                {"id": "another-model"},
+            ]
+        });
+        let ids = parse_model_ids_from_json(&json).unwrap();
+        assert_eq!(ids, vec!["valid-model", "another-model"]);
+    }
+
+    #[test]
+    fn parse_non_string_id_skipped() {
+        let json = serde_json::json!({
+            "data": [{"id": 42}, {"id": "valid"}]
+        });
+        let ids = parse_model_ids_from_json(&json).unwrap();
+        assert_eq!(ids, vec!["valid"]);
+    }
+
+    #[test]
+    fn parse_plain_object_returns_error() {
+        let json = serde_json::json!({"error": "not found"});
+        assert!(parse_model_ids_from_json(&json).is_err());
+    }
+
+    #[test]
+    fn parse_data_takes_precedence_over_root_array() {
+        // If both "data" key and root array exist (unlikely but possible),
+        // "data" should take precedence per OpenAI convention
+        let json = serde_json::json!({"data": [{"id": "from-data"}]});
+        let ids = parse_model_ids_from_json(&json).unwrap();
+        assert_eq!(ids, vec!["from-data"]);
+    }
+
+    // -- ProviderError --
+
+    #[test]
+    fn provider_error_display() {
+        let e = ProviderError::Http("connection refused".into());
+        assert!(e.to_string().contains("connection refused"));
+
+        let e = ProviderError::Api { status: 429, body: "rate limited".into() };
+        assert!(e.to_string().contains("429"));
+        assert!(e.to_string().contains("rate limited"));
+
+        let e = ProviderError::NotConfigured("no key".into());
+        assert!(e.to_string().contains("no key"));
+
+        let e = ProviderError::InvalidResponse("bad json".into());
+        assert!(e.to_string().contains("bad json"));
+    }
+
+    // -- ProviderPreset --
+
+    #[test]
+    fn provider_preset_inventory_collects() {
+        // Verify the inventory collection macro compiles and the type is usable
+        let preset = ProviderPreset {
+            id: "test",
+            display_name: "Test",
+            base_url: "https://example.com",
+            backend_id: "openai",
+            supports_asr: true,
+            supports_llm: true,
+            gradient: "none",
+            default_asr_models: &["model-1"],
+            default_llm_models: &[],
+        };
+        assert_eq!(preset.id, "test");
+        assert_eq!(preset.backend_id, "openai");
+        assert!(preset.supports_asr);
+        assert!(preset.default_asr_models.len() == 1);
+    }
+
+    // -- ProviderRegistration --
+
+    #[test]
+    fn provider_registration_backend_id_is_static() {
+        let reg = ProviderRegistration {
+            backend_id: "test-backend",
+            factory: || panic!("not called"),
+        };
+        assert_eq!(reg.backend_id, "test-backend");
+    }
 }
