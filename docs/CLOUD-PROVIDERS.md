@@ -16,10 +16,7 @@ Référence unique pour toutes les APIs cloud pertinentes pour JonaWhisper (ASR 
 
 ### Détection ASR vs LLM
 
-Pas de flag explicite sur le provider. Le système utilise :
-- Les presets (`asrModels` / `llmModels` par `ProviderKind`) dans `src/config/providers.ts`
-- Une heuristique sur le nom du modèle (`whisper`, `transcrib` = ASR)
-- Les providers Custom sont considérés comme supportant les deux
+Chaque preset déclare explicitement ses capacités via `ProviderPreset.supports_asr` et `supports_llm` (système inventory dans `jona-provider-openai/src/lib.rs`). Pour les providers Custom, les deux sont considérés comme supportés.
 
 ### Sécurité
 
@@ -45,6 +42,7 @@ L'app supporte `POST /v1/audio/transcriptions` avec multipart form. Ces provider
 | **OpenAI** | gpt-4o-transcribe | $0.006 | ~320ms | 2.46% | 99+ | idem | idem |
 | **OpenAI** | whisper-1 | $0.006 | ~500ms | ~4% | 99 | idem | idem |
 | **Mistral** | pixtral (multimodal audio) | — | — | — | Multi | `https://api.mistral.ai/v1` | `Bearer ...` |
+| **SambaNova** | whisper-large-v3 | — | — | — | 99 | `https://api.sambanova.ai/v1` | `Bearer ...` |
 
 **Recommandation** : Groq whisper-large-v3-turbo — le plus rapide et le moins cher pour du multilingue. Groq distil-whisper = le moins cher toutes catégories ($0.02/heure, EN seul). OpenAI gpt-4o-transcribe = meilleure qualité absolue (90% fewer hallucinations vs Whisper v2).
 
@@ -122,6 +120,8 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **Fireworks** | llama-v3p1-405b | $3.00 | $3.00 | Modéré | Non | `https://api.fireworks.ai/inference/v1` | `Bearer fw_...` |
 | **OpenRouter** | 200+ modèles | Variable | Variable | Variable | Non | `https://openrouter.ai/api/v1` | `Bearer sk-or-...` |
 | **xAI** | grok-2 | $2.00 | $10.00 | Rapide | Non | `https://api.x.ai/v1` | `Bearer xai-...` |
+| **SambaNova** | Meta-Llama-3.1-8B-Instant | — | — | Très rapide | Oui (rate-limited) | `https://api.sambanova.ai/v1` | `Bearer ...` |
+| **Nebius AI** | Meta-Llama-3.1-8B-Instruct | — | — | Rapide | Non | `https://api.studio.nebius.com/v1` | `Bearer ...` |
 
 **Recommandation** : Groq Llama 8B pour la vitesse, GPT-4.1-nano pour la qualité propriétaire. Cerebras/Gemini si free tier souhaité. Éviter DeepSeek (latence trop haute pour du temps réel).
 
@@ -218,30 +218,27 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 
 ## Presets actuels
 
-9 providers préconfigurés dans `src/config/providers.ts`. L'utilisateur entre juste sa clé API.
+12 providers OpenAI-compatible préconfigurés dans `jona-provider-openai/src/lib.rs` (système inventory) + 1 provider Anthropic dans `jona-provider-anthropic`. L'utilisateur entre juste sa clé API.
 
-| Provider | `ProviderKind` | ASR | LLM | Base URL |
-|----------|---------------|-----|-----|----------|
-| **OpenAI** | `OpenAI` | whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe | gpt-4o-mini, gpt-4o | `api.openai.com` |
-| **Groq** | `Groq` | whisper-large-v3-turbo, whisper-large-v3 | llama-3.1-8b-instant | `api.groq.com` |
-| **Fireworks** | `Fireworks` | whisper-v3-turbo, whisper-v3 | — | `api.fireworks.ai` |
-| **Together** | `Together` | openai/whisper-large-v3 | Llama-3.2-3B | `api.together.xyz` |
-| **Anthropic** | `Anthropic` | — | claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-6 | `api.anthropic.com` |
-| **Cerebras** | `Cerebras` | — | llama3.1-8b | `api.cerebras.ai` |
-| **Gemini** | `Gemini` | — | gemini-2.5-flash-lite | `generativelanguage.googleapis.com` |
-| **Mistral** | `Mistral` | — | ministral-3b-latest | `api.mistral.ai` |
-| **DeepSeek** | `DeepSeek` | — | deepseek-v3.2 | `api.deepseek.com` |
+| Provider | `id` | ASR | LLM | Base URL |
+|----------|------|-----|-----|----------|
+| **OpenAI** | `openai` | whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe | gpt-4o-mini, gpt-4o | `api.openai.com` |
+| **Groq** | `groq` | whisper-large-v3-turbo, whisper-large-v3 | llama-3.1-8b-instant | `api.groq.com` |
+| **Cerebras** | `cerebras` | — | llama3.1-8b | `api.cerebras.ai` |
+| **Google Gemini** | `gemini` | — | gemini-2.5-flash-lite | `generativelanguage.googleapis.com` |
+| **Mistral** | `mistral` | — | ministral-3b-latest | `api.mistral.ai` |
+| **Fireworks** | `fireworks` | whisper-v3-turbo, whisper-v3 | — | `api.fireworks.ai` |
+| **Together** | `together` | openai/whisper-large-v3 | Llama-3.2-3B | `api.together.xyz` |
+| **DeepSeek** | `deepseek` | — | deepseek-v3.2 | `api.deepseek.com` |
+| **OpenRouter** | `openrouter` | — | (200+ modèles) | `openrouter.ai` |
+| **xAI** | `xai` | — | grok-2 | `api.x.ai` |
+| **SambaNova** | `sambanova` | whisper-large-v3 | Meta-Llama-3.1-8B-Instant | `api.sambanova.ai` |
+| **Nebius AI** | `nebius` | — | Meta-Llama-3.1-8B-Instruct | `api.studio.nebius.com` |
+| **Anthropic** | `anthropic` | — | claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-6 | `api.anthropic.com` |
 
 ---
 
 ## Résumé décisionnel
-
-### Nouveaux presets à ajouter (OpenAI-compatible, juste un `ProviderKind` + base URL)
-
-| Provider | ASR | LLM | Priorité | Notes |
-|----------|-----|-----|----------|-------|
-| **OpenRouter** | ❌ | ✅ | Haute | Agrégateur, 200+ modèles, une seule clé |
-| **xAI (Grok)** | ❌ | ✅ | Moyenne | OpenAI-compat, modèles Grok |
 
 ### Nouveaux providers à implémenter (crate `jona-provider-*` dédié)
 
