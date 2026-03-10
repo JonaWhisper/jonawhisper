@@ -290,6 +290,9 @@ pub fn run() {
             // Mic test sender (clone before cmd_tx is moved)
             app.manage(recording::MicTestSender(cmd_tx.clone()));
 
+            // Clone before moving into RecordingState — spectrum emitter needs it too
+            let samples_received_for_spectrum = samples_received.clone();
+
             // Recording state (Send-safe: only channels, no cpal::Stream)
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
                 cmd_tx.clone(),
@@ -346,6 +349,7 @@ pub fn run() {
                 cmd_tx,
                 spectrum_data,
                 stream_error,
+                samples_received_for_spectrum,
             );
 
             Ok(())

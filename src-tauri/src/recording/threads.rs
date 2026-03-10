@@ -131,6 +131,7 @@ pub fn spawn_spectrum_emitter(
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,
     spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
+    samples_received: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
@@ -160,7 +161,11 @@ pub fn spawn_spectrum_emitter(
 
         let spectrum = spectrum_data.lock().unwrap().clone();
         let is_flat = spectrum.iter().all(|&v| v < 0.001);
-        if is_flat && !is_mic_testing && state.audio_flags.is_recording() {
+        // Only warn about flat spectrum after audio samples have been received —
+        // the first ~100-150ms are always flat while the FFT buffer fills up.
+        if is_flat && !is_mic_testing && state.audio_flags.is_recording()
+            && samples_received.load(Ordering::Relaxed)
+        {
             log::warn!("Spectrum flat while recording (queue depth: {})", cmd_tx.len());
         }
         let _ = cmd_tx.send(AudioCmd::GetSpectrum);
