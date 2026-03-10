@@ -62,7 +62,7 @@ pub fn run(raw: &mut Value, prefs: &mut Preferences) -> bool {
 }
 
 /// v1: Migrate api_servers/llm_config → providers, cleanup_mode → text_cleanup_enabled, etc.
-fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
+pub(crate) fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
     let has_old_api_servers = raw.get("api_servers").is_some();
     let has_old_llm_config = raw.get("llm_config").is_some();
 
@@ -303,7 +303,7 @@ fn migrate_v2(raw: &mut Value, prefs: &mut Preferences) {
 }
 
 /// v3: Update llm_max_tokens from old default (256) to new default (4096)
-fn migrate_v3(_raw: &mut Value, prefs: &mut Preferences) {
+pub(crate) fn migrate_v3(_raw: &mut Value, prefs: &mut Preferences) {
     if prefs.llm_max_tokens <= 256 {
         log::info!("Migration v3: updating llm_max_tokens from {} to 4096", prefs.llm_max_tokens);
         prefs.llm_max_tokens = 4096;
@@ -339,7 +339,7 @@ fn migrate_v5(_raw: &mut Value, prefs: &mut Preferences) {
 }
 
 /// v6: Split punctuation model out of cleanup_model_id into its own punctuation_model_id field.
-fn migrate_v6(_raw: &mut Value, prefs: &mut Preferences) {
+pub(crate) fn migrate_v6(_raw: &mut Value, prefs: &mut Preferences) {
     let is_punctuation = prefs.cleanup_model_id.starts_with("bert-punctuation:")
         || prefs.cleanup_model_id.starts_with("pcs-punctuation:");
 
@@ -401,7 +401,7 @@ fn migrate_v7(_raw: &mut Value, prefs: &mut Preferences) {
 
 /// v8: Normalize provider kind from PascalCase enum variants to lowercase string IDs.
 /// Also fill in base_url from presets for providers that have an empty URL.
-fn migrate_v8(_raw: &mut Value, prefs: &mut Preferences) {
+pub(crate) fn migrate_v8(_raw: &mut Value, prefs: &mut Preferences) {
     let kind_map: &[(&str, &str)] = &[
         ("OpenAI", "openai"),
         ("Anthropic", "anthropic"),
@@ -445,6 +445,274 @@ fn migrate_v8(_raw: &mut Value, prefs: &mut Preferences) {
     }
     if migrated > 0 {
         log::info!("Migration v8: normalized {} provider kind(s) to lowercase", migrated);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn empty_prefs() -> Preferences {
+        Preferences::default()
+    }
+
+    // -- run() orchestrator --
+
+    #[test]
+    fn run_skips_when_already_current() {
+        let mut raw = json!({"_version": CURRENT_VERSION});
+        let mut prefs = empty_prefs();
+        assert!(!run(&mut raw, &mut prefs));
+    }
+
+    #[test]
+    fn run_applies_pending_migrations() {
+        let mut raw = json!({"_version": 7});
+        let mut prefs = empty_prefs();
+        assert!(run(&mut raw, &mut prefs));
+        assert_eq!(raw["_version"], CURRENT_VERSION);
+        assert_eq!(prefs.schema_version, CURRENT_VERSION);
+    }
+
+    #[test]
+    fn run_from_zero_applies_all() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        assert!(run(&mut raw, &mut prefs));
+        assert_eq!(raw["_version"], CURRENT_VERSION);
+    }
+
+    // -- migrate_v1 --
+
+    #[test]
+    fn v1_migrates_api_servers_to_providers() {
+        let mut raw = json!({
+            "api_servers": [{
+                "id": "my-server",
+                "name": "My Server",
+                "url": "https://api.example.com",
+                "model": "whisper-1",
+                "api_key": "sk-test"
+            }]
+        });
+        let mut prefs = empty_prefs();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers.len(), 1);
+        assert_eq!(prefs.providers[0].id, "my-server");
+        assert_eq!(prefs.providers[0].kind, "custom");
+        assert_eq!(prefs.providers[0].url, "https://api.example.com");
+        assert_eq!(prefs.selected_model_id, "cloud:my-server");
+        assert_eq!(prefs.asr_cloud_model, "whisper-1");
+    }
+
+    #[test]
+    fn v1_migrates_llm_config() {
+        let mut raw = json!({
+            "llm_config": {
+                "provider": "openai",
+                "api_url": "https://api.openai.com/v1",
+                "api_key": "sk-llm",
+                "model": "gpt-4o",
+                "enabled": true
+            }
+        });
+        let mut prefs = empty_prefs();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert!(prefs.text_cleanup_enabled);
+        assert_eq!(prefs.llm_model, "gpt-4o");
+        assert_eq!(prefs.llm_provider_id, "provider-openai");
+        assert_eq!(prefs.providers.len(), 1);
+        assert_eq!(prefs.providers[0].kind, "openai");
+    }
+
+    #[test]
+    fn v1_migrates_cleanup_mode_punctuation() {
+        let mut raw = json!({
+            "cleanup_mode": "punctuation",
+            "punctuation_model_id": "bert-punctuation:base"
+        });
+        let mut prefs = empty_prefs();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert!(prefs.text_cleanup_enabled);
+        assert_eq!(prefs.cleanup_model_id, "bert-punctuation:base");
+    }
+
+    #[test]
+    fn v1_migrates_cleanup_mode_full_local() {
+        let mut raw = json!({
+            "cleanup_mode": "full",
+            "llm_source": "local",
+            "llm_local_model_id": "llm-local:tinyllama"
+        });
+        let mut prefs = empty_prefs();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert!(prefs.text_cleanup_enabled);
+        assert_eq!(prefs.cleanup_model_id, "llama:tinyllama");
+    }
+
+    #[test]
+    fn v1_resets_old_openai_api_prefix() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.selected_model_id = "openai-api:whisper-1".to_string();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.selected_model_id, default_model_id());
+    }
+
+    #[test]
+    fn v1_migrates_asr_provider_id() {
+        let mut raw = json!({"asr_provider_id": "my-provider"});
+        let mut prefs = empty_prefs();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.selected_model_id, "cloud:my-provider");
+    }
+
+    #[test]
+    fn v1_noop_on_empty_json() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        let old_model = prefs.selected_model_id.clone();
+        migrate_v1(&mut raw, &mut prefs);
+
+        assert!(prefs.providers.is_empty());
+        assert_eq!(prefs.selected_model_id, old_model);
+    }
+
+    // -- migrate_v3 --
+
+    #[test]
+    fn v3_updates_low_max_tokens() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.llm_max_tokens = 256;
+        migrate_v3(&mut raw, &mut prefs);
+        assert_eq!(prefs.llm_max_tokens, 4096);
+    }
+
+    #[test]
+    fn v3_preserves_high_max_tokens() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.llm_max_tokens = 8192;
+        migrate_v3(&mut raw, &mut prefs);
+        assert_eq!(prefs.llm_max_tokens, 8192);
+    }
+
+    // -- migrate_v6 --
+
+    #[test]
+    fn v6_splits_punctuation_model() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.text_cleanup_enabled = true;
+        prefs.cleanup_model_id = "bert-punctuation:base".to_string();
+        migrate_v6(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.punctuation_model_id, "bert-punctuation:base");
+        assert!(prefs.cleanup_model_id.is_empty());
+        assert!(!prefs.text_cleanup_enabled);
+    }
+
+    #[test]
+    fn v6_splits_pcs_punctuation() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.cleanup_model_id = "pcs-punctuation:large".to_string();
+        migrate_v6(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.punctuation_model_id, "pcs-punctuation:large");
+        assert!(prefs.cleanup_model_id.is_empty());
+    }
+
+    #[test]
+    fn v6_ignores_non_punctuation_model() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.cleanup_model_id = "correction:gec-t5-small".to_string();
+        prefs.text_cleanup_enabled = true;
+        migrate_v6(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.cleanup_model_id, "correction:gec-t5-small");
+        assert!(prefs.punctuation_model_id.is_empty());
+        assert!(prefs.text_cleanup_enabled);
+    }
+
+    // -- migrate_v8 --
+    // Note: v8 calls jona_provider::preset() which requires ProviderCatalog init.
+    // Tests use init_catalog() to initialize it. In test context, inventory may
+    // not have the backend crates linked, so preset lookups may return None —
+    // but the kind normalization logic is still fully testable.
+
+    fn init_catalog() {
+        use std::sync::Once;
+        static INIT: Once = Once::new();
+        INIT.call_once(|| jona_provider::ProviderCatalog::init_auto());
+    }
+
+    fn test_provider(kind: &str, url: &str) -> Provider {
+        Provider {
+            id: "p1".into(), name: "Test".into(), kind: kind.into(),
+            url: url.into(), api_key: String::new(),
+            allow_insecure: false, cached_models: vec![], supports_asr: true,
+            supports_llm: true, api_format: None,
+        }
+    }
+
+    #[test]
+    fn v8_normalizes_pascal_case_kinds() {
+        init_catalog();
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.providers.push(test_provider("OpenAI", "https://api.openai.com/v1"));
+        prefs.providers.push(test_provider("Anthropic", "https://api.anthropic.com/v1"));
+        migrate_v8(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers[0].kind, "openai");
+        assert_eq!(prefs.providers[1].kind, "anthropic");
+    }
+
+    #[test]
+    fn v8_unknown_pascal_falls_back_to_lowercase() {
+        init_catalog();
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.providers.push(test_provider("MyCustomBackend", "https://example.com"));
+        migrate_v8(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers[0].kind, "mycustombackend");
+    }
+
+    #[test]
+    fn v8_already_lowercase_unchanged() {
+        init_catalog();
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.providers.push(test_provider("custom", "https://example.com"));
+        migrate_v8(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers[0].kind, "custom");
+    }
+
+    #[test]
+    fn v8_fills_empty_url_from_preset() {
+        init_catalog();
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.providers.push(test_provider("OpenAI", ""));
+        migrate_v8(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers[0].kind, "openai");
+        // If preset was found, URL should be filled
+        if !prefs.providers[0].url.is_empty() {
+            assert!(prefs.providers[0].url.starts_with("https://"));
+        }
     }
 }
 

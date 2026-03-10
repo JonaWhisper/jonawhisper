@@ -121,7 +121,7 @@ pub(super) fn strip_hallucinations(text: &str) -> String {
 
 /// Detect excessive repetition (same word 3+ times in a row, or text is mostly one word).
 /// Whisper hallucinates by looping the same word/phrase on silence.
-fn has_excessive_repetition(text: &str) -> bool {
+pub(crate) fn has_excessive_repetition(text: &str) -> bool {
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.len() < 3 {
         return false;
@@ -152,4 +152,128 @@ fn has_excessive_repetition(text: &str) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- strip_hallucinations --
+
+    #[test]
+    fn normal_text_passes_through() {
+        assert_eq!(strip_hallucinations("bonjour le monde"), "bonjour le monde");
+    }
+
+    #[test]
+    fn exact_hallucination_returns_empty() {
+        assert_eq!(strip_hallucinations("sous-titrage"), "");
+        assert_eq!(strip_hallucinations("thank you for watching"), "");
+        assert_eq!(strip_hallucinations("Subtitles by"), "");
+    }
+
+    #[test]
+    fn hallucination_case_insensitive() {
+        assert_eq!(strip_hallucinations("SOUS-TITRAGE"), "");
+        assert_eq!(strip_hallucinations("Thank You For Watching"), "");
+    }
+
+    #[test]
+    fn hallucination_with_leading_trailing_whitespace() {
+        assert_eq!(strip_hallucinations("  sous-titrage  "), "");
+        assert_eq!(strip_hallucinations("\n thank you for watching \n"), "");
+    }
+
+    #[test]
+    fn hallucination_with_trailing_dots() {
+        assert_eq!(strip_hallucinations("sous-titrage..."), "");
+        assert_eq!(strip_hallucinations("bye."), "");
+    }
+
+    #[test]
+    fn hallucination_starts_with_match() {
+        assert_eq!(strip_hallucinations("sous-titrage et quelque chose"), "");
+    }
+
+    #[test]
+    fn embedded_hallucination_stripped() {
+        let result = strip_hallucinations("bonjour sous-titrage monde");
+        assert!(result.contains("bonjour"));
+        assert!(result.contains("monde"));
+        assert!(!result.to_lowercase().contains("sous-titrage"));
+    }
+
+    #[test]
+    fn music_symbols_return_empty() {
+        assert_eq!(strip_hallucinations("\u{266A}"), "");
+        assert_eq!(strip_hallucinations("\u{266A} \u{266B}"), "");
+        assert_eq!(strip_hallucinations("..."), "");
+        assert_eq!(strip_hallucinations("\u{2026}"), "");
+    }
+
+    #[test]
+    fn url_hallucination_returns_empty() {
+        assert_eq!(strip_hallucinations("www.example.com"), "");
+        assert_eq!(strip_hallucinations("http://example.com"), "");
+    }
+
+    #[test]
+    fn multilingual_hallucinations() {
+        assert_eq!(strip_hallucinations("Vielen Dank f\u{00FC}rs Zuschauen"), "");
+        assert_eq!(strip_hallucinations("Gracias por ver"), "");
+        assert_eq!(strip_hallucinations("obrigado por assistir"), "");
+        assert_eq!(strip_hallucinations("bedankt voor het kijken"), "");
+    }
+
+    // -- has_excessive_repetition --
+
+    #[test]
+    fn no_repetition_in_normal_text() {
+        assert!(!has_excessive_repetition("the cat sat on the mat"));
+    }
+
+    #[test]
+    fn three_consecutive_same_words() {
+        assert!(has_excessive_repetition("okay okay okay"));
+    }
+
+    #[test]
+    fn two_consecutive_same_words_not_enough() {
+        assert!(!has_excessive_repetition("hello hello world"));
+    }
+
+    #[test]
+    fn dominant_word_over_70_percent() {
+        // "the the the the the cat" — "the" is 5/6 = 83%
+        assert!(has_excessive_repetition("the the the the the cat"));
+    }
+
+    #[test]
+    fn dominant_word_needs_minimum_four() {
+        // "a b a b a" — "a" is 3/5 = 60%, not dominant and not 3-consecutive
+        assert!(!has_excessive_repetition("a b a b a"));
+    }
+
+    #[test]
+    fn short_text_no_repetition() {
+        assert!(!has_excessive_repetition("ok"));
+        assert!(!has_excessive_repetition("ok ok"));
+    }
+
+    #[test]
+    fn empty_text() {
+        assert!(!has_excessive_repetition(""));
+    }
+
+    #[test]
+    fn case_insensitive_consecutive() {
+        assert!(has_excessive_repetition("Hello hello HELLO"));
+    }
+
+    #[test]
+    fn non_consecutive_repetition_not_detected() {
+        // "a b a b a b" — "a" appears 3 times but never 3 in a row
+        // and 3/6 = 50% (< 70%)
+        assert!(!has_excessive_repetition("a b a b a b"));
+    }
 }
