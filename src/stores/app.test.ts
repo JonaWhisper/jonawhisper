@@ -57,29 +57,32 @@ describe('app store', () => {
   })
 
   describe('event listeners', () => {
-    function setupStore() {
-      // Mock all the init invokes to avoid errors
-      mockInvoke.mockResolvedValue({ is_recording: false, is_transcribing: false, queue_count: 0, active_downloads: {} })
+    async function setupStore() {
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        switch (cmd) {
+          case 'get_app_state': return { is_recording: false, is_transcribing: false, queue_count: 0, active_downloads: {} }
+          case 'get_settings': return { app_locale: 'auto', hallucination_filter_enabled: true, hotkey: 'right_command', cancel_shortcut: 'escape', recording_mode: 'push_to_talk', selected_input_device_uid: null, selected_model_id: '', selected_language: 'auto', text_cleanup_enabled: false, cleanup_model_id: '', llm_provider_id: '', llm_model: '', asr_cloud_model: 'whisper-1', gpu_mode: 'auto', llm_max_tokens: 4096, audio_ducking_enabled: false, audio_ducking_level: 0.2, vad_enabled: true, punctuation_model_id: '', disfluency_removal_enabled: true, itn_enabled: true, spellcheck_enabled: false, theme: 'system', log_level: 'info', log_retention: 'previous' }
+          case 'get_engines': return []
+          case 'get_models': return []
+          case 'get_providers': return []
+          case 'get_provider_presets': return []
+          default: return undefined
+        }
+      })
       const store = useAppStore()
-      // Trigger setupListeners by calling init (but we need the listeners registered)
-      // setupListeners is called inside init, so we just need the events registered
-      // Let's manually trigger by calling init
-      store.init()
+      await store.init()
       return store
     }
 
     it('recording-started sets isRecording true', async () => {
-      const store = setupStore()
-      // Wait for init promises
-      await vi.waitFor(() => expect(listeners['recording-started']).toBeDefined())
+      const store = await setupStore()
 
       listeners['recording-started']!({ payload: {} })
       expect(store.isRecording).toBe(true)
     })
 
     it('recording-stopped sets isRecording false and updates queueCount', async () => {
-      const store = setupStore()
-      await vi.waitFor(() => expect(listeners['recording-stopped']).toBeDefined())
+      const store = await setupStore()
 
       store.isRecording = true
       listeners['recording-stopped']!({ payload: { queue_count: 3 } })
@@ -88,8 +91,7 @@ describe('app store', () => {
     })
 
     it('transcription-cancelled resets isTranscribing and zeroes queueCount', async () => {
-      const store = setupStore()
-      await vi.waitFor(() => expect(listeners['transcription-cancelled']).toBeDefined())
+      const store = await setupStore()
 
       store.isTranscribing = true
       store.queueCount = 5

@@ -247,8 +247,10 @@ describe('engines store actions', () => {
 
   it('fetchModels populates models from invoke', async () => {
     const store = useEnginesStore()
-    const data = [makeModel({ id: 'whisper:tiny' })]
-    // fetchModels also calls validateSelections which may call setSetting
+    const settings = useSettingsStore()
+    settings.selectedModelId = ''
+    store.engines = [makeEngine({ id: 'test-engine', category: 'asr' })]
+    const data = [makeModel({ id: 'whisper:tiny', engine_id: 'test-engine', is_downloaded: true })]
     mockInvoke.mockImplementation(async (cmd: string) => {
       if (cmd === 'get_models') return data
       return undefined
