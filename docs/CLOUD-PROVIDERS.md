@@ -16,7 +16,7 @@ Référence unique pour toutes les APIs cloud pertinentes pour JonaWhisper (ASR 
 
 ### Détection ASR vs LLM
 
-Chaque preset déclare explicitement ses capacités via `ProviderPreset.supports_asr` et `supports_llm` (système inventory dans `jona-provider-openai/src/lib.rs`). Pour les providers Custom, les deux sont considérés comme supportés.
+Chaque preset déclare explicitement ses capacités via `ProviderPreset.supports_asr` et `supports_llm` (système inventory dans le crate `jona-provider-openai`). Pour les providers Custom, les deux sont considérés comme supportés.
 
 ### Sécurité
 
@@ -121,7 +121,7 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **OpenRouter** | 200+ modèles | Variable | Variable | Variable | Non | `https://openrouter.ai/api/v1` | `Bearer sk-or-...` |
 | **xAI** | grok-2 | $2.00 | $10.00 | Rapide | Non | `https://api.x.ai/v1` | `Bearer xai-...` |
 | **SambaNova** | Meta-Llama-3.1-8B-Instant | — | — | Très rapide | Oui (rate-limited) | `https://api.sambanova.ai/v1` | `Bearer ...` |
-| **Nebius AI** | Meta-Llama-3.1-8B-Instruct | — | — | Rapide | Non | `https://api.studio.nebius.com/v1` | `Bearer ...` |
+| **Nebius AI** | meta-llama/Meta-Llama-3.1-8B-Instruct | — | — | Rapide | Non | `https://api.studio.nebius.com/v1` | `Bearer ...` |
 
 **Recommandation** : Groq Llama 8B pour la vitesse, GPT-4.1-nano pour la qualité propriétaire. Cerebras/Gemini si free tier souhaité. Éviter DeepSeek (latence trop haute pour du temps réel).
 
@@ -218,7 +218,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 
 ## Presets actuels
 
-12 providers OpenAI-compatible préconfigurés dans `jona-provider-openai/src/lib.rs` (système inventory) + 1 provider Anthropic dans `jona-provider-anthropic`. L'utilisateur entre juste sa clé API.
+12 providers OpenAI-compatible préconfigurés dans le crate `jona-provider-openai` (système inventory) + 1 provider Anthropic dans le crate `jona-provider-anthropic`. L'utilisateur entre juste sa clé API.
 
 | Provider | `id` | ASR | LLM | Base URL |
 |----------|------|-----|-----|----------|
@@ -233,7 +233,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **OpenRouter** | `openrouter` | — | (200+ modèles) | `openrouter.ai` |
 | **xAI** | `xai` | — | grok-2 | `api.x.ai` |
 | **SambaNova** | `sambanova` | whisper-large-v3 | Meta-Llama-3.1-8B-Instant | `api.sambanova.ai` |
-| **Nebius AI** | `nebius` | — | Meta-Llama-3.1-8B-Instruct | `api.studio.nebius.com` |
+| **Nebius AI** | `nebius` | — | meta-llama/Meta-Llama-3.1-8B-Instruct | `api.studio.nebius.com` |
 | **Anthropic** | `anthropic` | — | claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-6 | `api.anthropic.com` |
 
 ---
