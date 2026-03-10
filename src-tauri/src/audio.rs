@@ -33,10 +33,11 @@ pub struct AudioRecorder {
     spectrum: Arc<Mutex<Vec<f32>>>,
     fft_buffer: Arc<Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
+    samples_received: Arc<AtomicBool>,
 }
 
 impl AudioRecorder {
-    pub fn new(stream_error: Arc<AtomicBool>) -> Self {
+    pub fn new(stream_error: Arc<AtomicBool>, samples_received: Arc<AtomicBool>) -> Self {
         Self {
             stream: None,
             writer: Arc::new(Mutex::new(None)),
@@ -44,6 +45,7 @@ impl AudioRecorder {
             spectrum: Arc::new(Mutex::new(vec![0.0; NUM_BANDS])),
             fft_buffer: Arc::new(Mutex::new(Vec::with_capacity(FFT_SIZE))),
             stream_error,
+            samples_received,
         }
     }
 
@@ -150,6 +152,7 @@ impl AudioRecorder {
         *self.spectrum.lock().unwrap() = vec![0.0; NUM_BANDS];
         *self.fft_buffer.lock().unwrap() = Vec::with_capacity(FFT_SIZE);
         self.stream_error.store(false, Ordering::Relaxed);
+        self.samples_received.store(false, Ordering::Relaxed);
 
         let writer_clone = Arc::clone(&self.writer);
         let fft_buffer_clone = Arc::clone(&self.fft_buffer);
@@ -165,9 +168,11 @@ impl AudioRecorder {
         let stream = match sample_format {
             SampleFormat::F32 => {
                 let error_flag = Arc::clone(&self.stream_error);
+                let received_flag = Arc::clone(&self.samples_received);
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                        received_flag.store(true, Ordering::Relaxed);
                         let mono = mix_to_mono(data, channels);
                         let resampled = resample(&mono, rate, SAMPLE_RATE);
                         process_samples(&resampled, &writer_clone, &fft_buffer_clone, &spectrum_clone);
@@ -184,9 +189,11 @@ impl AudioRecorder {
                 let fft_buffer_clone2 = Arc::clone(&self.fft_buffer);
                 let spectrum_clone2 = Arc::clone(&self.spectrum);
                 let error_flag = Arc::clone(&self.stream_error);
+                let received_flag = Arc::clone(&self.samples_received);
                 device.build_input_stream(
                     &config,
                     move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                        received_flag.store(true, Ordering::Relaxed);
                         let float_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
                         let mono = mix_to_mono(&float_data, channels);
                         let resampled = resample(&mono, rate, SAMPLE_RATE);

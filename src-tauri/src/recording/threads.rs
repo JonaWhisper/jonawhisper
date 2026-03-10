@@ -9,11 +9,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-/// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error).
+/// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error, samples_received).
 type AudioThreadHandles = (
     crossbeam_channel::Sender<AudioCmd>,
     Arc<std::sync::Mutex<Vec<f32>>>,
     crossbeam_channel::Receiver<AudioReply>,
+    Arc<AtomicBool>,
     Arc<AtomicBool>,
 );
 
@@ -27,8 +28,11 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
     let stream_error = Arc::new(AtomicBool::new(false));
     let stream_error_clone = Arc::clone(&stream_error);
 
+    let samples_received = Arc::new(AtomicBool::new(false));
+    let samples_received_clone = Arc::clone(&samples_received);
+
     std::thread::spawn(move || {
-        let mut recorder = audio::AudioRecorder::new(stream_error_clone);
+        let mut recorder = audio::AudioRecorder::new(stream_error_clone, samples_received_clone);
         loop {
             match cmd_rx.recv() {
                 Ok(AudioCmd::StartRecording { device_uid }) => {
@@ -57,7 +61,7 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
         }
     });
 
-    (cmd_tx, spectrum_data, reply_rx, stream_error)
+    (cmd_tx, spectrum_data, reply_rx, stream_error, samples_received)
 }
 
 pub fn spawn_hotkey_handler(

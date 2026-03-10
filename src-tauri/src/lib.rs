@@ -284,7 +284,7 @@ pub fn run() {
             ui::tray::setup_tray(app.handle())?;
 
             // Audio thread (cpal::Stream is not Send)
-            let (cmd_tx, spectrum_data, reply_rx, stream_error) =
+            let (cmd_tx, spectrum_data, reply_rx, stream_error, samples_received) =
                 recording::spawn_audio_thread();
 
             // Mic test sender (clone before cmd_tx is moved)
@@ -294,7 +294,7 @@ pub fn run() {
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
                 cmd_tx.clone(),
                 reply_rx,
-                spectrum_data.clone(),
+                samples_received,
             )));
 
             // Deferred monitoring flag — hotkey thread waits for this

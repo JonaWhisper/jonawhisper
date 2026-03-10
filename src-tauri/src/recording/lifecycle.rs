@@ -48,16 +48,12 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         platform::audio_ducking::duck_volume(ducking_level);
     }
 
-    // Wait for first audio data before transitioning to Recording.
+    // Wait for first audio callback before transitioning to Recording.
     // Without this, the pill shows Recording with a flat/grey spectrum
     // because cpal hasn't produced samples yet (~50-150ms delay).
     let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
     loop {
-        let _ = rec.audio_tx.send(AudioCmd::GetSpectrum);
-        std::thread::sleep(std::time::Duration::from_millis(15));
-        let spectrum = rec.spectrum_data.lock().unwrap().clone();
-        let has_data = spectrum.iter().any(|&v| v >= 0.001);
-        if has_data {
+        if rec.samples_received.load(std::sync::atomic::Ordering::Relaxed) {
             log::debug!("First audio samples received, transitioning to Recording");
             break;
         }
@@ -65,6 +61,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
             log::warn!("Timeout waiting for first audio samples, transitioning to Recording anyway");
             break;
         }
+        std::thread::sleep(std::time::Duration::from_millis(5));
     }
 
     // Stream has data — transition to Recording mode + audible cue
