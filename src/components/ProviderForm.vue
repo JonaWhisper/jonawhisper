@@ -15,6 +15,13 @@ import {
   ComboboxItem,
 } from '@/components/ui/combobox'
 import { ComboboxAnchor, ComboboxTrigger } from 'reka-ui'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Loader2, CheckCircle2, XCircle, ShieldAlert, ChevronsUpDown } from 'lucide-vue-next'
@@ -28,7 +35,7 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const engines = useEnginesStore()
 
 const isEditing = computed(() => !!props.provider)
@@ -41,14 +48,55 @@ const allowInsecure = ref(props.provider?.allow_insecure ?? false)
 const supportsAsr = ref(props.provider?.supports_asr ?? true)
 const supportsLlm = ref(props.provider?.supports_llm ?? true)
 const errors = ref<Record<string, string>>({})
+const extraValues = ref<Record<string, string>>({})
+
+// Initialize extra values from existing provider or preset defaults
+function initExtraValues(kindId: string) {
+  const preset = engines.providerPresets.find(p => p.id === kindId)
+  if (preset) {
+    const vals: Record<string, string> = {}
+    for (const field of preset.extra_fields) {
+      vals[field.id] = field.default_value
+    }
+    extraValues.value = vals
+  } else {
+    extraValues.value = {}
+  }
+}
+
+// When editing, populate from provider.extra
+if (props.provider) {
+  extraValues.value = { ...props.provider.extra }
+} else {
+  initExtraValues(kind.value)
+}
 
 // Test state
 const testStatus = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
 const testMessage = ref('')
 const fetchedModels = ref<string[]>(props.provider?.cached_models ?? [])
 
-const showUrl = computed(() => kind.value === 'custom')
-const canTest = computed(() => apiKey.value.trim().length > 0 || isEditing.value)
+const currentPreset = computed(() =>
+  engines.providerPresets.find(p => p.id === kind.value),
+)
+
+const visibleExtraFields = computed(() =>
+  currentPreset.value?.extra_fields ?? [],
+)
+
+const showUrl = computed(() => {
+  if (kind.value === 'custom') return true
+  return !(currentPreset.value?.hidden_fields?.includes('base_url'))
+})
+
+const showApiKey = computed(() =>
+  !(currentPreset.value?.hidden_fields?.includes('api_key')),
+)
+
+const canTest = computed(() => {
+  if (!showApiKey.value) return true
+  return apiKey.value.trim().length > 0 || isEditing.value
+})
 const showInsecureToggle = computed(() => kind.value === 'custom')
 const showCapabilities = computed(() => kind.value === 'custom')
 
@@ -88,6 +136,12 @@ function displayValue(val: unknown): string {
   return opt?.label ?? val
 }
 
+/** Resolve i18n label for an extra field: use i18n key if it exists, otherwise fallback to field.label. */
+function fieldLabel(fieldId: string, fallback: string): string {
+  const key = `provider.field.${fieldId}`
+  return te(key) ? t(key) : fallback
+}
+
 watch(kind, (newKind) => {
   if (isEditing.value) return
   const preset = engines.providerPresets.find(p => p.id === newKind)
@@ -104,6 +158,8 @@ watch(kind, (newKind) => {
   fetchedModels.value = []
   supportsAsr.value = true
   supportsLlm.value = true
+  // Reset extra values to preset defaults
+  initExtraValues(newKind)
 })
 
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -116,6 +172,12 @@ function validate(): boolean {
   errors.value = {}
   if (!name.value.trim()) errors.value.name = t('validation.required')
   if (showUrl.value && !url.value.trim()) errors.value.url = t('validation.required')
+  // Validate required extra fields
+  for (const field of visibleExtraFields.value) {
+    if (field.required && !(extraValues.value[field.id]?.trim())) {
+      errors.value[field.id] = t('validation.required')
+    }
+  }
   return Object.keys(errors.value).length === 0
 }
 
@@ -133,6 +195,7 @@ async function testConnection() {
     cached_models: [],
     supports_asr: supportsAsr.value,
     supports_llm: supportsLlm.value,
+    extra: { ...extraValues.value },
   }
 
   try {
@@ -163,6 +226,7 @@ function save() {
     cached_models: fetchedModels.value,
     supports_asr: isCustom ? supportsAsr.value : true,
     supports_llm: isCustom ? supportsLlm.value : true,
+    extra: { ...extraValues.value },
   }
 
   emit('save', provider)
@@ -223,7 +287,7 @@ function save() {
       <p v-if="errors.url" class="text-xs text-destructive">{{ errors.url }}</p>
     </div>
 
-    <div class="space-y-2">
+    <div v-if="showApiKey" class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.apiKey') }}</Label>
       <div class="flex gap-2">
         <Input v-model="apiKey" type="password" :placeholder="isEditing ? t('provider.apiKeyKeep') : 'sk-...'" class="h-9 text-sm flex-1" />
@@ -247,6 +311,44 @@ function save() {
         <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
         <span>{{ testMessage }}</span>
       </div>
+    </div>
+
+    <!-- Dynamic preset fields -->
+    <div v-for="field in visibleExtraFields" :key="field.id" class="space-y-2">
+      <Label class="text-xs text-muted-foreground">
+        {{ fieldLabel(field.id, field.label) }}
+        <span v-if="field.required" class="text-destructive">*</span>
+      </Label>
+
+      <!-- Text / Password input -->
+      <Input
+        v-if="field.field_type !== 'select'"
+        :model-value="extraValues[field.id] ?? ''"
+        @update:model-value="v => extraValues[field.id] = String(v)"
+        :type="field.field_type"
+        :placeholder="field.placeholder"
+        class="h-9 text-sm"
+      />
+
+      <!-- Select dropdown -->
+      <Select
+        v-else
+        :model-value="extraValues[field.id] ?? ''"
+        @update:model-value="v => extraValues[field.id] = String(v)"
+      >
+        <SelectTrigger class="w-full h-9 text-sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent class="max-h-[45vh]">
+          <SelectItem
+            v-for="[value, label] in field.options"
+            :key="value"
+            :value="value"
+          >{{ label }}</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <p v-if="errors[field.id]" class="text-xs text-destructive">{{ errors[field.id] }}</p>
     </div>
 
     <!-- Capabilities — only for Custom providers -->
