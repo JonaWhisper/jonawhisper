@@ -154,4 +154,6 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #d97706, #b45309)",
     default_asr_models: &[],
     default_llm_models: &["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250514", "claude-opus-4-6-20250626"],
+    extra_fields: &[],
+    hidden_fields: &[],
 }}
