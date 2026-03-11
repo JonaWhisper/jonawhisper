@@ -59,19 +59,19 @@ L'app supporte `POST /v1/audio/transcriptions` avec multipart form. Ces provider
 
 APIs ASR avec protocole dédié (non OpenAI-compatible), chacune dans son propre crate `jona-provider-*`.
 
-| Provider | Modèle | Prix/min | Latence | WER | FR | Streaming FR | API | Complexité | Priorité |
-|----------|--------|----------|---------|-----|-----|-------------|-----|------------|----------|
-| **Deepgram** | Nova-3 | $0.0043 | <300ms | 5.26% | Oui (codeswitching) | Oui | REST sync | **Faible** | ⭐ **Haute** |
-| **Rev.ai** | Reverb Foreign | $0.005 | <1s | — | Oui | Oui | REST sync | Faible | Moyenne |
-| **AssemblyAI** | Universal-2 | $0.0025 | Secondes/stream | ~14.5% | Oui | Oui (6 langues) | REST + polling | Élevée | Moyenne |
-| **ElevenLabs** | Scribe v2 | $0.01 | <150ms stream | ~93.5% FLEURS | Oui | Oui | Multipart sync | Faible | Basse |
-| **Gladia** | Whisper-Zero | $0.010 | Temps réel | — | Oui | Oui | Multipart + polling | Moyenne | Basse |
-| **Speechmatics** | Flow API | Sur devis | ~150ms | — | Oui (55+ lang) | Oui | REST/WebSocket | Moyenne | Basse |
-| **Google Cloud** | Chirp 3 | $0.016 | 1-2s | — | Oui (100+ lang) | Oui | GCP IAM complexe | Très élevée | Très basse |
-| **Azure Speech** | Standard | $0.017 | ~200ms | — | Oui (100+ lang) | Oui | SDK Azure | Très élevée | Très basse |
-| **Amazon Transcribe** | Standard | $0.024 | Secondes | — | Oui (100+ lang) | Oui | S3 + IAM | Très élevée | Très basse |
+| Provider | Modèle | Prix/min | Latence | WER | FR | Streaming | Crate | Statut |
+|----------|--------|----------|---------|-----|-----|-----------|-------|--------|
+| **Deepgram** | Nova-3 | $0.0043 | <300ms | 5.26% | Oui (codeswitching) | Oui | `jona-provider-deepgram` | ✅ |
+| **Rev.ai** | Reverb Foreign | $0.005 | <1s | — | Oui | Oui | `jona-provider-revai` | ✅ |
+| **AssemblyAI** | Universal-2 | $0.0025 | Secondes/stream | ~14.5% | Oui | Oui (6 langues) | `jona-provider-assemblyai` | ✅ |
+| **ElevenLabs** | Scribe v2 | $0.01 | <150ms stream | ~93.5% FLEURS | Oui | Oui | `jona-provider-elevenlabs` | ✅ |
+| **Gladia** | Whisper-Zero | $0.010 | Temps réel | — | Oui | Oui | — | Non implémenté |
+| **Speechmatics** | Flow API | Sur devis | ~150ms | — | Oui (55+ lang) | Oui | — | Non implémenté |
+| **Google Cloud** | Chirp 3 | $0.016 | 1-2s | — | Oui (100+ lang) | Oui | — | Non implémenté |
+| **Azure Speech** | Standard | $0.017 | ~200ms | — | Oui (100+ lang) | Oui | — | Non implémenté |
+| **Amazon Transcribe** | Standard | $0.024 | Secondes | — | Oui (100+ lang) | Oui | — | Non implémenté |
 
-### Détails des APIs prioritaires
+### Détails des APIs intégrées
 
 #### Deepgram
 
