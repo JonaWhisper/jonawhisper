@@ -63,6 +63,8 @@
   "provider.capabilities": "Capabilities",
   "provider.capabilities.asr": "Transcription (ASR)",
   "provider.capabilities.llm": "Text cleanup (LLM)",
+  "provider.field.api_key": "API Key",
+  "provider.field.base_url": "URL",
   "provider.field.region": "Region",
   "provider.field.access_key": "Access Key",
   "provider.field.secret_key": "Secret Key",

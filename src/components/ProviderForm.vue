@@ -331,14 +331,14 @@ function save() {
     <div v-if="hasCapabilities" class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.capabilities') }}</Label>
       <div class="flex items-center gap-6">
-        <label v-if="visibleExtraFields.some(f => f.id === 'supports_asr')" class="flex items-center gap-2 text-sm whitespace-nowrap">
+        <label v-if="visibleExtraFields.some(f => f.id === 'supports_asr')" class="flex items-center gap-2 text-sm cursor-pointer">
           <Switch
             :checked="extraValues['supports_asr'] === 'true'"
             @update:checked="(v: boolean) => extraValues['supports_asr'] = String(v)"
           />
           {{ t('provider.capabilities.asr') }}
         </label>
-        <label v-if="visibleExtraFields.some(f => f.id === 'supports_llm')" class="flex items-center gap-2 text-sm whitespace-nowrap">
+        <label v-if="visibleExtraFields.some(f => f.id === 'supports_llm')" class="flex items-center gap-2 text-sm cursor-pointer">
           <Switch
             :checked="extraValues['supports_llm'] === 'true'"
             @update:checked="(v: boolean) => extraValues['supports_llm'] = String(v)"
@@ -349,11 +349,13 @@ function save() {
     </div>
 
     <!-- Allow insecure -->
-    <div v-if="hasInsecureToggle" class="flex items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-900/50 dark:bg-amber-950/30">
-      <ShieldAlert class="w-5 h-5 text-amber-500 shrink-0" />
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium">{{ t('provider.allowInsecure') }}</p>
-        <p class="text-xs text-muted-foreground">{{ t('provider.allowInsecureDesc') }}</p>
+    <div v-if="hasInsecureToggle" class="flex items-center justify-between gap-3 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+      <div class="flex items-start gap-2 min-w-0">
+        <ShieldAlert class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+        <div class="min-w-0">
+          <div class="text-xs font-medium">{{ t('provider.allowInsecure') }}</div>
+          <div class="text-[11px] text-muted-foreground">{{ t('provider.allowInsecureDesc') }}</div>
+        </div>
       </div>
       <Switch
         :checked="extraValues['allow_insecure'] === 'true'"
