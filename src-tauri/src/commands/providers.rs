@@ -18,6 +18,7 @@ pub fn add_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppState
             if field.sensitive {
                 if let Some(value) = provider.extra.get(field.id) {
                     if value == CLEAR_SENTINEL {
+                        // New provider — nothing in keychain yet, just remove from extra map
                         provider.extra.remove(field.id);
                     } else if !value.is_empty() {
                         keyring_store_extra(&provider.id, field.id, value);
@@ -62,9 +63,9 @@ pub fn update_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppSt
             // New key provided — update keychain
             crate::state::keyring_store(&provider.id, &provider.api_key);
         }
-        // Handle sensitive extra fields:
+        // Handle sensitive extra fields (same pattern as api_key above):
         // - CLEAR_SENTINEL → delete from keychain and remove from extra
-        // - empty or masked (••••) → keep existing value
+        // - empty or masked (••••) → keep existing value (intentional: both mean "no change")
         // - anything else → store new value in keychain
         if let Some(preset) = jona_provider::preset(&provider.kind) {
             for field in preset.extra_fields {

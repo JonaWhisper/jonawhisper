@@ -64,9 +64,12 @@ function initExtraValues(kindId: string) {
   }
 }
 
-// When editing, populate from provider.extra
+// When editing, start with preset defaults then overlay existing values.
+// This ensures new fields added to a preset after the provider was created
+// still get their default value.
 if (props.provider) {
-  extraValues.value = { ...props.provider.extra }
+  initExtraValues(kind.value)
+  Object.assign(extraValues.value, props.provider.extra)
 } else {
   initExtraValues(kind.value)
 }
@@ -332,6 +335,8 @@ function save() {
     </div>
 
     <!-- Dynamic preset fields -->
+    <!-- NOTE: Sensitive extra fields behave like api_key: empty input = keep existing
+         value in backend. There is no explicit "clear" UI yet (same limitation as api_key). -->
     <div v-for="field in visibleExtraFields" :key="field.id" class="space-y-2">
       <Label class="text-xs text-muted-foreground">
         {{ fieldLabel(field.id, field.label) }}
