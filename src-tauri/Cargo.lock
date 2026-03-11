@@ -2896,6 +2896,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-provider-azure-speech"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jona-provider-cohere"
 version = "0.1.0"
 dependencies = [
@@ -2960,6 +2972,19 @@ dependencies = [
 name = "jona-provider-gladia"
 version = "0.1.0"
 dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-google-speech"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
  "inventory",
  "jona-types",
  "log",
@@ -3047,12 +3072,14 @@ dependencies = [
  "jona-provider",
  "jona-provider-anthropic",
  "jona-provider-assemblyai",
+ "jona-provider-azure-speech",
  "jona-provider-cohere",
  "jona-provider-copilot",
  "jona-provider-deepgram",
  "jona-provider-elevenlabs",
  "jona-provider-gemini-asr",
  "jona-provider-gladia",
+ "jona-provider-google-speech",
  "jona-provider-openai",
  "jona-provider-revai",
  "jona-provider-speechmatics",
