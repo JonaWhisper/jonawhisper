@@ -69,6 +69,7 @@
   "provider.field.api_version": "API Version",
   "provider.field.deployment_name": "Deployment Name",
   "provider.field.resource_name": "Resource Name",
+  "provider.field.s3_bucket": "S3 Bucket",
   "validation.required": "Required",
   "validation.httpsRequired": "HTTPS is required for this provider",
   "pill.recording": "Recording\u2026",
