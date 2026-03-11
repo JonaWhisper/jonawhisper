@@ -133,47 +133,70 @@ pub fn spawn_spectrum_emitter(
     stream_error: Arc<AtomicBool>,
     samples_received: Arc<AtomicBool>,
 ) {
-    std::thread::spawn(move || loop {
-        std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
+    // Number of flat spectrum frames to skip after samples start arriving.
+    // FFT needs 1024 samples (~64ms at 16kHz), spectrum emitter runs at ~33ms intervals,
+    // so ~4-6 frames will be flat before the first real spectrum is computed.
+    const FLAT_GRACE_FRAMES: u32 = 8;
 
-        // Fast lock-free check — avoids mutex contention when idle
-        if !state.audio_flags.is_active() {
-            continue;
-        }
+    std::thread::spawn(move || {
+        let mut flat_frames_since_active = 0u32;
+        let mut was_active = false;
 
-        let is_mic_testing = state.audio_flags.is_mic_testing();
+        loop {
+            std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
 
-        // Detect audio stream error (e.g. device disconnected)
-        if stream_error.load(Ordering::Relaxed) {
-            log::warn!("Audio stream error detected (device disconnected?), forcing stop");
-            state.runtime.lock().unwrap().is_recording = false;
-            state.audio_flags.set_recording(false);
-            stream_error.store(false, Ordering::Relaxed);
+            // Fast lock-free check — avoids mutex contention when idle
+            if !state.audio_flags.is_active() {
+                was_active = false;
+                flat_frames_since_active = 0;
+                continue;
+            }
 
-            // Actually stop the cpal stream — without this the mic stays active
-            let _ = cmd_tx.send(AudioCmd::StopRecording);
+            // Reset grace counter on new recording session
+            if !was_active {
+                was_active = true;
+                flat_frames_since_active = 0;
+            }
 
-            platform::play_sound("Basso");
-            let _ = app.emit(events::RECORDING_STOPPED, ());
-            show_error_then_close(&app);
-            continue;
-        }
+            let is_mic_testing = state.audio_flags.is_mic_testing();
 
-        let spectrum = spectrum_data.lock().unwrap().clone();
-        let is_flat = spectrum.iter().all(|&v| v < 0.001);
-        // Only warn about flat spectrum after audio samples have been received —
-        // the first ~100-150ms are always flat while the FFT buffer fills up.
-        if is_flat && !is_mic_testing && state.audio_flags.is_recording()
-            && samples_received.load(Ordering::Relaxed)
-        {
-            log::warn!("Spectrum flat while recording (queue depth: {})", cmd_tx.len());
-        }
-        let _ = cmd_tx.send(AudioCmd::GetSpectrum);
-        if is_mic_testing {
-            let _ = app.emit(events::MIC_TEST_SPECTRUM, &spectrum);
-        } else {
-            // Feed spectrum directly to native pill (no Tauri event needed)
-            crate::ui::pill::set_spectrum(&spectrum);
+            // Detect audio stream error (e.g. device disconnected)
+            if stream_error.load(Ordering::Relaxed) {
+                log::warn!("Audio stream error detected (device disconnected?), forcing stop");
+                state.runtime.lock().unwrap().is_recording = false;
+                state.audio_flags.set_recording(false);
+                stream_error.store(false, Ordering::Relaxed);
+
+                // Actually stop the cpal stream — without this the mic stays active
+                let _ = cmd_tx.send(AudioCmd::StopRecording);
+
+                platform::play_sound("Basso");
+                let _ = app.emit(events::RECORDING_STOPPED, ());
+                show_error_then_close(&app);
+                continue;
+            }
+
+            let spectrum = spectrum_data.lock().unwrap().clone();
+            let is_flat = spectrum.iter().all(|&v| v < 0.001);
+            // Only warn about flat spectrum after samples have been received AND the
+            // FFT buffer has had enough time to fill (grace period for cpal startup + FFT).
+            if is_flat && !is_mic_testing && state.audio_flags.is_recording()
+                && samples_received.load(Ordering::Relaxed)
+            {
+                flat_frames_since_active += 1;
+                if flat_frames_since_active > FLAT_GRACE_FRAMES {
+                    log::warn!("Spectrum flat while recording (queue depth: {})", cmd_tx.len());
+                }
+            } else if !is_flat {
+                flat_frames_since_active = 0;
+            }
+            let _ = cmd_tx.send(AudioCmd::GetSpectrum);
+            if is_mic_testing {
+                let _ = app.emit(events::MIC_TEST_SPECTRUM, &spectrum);
+            } else {
+                // Feed spectrum directly to native pill (no Tauri event needed)
+                crate::ui::pill::set_spectrum(&spectrum);
+            }
         }
     });
 }
