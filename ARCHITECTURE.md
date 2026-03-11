@@ -198,8 +198,9 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 | `ProcessingSection.vue` | Post-processing: VAD, hallucination filter, text cleanup (BERT/PCS/T5/LLM unified selector), LLM token cap |
 | `ShortcutsSection.vue` | Hotkey, recording mode (push-to-talk / toggle), cancel shortcut |
 | `MicrophoneSection.vue` | Input device selector with transport type icons, mic test with spectrum + level badge, audio ducking |
-| `ProvidersSection.vue` | Cloud provider management (9 presets + custom) |
-| `PermissionsSection.vue` | macOS permission status (microphone, accessibility, input monitoring) with grant buttons |
+| `ProvidersSection.vue` | Cloud provider management (13 presets + custom) |
+| `DictionarySection.vue` | User dictionary for protected words and replacement mappings |
+| `PermissionsSection.vue` | Permission status (microphone, accessibility, input monitoring) with grant buttons |
 | `GeneralSection.vue` | Appearance (theme), interface language, About card (version, GPL-3.0 license) |
 
 ### Key components

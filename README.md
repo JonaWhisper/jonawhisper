@@ -1,17 +1,17 @@
 # JonaWhisper
 
-Local-first voice-to-text dictation for macOS. Runs in the menu bar, records audio via a global hotkey, transcribes with your choice of speech recognition engine, and pastes the result into the active application.
+Local-first voice-to-text dictation app. Runs in the system tray, records audio via a global hotkey, transcribes with your choice of speech recognition engine, and pastes the result into the active application.
 
-All processing happens on your machine — no data leaves your Mac unless you choose a cloud provider. Cloud API keys are stored in the macOS Keychain, never in plaintext files.
+All processing happens on your machine — no data leaves your computer unless you choose a cloud provider. API keys are stored securely in the OS keychain, never in plaintext files.
 
-![CI](https://github.com/jplot/jona-whisper/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/JonaWhisper/jonawhisper/actions/workflows/ci.yml/badge.svg)
 
 ## Features
 
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Global hotkey** — push-to-talk or toggle mode, any key combination (modifier, combo, or standalone key)
 - **6 ASR engines** — Whisper, Canary, Parakeet-TDT, Qwen3-ASR, Voxtral (all local, GPU-accelerated), plus any OpenAI-compatible cloud API
-- **9 cloud presets** — OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, Anthropic
+- **13 cloud presets** — OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, OpenRouter, xAI, SambaNova, Nebius, Anthropic
 - **Text cleanup pipeline** — VAD silence trimming, hallucination filter, dictation commands, punctuation (BERT/PCS), grammar correction (T5), or full LLM cleanup (local/cloud)
 - **Floating pill** — real-time spectrum visualization, recording/transcribing states, cancel support
 - **Model manager** — parallel downloads with progress, pause/resume, benchmarks
@@ -195,7 +195,7 @@ JonaWhisper follows a **thin orchestrator** design. The main Tauri crate (`src-t
 ```
 src/                       Vue frontend
   views/                   Pages (Panel, SetupWizard)
-  sections/                Settings sections (9 sections)
+  sections/                Settings sections (10 sections)
   components/              UI components
   stores/                  Pinia stores (app, history, settings, engines, downloads)
   utils/                   Shared utilities (shortcut, formatting)
