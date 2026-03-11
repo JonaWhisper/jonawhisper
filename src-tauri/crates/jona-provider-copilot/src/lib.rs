@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::LazyLock;
+use tokio::sync::Mutex;
+use std::time::Instant;
 
 static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
@@ -15,12 +17,20 @@ static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .unwrap_or_else(|_| reqwest::Client::new())
 });
 
+/// Cached Copilot JWT: (full_api_key, jwt, fetched_at). GitHub Copilot JWTs
+/// typically last 30 min; we use a 25 min TTL to refresh before expiry.
+/// Keyed by the full OAuth token string so switching accounts invalidates the cache.
+static JWT_CACHE: LazyLock<Mutex<Option<(String, String, Instant)>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+const JWT_TTL_SECS: u64 = 25 * 60; // 25 minutes
+
 /// GitHub Copilot backend — exchanges a GitHub OAuth token for a short-lived
 /// Copilot JWT, then uses it with the OpenAI-compatible chat endpoint.
 pub struct CopilotBackend;
 
-/// Exchange a GitHub OAuth token (`gho_...`) for a Copilot JWT.
-async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
+/// Exchange a GitHub OAuth token (`gho_...`) for a Copilot JWT (network call).
+async fn fetch_token(github_token: &str) -> Result<String, ProviderError> {
     let response = ASYNC_CLIENT
         .get("https://api.github.com/copilot_internal/v2/token")
         .header("Authorization", format!("token {}", github_token))
@@ -44,6 +54,28 @@ async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| ProviderError::InvalidResponse("No token in response".into()))
+}
+
+/// Get a cached JWT or exchange for a fresh one if expired/missing.
+/// Holds the mutex lock across the full check-fetch-update cycle to prevent
+/// concurrent cold/expired cache misses from triggering duplicate HTTP requests.
+async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
+    // Hold lock across the entire check-fetch-update cycle to prevent races.
+    // tokio::sync::Mutex is Send-safe across .await points.
+    let mut cache = JWT_CACHE.lock().await;
+
+    if let Some((ref token_key, ref jwt, fetched_at)) = *cache {
+        if token_key == github_token && fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
+            return Ok(jwt.clone());
+        }
+    }
+
+    // Still holding lock — other callers wait during the HTTP call (~200ms).
+    // Acceptable for a desktop app where Copilot LLM calls are sequential in practice.
+    let jwt = fetch_token(github_token).await?;
+    *cache = Some((github_token.to_string(), jwt.clone(), Instant::now()));
+
+    Ok(jwt)
 }
 
 impl CloudProvider for CopilotBackend {
@@ -70,7 +102,14 @@ impl CloudProvider for CopilotBackend {
         max_tokens: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
-            let jwt = exchange_token(&provider.api_key).await?;
+            let api_key = provider.api_key.trim();
+            if api_key.is_empty() {
+                return Err(ProviderError::NotConfigured(
+                    "GitHub Copilot requires an OAuth token (gho_...)".into(),
+                ));
+            }
+
+            let jwt = exchange_token(api_key).await?;
 
             let request = ChatRequest {
                 model: model.to_string(),

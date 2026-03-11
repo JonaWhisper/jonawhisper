@@ -34,6 +34,8 @@ impl CloudProvider for OpenAICompatibleBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
+        let api_key = provider.api_key.trim();
+
         let file_bytes = std::fs::read(audio_path)?;
         let file_name = audio_path
             .file_name()
@@ -57,8 +59,8 @@ impl CloudProvider for OpenAICompatibleBackend {
         let url = format!("{}/audio/transcriptions", provider.base_url());
 
         let mut req = BLOCKING_CLIENT.post(&url).multipart(form);
-        if !provider.api_key.is_empty() {
-            req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+        if !api_key.is_empty() {
+            req = req.header("Authorization", format!("Bearer {api_key}"));
         }
 
         let response = req.send().map_err(|e| ProviderError::Http(e.to_string()))?;
@@ -72,12 +74,17 @@ impl CloudProvider for OpenAICompatibleBackend {
         let body = response
             .text()
             .map_err(|e| ProviderError::Http(e.to_string()))?;
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
-            if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
-                return Ok(TranscriptionResult::text_only(text.to_string()));
-            }
-        }
-        Ok(TranscriptionResult::text_only(body))
+        let json: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|e| ProviderError::InvalidResponse(format!(
+                "ASR response is not valid JSON: {e}"
+            )))?;
+        let text = json
+            .get("text")
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| ProviderError::InvalidResponse(
+                "ASR response JSON missing 'text' field".into(),
+            ))?;
+        Ok(TranscriptionResult::text_only(text.to_string()))
     }
 
     fn chat_completion<'a>(
@@ -108,9 +115,10 @@ impl CloudProvider for OpenAICompatibleBackend {
                 max_tokens,
             };
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT.post(&url).json(&request);
-            if !provider.api_key.is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+            if !api_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {api_key}"));
             }
 
             let response = send_and_check(req).await?;
@@ -136,9 +144,10 @@ impl CloudProvider for OpenAICompatibleBackend {
         Box::pin(async move {
             let url = format!("{}/models", provider.base_url());
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT.get(&url);
-            if !provider.api_key.is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+            if !api_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {api_key}"));
             }
 
             let response = send_and_check(req).await?;
@@ -272,7 +281,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
     default_asr_models: &[],
-    default_llm_models: &[],
+    default_llm_models: &["openai/gpt-4o", "anthropic/claude-sonnet-4", "google/gemini-2.0-flash-001"],
 }}
 inventory::submit! { ProviderPreset {
     id: "xai", display_name: "xAI",

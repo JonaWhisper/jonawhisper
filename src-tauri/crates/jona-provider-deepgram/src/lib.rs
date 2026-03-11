@@ -37,12 +37,13 @@ impl CloudProvider for DeepgramBackend {
             url.push_str(&format!("&language={}", language));
         }
 
+        let api_key = provider.api_key.trim();
         let mut req = BLOCKING_CLIENT
             .post(&url)
             .header("Content-Type", "audio/wav")
             .body(file_bytes);
-        if !provider.api_key.is_empty() {
-            req = req.header("Authorization", format!("Token {}", provider.api_key));
+        if !api_key.is_empty() {
+            req = req.header("Authorization", format!("Token {api_key}"));
         }
 
         let response = req.send().map_err(|e| ProviderError::Http(e.to_string()))?;
