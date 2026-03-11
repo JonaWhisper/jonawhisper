@@ -44,12 +44,17 @@ fn required_extra<'a>(provider: &'a Provider, key: &str) -> Result<&'a str, Prov
 /// Used for resource_name, deployment_name, and api_version to prevent path/query injection.
 fn validate_url_segment(value: &str, field_name: &str) -> Result<(), ProviderError> {
     if value.is_empty()
+        || value == "."
+        || value == ".."
+        || value.starts_with('.')
+        || value.ends_with('.')
         || !value
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
     {
         return Err(ProviderError::NotConfigured(format!(
-            "Invalid {field_name}: must contain only alphanumeric characters, hyphens and dots"
+            "Invalid {field_name}: must contain only alphanumeric characters, hyphens and dots, \
+             and must not start/end with a dot"
         )));
     }
     Ok(())
@@ -378,6 +383,10 @@ mod tests {
         assert!(validate_url_segment("ver?a=1", "test").is_err());
         assert!(validate_url_segment("dep&inject", "test").is_err());
         assert!(validate_url_segment("../escape", "test").is_err());
+        assert!(validate_url_segment(".", "test").is_err());
+        assert!(validate_url_segment("..", "test").is_err());
+        assert!(validate_url_segment(".hidden", "test").is_err());
+        assert!(validate_url_segment("trailing.", "test").is_err());
     }
 
     #[test]
