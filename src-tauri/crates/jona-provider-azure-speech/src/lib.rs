@@ -44,7 +44,8 @@ impl CloudProvider for AzureSpeechBackend {
         audio_path: &Path,
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
-        if provider.api_key.trim().is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(
                 "API key is not configured".into(),
             ));
@@ -99,14 +100,17 @@ impl CloudProvider for AzureSpeechBackend {
 
         let response = BLOCKING_CLIENT
             .post(&url)
-            .header("Ocp-Apim-Subscription-Key", &provider.api_key)
+            .header("Ocp-Apim-Subscription-Key", api_key)
             .multipart(form)
             .send()
             .map_err(|e| ProviderError::Http(e.to_string()))?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
+            let body = response.text().unwrap_or_else(|e| {
+                log::warn!("Failed to decode Azure Speech error body: {e}");
+                String::new()
+            });
             return Err(ProviderError::Api { status, body });
         }
 
@@ -157,6 +161,7 @@ impl CloudProvider for AzureSpeechBackend {
 /// values that already look like a locale (contain a hyphen).
 fn azure_locale(lang: &str) -> String {
     if lang == "auto" {
+        log::info!("Azure Speech: language \"auto\" not supported, falling back to en-US");
         return "en-US".to_string();
     }
     if lang.contains('-') || lang.contains('_') {

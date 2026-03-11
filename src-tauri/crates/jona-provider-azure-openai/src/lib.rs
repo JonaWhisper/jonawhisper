@@ -130,15 +130,18 @@ impl CloudProvider for AzureOpenAIBackend {
             .send()
             .map_err(|e| ProviderError::Http(e.to_string()))?;
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
-            return Err(ProviderError::Api { status, body });
-        }
+        let status = response.status();
 
         let body = response
             .text()
             .map_err(|e| ProviderError::Http(e.to_string()))?;
+
+        if !status.is_success() {
+            return Err(ProviderError::Api {
+                status: status.as_u16(),
+                body,
+            });
+        }
         let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
             ProviderError::InvalidResponse(format!("ASR response is not valid JSON: {e}"))
         })?;
@@ -208,7 +211,10 @@ impl CloudProvider for AzureOpenAIBackend {
 
             if !response.status().is_success() {
                 let status = response.status().as_u16();
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.unwrap_or_else(|e| {
+                    log::warn!("Failed to decode error response body: {e}");
+                    String::new()
+                });
                 return Err(ProviderError::Api { status, body });
             }
 

@@ -80,7 +80,10 @@ impl CloudProvider for CohereBackend {
 
             if !response.status().is_success() {
                 let status = response.status().as_u16();
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.unwrap_or_else(|e| {
+                    log::warn!("Failed to decode Cohere error body: {e}");
+                    String::new()
+                });
                 return Err(ProviderError::Api { status, body });
             }
 

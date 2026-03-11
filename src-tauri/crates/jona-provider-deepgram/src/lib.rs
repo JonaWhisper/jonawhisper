@@ -50,7 +50,10 @@ impl CloudProvider for DeepgramBackend {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
+            let body = response.text().unwrap_or_else(|e| {
+                log::warn!("Deepgram: failed to decode error body: {e}");
+                String::new()
+            });
             return Err(ProviderError::Api { status, body });
         }
 
@@ -62,7 +65,11 @@ impl CloudProvider for DeepgramBackend {
         let text = json
             .pointer("/results/channels/0/alternatives/0/transcript")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .ok_or_else(|| {
+                ProviderError::InvalidResponse(
+                    "Missing transcript in Deepgram response".into(),
+                )
+            })?
             .to_string();
 
         Ok(TranscriptionResult::text_only(text))

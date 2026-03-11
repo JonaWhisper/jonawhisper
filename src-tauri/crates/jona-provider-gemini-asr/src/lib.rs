@@ -100,11 +100,20 @@ impl CloudProvider for GeminiAsrBackend {
             .header("x-goog-api-key", api_key)
             .json(&request)
             .send()
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+            .map_err(|e| {
+                // Defense-in-depth: redact API key in case it leaks into error messages
+                let msg = e.to_string().replace(api_key, "[REDACTED]");
+                ProviderError::Http(msg)
+            })?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
+            let body = response.text().unwrap_or_else(|e| {
+                log::warn!("Failed to read Gemini error response body: {e}");
+                String::new()
+            });
+            // Redact API key from error body in case the server echoes it back
+            let body = body.replace(api_key, "[REDACTED]");
             return Err(ProviderError::Api { status, body });
         }
 
@@ -116,11 +125,16 @@ impl CloudProvider for GeminiAsrBackend {
         let text = json
             .pointer("/candidates/0/content/parts/0/text")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim()
-            .to_string();
+            .map(|s| s.trim())
+            .unwrap_or("");
 
-        Ok(TranscriptionResult::text_only(text))
+        if text.is_empty() {
+            return Err(ProviderError::InvalidResponse(
+                "Missing transcript in Gemini response".into(),
+            ));
+        }
+
+        Ok(TranscriptionResult::text_only(text.to_string()))
     }
 
     fn chat_completion<'a>(

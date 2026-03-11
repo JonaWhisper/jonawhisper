@@ -56,7 +56,9 @@ impl CloudProvider for GoogleSpeechBackend {
 
         let file_bytes = std::fs::read(audio_path)?;
 
-        // Read sample rate from WAV header (bytes 24-27, little-endian u32)
+        // Read sample rate from WAV header (bytes 24-27, little-endian u32).
+        // Assumes standard 44-byte RIFF/WAV header — valid for our pipeline
+        // which always produces PCM WAV via hound (see audio.rs).
         let sample_rate = if file_bytes.len() >= 28 {
             u32::from_le_bytes([
                 file_bytes[24],
@@ -87,17 +89,15 @@ impl CloudProvider for GoogleSpeechBackend {
             audio: RecognitionAudio { content: audio_b64 },
         };
 
-        let url = reqwest::Url::parse_with_params(
-            "https://speech.googleapis.com/v1/speech:recognize",
-            &[("key", &provider.api_key)],
-        )
-        .map_err(|e| ProviderError::Http(e.to_string()))?;
+        let url = "https://speech.googleapis.com/v1/speech:recognize";
 
         let response = BLOCKING_CLIENT
             .post(url)
+            .header("X-Goog-Api-Key", &provider.api_key)
             .json(&request)
             .send()
             .map_err(|e| {
+                // Defense-in-depth: redact API key in case it leaks into error messages
                 let msg = e.to_string().replace(&provider.api_key, "[REDACTED]");
                 ProviderError::Http(msg)
             })?;
