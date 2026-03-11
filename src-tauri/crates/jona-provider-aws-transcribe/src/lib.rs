@@ -291,21 +291,18 @@ async fn streaming_transcribe(
             ))
         })?;
 
-    // Use Bytes to share the buffer — slicing is O(1) with no copy
+    // Lazy stream — chunks produced on-demand, no intermediate Vec allocation
     let buf = bytes::Bytes::from(pcm_data);
-    let events: Vec<_> = (0..buf.len())
-        .step_by(8192)
-        .map(|start| {
-            let end = (start + 8192).min(buf.len());
-            let chunk = buf.slice(start..end);
-            Ok(AudioStream::AudioEvent(
-                AudioEvent::builder()
-                    .audio_chunk(Blob::new(chunk))
-                    .build(),
-            ))
-        })
-        .collect();
-    let audio_stream = futures_util::stream::iter(events);
+    let len = buf.len();
+    let audio_stream = futures_util::stream::iter((0..len).step_by(8192).map(move |start| {
+        let end = (start + 8192).min(len);
+        let chunk = buf.slice(start..end);
+        Ok(AudioStream::AudioEvent(
+            AudioEvent::builder()
+                .audio_chunk(Blob::new(chunk))
+                .build(),
+        ))
+    }));
 
     let sender = EventStreamSender::from(audio_stream);
 
@@ -472,10 +469,14 @@ async fn batch_transcribe(
         return Err(ProviderError::Http(format!("StartTranscriptionJob failed: {e}")));
     }
 
-    // 3. Poll until complete (max ~120s)
+    // 3. Poll until complete (max ~5 min with exponential backoff)
     let mut transcript_uri = String::new();
-    for _ in 0..60 {
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    let mut poll_interval = std::time::Duration::from_secs(2);
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
+    while tokio::time::Instant::now() < deadline {
+        tokio::time::sleep(poll_interval).await;
+        // Increase interval: 2s → 3s → 4s … capped at 10s
+        poll_interval = (poll_interval + std::time::Duration::from_secs(1)).min(std::time::Duration::from_secs(10));
 
         let resp = match transcribe_client
             .get_transcription_job()
@@ -545,11 +546,22 @@ async fn batch_transcribe(
         }
 
         match resp.json::<serde_json::Value>().await {
-            Ok(json) => json
-                .pointer("/results/transcripts/0/transcript")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string(),
+            Ok(json) => {
+                let transcript = json
+                    .pointer("/results/transcripts/0/transcript")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty());
+                match transcript {
+                    Some(t) => t.to_string(),
+                    None => {
+                        cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+                        return Err(ProviderError::InvalidResponse(
+                            "Missing or empty transcript in AWS Transcribe response".into(),
+                        ));
+                    }
+                }
+            }
             Err(e) => {
                 cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
                 return Err(ProviderError::InvalidResponse(e.to_string()));
