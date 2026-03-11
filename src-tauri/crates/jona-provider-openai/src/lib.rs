@@ -216,6 +216,30 @@ inventory::submit! { ProviderRegistration {
 }}
 
 // Provider presets
+
+// Custom (OpenAI-compatible) — user provides their own URL
+inventory::submit! { ProviderPreset {
+    id: "custom", display_name: "Custom (OpenAI-compatible)",
+    base_url: "", backend_id: "openai",
+    supports_asr: true, supports_llm: true,
+    gradient: "linear-gradient(135deg, #6b7280, #4b5563)",
+    default_asr_models: &[],
+    default_llm_models: &[],
+    extra_fields: &[
+        PresetField {
+            id: "base_url", label: "URL", field_type: FieldType::Text,
+            required: true, placeholder: "https://api.example.com/v1", default_value: "",
+            options: &[], sensitive: false,
+        },
+        PresetField {
+            id: "api_key", label: "API Key", field_type: FieldType::Password,
+            required: false, placeholder: "sk-...", default_value: "",
+            options: &[], sensitive: true,
+        },
+    ],
+    hidden_fields: &[],
+}}
+
 inventory::submit! { ProviderPreset {
     id: "openai", display_name: "OpenAI",
     base_url: "https://api.openai.com/v1", backend_id: "openai",

@@ -59,8 +59,7 @@ function initExtraValues(kindId: string) {
     }
     extraValues.value = vals
   } else {
-    // Custom provider — api_key managed via extraValues too
-    extraValues.value = { api_key: '' }
+    extraValues.value = {}
   }
 }
 
@@ -70,6 +69,10 @@ function initExtraValues(kindId: string) {
 if (props.provider) {
   initExtraValues(kind.value)
   Object.assign(extraValues.value, props.provider.extra)
+  // Map top-level url to base_url extra field for editing
+  if (props.provider.url && !extraValues.value['base_url']) {
+    extraValues.value['base_url'] = props.provider.url
+  }
 } else {
   initExtraValues(kind.value)
 }
@@ -91,13 +94,11 @@ const visibleExtraFields = computed(() => {
 })
 
 const showUrl = computed(() => {
-  if (kind.value === 'custom') return true
-  // Presets have hardcoded URLs — only show if no preset found (fallback)
+  // URL shown only if no preset found (shouldn't happen now that custom is a preset)
   return !currentPreset.value
 })
 
 const canTest = computed(() => {
-  // For presets: check all required extra fields
   for (const field of visibleExtraFields.value) {
     if (!field.required) continue
     const val = extraValues.value[field.id]?.trim()
@@ -105,10 +106,6 @@ const canTest = computed(() => {
       if (field.sensitive && isEditing.value) continue
       return false
     }
-  }
-  // For custom: check api_key
-  if (kind.value === 'custom') {
-    return (extraValues.value['api_key']?.trim().length ?? 0) > 0 || isEditing.value
   }
   return true
 })
@@ -125,7 +122,9 @@ const allOptions = computed(() => [
 ])
 
 const presetOptions = computed(() =>
-  engines.providerPresets.map(p => ({ value: p.id, label: p.display_name })),
+  engines.providerPresets
+    .filter(p => p.id !== 'custom')
+    .map(p => ({ value: p.id, label: p.display_name })),
 )
 
 const filteredCustom = computed(() => {
@@ -224,14 +223,14 @@ async function testConnection() {
     id: props.provider?.id ?? 'temp',
     name: name.value.trim(),
     kind: kind.value,
-    url: url.value.trim(),
+    url: extraValues.value['base_url']?.trim() || url.value.trim(),
     api_key: extraValues.value['api_key']?.trim() ?? '',
     allow_insecure: allowInsecure.value,
     cached_models: [],
     supports_asr: supportsAsr.value,
     supports_llm: supportsLlm.value,
     extra: Object.fromEntries(
-      Object.entries(extraValues.value).filter(([k]) => k !== 'api_key'),
+      Object.entries(extraValues.value).filter(([k]) => k !== 'api_key' && k !== 'base_url'),
     ),
   }
 
@@ -257,14 +256,14 @@ function save() {
     id: props.provider?.id ?? `provider-${kind.value}-${Date.now()}`,
     name: name.value.trim(),
     kind: kind.value,
-    url: url.value.trim(),
+    url: extraValues.value['base_url']?.trim() || url.value.trim(),
     api_key: extraValues.value['api_key']?.trim() ?? '',
     allow_insecure: allowInsecure.value,
     cached_models: fetchedModels.value,
     supports_asr: isCustom ? supportsAsr.value : true,
     supports_llm: isCustom ? supportsLlm.value : true,
     extra: Object.fromEntries(
-      Object.entries(extraValues.value).filter(([k]) => k !== 'api_key'),
+      Object.entries(extraValues.value).filter(([k]) => k !== 'api_key' && k !== 'base_url'),
     ),
   }
 
@@ -325,18 +324,6 @@ function save() {
       <Label class="text-xs text-muted-foreground">{{ t('provider.url') }}</Label>
       <Input v-model="url" class="h-9 text-sm" />
       <p v-if="errors.url" class="text-xs text-destructive">{{ errors.url }}</p>
-    </div>
-
-    <!-- API key for custom providers (no preset = no extra_fields) -->
-    <div v-if="kind === 'custom'" class="space-y-2">
-      <Label class="text-xs text-muted-foreground">{{ t('provider.apiKey') }}</Label>
-      <Input
-        :model-value="extraValues['api_key'] ?? ''"
-        @update:model-value="v => extraValues['api_key'] = String(v)"
-        type="password"
-        :placeholder="isEditing ? t('provider.apiKeyKeep') : 'sk-...'"
-        class="h-9 text-sm"
-      />
     </div>
 
     <!-- Test result -->
