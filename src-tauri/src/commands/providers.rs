@@ -176,6 +176,24 @@ pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, A
             .unwrap_or_default();
     }
 
+    // Hydrate sensitive extra fields: masked/empty values → use stored values
+    if let Some(preset) = jona_provider::preset(&resolved.kind) {
+        let stored_extras = state.settings.lock().unwrap().providers.iter()
+            .find(|p| p.id == provider.id)
+            .map(|p| p.extra.clone())
+            .unwrap_or_default();
+        for field in preset.extra_fields {
+            if field.sensitive {
+                let val = resolved.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
+                if val.is_empty() || val.starts_with('\u{2022}') {
+                    if let Some(stored_val) = stored_extras.get(field.id) {
+                        resolved.extra.insert(field.id.to_string(), stored_val.clone());
+                    }
+                }
+            }
+        }
+    }
+
     jona_provider::backend_for_provider(&resolved)
         .list_models(&resolved)
         .await

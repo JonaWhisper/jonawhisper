@@ -250,10 +250,14 @@ pub fn mask_value(s: &str) -> String {
     if s.is_empty() {
         return String::new();
     }
-    if s.len() > 4 {
-        format!("\u{2022}\u{2022}\u{2022}\u{2022}{}", &s[s.len() - 4..])
+    let bullet_prefix = "\u{2022}\u{2022}\u{2022}\u{2022}";
+    let char_count = s.chars().count();
+    if char_count > 4 {
+        // Take the last 4 Unicode scalar values to avoid slicing on invalid UTF-8 boundaries.
+        let tail: String = s.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
+        format!("{bullet_prefix}{tail}")
     } else {
-        "\u{2022}\u{2022}\u{2022}\u{2022}".to_string()
+        bullet_prefix.to_string()
     }
 }
 

@@ -80,9 +80,12 @@ const currentPreset = computed(() =>
   engines.providerPresets.find(p => p.id === kind.value),
 )
 
-const visibleExtraFields = computed(() =>
-  currentPreset.value?.extra_fields ?? [],
-)
+const visibleExtraFields = computed(() => {
+  const preset = currentPreset.value
+  if (!preset) return []
+  const hidden = new Set(preset.hidden_fields ?? [])
+  return preset.extra_fields.filter(field => !hidden.has(field.id))
+})
 
 const showUrl = computed(() => {
   if (kind.value === 'custom') return true
@@ -160,7 +163,7 @@ watch(kind, (newKind) => {
   supportsLlm.value = true
   // Reset extra values to preset defaults
   initExtraValues(newKind)
-})
+}, { immediate: true })
 
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value === 'string') {
