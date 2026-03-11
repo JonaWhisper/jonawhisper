@@ -77,6 +77,7 @@ impl CloudProvider for GoogleSpeechBackend {
 
         let request = RecognizeRequest {
             config: RecognitionConfig {
+                // Recording pipeline always produces 16-bit PCM WAV (see audio.rs)
                 encoding: "LINEAR16",
                 sample_rate_hertz: sample_rate,
                 language_code,
@@ -95,7 +96,10 @@ impl CloudProvider for GoogleSpeechBackend {
             .post(&url)
             .json(&request)
             .send()
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+            .map_err(|e| {
+                let msg = e.to_string().replace(&provider.api_key, "[REDACTED]");
+                ProviderError::Http(msg)
+            })?;
 
         if !response.status().is_success() {
             let status = response.status().as_u16();

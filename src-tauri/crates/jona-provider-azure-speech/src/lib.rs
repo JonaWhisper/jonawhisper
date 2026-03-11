@@ -56,6 +56,13 @@ impl CloudProvider for AzureSpeechBackend {
             .map(|s| s.as_str())
             .unwrap_or("eastus");
 
+        // Validate region against known list to prevent hostname injection
+        if !AZURE_REGIONS.iter().any(|(id, _)| *id == region) {
+            return Err(ProviderError::NotConfigured(
+                "Invalid or missing Azure region".into(),
+            ));
+        }
+
         let url = format!(
             "https://{}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15",
             region
