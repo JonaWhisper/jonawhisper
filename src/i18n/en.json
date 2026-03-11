@@ -58,7 +58,6 @@
   "provider.test": "Test",
   "provider.testSuccess": "{0} models",
   "provider.apiKeyKeep": "Leave empty to keep current key",
-  "provider.allowInsecure": "Allow insecure connection",
   "provider.allowInsecureDesc": "Allow HTTP (unencrypted) for local APIs.",
   "provider.capabilities": "Capabilities",
   "provider.field.api_key": "API Key",
