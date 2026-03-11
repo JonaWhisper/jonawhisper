@@ -44,6 +44,13 @@ impl CloudProvider for CohereBackend {
         Box::pin(async move {
             provider.validate_url().map_err(ProviderError::Http)?;
 
+            if provider.api_key.trim().is_empty() {
+                return Err(ProviderError::NotConfigured(format!(
+                    "Provider '{}' is missing an API key for Cohere",
+                    provider.name
+                )));
+            }
+
             let request = CohereRequest {
                 model: model.to_string(),
                 messages: vec![
