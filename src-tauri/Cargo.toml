@@ -7,7 +7,8 @@ members = [
     "crates/jona-provider-assemblyai", "crates/jona-provider-elevenlabs",
     "crates/jona-provider-cohere",
     "crates/jona-provider-gladia", "crates/jona-provider-speechmatics",
-    "crates/jona-provider-azure-speech", "crates/jona-provider-google-speech",
+    "crates/jona-provider-azure-speech", "crates/jona-provider-azure-openai",
+    "crates/jona-provider-google-speech",
     "crates/jona-engine-whisper", "crates/jona-engine-qwen", "crates/jona-engine-canary",
     "crates/jona-engine-parakeet", "crates/jona-engine-voxtral", "crates/jona-engine-llama",
     "crates/jona-engine-bert", "crates/jona-engine-pcs", "crates/jona-engine-correction",
@@ -56,6 +57,7 @@ jona-provider-cohere = { path = "crates/jona-provider-cohere" }
 jona-provider-gladia = { path = "crates/jona-provider-gladia" }
 jona-provider-speechmatics = { path = "crates/jona-provider-speechmatics" }
 jona-provider-azure-speech = { path = "crates/jona-provider-azure-speech" }
+jona-provider-azure-openai = { path = "crates/jona-provider-azure-openai" }
 jona-provider-google-speech = { path = "crates/jona-provider-google-speech" }
 jona-engine-whisper = { path = "crates/jona-engine-whisper" }
 jona-engine-qwen = { path = "crates/jona-engine-qwen" }

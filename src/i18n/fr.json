@@ -68,6 +68,7 @@
   "provider.field.secret_key": "Cl\u00e9 secr\u00e8te",
   "provider.field.api_version": "Version de l'API",
   "provider.field.deployment_name": "Nom du d\u00e9ploiement",
+  "provider.field.resource_name": "Nom de la ressource",
   "validation.required": "Requis",
   "validation.httpsRequired": "HTTPS est requis pour ce fournisseur",
   "pill.recording": "Enregistrement\u2026",
