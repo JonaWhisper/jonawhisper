@@ -347,14 +347,14 @@ function save() {
             :checked="extraValues['supports_asr'] === 'true'"
             @update:checked="(v: boolean) => extraValues['supports_asr'] = String(v)"
           />
-          {{ t('provider.capabilities.asr') }}
+          {{ fieldLabel('supports_asr', 'Speech-to-Text (ASR)') }}
         </label>
         <label v-if="visibleExtraFields.some(f => f.id === 'supports_llm')" class="flex items-center gap-2 text-sm cursor-pointer">
           <Switch
             :checked="extraValues['supports_llm'] === 'true'"
             @update:checked="(v: boolean) => extraValues['supports_llm'] = String(v)"
           />
-          {{ t('provider.capabilities.llm') }}
+          {{ fieldLabel('supports_llm', 'Text Generation (LLM)') }}
         </label>
       </div>
     </div>
@@ -364,7 +364,7 @@ function save() {
       <div class="flex items-start gap-2 min-w-0">
         <ShieldAlert class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
         <div class="min-w-0">
-          <div class="text-xs font-medium">{{ t('provider.allowInsecure') }}</div>
+          <div class="text-xs font-medium">{{ fieldLabel('allow_insecure', 'Allow HTTP (insecure)') }}</div>
           <div class="text-[11px] text-muted-foreground">{{ t('provider.allowInsecureDesc') }}</div>
         </div>
       </div>
