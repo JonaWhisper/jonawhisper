@@ -11,7 +11,7 @@ All processing happens on your machine — no data leaves your computer unless y
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Global hotkey** — push-to-talk or toggle mode, any key combination (modifier, combo, or standalone key)
 - **6 ASR engines** — Whisper, Canary, Parakeet-TDT, Qwen3-ASR, Voxtral (all local, GPU-accelerated), plus any OpenAI-compatible cloud API
-- **13 cloud presets** — OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, OpenRouter, xAI, SambaNova, Nebius, Anthropic
+- **20 cloud presets** — OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, OpenRouter, xAI, SambaNova, Nebius, Anthropic, Deepgram, GitHub Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere
 - **Text cleanup pipeline** — VAD silence trimming, hallucination filter, dictation commands, punctuation (BERT/PCS), grammar correction (T5), or full LLM cleanup (local/cloud)
 - **Floating pill** — real-time spectrum visualization, recording/transcribing states, cancel support
 - **Model manager** — parallel downloads with progress, pause/resume, benchmarks
@@ -183,7 +183,7 @@ JonaWhisper follows a **thin orchestrator** design. The main Tauri crate (`src-t
 | `jona-types` | Shared types (`ASREngine` trait, `ASRModel`, `EngineError`, `Preferences`, `Provider`) |
 | `jona-engines` | Infrastructure: `EngineCatalog`, downloader, ort session builder, mel features |
 | `jona-platform` | OS-specific code: hotkey (CGEvent tap), permissions, paste, audio devices, ducking |
-| `jona-provider` | Cloud provider backends (OpenAI-compatible, Anthropic) |
+| `jona-provider` | Cloud provider backends (OpenAI-compatible, Anthropic, Deepgram, Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere) |
 | `jona-engine-*` (10) | One crate per engine: whisper, canary, parakeet, qwen, voxtral, llama, bert, pcs, correction, spellcheck |
 
 **Plug-and-play engines**: each engine crate registers itself via `inventory::submit!` at link time. The main crate calls `EngineCatalog::init_auto()` at startup — no hardcoded engine list, no re-exports. Adding an engine = add a crate + `cargo` dependency, zero changes to the orchestrator.
@@ -211,7 +211,7 @@ src-tauri/                 Rust backend (thin orchestrator)
     platform/              macOS-specific (hotkey, permissions, paste, audio devices)
     ui/                    Native UI (tray, pill overlay, SDF icons)
   voxtral-c/               Vendored voxtral.c sources (C + Metal)
-crates/                    Workspace crates (types, engines, platform, provider, 9 engine crates)
+crates/                    Workspace crates (types, engines, platform, 9 provider crates, 9 engine crates)
 docs/                      Technical documentation
   AUDIO-PIPELINE.md        Audio preprocessing architecture & roadmap
   TEXT-PIPELINE.md         Text postprocessing architecture & roadmap

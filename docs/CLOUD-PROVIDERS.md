@@ -235,22 +235,29 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **SambaNova** | `sambanova` | whisper-large-v3 | Meta-Llama-3.1-8B-Instant | `api.sambanova.ai` |
 | **Nebius AI** | `nebius` | — | meta-llama/Meta-Llama-3.1-8B-Instruct | `api.studio.nebius.com` |
 | **Anthropic** | `anthropic` | — | claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-6 | `api.anthropic.com` |
+| **Deepgram** | `deepgram` | nova-3, nova-2 | — | `api.deepgram.com` |
+| **GitHub Copilot** | `copilot` | — | gpt-4o, gpt-4o-mini | `api.githubcopilot.com` |
+| **Gemini ASR** | `gemini-asr` | gemini-2.0-flash, gemini-2.5-flash | — | `generativelanguage.googleapis.com` |
+| **Rev.ai** | `revai` | reverb-english, reverb-foreign | — | `api.rev.ai` |
+| **AssemblyAI** | `assemblyai` | best, nano | — | `api.assemblyai.com` |
+| **ElevenLabs** | `elevenlabs` | scribe_v2, scribe_v1 | — | `api.elevenlabs.io` |
+| **Cohere** | `cohere` | — | command-r-plus, command-r | `api.cohere.com` |
 
 ---
 
 ## Résumé décisionnel
 
-### Nouveaux providers à implémenter (crate `jona-provider-*` dédié)
+### Providers dédiés (crate `jona-provider-*` — tous implémentés ✅)
 
-| Provider | Crate | ASR | LLM | Priorité | Complexité |
-|----------|-------|-----|-----|----------|------------|
-| **Deepgram** | `jona-provider-deepgram` | ✅ | ❌ | ⭐ Haute | Faible (REST sync, ~80 lignes) |
-| **GitHub Copilot** | `jona-provider-copilot` | ❌ | ✅ | ⭐ Haute | Moyenne (token exchange) |
-| **Gemini ASR** | `jona-provider-gemini` | ✅ | ❌ | Moyenne | Moyenne (multimodal base64) |
-| **Rev.ai** | `jona-provider-revai` | ✅ | ❌ | Moyenne | Faible (REST sync, ~50 lignes) |
-| **AssemblyAI** | `jona-provider-assemblyai` | ✅ | ❌ | Moyenne | Élevée (API async 3 étapes) |
-| **ElevenLabs** | `jona-provider-elevenlabs` | ✅ | ❌ | Basse | Faible (multipart sync, ~30 lignes) |
-| **Cohere** | `jona-provider-cohere` | ❌ | ✅ | Basse | Faible |
+| Provider | Crate | ASR | LLM | Status |
+|----------|-------|-----|-----|--------|
+| **Deepgram** | `jona-provider-deepgram` | ✅ | ❌ | ✅ Implémenté |
+| **GitHub Copilot** | `jona-provider-copilot` | ❌ | ✅ | ✅ Implémenté |
+| **Gemini ASR** | `jona-provider-gemini-asr` | ✅ | ❌ | ✅ Implémenté |
+| **Rev.ai** | `jona-provider-revai` | ✅ | ❌ | ✅ Implémenté |
+| **AssemblyAI** | `jona-provider-assemblyai` | ✅ | ❌ | ✅ Implémenté |
+| **ElevenLabs** | `jona-provider-elevenlabs` | ✅ | ❌ | ✅ Implémenté |
+| **Cohere** | `jona-provider-cohere` | ❌ | ✅ | ✅ Implémenté |
 
 ---
 
