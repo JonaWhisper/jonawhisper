@@ -228,7 +228,13 @@ impl CloudProvider for AzureOpenAIBackend {
         Box::pin(async move {
             // Azure OpenAI doesn't have a model listing API — models are tied to deployments.
             // Return the deployment name as the only available model.
-            let deployment = required_extra(provider, "deployment_name")?;
+            let deployment = required_extra(provider, "deployment_name")?.trim();
+            if deployment.is_empty() {
+                return Err(ProviderError::NotConfigured(
+                    "deployment_name is not configured".into(),
+                ));
+            }
+            validate_url_segment(deployment, "deployment_name")?;
             Ok(vec![deployment.to_string()])
         })
     }
