@@ -48,26 +48,41 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         platform::audio_ducking::duck_volume(ducking_level);
     }
 
-    // Wait for first audio callback before transitioning to Recording.
-    // Without this, the pill shows Recording with a flat/grey spectrum
-    // because cpal hasn't produced samples yet (~50-150ms delay).
-    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(500);
-    loop {
-        if rec.samples_received.load(std::sync::atomic::Ordering::Relaxed) {
-            log::debug!("First audio samples received, transitioning to Recording");
-            break;
+    // Wait for first audio samples in a background thread so the hotkey handler
+    // returns immediately and can process cancel/stop events during the wait.
+    let samples_flag = rec.samples_received.clone();
+    let state_clone = Arc::clone(state);
+    let app_clone = app.clone();
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + Duration::from_millis(500);
+        loop {
+            if samples_flag.load(Ordering::Relaxed) {
+                log::debug!("First audio samples received, transitioning to Recording");
+                break;
+            }
+            // Early exit if recording was stopped/cancelled while waiting
+            if !state_clone.audio_flags.is_recording() {
+                log::debug!("Recording stopped before first samples, aborting transition");
+                return;
+            }
+            if std::time::Instant::now() >= deadline {
+                log::warn!("Timeout waiting for first audio samples, transitioning to Recording anyway");
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(15));
         }
-        if std::time::Instant::now() >= deadline {
-            log::warn!("Timeout waiting for first audio samples, transitioning to Recording anyway");
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(5));
-    }
 
-    // Stream has data — transition to Recording mode + audible cue
-    platform::play_sound("Tink");
-    crate::ui::pill::set_mode(crate::ui::pill::PillMode::Recording);
-    let _ = app.emit(events::RECORDING_STARTED, ());
+        // Double-check recording wasn't cancelled during the final sleep
+        if !state_clone.audio_flags.is_recording() {
+            log::debug!("Recording stopped before transition, aborting");
+            return;
+        }
+
+        // Stream has data — transition to Recording mode + audible cue
+        platform::play_sound("Tink");
+        crate::ui::pill::set_mode(crate::ui::pill::PillMode::Recording);
+        let _ = app_clone.emit(events::RECORDING_STARTED, ());
+    });
 }
 
 pub fn stop_recording_and_enqueue(

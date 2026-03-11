@@ -284,8 +284,9 @@ pub fn run() {
             ui::tray::setup_tray(app.handle())?;
 
             // Audio thread (cpal::Stream is not Send)
-            let (cmd_tx, spectrum_data, reply_rx, stream_error, samples_received) =
-                recording::spawn_audio_thread();
+            let recording::AudioThreadHandles {
+                cmd_tx, spectrum_data, reply_rx, stream_error, samples_received,
+            } = recording::spawn_audio_thread();
 
             // Mic test sender (clone before cmd_tx is moved)
             app.manage(recording::MicTestSender(cmd_tx.clone()));

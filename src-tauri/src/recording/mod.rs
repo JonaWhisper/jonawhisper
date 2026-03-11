@@ -72,7 +72,7 @@ fn show_error_then_close(app: &tauri::AppHandle) {
     });
 }
 
-pub use threads::{spawn_audio_thread, spawn_hotkey_handler, spawn_spectrum_emitter};
+pub use threads::{spawn_audio_thread, spawn_hotkey_handler, spawn_spectrum_emitter, AudioThreadHandles};
 
 pub fn cleanup_orphan_audio_files() {
     let tmp_dir = std::env::temp_dir();

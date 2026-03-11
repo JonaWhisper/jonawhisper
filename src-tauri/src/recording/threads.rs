@@ -9,14 +9,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-/// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error, samples_received).
-type AudioThreadHandles = (
-    crossbeam_channel::Sender<AudioCmd>,
-    Arc<std::sync::Mutex<Vec<f32>>>,
-    crossbeam_channel::Receiver<AudioReply>,
-    Arc<AtomicBool>,
-    Arc<AtomicBool>,
-);
+/// Named return type for `spawn_audio_thread`.
+pub struct AudioThreadHandles {
+    pub cmd_tx: crossbeam_channel::Sender<AudioCmd>,
+    pub spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
+    pub reply_rx: crossbeam_channel::Receiver<AudioReply>,
+    pub stream_error: Arc<AtomicBool>,
+    pub samples_received: Arc<AtomicBool>,
+}
 
 /// Spawns the dedicated audio thread (cpal::Stream is not Send).
 pub fn spawn_audio_thread() -> AudioThreadHandles {
@@ -61,7 +61,7 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
         }
     });
 
-    (cmd_tx, spectrum_data, reply_rx, stream_error, samples_received)
+    AudioThreadHandles { cmd_tx, spectrum_data, reply_rx, stream_error, samples_received }
 }
 
 pub fn spawn_hotkey_handler(
