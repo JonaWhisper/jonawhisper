@@ -15,7 +15,7 @@ static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
         .unwrap_or_else(|_| reqwest::blocking::Client::new())
 });
 
-/// Speechmatics Batch ASR — 2-step workflow: create job (multipart) → poll for result.
+/// Speechmatics Batch ASR — 3-step workflow: create job (multipart) → poll for completion → fetch transcript.
 pub struct SpeechmaticsBackend;
 
 #[derive(Deserialize)]
