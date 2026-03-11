@@ -11,7 +11,10 @@ static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
     reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
         .build()
-        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+        .unwrap_or_else(|e| {
+            log::warn!("Rev.ai: failed to build HTTP client with timeout: {e}, falling back to default");
+            reqwest::blocking::Client::new()
+        })
 });
 
 /// Rev.ai ASR — multipart upload to the synchronous speech-to-text endpoint.
@@ -60,7 +63,10 @@ impl CloudProvider for RevAiBackend {
 
         if !response.status().is_success() {
             let status = response.status().as_u16();
-            let body = response.text().unwrap_or_default();
+            let body = response.text().unwrap_or_else(|e| {
+                log::warn!("Rev.ai: failed to read error response body: {e}");
+                String::new()
+            });
             return Err(ProviderError::Api { status, body });
         }
 

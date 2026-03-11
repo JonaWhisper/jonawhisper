@@ -43,6 +43,8 @@ impl CloudProvider for AnthropicBackend {
         max_tokens: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
+            provider.validate_url().map_err(ProviderError::Http)?;
+
             let url = format!("{}/messages", provider.base_url());
 
             let request = AnthropicRequest {
@@ -140,7 +142,10 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
         .map_err(|e| ProviderError::Http(e.to_string()))?;
     if !response.status().is_success() {
         let status = response.status().as_u16();
-        let body = response.text().await.unwrap_or_default();
+        let body = response.text().await.unwrap_or_else(|e| {
+            log::warn!("Anthropic: failed to decode error body: {e}");
+            String::new()
+        });
         return Err(ProviderError::Api { status, body });
     }
     Ok(response)

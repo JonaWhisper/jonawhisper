@@ -12,7 +12,10 @@ static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
     reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
         .build()
-        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+        .unwrap_or_else(|e| {
+            log::warn!("AssemblyAI: failed to build HTTP client with timeout: {e}, falling back to default");
+            reqwest::blocking::Client::new()
+        })
 });
 
 /// AssemblyAI ASR — asynchronous 3-step workflow: upload → create transcript → poll.
@@ -66,7 +69,10 @@ impl CloudProvider for AssemblyAiBackend {
 
         if !upload_resp.status().is_success() {
             let status = upload_resp.status().as_u16();
-            let body = upload_resp.text().unwrap_or_default();
+            let body = upload_resp.text().unwrap_or_else(|e| {
+                log::warn!("AssemblyAI: failed to read upload error body: {e}");
+                String::new()
+            });
             return Err(ProviderError::Api { status, body });
         }
 
@@ -94,7 +100,10 @@ impl CloudProvider for AssemblyAiBackend {
 
         if !create_resp.status().is_success() {
             let status = create_resp.status().as_u16();
-            let body = create_resp.text().unwrap_or_default();
+            let body = create_resp.text().unwrap_or_else(|e| {
+                log::warn!("AssemblyAI: failed to read create-transcript error body: {e}");
+                String::new()
+            });
             return Err(ProviderError::Api { status, body });
         }
 
@@ -137,7 +146,10 @@ impl CloudProvider for AssemblyAiBackend {
 
             if !poll_resp.status().is_success() {
                 let status = poll_resp.status().as_u16();
-                let body = poll_resp.text().unwrap_or_default();
+                let body = poll_resp.text().unwrap_or_else(|e| {
+                    log::warn!("AssemblyAI: failed to read poll error body: {e}");
+                    String::new()
+                });
                 return Err(ProviderError::Api { status, body });
             }
 
@@ -148,13 +160,23 @@ impl CloudProvider for AssemblyAiBackend {
             match result.status.as_str() {
                 "completed" => {
                     let text = result.text.unwrap_or_default();
+                    if text.is_empty() {
+                        return Err(ProviderError::InvalidResponse(
+                            "AssemblyAI returned an empty transcript".into(),
+                        ));
+                    }
                     return Ok(TranscriptionResult::text_only(text));
                 }
                 "error" => {
                     let msg = result.error.unwrap_or_else(|| "Unknown error".into());
                     return Err(ProviderError::InvalidResponse(msg));
                 }
-                _ => {} // "queued" or "processing"
+                "queued" | "processing" => {} // expected intermediate states
+                unknown => {
+                    return Err(ProviderError::InvalidResponse(format!(
+                        "AssemblyAI returned unexpected transcript status: '{unknown}'"
+                    )));
+                }
             }
         }
 

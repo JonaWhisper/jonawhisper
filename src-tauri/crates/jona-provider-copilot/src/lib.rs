@@ -41,7 +41,10 @@ async fn fetch_token(github_token: &str) -> Result<String, ProviderError> {
 
     if !response.status().is_success() {
         let status = response.status().as_u16();
-        let body = response.text().await.unwrap_or_default();
+        let body = response.text().await.unwrap_or_else(|e| {
+            log::warn!("Failed to decode Copilot token error body: {e}");
+            String::new()
+        });
         return Err(ProviderError::Api { status, body });
     }
 
@@ -134,7 +137,10 @@ impl CloudProvider for CopilotBackend {
 
             if !response.status().is_success() {
                 let status = response.status().as_u16();
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.unwrap_or_else(|e| {
+                    log::warn!("Failed to decode Copilot chat error body: {e}");
+                    String::new()
+                });
                 return Err(ProviderError::Api { status, body });
             }
 

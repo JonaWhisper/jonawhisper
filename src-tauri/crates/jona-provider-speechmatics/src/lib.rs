@@ -12,7 +12,10 @@ static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
     reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
         .build()
-        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+        .unwrap_or_else(|e| {
+            log::warn!("Speechmatics: failed to build HTTP client with timeout: {e}, falling back to default");
+            reqwest::blocking::Client::new()
+        })
 });
 
 /// Speechmatics Batch ASR — 3-step workflow: create job (multipart) → poll for completion → fetch transcript.
@@ -106,7 +109,10 @@ impl CloudProvider for SpeechmaticsBackend {
 
         if !create_resp.status().is_success() {
             let status = create_resp.status().as_u16();
-            let body = create_resp.text().unwrap_or_default();
+            let body = create_resp.text().unwrap_or_else(|e| {
+                log::warn!("Speechmatics: failed to read create-job error body: {e}");
+                String::new()
+            });
             return Err(ProviderError::Api { status, body });
         }
 
@@ -143,7 +149,10 @@ impl CloudProvider for SpeechmaticsBackend {
 
             if !poll_resp.status().is_success() {
                 let status = poll_resp.status().as_u16();
-                let body = poll_resp.text().unwrap_or_default();
+                let body = poll_resp.text().unwrap_or_else(|e| {
+                    log::warn!("Speechmatics: failed to read poll error body: {e}");
+                    String::new()
+                });
                 return Err(ProviderError::Api { status, body });
             }
 
@@ -162,7 +171,10 @@ impl CloudProvider for SpeechmaticsBackend {
 
                     if !tr_resp.status().is_success() {
                         let status = tr_resp.status().as_u16();
-                        let body = tr_resp.text().unwrap_or_default();
+                        let body = tr_resp.text().unwrap_or_else(|e| {
+                            log::warn!("Speechmatics: failed to read transcript error body: {e}");
+                            String::new()
+                        });
                         return Err(ProviderError::Api { status, body });
                     }
 
