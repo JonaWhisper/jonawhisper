@@ -226,5 +226,5 @@ inventory::submit! { ProviderPreset {
             sensitive: true,
         },
     ],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}

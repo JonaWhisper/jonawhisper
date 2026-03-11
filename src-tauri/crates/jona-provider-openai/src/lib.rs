@@ -267,7 +267,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "sk-...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "groq", display_name: "Groq",
@@ -281,7 +281,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "gsk_...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "cerebras", display_name: "Cerebras",
@@ -295,7 +295,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "gemini", display_name: "Google Gemini",
@@ -309,7 +309,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "AIza...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "mistral", display_name: "Mistral",
@@ -323,7 +323,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "fireworks", display_name: "Fireworks AI",
@@ -337,7 +337,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "fw_...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "together", display_name: "Together AI",
@@ -351,7 +351,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "deepseek", display_name: "DeepSeek",
@@ -365,7 +365,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "sk-...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "openrouter", display_name: "OpenRouter",
@@ -379,7 +379,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "sk-or-...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "xai", display_name: "xAI",
@@ -393,7 +393,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "xai-...", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "sambanova", display_name: "SambaNova",
@@ -407,7 +407,7 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "nebius", display_name: "Nebius AI",
@@ -421,5 +421,5 @@ inventory::submit! { ProviderPreset {
         required: true, placeholder: "", default_value: "",
         options: &[], sensitive: true,
     }],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}

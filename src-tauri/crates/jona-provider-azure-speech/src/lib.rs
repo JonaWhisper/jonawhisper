@@ -234,7 +234,7 @@ inventory::submit! { ProviderPreset {
             sensitive: false,
         },
     ],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 
 #[cfg(test)]
