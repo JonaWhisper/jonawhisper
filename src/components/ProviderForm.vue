@@ -330,7 +330,7 @@ function save() {
     <!-- Capabilities -->
     <div v-if="hasCapabilities" class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.capabilities') }}</Label>
-      <div class="flex items-center gap-6">
+      <div class="flex gap-4">
         <label v-if="visibleExtraFields.some(f => f.id === 'supports_asr')" class="flex items-center gap-2 text-sm cursor-pointer">
           <Switch
             :checked="extraValues['supports_asr'] === 'true'"
