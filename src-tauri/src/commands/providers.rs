@@ -154,6 +154,7 @@ fn field_type_str(ft: jona_types::FieldType) -> String {
         jona_types::FieldType::Text => "text".to_string(),
         jona_types::FieldType::Password => "password".to_string(),
         jona_types::FieldType::Select => "select".to_string(),
+        jona_types::FieldType::Toggle => "toggle".to_string(),
     }
 }
 

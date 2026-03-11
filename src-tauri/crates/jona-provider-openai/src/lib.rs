@@ -236,6 +236,21 @@ inventory::submit! { ProviderPreset {
             required: false, placeholder: "sk-...", default_value: "",
             options: &[], sensitive: true,
         },
+        PresetField {
+            id: "supports_asr", label: "Speech-to-Text (ASR)", field_type: FieldType::Toggle,
+            required: false, placeholder: "", default_value: "true",
+            options: &[], sensitive: false,
+        },
+        PresetField {
+            id: "supports_llm", label: "Text Generation (LLM)", field_type: FieldType::Toggle,
+            required: false, placeholder: "", default_value: "true",
+            options: &[], sensitive: false,
+        },
+        PresetField {
+            id: "allow_insecure", label: "Allow HTTP (insecure)", field_type: FieldType::Toggle,
+            required: false, placeholder: "", default_value: "false",
+            options: &[], sensitive: false,
+        },
     ],
     hidden_fields: &[],
 }}
