@@ -43,7 +43,8 @@ impl CloudProvider for AssemblyAiBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
-        if provider.api_key.trim().is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(format!(
                 "Provider '{}' is missing an API key for AssemblyAI",
                 provider.name
@@ -51,7 +52,7 @@ impl CloudProvider for AssemblyAiBackend {
         }
 
         let base = provider.base_url();
-        let auth_header = ("authorization", provider.api_key.as_str());
+        let auth_header = ("authorization", api_key);
 
         // Step 1: Upload audio file
         let file_bytes = std::fs::read(audio_path)?;

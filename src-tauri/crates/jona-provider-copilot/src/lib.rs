@@ -111,7 +111,7 @@ impl CloudProvider for CopilotBackend {
         max_tokens: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
-            let jwt = exchange_token(&provider.api_key).await?;
+            let jwt = exchange_token(provider.api_key.trim()).await?;
 
             let request = ChatRequest {
                 model: model.to_string(),

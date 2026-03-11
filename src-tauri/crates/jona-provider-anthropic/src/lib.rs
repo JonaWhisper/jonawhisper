@@ -56,12 +56,13 @@ impl CloudProvider for AnthropicBackend {
                 }],
             };
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT
                 .post(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION)
                 .json(&request);
-            if !provider.api_key.is_empty() {
-                req = req.header("x-api-key", &provider.api_key);
+            if !api_key.is_empty() {
+                req = req.header("x-api-key", api_key);
             }
 
             let response = send_and_check(req).await?;
@@ -87,11 +88,12 @@ impl CloudProvider for AnthropicBackend {
         Box::pin(async move {
             let url = format!("{}/models", provider.base_url());
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT
                 .get(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION);
-            if !provider.api_key.is_empty() {
-                req = req.header("x-api-key", &provider.api_key);
+            if !api_key.is_empty() {
+                req = req.header("x-api-key", api_key);
             }
 
             let response = send_and_check(req).await?;

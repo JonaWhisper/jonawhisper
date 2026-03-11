@@ -35,7 +35,8 @@ impl CloudProvider for OpenAICompatibleBackend {
         provider.validate_url().map_err(ProviderError::Http)?;
 
         // Validate API key before file I/O to fail fast (trim to catch whitespace-only keys)
-        if provider.api_key.trim().is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(
                 "API key is not configured".into(),
             ));
@@ -64,8 +65,8 @@ impl CloudProvider for OpenAICompatibleBackend {
         let url = format!("{}/audio/transcriptions", provider.base_url());
 
         let mut req = BLOCKING_CLIENT.post(&url).multipart(form);
-        if !provider.api_key.trim().is_empty() {
-            req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+        if !api_key.is_empty() {
+            req = req.header("Authorization", format!("Bearer {api_key}"));
         }
 
         let response = req.send().map_err(|e| ProviderError::Http(e.to_string()))?;
@@ -120,9 +121,10 @@ impl CloudProvider for OpenAICompatibleBackend {
                 max_tokens,
             };
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT.post(&url).json(&request);
-            if !provider.api_key.trim().is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+            if !api_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {api_key}"));
             }
 
             let response = send_and_check(req).await?;
@@ -148,9 +150,10 @@ impl CloudProvider for OpenAICompatibleBackend {
         Box::pin(async move {
             let url = format!("{}/models", provider.base_url());
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT.get(&url);
-            if !provider.api_key.trim().is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", provider.api_key));
+            if !api_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {api_key}"));
             }
 
             let response = send_and_check(req).await?;

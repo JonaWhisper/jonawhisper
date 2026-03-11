@@ -55,7 +55,8 @@ impl CloudProvider for SpeechmaticsBackend {
         audio_path: &Path,
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
-        if provider.api_key.is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(
                 "Speechmatics API key is not configured".into(),
             ));
@@ -63,7 +64,7 @@ impl CloudProvider for SpeechmaticsBackend {
         provider.validate_url().map_err(ProviderError::Http)?;
 
         let base = provider.base_url();
-        let bearer = format!("Bearer {}", provider.api_key);
+        let bearer = format!("Bearer {api_key}");
 
         // Build transcription config JSON
         let operating_point = if model.is_empty() || model == "enhanced" {

@@ -51,7 +51,8 @@ impl CloudProvider for GeminiAsrBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
-        if provider.api_key.trim().is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(format!(
                 "Provider '{}' is missing an API key for Gemini",
                 provider.name
@@ -96,7 +97,7 @@ impl CloudProvider for GeminiAsrBackend {
 
         let response = BLOCKING_CLIENT
             .post(&url)
-            .header("x-goog-api-key", &provider.api_key)
+            .header("x-goog-api-key", api_key)
             .json(&request)
             .send()
             .map_err(|e| ProviderError::Http(e.to_string()))?;

@@ -48,7 +48,8 @@ impl CloudProvider for GladiaBackend {
         audio_path: &Path,
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
-        if provider.api_key.trim().is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(
                 "Gladia API key is not configured".into(),
             ));
@@ -56,7 +57,6 @@ impl CloudProvider for GladiaBackend {
         provider.validate_url().map_err(ProviderError::Http)?;
 
         let base = provider.base_url();
-        let api_key = provider.api_key.as_str();
 
         // Step 1: Upload audio file via multipart
         let file_bytes = std::fs::read(audio_path)?;
