@@ -134,11 +134,11 @@ Defines the `ASREngine` trait, `ASRModel`, `EngineError`, `Preferences`, `Provid
 
 macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future Windows support. Hotkey (CGEvent tap), permissions, paste, audio devices, audio ducking, sound playback, launch-at-login.
 
-#### `jona-provider` — Cloud backends
+#### `jona-provider` + `jona-provider-*` (11 crates) — Cloud backends
 
-`CloudProvider` trait + OpenAI-compatible and Anthropic backends. Handles ASR transcription, LLM chat completion, and model listing via cloud APIs.
+`CloudProvider` trait + provider backends: OpenAI-compatible (12 presets), Anthropic, Deepgram, Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere, Gladia, Speechmatics. Handles ASR transcription, LLM chat completion, and model listing via cloud APIs.
 
-#### Engine crates (10)
+#### Engine crates (11)
 
 Each crate implements `ASREngine`, registers itself via `inventory::submit!`, and is fully self-contained (catalog + inference).
 
@@ -153,6 +153,7 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-pcs` | PCS punctuation (47 lang) | ort (ONNX + CoreML), SentencePiece tokenizer |
 | `jona-engine-correction` | T5 grammar correction | ort (ONNX + CoreML), autoregressive decoding, repeat penalty 1.5, n-gram blocking, live loop detection |
 | `jona-engine-spellcheck` | SymSpell dictionaries | Data-only (no inference), manifest-driven from GitHub Releases |
+| `jona-engine-lm` | KenLM language models | Vendored KenLM C++ (query-only), mmap-backed, trigram scoring |
 | `jona-engine-llama` | Local LLM (llama.cpp) | llama-cpp-2, Metal GPU offload, GGUF Q4 models |
 
 ### Platform (`platform/`)
@@ -198,7 +199,7 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 | `ProcessingSection.vue` | Post-processing: VAD, hallucination filter, text cleanup (BERT/PCS/T5/LLM unified selector), LLM token cap |
 | `ShortcutsSection.vue` | Hotkey, recording mode (push-to-talk / toggle), cancel shortcut |
 | `MicrophoneSection.vue` | Input device selector with transport type icons, mic test with spectrum + level badge, audio ducking |
-| `ProvidersSection.vue` | Cloud provider management (20 presets + custom) |
+| `ProvidersSection.vue` | Cloud provider management (22 presets + custom) |
 | `DictionarySection.vue` | User dictionary for protected words and replacement mappings |
 | `PermissionsSection.vue` | Permission status (microphone, accessibility, input monitoring) with grant buttons |
 | `GeneralSection.vue` | Appearance (theme), interface language, About card (version, GPL-3.0 license) |

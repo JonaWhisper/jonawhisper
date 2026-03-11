@@ -11,8 +11,8 @@
 
 ```bash
 # Clone the repo
-git clone https://github.com/jplot/jona-whisper.git
-cd jona-whisper
+git clone https://github.com/JonaWhisper/jonawhisper.git
+cd jonawhisper
 
 # Install frontend dependencies
 npm install
@@ -37,11 +37,11 @@ Key directories:
 | Directory | Contents |
 |-----------|----------|
 | `src/` | Vue 3 frontend (views, sections, components, stores) |
-| `crates/jona-engine-*/` | ASR & cleanup engines (whisper, canary, parakeet, qwen, voxtral, bert, pcs, correction, llama, spellcheck) |
+| `crates/jona-engine-*/` | ASR & cleanup engines (whisper, canary, parakeet, qwen, voxtral, bert, pcs, correction, llama, spellcheck, lm) |
 | `crates/jona-engines/` | Engine catalog, model downloads, shared inference utilities |
 | `crates/jona-types/` | Shared types (ASREngine trait, ASRModel, Preferences, etc.) |
 | `crates/jona-platform/` | macOS-specific code (hotkeys, permissions, paste) |
-| `crates/jona-provider/` | Cloud provider backends (OpenAI-compatible, Anthropic) |
+| `crates/jona-provider*/` | Cloud provider backends (11 crates: OpenAI-compatible, Anthropic, Deepgram, Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere, Gladia, Speechmatics) |
 | `src-tauri/src/cleanup/` | Text cleanup pipeline (VAD, post-processing, spellcheck, ITN, LLM) |
 | `src-tauri/src/ui/` | Native UI (tray, pill overlay, SDF icons) |
 | `src/stories/` | Histoire stories + Playwright capture script |
