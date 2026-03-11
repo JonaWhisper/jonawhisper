@@ -39,6 +39,7 @@ pub struct RecordingState {
     last_short_tap_time: Option<Instant>,
     audio_tx: crossbeam_channel::Sender<AudioCmd>,
     audio_rx: crossbeam_channel::Receiver<AudioReply>,
+    pub(crate) samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Wrapper around audio command sender for mic test (managed by Tauri).
@@ -47,12 +48,14 @@ pub struct MicTestSender(pub crossbeam_channel::Sender<AudioCmd>);
 pub fn new_recording_state(
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,
     reply_rx: crossbeam_channel::Receiver<AudioReply>,
+    samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> RecordingState {
     RecordingState {
         key_down_time: None,
         last_short_tap_time: None,
         audio_tx: cmd_tx,
         audio_rx: reply_rx,
+        samples_received,
     }
 }
 
@@ -69,7 +72,7 @@ fn show_error_then_close(app: &tauri::AppHandle) {
     });
 }
 
-pub use threads::{spawn_audio_thread, spawn_hotkey_handler, spawn_spectrum_emitter};
+pub use threads::{spawn_audio_thread, spawn_hotkey_handler, spawn_spectrum_emitter, AudioThreadHandles};
 
 pub fn cleanup_orphan_audio_files() {
     let tmp_dir = std::env::temp_dir();

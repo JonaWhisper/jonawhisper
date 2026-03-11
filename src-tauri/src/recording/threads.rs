@@ -9,13 +9,14 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-/// Return type for spawn_audio_thread: (cmd_tx, spectrum_data, reply_rx, stream_error).
-type AudioThreadHandles = (
-    crossbeam_channel::Sender<AudioCmd>,
-    Arc<std::sync::Mutex<Vec<f32>>>,
-    crossbeam_channel::Receiver<AudioReply>,
-    Arc<AtomicBool>,
-);
+/// Named return type for `spawn_audio_thread`.
+pub struct AudioThreadHandles {
+    pub cmd_tx: crossbeam_channel::Sender<AudioCmd>,
+    pub spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
+    pub reply_rx: crossbeam_channel::Receiver<AudioReply>,
+    pub stream_error: Arc<AtomicBool>,
+    pub samples_received: Arc<AtomicBool>,
+}
 
 /// Spawns the dedicated audio thread (cpal::Stream is not Send).
 pub fn spawn_audio_thread() -> AudioThreadHandles {
@@ -27,8 +28,11 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
     let stream_error = Arc::new(AtomicBool::new(false));
     let stream_error_clone = Arc::clone(&stream_error);
 
+    let samples_received = Arc::new(AtomicBool::new(false));
+    let samples_received_clone = Arc::clone(&samples_received);
+
     std::thread::spawn(move || {
-        let mut recorder = audio::AudioRecorder::new(stream_error_clone);
+        let mut recorder = audio::AudioRecorder::new(stream_error_clone, samples_received_clone);
         loop {
             match cmd_rx.recv() {
                 Ok(AudioCmd::StartRecording { device_uid }) => {
@@ -57,7 +61,7 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
         }
     });
 
-    (cmd_tx, spectrum_data, reply_rx, stream_error)
+    AudioThreadHandles { cmd_tx, spectrum_data, reply_rx, stream_error, samples_received }
 }
 
 pub fn spawn_hotkey_handler(
@@ -127,6 +131,7 @@ pub fn spawn_spectrum_emitter(
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,
     spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
+    samples_received: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
@@ -156,7 +161,11 @@ pub fn spawn_spectrum_emitter(
 
         let spectrum = spectrum_data.lock().unwrap().clone();
         let is_flat = spectrum.iter().all(|&v| v < 0.001);
-        if is_flat && !is_mic_testing && state.audio_flags.is_recording() {
+        // Only warn about flat spectrum after audio samples have been received —
+        // the first ~100-150ms are always flat while the FFT buffer fills up.
+        if is_flat && !is_mic_testing && state.audio_flags.is_recording()
+            && samples_received.load(Ordering::Relaxed)
+        {
             log::warn!("Spectrum flat while recording (queue depth: {})", cmd_tx.len());
         }
         let _ = cmd_tx.send(AudioCmd::GetSpectrum);
