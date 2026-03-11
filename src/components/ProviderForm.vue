@@ -15,6 +15,7 @@ import {
   ComboboxItem,
 } from '@/components/ui/combobox'
 import { ComboboxAnchor, ComboboxTrigger } from 'reka-ui'
+import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Loader2, CheckCircle2, XCircle, ShieldAlert, ChevronsUpDown } from 'lucide-vue-next'
 
@@ -53,15 +54,27 @@ const showCapabilities = computed(() => kind.value === 'custom')
 
 const searchTerm = ref('')
 
+const customOption = computed(() => ({ value: 'custom', label: t('provider.kind.custom') }))
+
 const allOptions = computed(() => [
+  customOption.value,
   ...engines.providerPresets.map(p => ({ value: p.id, label: p.display_name })),
-  { value: 'custom', label: t('provider.kind.custom') },
 ])
 
-const filteredOptions = computed(() => {
-  if (!searchTerm.value) return allOptions.value
+const presetOptions = computed(() =>
+  engines.providerPresets.map(p => ({ value: p.id, label: p.display_name })),
+)
+
+const filteredCustom = computed(() => {
+  if (!searchTerm.value) return customOption.value
   const q = searchTerm.value.toLowerCase()
-  return allOptions.value.filter(o => o.label.toLowerCase().includes(q))
+  return customOption.value.label.toLowerCase().includes(q) ? customOption.value : null
+})
+
+const filteredPresets = computed(() => {
+  if (!searchTerm.value) return presetOptions.value
+  const q = searchTerm.value.toLowerCase()
+  return presetOptions.value.filter(o => o.label.toLowerCase().includes(q))
 })
 
 const presetDisplayName = computed(() => {
@@ -180,8 +193,12 @@ function save() {
         </ComboboxAnchor>
         <ComboboxContent>
           <ComboboxEmpty>{{ t('provider.noResults') }}</ComboboxEmpty>
+          <ComboboxItem v-if="filteredCustom" :value="filteredCustom.value">
+            {{ filteredCustom.label }}
+          </ComboboxItem>
+          <Separator v-if="filteredCustom && filteredPresets.length" class="my-1" />
           <ComboboxItem
-            v-for="option in filteredOptions"
+            v-for="option in filteredPresets"
             :key="option.value"
             :value="option.value"
           >
