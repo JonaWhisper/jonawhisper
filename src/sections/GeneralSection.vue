@@ -181,7 +181,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     <!-- About card -->
     <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-5 mb-2.5">
       <div class="text-center">
-        <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">J</div>
+        <img src="@/assets/icon.png" alt="JonaWhisper" class="w-12 h-12 mx-auto mb-2 rounded-xl" />
         <div class="text-base font-bold">JonaWhisper</div>
         <div v-if="appVersion" class="text-xs text-muted-foreground mt-0.5">v{{ appVersion }}</div>
         <div class="text-[10px] text-muted-foreground/60 mt-1">GPL-3.0</div>

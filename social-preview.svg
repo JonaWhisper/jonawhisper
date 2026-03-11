@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <!-- Accent gradient for the logo -->
+    <linearGradient id="accent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+    <!-- Glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <!-- Subtle glow behind logo -->
+    <radialGradient id="logoGlow" cx="50%" cy="45%" r="35%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.12"/>
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Subtle radial glow -->
+  <rect width="1280" height="640" fill="url(#logoGlow)"/>
+
+  <!-- Decorative sound waves (left side, subtle) -->
+  <g opacity="0.06" stroke="#60a5fa" fill="none" stroke-width="1.5">
+    <ellipse cx="640" cy="260" rx="280" ry="140"/>
+    <ellipse cx="640" cy="260" rx="340" ry="170"/>
+    <ellipse cx="640" cy="260" rx="400" ry="200"/>
+    <ellipse cx="640" cy="260" rx="460" ry="230"/>
+  </g>
+
+  <!-- Logo: Microphone + Sound Waves -->
+  <g transform="translate(640, 240)">
+    <!-- Sound wave arcs (left) -->
+    <g stroke="url(#accent)" fill="none" stroke-width="3.5" stroke-linecap="round" opacity="0.7">
+      <path d="M-58,-30 Q-78,-15 -58,0 Q-78,15 -58,30"/>
+      <path d="M-74,-45 Q-100,-22 -74,0 Q-100,22 -74,45"/>
+      <path d="M-90,-58 Q-122,-29 -90,0 Q-122,29 -90,58"/>
+    </g>
+    <!-- Sound wave arcs (right) -->
+    <g stroke="url(#accent)" fill="none" stroke-width="3.5" stroke-linecap="round" opacity="0.7">
+      <path d="M58,-30 Q78,-15 58,0 Q78,15 58,30"/>
+      <path d="M74,-45 Q100,-22 74,0 Q100,22 74,45"/>
+      <path d="M90,-58 Q122,-29 90,0 Q122,29 90,58"/>
+    </g>
+    <!-- Microphone body -->
+    <rect x="-22" y="-55" width="44" height="75" rx="22" fill="url(#accent)"/>
+    <!-- Microphone grille lines -->
+    <line x1="-12" y1="-35" x2="12" y2="-35" stroke="#0f172a" stroke-width="2" opacity="0.3"/>
+    <line x1="-14" y1="-25" x2="14" y2="-25" stroke="#0f172a" stroke-width="2" opacity="0.3"/>
+    <line x1="-14" y1="-15" x2="14" y2="-15" stroke="#0f172a" stroke-width="2" opacity="0.3"/>
+    <line x1="-12" y1="-5" x2="12" y2="-5" stroke="#0f172a" stroke-width="2" opacity="0.3"/>
+    <!-- Microphone stand -->
+    <path d="M-35,20 Q-35,55 0,55 Q35,55 35,20" fill="none" stroke="url(#accent)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="0" y1="55" x2="0" y2="75" stroke="url(#accent)" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="-18" y1="75" x2="18" y2="75" stroke="url(#accent)" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- App name -->
+  <text x="640" y="390" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="700" fill="#f8fafc" letter-spacing="-1">
+    Jona<tspan fill="url(#accent)">Whisper</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="640" y="435" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="400" fill="#94a3b8" letter-spacing="0.5">
+    AI-Powered Voice Dictation
+  </text>
+
+  <!-- Bottom accent line -->
+  <rect x="540" y="470" width="200" height="2" rx="1" fill="url(#accent)" opacity="0.4"/>
+
+  <!-- Tech badges -->
+  <g transform="translate(640, 510)" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="500">
+    <g transform="translate(-120, 0)">
+      <rect x="-40" y="-12" width="80" height="24" rx="12" fill="#60a5fa" opacity="0.15"/>
+      <text text-anchor="middle" y="5" fill="#60a5fa">Rust</text>
+    </g>
+    <g transform="translate(0, 0)">
+      <rect x="-40" y="-12" width="80" height="24" rx="12" fill="#a78bfa" opacity="0.15"/>
+      <text text-anchor="middle" y="5" fill="#a78bfa">Tauri</text>
+    </g>
+    <g transform="translate(120, 0)">
+      <rect x="-40" y="-12" width="80" height="24" rx="12" fill="#34d399" opacity="0.15"/>
+      <text text-anchor="middle" y="5" fill="#34d399">Vue</text>
+    </g>
+  </g>
+</svg>
