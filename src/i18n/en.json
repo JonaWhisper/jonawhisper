@@ -69,6 +69,7 @@
   "provider.field.api_version": "API Version",
   "provider.field.deployment_name": "Deployment Name",
   "validation.required": "Required",
+  "validation.httpsRequired": "HTTPS is required for this provider",
   "pill.recording": "Recording\u2026",
   "pill.transcribing": "Transcribing\u2026",
   "settings.locale.auto": "System Default",

@@ -168,6 +168,18 @@ watch(kind, (newKind) => {
   initExtraValues(newKind)
 }, { immediate: true })
 
+// Re-apply preset defaults when presets arrive asynchronously
+// (providerPresets may still be empty when the component first mounts)
+let presetsInitialized = false
+watch(() => engines.providerPresets, (presets) => {
+  if (!presets.length || presetsInitialized) return
+  presetsInitialized = true
+  initExtraValues(kind.value)
+  if (props.provider) {
+    Object.assign(extraValues.value, props.provider.extra)
+  }
+})
+
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value === 'string') {
     kind.value = value
@@ -178,6 +190,13 @@ function validate(): boolean {
   errors.value = {}
   if (!name.value.trim()) errors.value.name = t('validation.required')
   if (showUrl.value && !url.value.trim()) errors.value.url = t('validation.required')
+  // Reject HTTP URLs for non-custom presets (unless allow_insecure)
+  if (showUrl.value && url.value.trim() && kind.value !== 'custom' && !allowInsecure.value) {
+    const u = url.value.trim().toLowerCase()
+    if (u.startsWith('http://')) {
+      errors.value.url = t('validation.httpsRequired')
+    }
+  }
   // Validate required extra fields
   for (const field of visibleExtraFields.value) {
     if (field.required && !(extraValues.value[field.id]?.trim())) {
