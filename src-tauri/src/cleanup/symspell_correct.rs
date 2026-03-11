@@ -1085,8 +1085,8 @@ mod tests {
         require_dicts!();
         // No confidence data = correct as usual
         let (result, _) = auto_correct("helo world", "en", &[]);
-        assert!(result != "helo world" || result == "helo world",
-            "Without confidence data, correction should still work");
+        assert!(result.contains("hello") || result.contains("help"),
+            "Without confidence data, 'helo' should still be corrected: {}", result);
     }
 
     #[test]
@@ -1118,8 +1118,8 @@ mod tests {
         ];
         let (result, _) = auto_correct("helo", "en", &confidences);
         // Should still attempt correction since confidence is unknown
-        assert!(result != "helo" || result == "helo",
-            "With None confidence, normal correction rules apply");
+        assert!(result.contains("hello") || result.contains("help"),
+            "With None confidence, 'helo' should be corrected: {}", result);
     }
 
     #[test]
@@ -1131,7 +1131,8 @@ mod tests {
         ];
         let (result, _) = auto_correct("helo", "en", &confidences);
         // At exactly 0.85, word should still be corrected (threshold is >0.85)
-        assert!(result != "helo" || result == "helo");
+        assert!(result.contains("hello") || result.contains("help"),
+            "At threshold boundary 0.85, 'helo' should be corrected: {}", result);
     }
 
     #[test]

@@ -194,3 +194,40 @@ pub fn get_launch_at_login_status() -> String {
 pub fn set_launch_at_login(enabled: bool) -> Result<String, String> {
     platform::set_launch_at_login(enabled).map(|s| s.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_log_level_trace() {
+        assert_eq!(parse_log_level("trace"), log::LevelFilter::Trace);
+    }
+
+    #[test]
+    fn parse_log_level_debug() {
+        assert_eq!(parse_log_level("debug"), log::LevelFilter::Debug);
+    }
+
+    #[test]
+    fn parse_log_level_info() {
+        assert_eq!(parse_log_level("info"), log::LevelFilter::Info);
+    }
+
+    #[test]
+    fn parse_log_level_warn() {
+        assert_eq!(parse_log_level("warn"), log::LevelFilter::Warn);
+    }
+
+    #[test]
+    fn parse_log_level_error() {
+        assert_eq!(parse_log_level("error"), log::LevelFilter::Error);
+    }
+
+    #[test]
+    fn parse_log_level_unknown_defaults_to_info() {
+        assert_eq!(parse_log_level("verbose"), log::LevelFilter::Info);
+        assert_eq!(parse_log_level(""), log::LevelFilter::Info);
+        assert_eq!(parse_log_level("INFO"), log::LevelFilter::Info);
+    }
+}

@@ -1,12 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-// Mock Tauri APIs before importing stores
+// Track invoke calls and event listeners
+const mockInvoke = vi.fn()
 vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
+  invoke: (...args: unknown[]) => mockInvoke(...args),
 }))
+const listeners: Record<string, (event: unknown) => void> = {}
 vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(),
+  listen: vi.fn((event: string, handler: (event: unknown) => void) => {
+    listeners[event] = handler
+    return () => { delete listeners[event] }
+  }),
 }))
 
 import { useEnginesStore } from './engines'
@@ -67,6 +72,8 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
 describe('engines store computed properties', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockInvoke.mockReset()
+    Object.keys(listeners).forEach(k => delete listeners[k])
   })
 
   it('downloadedModels filters to available models', () => {
@@ -217,5 +224,84 @@ describe('engines store computed properties', () => {
     store.updatableModelIds = new Set(['model-a', 'model-b'])
     expect(store.hasUpdate('model-a')).toBe(true)
     expect(store.hasUpdate('model-c')).toBe(false)
+  })
+})
+
+describe('engines store actions', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    mockInvoke.mockReset()
+    Object.keys(listeners).forEach(k => delete listeners[k])
+  })
+
+  it('fetchEngines populates engines from invoke', async () => {
+    const store = useEnginesStore()
+    const data = [makeEngine({ id: 'whisper' }), makeEngine({ id: 'canary' })]
+    mockInvoke.mockResolvedValueOnce(data)
+
+    await store.fetchEngines()
+
+    expect(store.engines).toEqual(data)
+    expect(mockInvoke).toHaveBeenCalledWith('get_engines')
+  })
+
+  it('fetchModels populates models from invoke', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    settings.selectedModelId = ''
+    store.engines = [makeEngine({ id: 'test-engine', category: 'asr' })]
+    const data = [makeModel({ id: 'whisper:tiny', engine_id: 'test-engine', is_downloaded: true })]
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return data
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    expect(store.models).toEqual(data)
+  })
+
+  it('validateSelections resets selectedModelId when model is deleted', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    settings.selectedModelId = 'whisper:deleted-model'
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    mockInvoke.mockResolvedValue(undefined)
+
+    // fetchModels triggers validateSelections
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+    await store.fetchModels()
+
+    expect(settings.selectedModelId).toBe('whisper:tiny')
+  })
+
+  it('validateSelections resets cleanupModelId when model is deleted', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    settings.cleanupModelId = 'correction:deleted'
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    mockInvoke.mockResolvedValue(undefined)
+
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+    await store.fetchModels()
+
+    expect(settings.cleanupModelId).toBe('')
+  })
+
+  it('model-updates-available event updates updatableModelIds', () => {
+    const store = useEnginesStore()
+    store.setupListeners()
+
+    listeners['model-updates-available']!({ payload: ['model-a', 'model-b'] })
+
+    expect(store.updatableModelIds).toEqual(new Set(['model-a', 'model-b']))
   })
 })
