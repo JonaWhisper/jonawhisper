@@ -18,6 +18,7 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
     cached_models: [],
     supports_asr: false,
     supports_llm: false,
+    extra: {},
     ...overrides,
   }
 }
@@ -28,12 +29,14 @@ const TEST_PRESETS: ProviderPresetInfo[] = [
     supports_asr: true, supports_llm: true, gradient: '',
     default_asr_models: ['whisper-1', 'gpt-4o-transcribe', 'gpt-4o-mini-transcribe'],
     default_llm_models: ['gpt-4o-mini', 'gpt-4o'],
+    extra_fields: [], hidden_fields: [],
   },
   {
     id: 'anthropic', display_name: 'Anthropic', base_url: 'https://api.anthropic.com/v1',
     supports_asr: false, supports_llm: true, gradient: '',
     default_asr_models: [],
     default_llm_models: ['claude-haiku-4-5-20251001'],
+    extra_fields: [], hidden_fields: [],
   },
 ]
 

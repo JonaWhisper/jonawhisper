@@ -240,6 +240,25 @@ pub struct Provider {
     /// Override API format for Custom providers (default: OpenAI-compatible).
     #[serde(default)]
     pub api_format: Option<String>,
+    /// Extra field values from preset-specific fields.
+    #[serde(default)]
+    pub extra: HashMap<String, String>,
+}
+
+/// Mask a sensitive string for display (e.g. "sk-12345678" → "••••5678").
+pub fn mask_value(s: &str) -> String {
+    if s.is_empty() {
+        return String::new();
+    }
+    let bullet_prefix = "\u{2022}\u{2022}\u{2022}\u{2022}";
+    let char_count = s.chars().count();
+    if char_count > 4 {
+        // Take the last 4 Unicode scalar values to avoid slicing on invalid UTF-8 boundaries.
+        let tail: String = s.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
+        format!("{bullet_prefix}{tail}")
+    } else {
+        bullet_prefix.to_string()
+    }
 }
 
 impl Provider {
@@ -271,16 +290,14 @@ impl Provider {
         Ok(())
     }
 
+    /// Get an extra field value by ID. Returns empty string if not set.
+    pub fn extra(&self, field_id: &str) -> &str {
+        self.extra.get(field_id).map(|s| s.as_str()).unwrap_or("")
+    }
+
     /// Return a masked version of the API key for display (e.g. "••••abcd").
     pub fn masked_api_key(&self) -> String {
-        if self.api_key.is_empty() {
-            return String::new();
-        }
-        if self.api_key.len() > 4 {
-            format!("\u{2022}\u{2022}\u{2022}\u{2022}{}", &self.api_key[self.api_key.len() - 4..])
-        } else {
-            "\u{2022}\u{2022}\u{2022}\u{2022}".to_string()
-        }
+        mask_value(&self.api_key)
     }
 }
 
@@ -325,11 +342,58 @@ pub fn keyring_delete(provider_id: &str) {
     }
 }
 
-/// Populate empty api_key fields from the OS keychain.
+/// Store a sensitive extra field value in the OS keychain.
+pub fn keyring_store_extra(provider_id: &str, field_id: &str, value: &str) {
+    if value.is_empty() {
+        return;
+    }
+    let user = format!("provider:{}:extra:{}", provider_id, field_id);
+    match keyring::Entry::new(KEYRING_SERVICE, &user) {
+        Ok(entry) => {
+            if let Err(e) = entry.set_password(value) {
+                log::error!("keyring: failed to store extra field {}:{}: {}", provider_id, field_id, e);
+            }
+        }
+        Err(e) => log::error!("keyring: failed to create entry for {}:{}: {}", provider_id, field_id, e),
+    }
+}
+
+/// Load a sensitive extra field value from the OS keychain. Returns empty string on failure.
+pub fn keyring_load_extra(provider_id: &str, field_id: &str) -> String {
+    let user = format!("provider:{}:extra:{}", provider_id, field_id);
+    match keyring::Entry::new(KEYRING_SERVICE, &user) {
+        Ok(entry) => entry.get_password().unwrap_or_default(),
+        Err(e) => {
+            log::warn!("keyring: failed to create entry for {}:{}: {}", provider_id, field_id, e);
+            String::new()
+        }
+    }
+}
+
+/// Delete a sensitive extra field value from the OS keychain.
+pub fn keyring_delete_extra(provider_id: &str, field_id: &str) {
+    let user = format!("provider:{}:extra:{}", provider_id, field_id);
+    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, &user) {
+        let _ = entry.delete_credential();
+    }
+}
+
+/// Populate empty api_key fields and sensitive extra fields from the OS keychain.
 pub fn load_api_keys_from_keyring(providers: &mut [Provider]) {
     for provider in providers.iter_mut() {
         if provider.api_key.is_empty() {
             provider.api_key = keyring_load(&provider.id);
+        }
+        // Hydrate sensitive extra fields from keychain
+        if let Some(preset) = preset_by_id(&provider.kind) {
+            for field in preset.extra_fields {
+                if field.sensitive && !provider.extra.contains_key(field.id) {
+                    let val = keyring_load_extra(&provider.id, field.id);
+                    if !val.is_empty() {
+                        provider.extra.insert(field.id.to_string(), val);
+                    }
+                }
+            }
         }
     }
 }
@@ -446,10 +510,18 @@ impl Preferences {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        // Clone and strip API keys — they live in the OS keychain, not on disk
+        // Clone and strip API keys + sensitive extra fields — they live in the OS keychain, not on disk
         let mut prefs_for_disk = self.clone();
         for provider in &mut prefs_for_disk.providers {
             provider.api_key.clear();
+            // Strip sensitive extra fields
+            if let Some(preset) = preset_by_id(&provider.kind) {
+                for field in preset.extra_fields {
+                    if field.sensitive {
+                        provider.extra.remove(field.id);
+                    }
+                }
+            }
         }
         if let Ok(data) = serde_json::to_string_pretty(&prefs_for_disk) {
             match std::fs::write(&path, &data) {
@@ -757,7 +829,7 @@ mod tests {
             id: "test".into(), name: "Test".into(), kind: "openai".into(),
             url: "https://api.openai.com/v1".into(), api_key: String::new(),
             allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-            api_format: None,
+            api_format: None, extra: HashMap::new(),
         };
         overrides(&mut p);
         p
@@ -782,6 +854,18 @@ mod tests {
     fn provider_masked_api_key_short() {
         let p = test_provider(|p| p.api_key = "abc".into());
         assert_eq!(p.masked_api_key(), "\u{2022}\u{2022}\u{2022}\u{2022}");
+    }
+
+    #[test]
+    fn mask_value_non_ascii() {
+        // Multi-byte UTF-8: accented chars
+        assert_eq!(mask_value("clé-sécrète"), "••••rète");
+        // Emoji (4-byte chars) — 9 scalar values, last 4 shown
+        assert_eq!(mask_value("pass🔑🔒🔐💎🎉"), "••••🔒🔐💎🎉");
+        // Exactly 4 multi-byte chars → fully masked
+        assert_eq!(mask_value("àéîö"), "••••");
+        // CJK characters (6 chars, last 4 shown)
+        assert_eq!(mask_value("秘密のキー値"), "••••のキー値");
     }
 
     #[test]

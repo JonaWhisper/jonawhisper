@@ -223,4 +223,6 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #a855f7, #7c3aed)",
     default_asr_models: &["whisper-zero"],
     default_llm_models: &[],
+    extra_fields: &[],
+    hidden_fields: &[],
 }}

@@ -60,6 +60,17 @@ export interface HistoryEntry {
 
 export type ProviderKind = string
 
+export interface PresetFieldInfo {
+  id: string
+  label: string
+  field_type: 'text' | 'password' | 'select'
+  required: boolean
+  placeholder: string
+  default_value: string
+  options: [string, string][]
+  sensitive: boolean
+}
+
 export interface ProviderPresetInfo {
   id: string
   display_name: string
@@ -69,6 +80,8 @@ export interface ProviderPresetInfo {
   gradient: string
   default_asr_models: string[]
   default_llm_models: string[]
+  extra_fields: PresetFieldInfo[]
+  hidden_fields: string[]
 }
 
 export interface Provider {
@@ -82,6 +95,7 @@ export interface Provider {
   supports_asr: boolean
   supports_llm: boolean
   api_format?: 'open_ai' | 'anthropic' | null
+  extra: Record<string, string>
 }
 
 export interface CleanupModel {

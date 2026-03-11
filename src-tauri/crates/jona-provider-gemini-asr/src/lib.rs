@@ -166,4 +166,6 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #4285f4, #1a73e8)",
     default_asr_models: &["gemini-2.0-flash", "gemini-2.5-flash"],
     default_llm_models: &[],
+    extra_fields: &[],
+    hidden_fields: &["base_url"],
 }}

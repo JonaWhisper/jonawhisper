@@ -603,6 +603,7 @@ mod tests {
             supports_asr: true,
             supports_llm: true,
             api_format: None,
+            extra: std::collections::HashMap::new(),
         };
         // Should not panic — resolves preset → backend
         let _ = jona_provider::backend_for_provider(&provider);
@@ -623,6 +624,7 @@ mod tests {
             supports_asr: false,
             supports_llm: true,
             api_format: Some("anthropic".into()),
+            extra: std::collections::HashMap::new(),
         };
         // Should resolve to the anthropic backend without panicking
         let _ = jona_provider::backend_for_provider(&provider);

@@ -208,4 +208,6 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #24292e, #586069)",
     default_asr_models: &[],
     default_llm_models: &["gpt-4o", "gpt-4o-mini"],
+    extra_fields: &[],
+    hidden_fields: &["base_url"],
 }}

@@ -218,6 +218,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #10a37f, #0d8c6d)",
     default_asr_models: &["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"],
     default_llm_models: &["gpt-4o-mini", "gpt-4o"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "groq", display_name: "Groq",
@@ -226,6 +227,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #9333ea, #7c3aed)",
     default_asr_models: &["whisper-large-v3-turbo", "whisper-large-v3"],
     default_llm_models: &["llama-3.1-8b-instant"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "cerebras", display_name: "Cerebras",
@@ -234,6 +236,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #3b82f6, #2563eb)",
     default_asr_models: &[],
     default_llm_models: &["llama3.1-8b"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "gemini", display_name: "Google Gemini",
@@ -242,6 +245,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #0ea5e9, #0284c7)",
     default_asr_models: &[],
     default_llm_models: &["gemini-2.5-flash-lite"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "mistral", display_name: "Mistral",
@@ -250,6 +254,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #6366f1, #4f46e5)",
     default_asr_models: &[],
     default_llm_models: &["ministral-3b-latest"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "fireworks", display_name: "Fireworks AI",
@@ -258,6 +263,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #ef4444, #dc2626)",
     default_asr_models: &["whisper-v3-turbo", "whisper-v3"],
     default_llm_models: &[],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "together", display_name: "Together AI",
@@ -266,6 +272,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #14b8a6, #0d9488)",
     default_asr_models: &["openai/whisper-large-v3"],
     default_llm_models: &["meta-llama/Llama-3.2-3B"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "deepseek", display_name: "DeepSeek",
@@ -274,6 +281,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #06b6d4, #0891b2)",
     default_asr_models: &[],
     default_llm_models: &["deepseek-v3.2"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "openrouter", display_name: "OpenRouter",
@@ -282,6 +290,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
     default_asr_models: &[],
     default_llm_models: &["openai/gpt-4o", "anthropic/claude-sonnet-4", "google/gemini-2.0-flash-001"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "xai", display_name: "xAI",
@@ -290,6 +299,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #1d1d1f, #3a3a3c)",
     default_asr_models: &[],
     default_llm_models: &["grok-2"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "sambanova", display_name: "SambaNova",
@@ -298,6 +308,7 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #f97316, #ea580c)",
     default_asr_models: &["whisper-large-v3"],
     default_llm_models: &["Meta-Llama-3.1-8B-Instant"],
+    extra_fields: &[], hidden_fields: &[],
 }}
 inventory::submit! { ProviderPreset {
     id: "nebius", display_name: "Nebius AI",
@@ -306,4 +317,5 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #d946ef, #c026d3)",
     default_asr_models: &[],
     default_llm_models: &["meta-llama/Meta-Llama-3.1-8B-Instruct"],
+    extra_fields: &[], hidden_fields: &[],
 }}

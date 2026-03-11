@@ -114,4 +114,6 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #13ef93, #149e6a)",
     default_asr_models: &["nova-3", "nova-2"],
     default_llm_models: &[],
+    extra_fields: &[],
+    hidden_fields: &[],
 }}
