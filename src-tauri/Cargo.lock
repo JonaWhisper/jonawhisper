@@ -2884,7 +2884,92 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-provider-assemblyai"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-cohere"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-copilot"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-deepgram"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-elevenlabs"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-gemini-asr"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jona-provider-openai"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-revai"
 version = "0.1.0"
 dependencies = [
  "inventory",
@@ -2937,7 +3022,14 @@ dependencies = [
  "jona-platform",
  "jona-provider",
  "jona-provider-anthropic",
+ "jona-provider-assemblyai",
+ "jona-provider-cohere",
+ "jona-provider-copilot",
+ "jona-provider-deepgram",
+ "jona-provider-elevenlabs",
+ "jona-provider-gemini-asr",
  "jona-provider-openai",
+ "jona-provider-revai",
  "jona-types",
  "keyring",
  "llama-cpp-2",

@@ -1,0 +1,180 @@
+use jona_types::{
+    CloudProvider, Provider, ProviderError, ProviderPreset, ProviderRegistration,
+    TranscriptionResult,
+};
+use serde::Deserialize;
+use std::future::Future;
+use std::path::Path;
+use std::pin::Pin;
+use std::sync::LazyLock;
+
+static BLOCKING_CLIENT: LazyLock<reqwest::blocking::Client> = LazyLock::new(|| {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .unwrap_or_else(|_| reqwest::blocking::Client::new())
+});
+
+/// AssemblyAI ASR — asynchronous 3-step workflow: upload → create transcript → poll.
+pub struct AssemblyAiBackend;
+
+#[derive(Deserialize)]
+struct UploadResponse {
+    upload_url: String,
+}
+
+#[derive(Deserialize)]
+struct TranscriptResponse {
+    id: String,
+    status: String,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+impl CloudProvider for AssemblyAiBackend {
+    fn transcribe(
+        &self,
+        provider: &Provider,
+        model: &str,
+        audio_path: &Path,
+        language: &str,
+    ) -> Result<TranscriptionResult, ProviderError> {
+        provider.validate_url().map_err(ProviderError::Http)?;
+
+        let base = provider.base_url();
+        let auth_header = ("authorization", provider.api_key.as_str());
+
+        // Step 1: Upload audio file
+        let file_bytes = std::fs::read(audio_path)?;
+        let upload_resp = BLOCKING_CLIENT
+            .post(format!("{}/v2/upload", base))
+            .header(auth_header.0, auth_header.1)
+            .header("Content-Type", "application/octet-stream")
+            .body(file_bytes)
+            .send()
+            .map_err(|e| ProviderError::Http(e.to_string()))?;
+
+        if !upload_resp.status().is_success() {
+            let status = upload_resp.status().as_u16();
+            let body = upload_resp.text().unwrap_or_default();
+            return Err(ProviderError::Api { status, body });
+        }
+
+        let upload: UploadResponse = upload_resp
+            .json()
+            .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
+
+        // Step 2: Create transcript
+        let mut body = serde_json::json!({
+            "audio_url": upload.upload_url,
+        });
+        if !model.is_empty() && model != "best" {
+            body["speech_model"] = serde_json::Value::String(model.to_string());
+        }
+        if language != "auto" {
+            body["language_code"] = serde_json::Value::String(language.to_string());
+        }
+
+        let create_resp = BLOCKING_CLIENT
+            .post(format!("{}/v2/transcript", base))
+            .header(auth_header.0, auth_header.1)
+            .json(&body)
+            .send()
+            .map_err(|e| ProviderError::Http(e.to_string()))?;
+
+        if !create_resp.status().is_success() {
+            let status = create_resp.status().as_u16();
+            let body = create_resp.text().unwrap_or_default();
+            return Err(ProviderError::Api { status, body });
+        }
+
+        let transcript: TranscriptResponse = create_resp
+            .json()
+            .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
+
+        // Step 3: Poll until completed or error
+        let poll_url = format!("{}/v2/transcript/{}", base, transcript.id);
+        let max_polls = 60; // 60 * 2s = 2 minutes max
+        for _ in 0..max_polls {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            let poll_resp = BLOCKING_CLIENT
+                .get(&poll_url)
+                .header(auth_header.0, auth_header.1)
+                .send()
+                .map_err(|e| ProviderError::Http(e.to_string()))?;
+
+            if !poll_resp.status().is_success() {
+                let status = poll_resp.status().as_u16();
+                let body = poll_resp.text().unwrap_or_default();
+                return Err(ProviderError::Api { status, body });
+            }
+
+            let result: TranscriptResponse = poll_resp
+                .json()
+                .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
+
+            match result.status.as_str() {
+                "completed" => {
+                    let text = result.text.unwrap_or_default();
+                    return Ok(TranscriptionResult::text_only(text));
+                }
+                "error" => {
+                    let msg = result.error.unwrap_or_else(|| "Unknown error".into());
+                    return Err(ProviderError::InvalidResponse(msg));
+                }
+                _ => continue, // "queued" or "processing"
+            }
+        }
+
+        Err(ProviderError::InvalidResponse(
+            "AssemblyAI transcript timed out after polling".into(),
+        ))
+    }
+
+    fn chat_completion<'a>(
+        &'a self,
+        provider: &'a Provider,
+        _model: &'a str,
+        _system: &'a str,
+        _user_message: &'a str,
+        _temperature: f32,
+        _max_tokens: u32,
+    ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
+        Box::pin(async move {
+            Err(ProviderError::NotConfigured(format!(
+                "Provider '{}' does not support LLM chat",
+                provider.name
+            )))
+        })
+    }
+
+    fn list_models<'a>(
+        &'a self,
+        _provider: &'a Provider,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>> {
+        Box::pin(async move {
+            Ok(vec![
+                "best".into(),
+                "nano".into(),
+                "conformer-2".into(),
+            ])
+        })
+    }
+}
+
+inventory::submit! { ProviderRegistration {
+    backend_id: "assemblyai",
+    factory: || Box::new(AssemblyAiBackend),
+}}
+
+inventory::submit! { ProviderPreset {
+    id: "assemblyai", display_name: "AssemblyAI",
+    base_url: "https://api.assemblyai.com", backend_id: "assemblyai",
+    supports_asr: true, supports_llm: false,
+    gradient: "linear-gradient(135deg, #6366f1, #4f46e5)",
+    default_asr_models: &["best", "nano"],
+    default_llm_models: &[],
+}}
