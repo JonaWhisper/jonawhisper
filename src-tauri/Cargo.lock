@@ -2957,6 +2957,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-provider-gladia"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jona-provider-openai"
 version = "0.1.0"
 dependencies = [
@@ -2970,6 +2982,18 @@ dependencies = [
 
 [[package]]
 name = "jona-provider-revai"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jona-provider-speechmatics"
 version = "0.1.0"
 dependencies = [
  "inventory",
@@ -3028,8 +3052,10 @@ dependencies = [
  "jona-provider-deepgram",
  "jona-provider-elevenlabs",
  "jona-provider-gemini-asr",
+ "jona-provider-gladia",
  "jona-provider-openai",
  "jona-provider-revai",
+ "jona-provider-speechmatics",
  "jona-types",
  "keyring",
  "llama-cpp-2",
