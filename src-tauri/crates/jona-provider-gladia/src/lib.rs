@@ -28,25 +28,16 @@ struct InitResponse {
     result_url: String,
 }
 
-#[derive(Deserialize)]
-struct PollResponse {
-    status: String,
-    #[serde(default)]
-    result: Option<TranscriptionResult_>,
-    #[serde(default)]
-    error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct TranscriptionResult_ {
-    #[serde(default)]
-    transcription: Option<Transcription>,
-}
-
-#[derive(Deserialize)]
-struct Transcription {
-    #[serde(default)]
-    full_transcript: Option<String>,
+/// Stepped polling backoff: 1s for first 5 polls, 2s up to 15 polls, then 3s.
+fn poll_delay(poll_index: u32) -> std::time::Duration {
+    let secs = if poll_index < 5 {
+        1
+    } else if poll_index < 15 {
+        2
+    } else {
+        3
+    };
+    std::time::Duration::from_secs(secs)
 }
 
 impl CloudProvider for GladiaBackend {
@@ -123,9 +114,15 @@ impl CloudProvider for GladiaBackend {
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
 
         // Step 3: Poll result_url until status is "done" or "error"
-        let max_polls = 60; // 60 * 2s = 2 minutes max
-        for _ in 0..max_polls {
-            std::thread::sleep(std::time::Duration::from_secs(2));
+        // Stepped backoff: 1s (polls 0-4), 2s (5-14), 3s (15+). ~120s total budget.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        let mut poll_count = 0u32;
+        loop {
+            std::thread::sleep(poll_delay(poll_count));
+            poll_count += 1;
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
 
             let poll_resp = BLOCKING_CLIENT
                 .get(&init.result_url)
@@ -139,22 +136,32 @@ impl CloudProvider for GladiaBackend {
                 return Err(ProviderError::Api { status, body });
             }
 
-            let result: PollResponse = poll_resp
+            // Parse as raw JSON and use pointer for robust field access
+            let json: serde_json::Value = poll_resp
                 .json()
                 .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
 
-            match result.status.as_str() {
+            let status = json
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            match status {
                 "done" => {
-                    let text = result
-                        .result
-                        .and_then(|r| r.transcription)
-                        .and_then(|t| t.full_transcript)
-                        .unwrap_or_default();
-                    return Ok(TranscriptionResult::text_only(text));
+                    let text = json
+                        .pointer("/result/transcription/full_transcript")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| ProviderError::InvalidResponse(
+                            "Gladia response missing /result/transcription/full_transcript".into(),
+                        ))?;
+                    return Ok(TranscriptionResult::text_only(text.to_string()));
                 }
                 "error" => {
-                    let msg = result.error.unwrap_or_else(|| "Unknown error".into());
-                    return Err(ProviderError::InvalidResponse(msg));
+                    let msg = json
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
+                    return Err(ProviderError::InvalidResponse(msg.to_string()));
                 }
                 _ => continue, // "queued" or "processing"
             }

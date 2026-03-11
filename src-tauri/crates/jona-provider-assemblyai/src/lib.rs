@@ -101,11 +101,24 @@ impl CloudProvider for AssemblyAiBackend {
             .json()
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
 
-        // Step 3: Poll until completed or error (cap at 90s to stay under pipeline's 120s timeout)
+        // Step 3: Poll until completed or error.
+        // Capped at 90s to stay safely under the HTTP client's 120s timeout — if the
+        // transcript isn't ready by then, we'd rather return a clear timeout error than
+        // let the client silently drop the connection.
+        // Stepped backoff: 1s (polls 0-4), 2s (5-14), 3s (15+).
         let poll_url = format!("{}/v2/transcript/{}", base, transcript.id);
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+        let mut poll_count = 0u32;
         loop {
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            let delay = if poll_count < 5 {
+                1
+            } else if poll_count < 15 {
+                2
+            } else {
+                3
+            };
+            std::thread::sleep(std::time::Duration::from_secs(delay));
+            poll_count += 1;
             if std::time::Instant::now() >= deadline {
                 break;
             }

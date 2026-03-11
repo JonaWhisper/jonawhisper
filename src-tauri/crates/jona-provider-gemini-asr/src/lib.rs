@@ -65,9 +65,12 @@ impl CloudProvider for GeminiAsrBackend {
         );
 
         let prompt = if language != "auto" {
-            format!("Transcribe this audio in {}. Output only the transcription, nothing else.", language)
+            format!(
+                "Transcribe the following audio. Output only the transcription text, nothing else. Language: {}",
+                language
+            )
         } else {
-            "Transcribe this audio. Output only the transcription, nothing else.".to_string()
+            "Transcribe the following audio. Output only the transcription text, nothing else.".to_string()
         };
 
         let request = GeminiRequest {

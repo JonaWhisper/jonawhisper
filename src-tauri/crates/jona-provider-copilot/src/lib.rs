@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, Mutex};
+use std::time::Instant;
 
 static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
     reqwest::Client::builder()
@@ -15,12 +16,19 @@ static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .unwrap_or_else(|_| reqwest::Client::new())
 });
 
+/// Cached Copilot JWT: (token, fetched_at). GitHub Copilot JWTs typically last 30 min;
+/// we use a 25 min TTL to refresh before expiry.
+static JWT_CACHE: LazyLock<Mutex<Option<(String, Instant)>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+const JWT_TTL_SECS: u64 = 25 * 60; // 25 minutes
+
 /// GitHub Copilot backend — exchanges a GitHub OAuth token for a short-lived
 /// Copilot JWT, then uses it with the OpenAI-compatible chat endpoint.
 pub struct CopilotBackend;
 
-/// Exchange a GitHub OAuth token (`gho_...`) for a Copilot JWT.
-async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
+/// Exchange a GitHub OAuth token (`gho_...`) for a Copilot JWT (network call).
+async fn fetch_token(github_token: &str) -> Result<String, ProviderError> {
     let response = ASYNC_CLIENT
         .get("https://api.github.com/copilot_internal/v2/token")
         .header("Authorization", format!("token {}", github_token))
@@ -44,6 +52,27 @@ async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| ProviderError::InvalidResponse("No token in response".into()))
+}
+
+/// Get a cached JWT or exchange for a fresh one if expired/missing.
+async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
+    // Check cache
+    if let Ok(guard) = JWT_CACHE.lock() {
+        if let Some((ref token, fetched_at)) = *guard {
+            if fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
+                return Ok(token.clone());
+            }
+        }
+    }
+
+    // Cache miss or expired — fetch a new token
+    let token = fetch_token(github_token).await?;
+
+    if let Ok(mut guard) = JWT_CACHE.lock() {
+        *guard = Some((token.clone(), Instant::now()));
+    }
+
+    Ok(token)
 }
 
 impl CloudProvider for CopilotBackend {

@@ -39,7 +39,7 @@ impl CloudProvider for AnthropicBackend {
         model: &'a str,
         system: &'a str,
         user_message: &'a str,
-        _temperature: f32,
+        temperature: f32,
         max_tokens: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
@@ -48,6 +48,7 @@ impl CloudProvider for AnthropicBackend {
             let request = AnthropicRequest {
                 model: model.to_string(),
                 max_tokens,
+                temperature,
                 system: system.to_string(),
                 messages: vec![AnthropicMessage {
                     role: "user",
@@ -109,6 +110,7 @@ impl CloudProvider for AnthropicBackend {
 struct AnthropicRequest {
     model: String,
     max_tokens: u32,
+    temperature: f32,
     system: String,
     messages: Vec<AnthropicMessage>,
 }

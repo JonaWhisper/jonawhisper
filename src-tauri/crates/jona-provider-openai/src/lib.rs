@@ -34,6 +34,13 @@ impl CloudProvider for OpenAICompatibleBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
+        // Validate API key before file I/O to fail fast
+        if provider.api_key.is_empty() {
+            return Err(ProviderError::NotConfigured(
+                "API key is not configured".into(),
+            ));
+        }
+
         let file_bytes = std::fs::read(audio_path)?;
         let file_name = audio_path
             .file_name()
@@ -72,12 +79,17 @@ impl CloudProvider for OpenAICompatibleBackend {
         let body = response
             .text()
             .map_err(|e| ProviderError::Http(e.to_string()))?;
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
-            if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
-                return Ok(TranscriptionResult::text_only(text.to_string()));
-            }
-        }
-        Ok(TranscriptionResult::text_only(body))
+        let json: serde_json::Value = serde_json::from_str(&body)
+            .map_err(|e| ProviderError::InvalidResponse(format!(
+                "ASR response is not valid JSON: {e}"
+            )))?;
+        let text = json
+            .get("text")
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| ProviderError::InvalidResponse(
+                "ASR response JSON missing 'text' field".into(),
+            ))?;
+        Ok(TranscriptionResult::text_only(text.to_string()))
     }
 
     fn chat_completion<'a>(
@@ -272,7 +284,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
     default_asr_models: &[],
-    default_llm_models: &[],
+    default_llm_models: &["openai/gpt-4o", "anthropic/claude-sonnet-4", "google/gemini-2.0-flash-001"],
 }}
 inventory::submit! { ProviderPreset {
     id: "xai", display_name: "xAI",
