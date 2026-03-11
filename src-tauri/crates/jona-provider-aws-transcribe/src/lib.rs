@@ -367,9 +367,19 @@ impl CloudProvider for AwsTranscribeBatchBackend {
         let s3_bucket = provider
             .extra
             .get("s3_bucket")
+            .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
-            .ok_or_else(|| ProviderError::NotConfigured("S3 bucket is not configured".into()))?
-            .clone();
+            .ok_or_else(|| ProviderError::NotConfigured("S3 bucket is not configured".into()))?;
+
+        // Basic S3 bucket name validation (3-63 chars, lowercase alphanumeric + hyphens + dots)
+        if s3_bucket.len() < 3
+            || s3_bucket.len() > 63
+            || !s3_bucket.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.')
+        {
+            return Err(ProviderError::NotConfigured(format!(
+                "Invalid S3 bucket name: '{s3_bucket}'"
+            )));
+        }
 
         let lang_code = aws_language_code(language)?;
 
@@ -469,7 +479,7 @@ async fn batch_transcribe(
         return Err(ProviderError::Http(format!("StartTranscriptionJob failed: {e}")));
     }
 
-    // 3. Poll until complete (max ~5 min with exponential backoff)
+    // 3. Poll until complete (max ~5 min with linear backoff 2s→10s)
     let mut transcript_uri = String::new();
     let mut poll_interval = std::time::Duration::from_secs(2);
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
