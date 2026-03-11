@@ -92,7 +92,8 @@ const visibleExtraFields = computed(() => {
 
 const showUrl = computed(() => {
   if (kind.value === 'custom') return true
-  return !(currentPreset.value?.hidden_fields?.includes('base_url'))
+  // Presets have hardcoded URLs — only show if no preset found (fallback)
+  return !currentPreset.value
 })
 
 const showApiKey = computed(() =>
