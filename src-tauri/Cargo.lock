@@ -2896,6 +2896,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-provider-azure-openai"
+version = "0.1.0"
+dependencies = [
+ "inventory",
+ "jona-types",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "jona-provider-azure-speech"
 version = "0.1.0"
 dependencies = [
@@ -3073,6 +3086,7 @@ dependencies = [
  "jona-provider",
  "jona-provider-anthropic",
  "jona-provider-assemblyai",
+ "jona-provider-azure-openai",
  "jona-provider-azure-speech",
  "jona-provider-cohere",
  "jona-provider-copilot",
