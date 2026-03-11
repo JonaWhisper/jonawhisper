@@ -87,13 +87,14 @@ impl CloudProvider for GoogleSpeechBackend {
             audio: RecognitionAudio { content: audio_b64 },
         };
 
-        let url = format!(
-            "https://speech.googleapis.com/v1/speech:recognize?key={}",
-            provider.api_key
-        );
+        let url = reqwest::Url::parse_with_params(
+            "https://speech.googleapis.com/v1/speech:recognize",
+            &[("key", &provider.api_key)],
+        )
+        .map_err(|e| ProviderError::Http(e.to_string()))?;
 
         let response = BLOCKING_CLIENT
-            .post(&url)
+            .post(url)
             .json(&request)
             .send()
             .map_err(|e| {
