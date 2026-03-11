@@ -122,15 +122,19 @@ fn aws_language_code(lang: &str) -> Result<String, ProviderError> {
 
 /// Run an async future from a sync context, using the current Tokio handle if available,
 /// or creating a temporary runtime as fallback.
-fn run_async<F: std::future::Future>(fut: F) -> F::Output {
+fn run_async<F: std::future::Future>(fut: F) -> Result<F::Output, ProviderError> {
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        handle.block_on(fut)
+        Ok(handle.block_on(fut))
     } else {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
-            .expect("failed to create Tokio runtime for AWS Transcribe");
-        rt.block_on(fut)
+            .map_err(|e| {
+                ProviderError::InvalidResponse(format!(
+                    "Failed to create Tokio runtime for AWS Transcribe: {e}"
+                ))
+            })?;
+        Ok(rt.block_on(fut))
     }
 }
 
@@ -233,7 +237,7 @@ impl CloudProvider for AwsTranscribeStreamingBackend {
 
         let result = run_async(async {
             streaming_transcribe(&config, pcm_data, sample_rate as i32, &lang_code).await
-        })?;
+        })??;
 
         Ok(TranscriptionResult::text_only(result))
     }
@@ -374,7 +378,7 @@ impl CloudProvider for AwsTranscribeBatchBackend {
 
         let result = run_async(async {
             batch_transcribe(&config, audio_bytes, &s3_bucket, &lang_code).await
-        })?;
+        })??;
 
         Ok(TranscriptionResult::text_only(result))
     }
@@ -525,8 +529,9 @@ async fn batch_transcribe(
         let resp = match HTTP_CLIENT.get(&transcript_uri).send().await {
             Ok(r) => r,
             Err(e) => {
+                let sanitized = e.to_string().replace(&transcript_uri, "<redacted>");
                 cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
-                return Err(ProviderError::Http(format!("Failed to download transcript: {e}")));
+                return Err(ProviderError::Http(format!("Failed to download transcript: {sanitized}")));
             }
         };
 
@@ -591,7 +596,7 @@ inventory::submit! { ProviderPreset {
         PresetField {
             id: "access_key",
             label: "Access Key ID",
-            field_type: FieldType::Text,
+            field_type: FieldType::Password,
             required: true,
             placeholder: "AKIA...",
             default_value: "",
@@ -635,7 +640,7 @@ inventory::submit! { ProviderPreset {
         PresetField {
             id: "access_key",
             label: "Access Key ID",
-            field_type: FieldType::Text,
+            field_type: FieldType::Password,
             required: true,
             placeholder: "AKIA...",
             default_value: "",
