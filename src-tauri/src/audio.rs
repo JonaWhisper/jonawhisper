@@ -243,8 +243,9 @@ impl AudioRecorder {
         self.current_file.lock().unwrap().take()
     }
 
-    pub fn get_spectrum(&self) -> Vec<f32> {
-        self.spectrum.lock().unwrap().clone()
+    /// Returns a shared handle to the live spectrum data (updated by the cpal callback).
+    pub fn spectrum_handle(&self) -> Arc<Mutex<Vec<f32>>> {
+        Arc::clone(&self.spectrum)
     }
 }
 

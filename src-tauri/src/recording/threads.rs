@@ -5,14 +5,15 @@ use crate::platform;
 use crate::platform::hotkey;
 use crate::state::AppState;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 /// Named return type for `spawn_audio_thread`.
 pub struct AudioThreadHandles {
     pub cmd_tx: crossbeam_channel::Sender<AudioCmd>,
-    pub spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
+    /// Live spectrum data — shared directly with the cpal callback (no intermediate copy).
+    pub spectrum_data: Arc<Mutex<Vec<f32>>>,
     pub reply_rx: crossbeam_channel::Receiver<AudioReply>,
     pub stream_error: Arc<AtomicBool>,
     pub samples_received: Arc<AtomicBool>,
@@ -22,8 +23,6 @@ pub struct AudioThreadHandles {
 pub fn spawn_audio_thread() -> AudioThreadHandles {
     let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded::<AudioCmd>();
     let (reply_tx, reply_rx) = crossbeam_channel::unbounded::<AudioReply>();
-    let spectrum_data = Arc::new(std::sync::Mutex::new(vec![0.0f32; 12]));
-    let spectrum_clone = spectrum_data.clone();
 
     let stream_error = Arc::new(AtomicBool::new(false));
     let stream_error_clone = Arc::clone(&stream_error);
@@ -31,8 +30,14 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
     let samples_received = Arc::new(AtomicBool::new(false));
     let samples_received_clone = Arc::clone(&samples_received);
 
+    // Channel to send back the recorder's live spectrum handle once created.
+    let (spectrum_tx, spectrum_rx) = crossbeam_channel::bounded::<Arc<Mutex<Vec<f32>>>>(1);
+
     std::thread::spawn(move || {
         let mut recorder = audio::AudioRecorder::new(stream_error_clone, samples_received_clone);
+        // Send the recorder's spectrum handle back to the main thread.
+        let _ = spectrum_tx.send(recorder.spectrum_handle());
+
         loop {
             match cmd_rx.recv() {
                 Ok(AudioCmd::StartRecording { device_uid }) => {
@@ -42,10 +47,6 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
                 Ok(AudioCmd::StopRecording) => {
                     let path = recorder.stop_recording();
                     let _ = reply_tx.send(AudioReply::Stopped { path });
-                }
-                Ok(AudioCmd::GetSpectrum) => {
-                    let s = recorder.get_spectrum();
-                    *spectrum_clone.lock().unwrap() = s.clone();
                 }
                 Ok(AudioCmd::StartMicTest { device_uid }) => {
                     recorder.start_recording(device_uid.as_deref());
@@ -60,6 +61,9 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
             }
         }
     });
+
+    // Receive the live spectrum handle from the audio thread.
+    let spectrum_data = spectrum_rx.recv().expect("audio thread failed to send spectrum handle");
 
     AudioThreadHandles { cmd_tx, spectrum_data, reply_rx, stream_error, samples_received }
 }
@@ -129,7 +133,7 @@ pub fn spawn_spectrum_emitter(
     app: AppHandle,
     state: Arc<AppState>,
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,
-    spectrum_data: Arc<std::sync::Mutex<Vec<f32>>>,
+    spectrum_data: Arc<Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
     samples_received: Arc<AtomicBool>,
 ) {
@@ -176,10 +180,9 @@ pub fn spawn_spectrum_emitter(
                 continue;
             }
 
+            // Read spectrum directly from the recorder's Arc (no GetSpectrum roundtrip).
             let spectrum = spectrum_data.lock().unwrap().clone();
             let is_flat = spectrum.iter().all(|&v| v < 0.001);
-            // Only warn about flat spectrum after samples have been received AND the
-            // FFT buffer has had enough time to fill (grace period for cpal startup + FFT).
             if is_flat && !is_mic_testing && state.audio_flags.is_recording()
                 && samples_received.load(Ordering::Relaxed)
             {
@@ -190,7 +193,6 @@ pub fn spawn_spectrum_emitter(
             } else if !is_flat {
                 flat_frames_since_active = 0;
             }
-            let _ = cmd_tx.send(AudioCmd::GetSpectrum);
             if is_mic_testing {
                 let _ = app.emit(events::MIC_TEST_SPECTRUM, &spectrum);
             } else {
