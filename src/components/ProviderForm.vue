@@ -59,7 +59,8 @@ function initExtraValues(kindId: string) {
     }
     extraValues.value = vals
   } else {
-    extraValues.value = {}
+    // Custom provider — api_key managed via extraValues too
+    extraValues.value = { api_key: '' }
   }
 }
 
@@ -96,14 +97,18 @@ const showUrl = computed(() => {
 })
 
 const canTest = computed(() => {
+  // For presets: check all required extra fields
   for (const field of visibleExtraFields.value) {
     if (!field.required) continue
     const val = extraValues.value[field.id]?.trim()
     if (!val) {
-      // Sensitive fields can be empty when editing (= keep existing)
       if (field.sensitive && isEditing.value) continue
       return false
     }
+  }
+  // For custom: check api_key
+  if (kind.value === 'custom') {
+    return (extraValues.value['api_key']?.trim().length ?? 0) > 0 || isEditing.value
   }
   return true
 })
@@ -320,6 +325,18 @@ function save() {
       <Label class="text-xs text-muted-foreground">{{ t('provider.url') }}</Label>
       <Input v-model="url" class="h-9 text-sm" />
       <p v-if="errors.url" class="text-xs text-destructive">{{ errors.url }}</p>
+    </div>
+
+    <!-- API key for custom providers (no preset = no extra_fields) -->
+    <div v-if="kind === 'custom'" class="space-y-2">
+      <Label class="text-xs text-muted-foreground">{{ t('provider.apiKey') }}</Label>
+      <Input
+        :model-value="extraValues['api_key'] ?? ''"
+        @update:model-value="v => extraValues['api_key'] = String(v)"
+        type="password"
+        :placeholder="isEditing ? t('provider.apiKeyKeep') : 'sk-...'"
+        class="h-9 text-sm"
+      />
     </div>
 
     <!-- Test result -->
