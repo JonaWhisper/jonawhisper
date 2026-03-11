@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="100%" style="stop-color:#a78bfa"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="40%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:0"/>
+    </radialGradient>
+    <!-- macOS squircle clip -->
+    <clipPath id="squircle">
+      <path d="M512,0 C748,0 820,0 900,60 C960,120 1024,200 1024,276 L1024,748 C1024,824 960,904 900,964 C820,1024 748,1024 512,1024 C276,1024 204,1024 124,964 C64,904 0,824 0,748 L0,276 C0,200 64,120 124,60 C204,0 276,0 512,0Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="220" fill="url(#glow)"/>
+
+  <!-- Logo centered -->
+  <g transform="translate(512, 490)">
+    <!-- Sound wave arcs (left) -->
+    <g stroke="url(#accent)" fill="none" stroke-width="14" stroke-linecap="round" opacity="0.6">
+      <path d="M-115,-65 Q-155,-32 -115,0 Q-155,32 -115,65"/>
+      <path d="M-155,-100 Q-210,-50 -155,0 Q-210,50 -155,100"/>
+      <path d="M-195,-135 Q-260,-67 -195,0 Q-260,67 -195,135"/>
+    </g>
+    <!-- Sound wave arcs (right) -->
+    <g stroke="url(#accent)" fill="none" stroke-width="14" stroke-linecap="round" opacity="0.6">
+      <path d="M115,-65 Q155,-32 115,0 Q155,32 115,65"/>
+      <path d="M155,-100 Q210,-50 155,0 Q210,50 155,100"/>
+      <path d="M195,-135 Q260,-67 195,0 Q260,67 195,135"/>
+    </g>
+    <!-- Microphone body -->
+    <rect x="-52" y="-135" width="104" height="180" rx="52" fill="url(#accent)"/>
+    <!-- Microphone grille lines -->
+    <line x1="-28" y1="-90" x2="28" y2="-90" stroke="#0f172a" stroke-width="5" opacity="0.3"/>
+    <line x1="-32" y1="-65" x2="32" y2="-65" stroke="#0f172a" stroke-width="5" opacity="0.3"/>
+    <line x1="-32" y1="-40" x2="32" y2="-40" stroke="#0f172a" stroke-width="5" opacity="0.3"/>
+    <line x1="-28" y1="-15" x2="28" y2="-15" stroke="#0f172a" stroke-width="5" opacity="0.3"/>
+    <!-- Microphone stand -->
+    <path d="M-80,45 Q-80,130 0,130 Q80,130 80,45" fill="none" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
+    <line x1="0" y1="130" x2="0" y2="180" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
+    <line x1="-42" y1="180" x2="42" y2="180" stroke="url(#accent)" stroke-width="12" stroke-linecap="round"/>
+  </g>
+</svg>
