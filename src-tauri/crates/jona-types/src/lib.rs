@@ -240,6 +240,21 @@ pub struct Provider {
     /// Override API format for Custom providers (default: OpenAI-compatible).
     #[serde(default)]
     pub api_format: Option<String>,
+    /// Extra field values from preset-specific fields.
+    #[serde(default)]
+    pub extra: HashMap<String, String>,
+}
+
+/// Mask a sensitive string for display (e.g. "sk-12345678" → "••••5678").
+pub fn mask_value(s: &str) -> String {
+    if s.is_empty() {
+        return String::new();
+    }
+    if s.len() > 4 {
+        format!("\u{2022}\u{2022}\u{2022}\u{2022}{}", &s[s.len() - 4..])
+    } else {
+        "\u{2022}\u{2022}\u{2022}\u{2022}".to_string()
+    }
 }
 
 impl Provider {
@@ -271,16 +286,14 @@ impl Provider {
         Ok(())
     }
 
+    /// Get an extra field value by ID. Returns empty string if not set.
+    pub fn extra(&self, field_id: &str) -> &str {
+        self.extra.get(field_id).map(|s| s.as_str()).unwrap_or("")
+    }
+
     /// Return a masked version of the API key for display (e.g. "••••abcd").
     pub fn masked_api_key(&self) -> String {
-        if self.api_key.is_empty() {
-            return String::new();
-        }
-        if self.api_key.len() > 4 {
-            format!("\u{2022}\u{2022}\u{2022}\u{2022}{}", &self.api_key[self.api_key.len() - 4..])
-        } else {
-            "\u{2022}\u{2022}\u{2022}\u{2022}".to_string()
-        }
+        mask_value(&self.api_key)
     }
 }
 
@@ -757,7 +770,7 @@ mod tests {
             id: "test".into(), name: "Test".into(), kind: "openai".into(),
             url: "https://api.openai.com/v1".into(), api_key: String::new(),
             allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
-            api_format: None,
+            api_format: None, extra: HashMap::new(),
         };
         overrides(&mut p);
         p

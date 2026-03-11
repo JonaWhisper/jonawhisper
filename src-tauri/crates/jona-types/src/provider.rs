@@ -1,9 +1,40 @@
 //! Cloud provider types, trait, and auto-registration.
 
 use crate::{Provider, TranscriptionResult};
+use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
+
+/// Type of form field for a preset's extra parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FieldType {
+    Text,
+    Password,
+    Select,
+}
+
+/// A custom field defined by a provider preset.
+#[derive(Debug, Clone)]
+pub struct PresetField {
+    /// Unique field identifier (e.g. "region", "access_key").
+    pub id: &'static str,
+    /// Display label (English fallback — frontend uses i18n key `provider.field.{id}`).
+    pub label: &'static str,
+    /// Field type controls rendering and masking behavior.
+    pub field_type: FieldType,
+    /// Whether the field must be non-empty to save.
+    pub required: bool,
+    /// Placeholder text shown in the input.
+    pub placeholder: &'static str,
+    /// Default value (empty string if none).
+    pub default_value: &'static str,
+    /// For Select fields: available options as `(value, label)` pairs.
+    pub options: &'static [(&'static str, &'static str)],
+    /// Whether the value is sensitive (stored in keychain, masked in IPC).
+    pub sensitive: bool,
+}
 
 /// Errors returned by cloud provider operations.
 #[derive(Debug, thiserror::Error)]
@@ -69,6 +100,10 @@ pub struct ProviderPreset {
     pub gradient: &'static str,
     pub default_asr_models: &'static [&'static str],
     pub default_llm_models: &'static [&'static str],
+    /// Additional fields this preset needs beyond name/apiKey/url.
+    pub extra_fields: &'static [PresetField],
+    /// Default field IDs to hide (e.g. `&["base_url"]` for providers with fixed endpoints).
+    pub hidden_fields: &'static [&'static str],
 }
 
 inventory::collect!(ProviderPreset);
@@ -216,6 +251,8 @@ mod tests {
             gradient: "none",
             default_asr_models: &["model-1"],
             default_llm_models: &[],
+            extra_fields: &[],
+            hidden_fields: &[],
         };
         assert_eq!(preset.id, "test");
         assert_eq!(preset.backend_id, "openai");
