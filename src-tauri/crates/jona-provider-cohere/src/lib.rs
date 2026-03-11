@@ -44,7 +44,8 @@ impl CloudProvider for CohereBackend {
         Box::pin(async move {
             provider.validate_url().map_err(ProviderError::Http)?;
 
-            if provider.api_key.trim().is_empty() {
+            let api_key = provider.api_key.trim();
+            if api_key.is_empty() {
                 return Err(ProviderError::NotConfigured(format!(
                     "Provider '{}' is missing an API key for Cohere",
                     provider.name
@@ -71,7 +72,7 @@ impl CloudProvider for CohereBackend {
 
             let response = ASYNC_CLIENT
                 .post(&url)
-                .header("Authorization", format!("Bearer {}", provider.api_key))
+                .header("Authorization", format!("Bearer {api_key}"))
                 .json(&request)
                 .send()
                 .await

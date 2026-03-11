@@ -250,10 +250,14 @@ pub fn mask_value(s: &str) -> String {
     if s.is_empty() {
         return String::new();
     }
-    if s.len() > 4 {
-        format!("\u{2022}\u{2022}\u{2022}\u{2022}{}", &s[s.len() - 4..])
+    let bullet_prefix = "\u{2022}\u{2022}\u{2022}\u{2022}";
+    let char_count = s.chars().count();
+    if char_count > 4 {
+        // Take the last 4 Unicode scalar values to avoid slicing on invalid UTF-8 boundaries.
+        let tail: String = s.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
+        format!("{bullet_prefix}{tail}")
     } else {
-        "\u{2022}\u{2022}\u{2022}\u{2022}".to_string()
+        bullet_prefix.to_string()
     }
 }
 
@@ -850,6 +854,18 @@ mod tests {
     fn provider_masked_api_key_short() {
         let p = test_provider(|p| p.api_key = "abc".into());
         assert_eq!(p.masked_api_key(), "\u{2022}\u{2022}\u{2022}\u{2022}");
+    }
+
+    #[test]
+    fn mask_value_non_ascii() {
+        // Multi-byte UTF-8: accented chars
+        assert_eq!(mask_value("clé-sécrète"), "••••rète");
+        // Emoji (4-byte chars) — 9 scalar values, last 4 shown
+        assert_eq!(mask_value("pass🔑🔒🔐💎🎉"), "••••🔒🔐💎🎉");
+        // Exactly 4 multi-byte chars → fully masked
+        assert_eq!(mask_value("àéîö"), "••••");
+        // CJK characters (6 chars, last 4 shown)
+        assert_eq!(mask_value("秘密のキー値"), "••••のキー値");
     }
 
     #[test]

@@ -4,18 +4,28 @@ use crate::state::{AppState, Provider, mask_value, keyring_store_extra, keyring_
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
+/// Sentinel value: when a sensitive extra field is set to this, the field is
+/// explicitly cleared (deleted from keychain and removed from `extra`).
+/// Uses a null-byte prefix so it cannot collide with any user-typed value
+/// (HTML input fields cannot contain null bytes).
+const CLEAR_SENTINEL: &str = "\0CLEAR";
+
 #[tauri::command]
-pub fn add_provider(provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+pub fn add_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
     // Store API key in OS keychain, not in preferences file
     crate::state::keyring_store(&provider.id, &provider.api_key);
     // Store sensitive extra fields in keychain
     if let Some(preset) = jona_provider::preset(&provider.kind) {
         for field in preset.extra_fields {
-            if field.sensitive {
-                if let Some(value) = provider.extra.get(field.id) {
-                    if !value.is_empty() {
-                        keyring_store_extra(&provider.id, field.id, value);
-                    }
+            if !field.sensitive {
+                continue;
+            }
+            if let Some(value) = provider.extra.get(field.id) {
+                if value == CLEAR_SENTINEL {
+                    // New provider — nothing in keychain yet, just remove from extra map
+                    provider.extra.remove(field.id);
+                } else if !value.is_empty() {
+                    keyring_store_extra(&provider.id, field.id, value);
                 }
             }
         }
@@ -56,15 +66,26 @@ pub fn update_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppSt
             // New key provided — update keychain
             crate::state::keyring_store(&provider.id, &provider.api_key);
         }
-        // Handle sensitive extra fields: empty or masked value = keep existing
+        // Handle sensitive extra fields (same pattern as api_key above):
+        // - CLEAR_SENTINEL → delete from keychain and remove from extra
+        // - empty or matches masked version of stored value → keep existing
+        // - anything else → store new value in keychain
         if let Some(preset) = jona_provider::preset(&provider.kind) {
             for field in preset.extra_fields {
-                if field.sensitive {
-                    let new_val = provider.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
-                    if new_val.is_empty() || new_val.starts_with('\u{2022}') {
+                if !field.sensitive {
+                    continue;
+                }
+                let new_val = provider.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
+                if new_val == CLEAR_SENTINEL {
+                    keyring_delete_extra(&provider.id, field.id);
+                    provider.extra.remove(field.id);
+                } else {
+                    let stored = existing.extra.get(field.id).cloned().unwrap_or_default();
+                    let masked = mask_value(&stored);
+                    if new_val.is_empty() || new_val == masked {
                         // Keep existing value
-                        if let Some(existing_val) = existing.extra.get(field.id) {
-                            provider.extra.insert(field.id.to_string(), existing_val.clone());
+                        if !stored.is_empty() {
+                            provider.extra.insert(field.id.to_string(), stored);
                         }
                     } else {
                         keyring_store_extra(&provider.id, field.id, new_val);
@@ -92,11 +113,9 @@ pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
                 p.url = preset.base_url.to_string();
             }
             // Mask sensitive extra fields
-            for field in preset.extra_fields {
-                if field.sensitive {
-                    if let Some(val) = p.extra.get_mut(field.id) {
-                        *val = mask_value(val);
-                    }
+            for field in preset.extra_fields.iter().filter(|f| f.sensitive) {
+                if let Some(val) = p.extra.get_mut(field.id) {
+                    *val = mask_value(val);
                 }
             }
         }
@@ -167,13 +186,42 @@ pub fn get_provider_presets() -> Vec<ProviderPresetInfo> {
 pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, AppError> {
     provider.validate_url().map_err(|e| AppError::Other(e.to_string()))?;
 
-    // If api_key is masked (editing mode), use the stored key
+    // Resolve stored credentials: single lock to get both api_key and extra fields
     let mut resolved = provider.clone();
-    if resolved.api_key.is_empty() || resolved.api_key.starts_with('\u{2022}') {
-        resolved.api_key = state.settings.lock().unwrap().providers.iter()
-            .find(|p| p.id == provider.id)
-            .map(|p| p.api_key.clone())
-            .unwrap_or_default();
+    let (stored_key, stored_extras) = {
+        let s = state.settings.lock().unwrap();
+        let stored = s.providers.iter().find(|p| p.id == provider.id);
+        (
+            stored.map(|p| p.api_key.clone()).unwrap_or_default(),
+            stored.map(|p| p.extra.clone()).unwrap_or_default(),
+        )
+    };
+
+    // If api_key is empty or matches the masked version of the stored key, use the stored key
+    if resolved.api_key.is_empty() || resolved.api_key == mask_value(&stored_key) {
+        resolved.api_key = stored_key;
+    }
+
+    // Hydrate sensitive extra fields:
+    // - CLEAR_SENTINEL → leave empty (don't hydrate)
+    // - empty or matches masked version of stored value → use stored value
+    // - anything else → use as-is (new value from user)
+    if let Some(preset) = jona_provider::preset(&resolved.kind) {
+        for field in preset.extra_fields {
+            if !field.sensitive {
+                continue;
+            }
+            let val = resolved.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
+            if val == CLEAR_SENTINEL {
+                resolved.extra.remove(field.id);
+            } else {
+                let stored = stored_extras.get(field.id).cloned().unwrap_or_default();
+                let masked = mask_value(&stored);
+                if (val.is_empty() || val == masked) && !stored.is_empty() {
+                    resolved.extra.insert(field.id.to_string(), stored);
+                }
+            }
+        }
     }
 
     jona_provider::backend_for_provider(&resolved)

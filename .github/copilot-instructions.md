@@ -7,7 +7,7 @@ It runs ASR (speech-to-text) models **locally** on the user's machine — privac
 
 ## Architecture
 
-- **Cargo workspace** with 15 crates under `src-tauri/crates/`
+- **Cargo workspace** with 26 crates under `src-tauri/crates/`
 - Main crate: `src-tauri/src/` — thin orchestrator (AppState, recording, commands, UI)
 - Frontend: `src/` — Vue 3 + Pinia stores + shadcn-vue + Tailwind
 - Engine crates auto-register via `inventory::submit!` + `EngineCatalog::init_auto()`

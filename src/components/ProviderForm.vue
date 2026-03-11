@@ -64,9 +64,12 @@ function initExtraValues(kindId: string) {
   }
 }
 
-// When editing, populate from provider.extra
+// When editing, start with preset defaults then overlay existing values.
+// This ensures new fields added to a preset after the provider was created
+// still get their default value.
 if (props.provider) {
-  extraValues.value = { ...props.provider.extra }
+  initExtraValues(kind.value)
+  Object.assign(extraValues.value, props.provider.extra)
 } else {
   initExtraValues(kind.value)
 }
@@ -80,9 +83,12 @@ const currentPreset = computed(() =>
   engines.providerPresets.find(p => p.id === kind.value),
 )
 
-const visibleExtraFields = computed(() =>
-  currentPreset.value?.extra_fields ?? [],
-)
+const visibleExtraFields = computed(() => {
+  const preset = currentPreset.value
+  if (!preset) return []
+  const hidden = new Set(preset.hidden_fields ?? [])
+  return preset.extra_fields.filter(field => !hidden.has(field.id))
+})
 
 const showUrl = computed(() => {
   if (kind.value === 'custom') return true
@@ -160,6 +166,18 @@ watch(kind, (newKind) => {
   supportsLlm.value = true
   // Reset extra values to preset defaults
   initExtraValues(newKind)
+}, { immediate: true })
+
+// Re-apply preset defaults when presets arrive asynchronously
+// (providerPresets may still be empty when the component first mounts)
+let presetsInitialized = false
+watch(() => engines.providerPresets, (presets) => {
+  if (!presets.length || presetsInitialized) return
+  presetsInitialized = true
+  initExtraValues(kind.value)
+  if (props.provider) {
+    Object.assign(extraValues.value, props.provider.extra)
+  }
 })
 
 function onKindChange(value: string | number | bigint | Record<string, unknown> | null) {
@@ -172,6 +190,13 @@ function validate(): boolean {
   errors.value = {}
   if (!name.value.trim()) errors.value.name = t('validation.required')
   if (showUrl.value && !url.value.trim()) errors.value.url = t('validation.required')
+  // Reject HTTP URLs for non-custom presets (unless allow_insecure)
+  if (showUrl.value && url.value.trim() && kind.value !== 'custom' && !allowInsecure.value) {
+    const u = url.value.trim().toLowerCase()
+    if (u.startsWith('http://')) {
+      errors.value.url = t('validation.httpsRequired')
+    }
+  }
   // Validate required extra fields
   for (const field of visibleExtraFields.value) {
     if (field.required && !(extraValues.value[field.id]?.trim())) {
@@ -243,6 +268,7 @@ function save() {
         v-model:search-term="searchTerm"
         :reset-search-term-on-select="true"
         :reset-search-term-on-blur="true"
+        :open-on-focus="true"
         @update:model-value="onKindChange"
       >
         <ComboboxAnchor class="flex h-9 w-full items-center rounded-md border border-input bg-transparent shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring">
@@ -302,18 +328,35 @@ function save() {
           <template v-else>{{ t('provider.test') }}</template>
         </Button>
       </div>
-      <!-- Test result -->
-      <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 text-xs text-green-600">
-        <CheckCircle2 class="w-3.5 h-3.5" />
-        <span>{{ testMessage }}</span>
-      </div>
-      <div v-if="testStatus === 'error'" class="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
-        <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
-        <span>{{ testMessage }}</span>
-      </div>
+    </div>
+
+    <!-- Test button (standalone) when API key is hidden -->
+    <div v-if="!showApiKey" class="space-y-2">
+      <Button
+        variant="outline"
+        size="sm"
+        class="w-full h-9"
+        :disabled="!canTest || testStatus === 'loading'"
+        @click="testConnection"
+      >
+        <Loader2 v-if="testStatus === 'loading'" class="w-3.5 h-3.5 animate-spin mr-2" />
+        <template v-else>{{ t('provider.test') }}</template>
+      </Button>
+    </div>
+
+    <!-- Test result -->
+    <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 text-xs text-green-600">
+      <CheckCircle2 class="w-3.5 h-3.5" />
+      <span>{{ testMessage }}</span>
+    </div>
+    <div v-if="testStatus === 'error'" class="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
+      <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
+      <span>{{ testMessage }}</span>
     </div>
 
     <!-- Dynamic preset fields -->
+    <!-- NOTE: Sensitive extra fields behave like api_key: empty input = keep existing
+         value in backend. There is no explicit "clear" UI yet (same limitation as api_key). -->
     <div v-for="field in visibleExtraFields" :key="field.id" class="space-y-2">
       <Label class="text-xs text-muted-foreground">
         {{ fieldLabel(field.id, field.label) }}
