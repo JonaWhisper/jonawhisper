@@ -20,4 +20,5 @@ log.workspace = true
 tokio = { version = "1", features = ["rt", "time"] }
 uuid = { version = "1", features = ["v4"] }
 futures-util = "0.3"
+bytes = "1"
 aws-smithy-http = "0.63"

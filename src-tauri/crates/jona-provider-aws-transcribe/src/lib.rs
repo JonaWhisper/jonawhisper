@@ -145,10 +145,19 @@ fn read_wav_pcm16(audio_path: &Path) -> Result<(Vec<u8>, u32), ProviderError> {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| ProviderError::InvalidResponse(format!("WAV decode error: {e}")))?,
         (hound::SampleFormat::Int, bps) => {
-            let shift = bps.saturating_sub(16);
+            let bps32 = u32::from(bps);
             reader
                 .into_samples::<i32>()
-                .map(|s| s.map(|v| (v >> shift) as i16))
+                .map(|s| s.map(|v| {
+                    let shifted = if bps32 < 16 {
+                        v << (16 - bps32)
+                    } else if bps32 > 16 {
+                        v >> (bps32 - 16)
+                    } else {
+                        v
+                    };
+                    shifted.clamp(i16::MIN as i32, i16::MAX as i32) as i16
+                }))
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| ProviderError::InvalidResponse(format!("WAV decode error: {e}")))?
         }
@@ -160,8 +169,32 @@ fn read_wav_pcm16(audio_path: &Path) -> Result<(Vec<u8>, u32), ProviderError> {
     };
 
     // Convert i16 samples to little-endian bytes
-    let pcm_bytes: Vec<u8> = pcm_i16.iter().flat_map(|s| s.to_le_bytes()).collect();
+    let pcm_bytes: Vec<u8> = pcm_i16.iter().flat_map(|s: &i16| s.to_le_bytes()).collect();
     Ok((pcm_bytes, sample_rate))
+}
+
+/// Encode raw PCM16 bytes into a valid WAV file for batch upload.
+fn encode_wav_pcm16(pcm_bytes: &[u8], sample_rate: u32) -> Vec<u8> {
+    let data_len = pcm_bytes.len() as u32;
+    let mut buf = Vec::with_capacity(44 + pcm_bytes.len());
+    // RIFF header
+    buf.extend_from_slice(b"RIFF");
+    buf.extend_from_slice(&(36 + data_len).to_le_bytes());
+    buf.extend_from_slice(b"WAVE");
+    // fmt chunk
+    buf.extend_from_slice(b"fmt ");
+    buf.extend_from_slice(&16u32.to_le_bytes()); // chunk size
+    buf.extend_from_slice(&1u16.to_le_bytes());  // PCM format
+    buf.extend_from_slice(&1u16.to_le_bytes());  // mono
+    buf.extend_from_slice(&sample_rate.to_le_bytes());
+    buf.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
+    buf.extend_from_slice(&2u16.to_le_bytes());  // block align
+    buf.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
+    // data chunk
+    buf.extend_from_slice(b"data");
+    buf.extend_from_slice(&data_len.to_le_bytes());
+    buf.extend_from_slice(pcm_bytes);
+    buf
 }
 
 // ── Streaming backend ───────────────────────────────────────────────────────
@@ -182,7 +215,7 @@ impl CloudProvider for AwsTranscribeStreamingBackend {
         let lang_code = aws_language_code(language);
 
         let result = run_async(async {
-            streaming_transcribe(&config, &pcm_data, sample_rate as i32, &lang_code).await
+            streaming_transcribe(&config, pcm_data, sample_rate as i32, &lang_code).await
         })?;
 
         Ok(TranscriptionResult::text_only(result))
@@ -214,9 +247,10 @@ impl CloudProvider for AwsTranscribeStreamingBackend {
 }
 
 /// Perform streaming transcription via AWS Transcribe Streaming SDK.
+/// Takes ownership of `pcm_data` to avoid copying chunks.
 async fn streaming_transcribe(
     config: &aws_config::SdkConfig,
-    pcm_data: &[u8],
+    pcm_data: Vec<u8>,
     sample_rate: i32,
     language_code: &str,
 ) -> Result<String, ProviderError> {
@@ -236,13 +270,16 @@ async fn streaming_transcribe(
             ))
         })?;
 
-    // Build audio events — must collect because EventStreamSender requires 'static
-    let events: Vec<_> = pcm_data
-        .chunks(8192)
-        .map(|chunk| {
+    // Use Bytes to share the buffer — slicing is O(1) with no copy
+    let buf = bytes::Bytes::from(pcm_data);
+    let events: Vec<_> = (0..buf.len())
+        .step_by(8192)
+        .map(|start| {
+            let end = (start + 8192).min(buf.len());
+            let chunk = buf.slice(start..end);
             Ok(AudioStream::AudioEvent(
                 AudioEvent::builder()
-                    .audio_chunk(Blob::new(chunk.to_vec()))
+                    .audio_chunk(Blob::new(chunk))
                     .build(),
             ))
         })
@@ -305,7 +342,9 @@ impl CloudProvider for AwsTranscribeBatchBackend {
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
         let config = aws_config(provider)?;
-        let audio_bytes = std::fs::read(audio_path)?;
+        // Convert to PCM16 WAV to ensure compatibility with AWS Transcribe
+        let (pcm_data, sample_rate) = read_wav_pcm16(audio_path)?;
+        let audio_bytes = encode_wav_pcm16(&pcm_data, sample_rate);
 
         let s3_bucket = provider
             .extra

@@ -3716,6 +3716,7 @@ dependencies = [
  "aws-sdk-transcribe",
  "aws-sdk-transcribestreaming",
  "aws-smithy-http",
+ "bytes",
  "futures-util",
  "hound",
  "inventory",
