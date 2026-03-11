@@ -1,6 +1,6 @@
 use jona_types::{
-    CloudProvider, Provider, ProviderError, ProviderPreset, ProviderRegistration,
-    TranscriptionResult,
+    CloudProvider, FieldType, PresetField, Provider, ProviderError, ProviderPreset,
+    ProviderRegistration, TranscriptionResult,
 };
 use serde::Serialize;
 use std::future::Future;
@@ -219,7 +219,18 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #34a853, #4285f4)",
     default_asr_models: &["latest_long", "latest_short"],
     default_llm_models: &[],
-    extra_fields: &[],
+    extra_fields: &[
+        PresetField {
+            id: "api_key",
+            label: "API Key",
+            field_type: FieldType::Password,
+            required: true,
+            placeholder: "AIza...",
+            default_value: "",
+            options: &[],
+            sensitive: true,
+        },
+    ],
     hidden_fields: &["base_url"],
 }}
 
