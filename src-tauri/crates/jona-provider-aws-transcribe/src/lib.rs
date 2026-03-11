@@ -479,10 +479,12 @@ async fn batch_transcribe(
         return Err(ProviderError::Http(format!("StartTranscriptionJob failed: {e}")));
     }
 
-    // 3. Poll until complete (max ~5 min with linear backoff 2s→10s)
+    // 3. Poll until complete (max ~100s with linear backoff 2s→10s)
+    // The app's transcription pipeline enforces a 120s timeout — keep batch polling
+    // well within that budget to allow time for S3 upload/download + cleanup.
     let mut transcript_uri = String::new();
     let mut poll_interval = std::time::Duration::from_secs(2);
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(300);
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(100);
     while tokio::time::Instant::now() < deadline {
         tokio::time::sleep(poll_interval).await;
         // Increase interval: 2s → 3s → 4s … capped at 10s
@@ -649,7 +651,7 @@ inventory::submit! { ProviderPreset {
     hidden_fields: &["api_key", "base_url"],
 }}
 
-// Batch preset — requires S3 bucket, better for longer audio
+// Batch preset — requires S3 bucket, useful when streaming API is unavailable
 inventory::submit! { ProviderPreset {
     id: "aws-transcribe-batch", display_name: "AWS Transcribe (Batch)",
     base_url: "https://transcribe.us-east-1.amazonaws.com",
