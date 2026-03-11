@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter};
 
 /// Sentinel value: when a sensitive extra field is set to this, the field is
 /// explicitly cleared (deleted from keychain and removed from `extra`).
-const CLEAR_SENTINEL: &str = "__CLEAR__";
+const CLEAR_SENTINEL: &str = "\0CLEAR";
 
 #[tauri::command]
 pub fn add_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
@@ -65,7 +65,7 @@ pub fn update_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppSt
         }
         // Handle sensitive extra fields (same pattern as api_key above):
         // - CLEAR_SENTINEL → delete from keychain and remove from extra
-        // - empty or masked (••••) → keep existing value (intentional: both mean "no change")
+        // - empty or matches masked version of stored value → keep existing
         // - anything else → store new value in keychain
         if let Some(preset) = jona_provider::preset(&provider.kind) {
             for field in preset.extra_fields {
@@ -74,13 +74,17 @@ pub fn update_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppSt
                     if new_val == CLEAR_SENTINEL {
                         keyring_delete_extra(&provider.id, field.id);
                         provider.extra.remove(field.id);
-                    } else if new_val.is_empty() || new_val.starts_with('\u{2022}') {
-                        // Keep existing value
-                        if let Some(existing_val) = existing.extra.get(field.id) {
-                            provider.extra.insert(field.id.to_string(), existing_val.clone());
-                        }
                     } else {
-                        keyring_store_extra(&provider.id, field.id, new_val);
+                        let stored = existing.extra.get(field.id).cloned().unwrap_or_default();
+                        let masked = mask_value(&stored);
+                        if new_val.is_empty() || new_val == masked {
+                            // Keep existing value
+                            if !stored.is_empty() {
+                                provider.extra.insert(field.id.to_string(), stored);
+                            }
+                        } else {
+                            keyring_store_extra(&provider.id, field.id, new_val);
+                        }
                     }
                 }
             }
@@ -180,18 +184,20 @@ pub fn get_provider_presets() -> Vec<ProviderPresetInfo> {
 pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, AppError> {
     provider.validate_url().map_err(|e| AppError::Other(e.to_string()))?;
 
-    // If api_key is masked (editing mode), use the stored key
+    // If api_key is empty or matches the masked version of the stored key, use the stored key
     let mut resolved = provider.clone();
-    if resolved.api_key.is_empty() || resolved.api_key.starts_with('\u{2022}') {
-        resolved.api_key = state.settings.lock().unwrap().providers.iter()
-            .find(|p| p.id == provider.id)
-            .map(|p| p.api_key.clone())
-            .unwrap_or_default();
+    let stored_key = state.settings.lock().unwrap().providers.iter()
+        .find(|p| p.id == provider.id)
+        .map(|p| p.api_key.clone())
+        .unwrap_or_default();
+    if resolved.api_key.is_empty() || resolved.api_key == mask_value(&stored_key) {
+        resolved.api_key = stored_key;
     }
 
     // Hydrate sensitive extra fields:
     // - CLEAR_SENTINEL → leave empty (don't hydrate)
-    // - masked/empty → use stored values
+    // - empty or matches masked version of stored value → use stored value
+    // - anything else → use as-is (new value from user)
     if let Some(preset) = jona_provider::preset(&resolved.kind) {
         let stored_extras = state.settings.lock().unwrap().providers.iter()
             .find(|p| p.id == provider.id)
@@ -202,10 +208,15 @@ pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, A
                 let val = resolved.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
                 if val == CLEAR_SENTINEL {
                     resolved.extra.remove(field.id);
-                } else if val.is_empty() || val.starts_with('\u{2022}') {
-                    if let Some(stored_val) = stored_extras.get(field.id) {
-                        resolved.extra.insert(field.id.to_string(), stored_val.clone());
+                } else {
+                    let stored = stored_extras.get(field.id).cloned().unwrap_or_default();
+                    let masked = mask_value(&stored);
+                    if val.is_empty() || val == masked {
+                        if !stored.is_empty() {
+                            resolved.extra.insert(field.id.to_string(), stored);
+                        }
                     }
+                    // else: val is a new value, keep it as-is in resolved.extra
                 }
             }
         }
