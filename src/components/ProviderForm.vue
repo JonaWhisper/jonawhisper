@@ -43,7 +43,6 @@ const isEditing = computed(() => !!props.provider)
 const kind = ref(props.provider?.kind ?? (engines.providerPresets[0]?.id ?? 'custom'))
 const name = ref(props.provider?.name ?? '')
 const url = ref(props.provider?.url ?? '')
-const apiKey = ref('')
 const allowInsecure = ref(props.provider?.allow_insecure ?? false)
 const supportsAsr = ref(props.provider?.supports_asr ?? true)
 const supportsLlm = ref(props.provider?.supports_llm ?? true)
@@ -96,13 +95,17 @@ const showUrl = computed(() => {
   return !currentPreset.value
 })
 
-const showApiKey = computed(() =>
-  !(currentPreset.value?.hidden_fields?.includes('api_key')),
-)
-
 const canTest = computed(() => {
-  if (!showApiKey.value) return true
-  return apiKey.value.trim().length > 0 || isEditing.value
+  for (const field of visibleExtraFields.value) {
+    if (!field.required) continue
+    const val = extraValues.value[field.id]?.trim()
+    if (!val) {
+      // Sensitive fields can be empty when editing (= keep existing)
+      if (field.sensitive && isEditing.value) continue
+      return false
+    }
+  }
+  return true
 })
 const showInsecureToggle = computed(() => kind.value === 'custom')
 const showCapabilities = computed(() => kind.value === 'custom')
@@ -198,9 +201,10 @@ function validate(): boolean {
       errors.value.url = t('validation.httpsRequired')
     }
   }
-  // Validate required extra fields
+  // Validate required extra fields (sensitive fields skip validation when editing — empty = keep existing)
   for (const field of visibleExtraFields.value) {
     if (field.required && !(extraValues.value[field.id]?.trim())) {
+      if (field.sensitive && isEditing.value) continue
       errors.value[field.id] = t('validation.required')
     }
   }
@@ -216,12 +220,14 @@ async function testConnection() {
     name: name.value.trim(),
     kind: kind.value,
     url: url.value.trim(),
-    api_key: apiKey.value.trim(),
+    api_key: extraValues.value['api_key']?.trim() ?? '',
     allow_insecure: allowInsecure.value,
     cached_models: [],
     supports_asr: supportsAsr.value,
     supports_llm: supportsLlm.value,
-    extra: { ...extraValues.value },
+    extra: Object.fromEntries(
+      Object.entries(extraValues.value).filter(([k]) => k !== 'api_key'),
+    ),
   }
 
   try {
@@ -247,12 +253,14 @@ function save() {
     name: name.value.trim(),
     kind: kind.value,
     url: url.value.trim(),
-    api_key: apiKey.value.trim(),
+    api_key: extraValues.value['api_key']?.trim() ?? '',
     allow_insecure: allowInsecure.value,
     cached_models: fetchedModels.value,
     supports_asr: isCustom ? supportsAsr.value : true,
     supports_llm: isCustom ? supportsLlm.value : true,
-    extra: { ...extraValues.value },
+    extra: Object.fromEntries(
+      Object.entries(extraValues.value).filter(([k]) => k !== 'api_key'),
+    ),
   }
 
   emit('save', provider)
@@ -312,37 +320,6 @@ function save() {
       <Label class="text-xs text-muted-foreground">{{ t('provider.url') }}</Label>
       <Input v-model="url" class="h-9 text-sm" />
       <p v-if="errors.url" class="text-xs text-destructive">{{ errors.url }}</p>
-    </div>
-
-    <div v-if="showApiKey" class="space-y-2">
-      <Label class="text-xs text-muted-foreground">{{ t('provider.apiKey') }}</Label>
-      <div class="flex gap-2">
-        <Input v-model="apiKey" type="password" :placeholder="isEditing ? t('provider.apiKeyKeep') : 'sk-...'" class="h-9 text-sm flex-1" />
-        <Button
-          variant="outline"
-          size="sm"
-          class="shrink-0 h-9 w-20"
-          :disabled="!canTest || testStatus === 'loading'"
-          @click="testConnection"
-        >
-          <Loader2 v-if="testStatus === 'loading'" class="w-3.5 h-3.5 animate-spin" />
-          <template v-else>{{ t('provider.test') }}</template>
-        </Button>
-      </div>
-    </div>
-
-    <!-- Test button (standalone) when API key is hidden -->
-    <div v-if="!showApiKey" class="space-y-2">
-      <Button
-        variant="outline"
-        size="sm"
-        class="w-full h-9"
-        :disabled="!canTest || testStatus === 'loading'"
-        @click="testConnection"
-      >
-        <Loader2 v-if="testStatus === 'loading'" class="w-3.5 h-3.5 animate-spin mr-2" />
-        <template v-else>{{ t('provider.test') }}</template>
-      </Button>
     </div>
 
     <!-- Test result -->
@@ -423,6 +400,16 @@ function save() {
     </div>
 
     <div class="flex justify-end gap-2 pt-2">
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="!canTest || testStatus === 'loading'"
+        @click="testConnection"
+      >
+        <Loader2 v-if="testStatus === 'loading'" class="w-3.5 h-3.5 animate-spin" />
+        <template v-else>{{ t('provider.test') }}</template>
+      </Button>
+      <div class="flex-1" />
       <Button variant="outline" size="sm" @click="emit('cancel')">{{ t('modelManager.cancel') }}</Button>
       <Button size="sm" @click="save">{{ t('modelManager.save') }}</Button>
     </div>

@@ -648,7 +648,7 @@ inventory::submit! { ProviderPreset {
             sensitive: false,
         },
     ],
-    hidden_fields: &["api_key", "base_url"],
+    hidden_fields: &["base_url"],
 }}
 
 // Batch preset — requires S3 bucket, useful when streaming API is unavailable
@@ -702,7 +702,7 @@ inventory::submit! { ProviderPreset {
             sensitive: false,
         },
     ],
-    hidden_fields: &["api_key", "base_url"],
+    hidden_fields: &["base_url"],
 }}
 
 #[cfg(test)]

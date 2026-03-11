@@ -1,5 +1,5 @@
 use jona_types::{
-    parse_model_ids_from_json, CloudProvider, Provider, ProviderError,
+    parse_model_ids_from_json, CloudProvider, FieldType, PresetField, Provider, ProviderError,
     ProviderPreset, ProviderRegistration, TranscriptionResult,
 };
 use serde::{Deserialize, Serialize};
@@ -163,6 +163,17 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #d97706, #b45309)",
     default_asr_models: &[],
     default_llm_models: &["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250514", "claude-opus-4-6-20250626"],
-    extra_fields: &[],
+    extra_fields: &[
+        PresetField {
+            id: "api_key",
+            label: "API Key",
+            field_type: FieldType::Password,
+            required: true,
+            placeholder: "sk-ant-...",
+            default_value: "",
+            options: &[],
+            sensitive: true,
+        },
+    ],
     hidden_fields: &[],
 }}
