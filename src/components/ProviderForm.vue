@@ -8,14 +8,16 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+} from '@/components/ui/combobox'
+import { ComboboxAnchor, ComboboxTrigger } from 'reka-ui'
+import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, CheckCircle2, XCircle, ShieldAlert } from 'lucide-vue-next'
+import { Loader2, CheckCircle2, XCircle, ShieldAlert, ChevronsUpDown } from 'lucide-vue-next'
 
 const props = defineProps<{
   provider?: Provider
@@ -50,10 +52,41 @@ const canTest = computed(() => apiKey.value.trim().length > 0 || isEditing.value
 const showInsecureToggle = computed(() => kind.value === 'custom')
 const showCapabilities = computed(() => kind.value === 'custom')
 
+const searchTerm = ref('')
+
+const customOption = computed(() => ({ value: 'custom', label: t('provider.kind.custom') }))
+
+const allOptions = computed(() => [
+  customOption.value,
+  ...engines.providerPresets.map(p => ({ value: p.id, label: p.display_name })),
+])
+
+const presetOptions = computed(() =>
+  engines.providerPresets.map(p => ({ value: p.id, label: p.display_name })),
+)
+
+const filteredCustom = computed(() => {
+  if (!searchTerm.value) return customOption.value
+  const q = searchTerm.value.toLowerCase()
+  return customOption.value.label.toLowerCase().includes(q) ? customOption.value : null
+})
+
+const filteredPresets = computed(() => {
+  if (!searchTerm.value) return presetOptions.value
+  const q = searchTerm.value.toLowerCase()
+  return presetOptions.value.filter(o => o.label.toLowerCase().includes(q))
+})
+
 const presetDisplayName = computed(() => {
   const preset = engines.providerPresets.find(p => p.id === kind.value)
   return preset?.display_name ?? kind.value
 })
+
+function displayValue(val: unknown): string {
+  if (typeof val !== 'string') return ''
+  const opt = allOptions.value.find(o => o.value === val)
+  return opt?.label ?? val
+}
 
 watch(kind, (newKind) => {
   if (isEditing.value) return
@@ -141,15 +174,38 @@ function save() {
     <!-- Add mode: kind selector -->
     <div v-if="!isEditing" class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.kind') }}</Label>
-      <Select :model-value="kind" @update:model-value="onKindChange">
-        <SelectTrigger class="w-full h-9 text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent class="max-h-52">
-          <SelectItem v-for="preset in engines.providerPresets" :key="preset.id" :value="preset.id">{{ preset.display_name }}</SelectItem>
-          <SelectItem value="custom">{{ t('provider.kind.custom') }}</SelectItem>
-        </SelectContent>
-      </Select>
+      <Combobox
+        :model-value="kind"
+        v-model:search-term="searchTerm"
+        :reset-search-term-on-select="true"
+        :reset-search-term-on-blur="true"
+        @update:model-value="onKindChange"
+      >
+        <ComboboxAnchor class="flex h-9 w-full items-center rounded-md border border-input bg-transparent shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring">
+          <ComboboxInput
+            :display-value="displayValue"
+            :placeholder="t('provider.searchPreset')"
+            class="h-full w-full bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none"
+          />
+          <ComboboxTrigger class="px-2 text-muted-foreground">
+            <ChevronsUpDown class="w-4 h-4 opacity-50 shrink-0" />
+          </ComboboxTrigger>
+        </ComboboxAnchor>
+        <ComboboxContent>
+          <ComboboxEmpty>{{ t('provider.noResults') }}</ComboboxEmpty>
+          <ComboboxItem v-if="filteredCustom" :value="filteredCustom.value">
+            {{ filteredCustom.label }}
+          </ComboboxItem>
+          <Separator v-if="filteredCustom && filteredPresets.length" class="my-1" />
+          <ComboboxItem
+            v-for="option in filteredPresets"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </ComboboxItem>
+        </ComboboxContent>
+      </Combobox>
     </div>
 
     <div class="space-y-2">
