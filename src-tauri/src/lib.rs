@@ -545,7 +545,8 @@ mod tests {
     fn asr_presets_have_default_models() {
         ensure_catalog();
         for p in jona_provider::presets() {
-            if p.supports_asr {
+            if p.supports_asr && p.id != "azure-openai" {
+                // Azure OpenAI models depend on user deployments
                 assert!(
                     !p.default_asr_models.is_empty(),
                     "Preset {} supports ASR but has no default ASR models",
@@ -559,8 +560,8 @@ mod tests {
     fn llm_presets_have_default_models() {
         ensure_catalog();
         for p in jona_provider::presets() {
-            if p.supports_llm && p.id != "openrouter" {
-                // OpenRouter is an aggregator with no default models
+            if p.supports_llm && !matches!(p.id, "openrouter" | "azure-openai") {
+                // OpenRouter/Azure OpenAI: models depend on user config
                 assert!(
                     !p.default_llm_models.is_empty(),
                     "Preset {} supports LLM but has no default LLM models",
