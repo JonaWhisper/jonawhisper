@@ -34,8 +34,8 @@ impl CloudProvider for OpenAICompatibleBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
-        // Validate API key before file I/O to fail fast
-        if provider.api_key.is_empty() {
+        // Validate API key before file I/O to fail fast (trim to catch whitespace-only keys)
+        if provider.api_key.trim().is_empty() {
             return Err(ProviderError::NotConfigured(
                 "API key is not configured".into(),
             ));
@@ -64,7 +64,7 @@ impl CloudProvider for OpenAICompatibleBackend {
         let url = format!("{}/audio/transcriptions", provider.base_url());
 
         let mut req = BLOCKING_CLIENT.post(&url).multipart(form);
-        if !provider.api_key.is_empty() {
+        if !provider.api_key.trim().is_empty() {
             req = req.header("Authorization", format!("Bearer {}", provider.api_key));
         }
 
@@ -121,7 +121,7 @@ impl CloudProvider for OpenAICompatibleBackend {
             };
 
             let mut req = ASYNC_CLIENT.post(&url).json(&request);
-            if !provider.api_key.is_empty() {
+            if !provider.api_key.trim().is_empty() {
                 req = req.header("Authorization", format!("Bearer {}", provider.api_key));
             }
 
@@ -149,7 +149,7 @@ impl CloudProvider for OpenAICompatibleBackend {
             let url = format!("{}/models", provider.base_url());
 
             let mut req = ASYNC_CLIENT.get(&url);
-            if !provider.api_key.is_empty() {
+            if !provider.api_key.trim().is_empty() {
                 req = req.header("Authorization", format!("Bearer {}", provider.api_key));
             }
 

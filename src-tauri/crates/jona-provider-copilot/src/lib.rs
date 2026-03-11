@@ -16,9 +16,10 @@ static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .unwrap_or_else(|_| reqwest::Client::new())
 });
 
-/// Cached Copilot JWT: (token, fetched_at). GitHub Copilot JWTs typically last 30 min;
-/// we use a 25 min TTL to refresh before expiry.
-static JWT_CACHE: LazyLock<Mutex<Option<(String, Instant)>>> =
+/// Cached Copilot JWT: (oauth_token_hash, jwt, fetched_at). GitHub Copilot JWTs
+/// typically last 30 min; we use a 25 min TTL to refresh before expiry.
+/// Keyed by a hash of the OAuth token so switching accounts invalidates the cache.
+static JWT_CACHE: LazyLock<Mutex<Option<(u64, String, Instant)>>> =
     LazyLock::new(|| Mutex::new(None));
 
 const JWT_TTL_SECS: u64 = 25 * 60; // 25 minutes
@@ -54,25 +55,36 @@ async fn fetch_token(github_token: &str) -> Result<String, ProviderError> {
         .ok_or_else(|| ProviderError::InvalidResponse("No token in response".into()))
 }
 
+/// Simple hash of the OAuth token for cache keying (not cryptographic, just identity).
+fn hash_token(token: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    token.hash(&mut hasher);
+    hasher.finish()
+}
+
 /// Get a cached JWT or exchange for a fresh one if expired/missing.
+/// Cache is keyed by the OAuth token hash so switching accounts invalidates it.
 async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
-    // Check cache
+    let token_hash = hash_token(github_token);
+
+    // Check cache — must match the current OAuth token
     if let Ok(guard) = JWT_CACHE.lock() {
-        if let Some((ref token, fetched_at)) = *guard {
-            if fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
-                return Ok(token.clone());
+        if let Some((cached_hash, ref jwt, fetched_at)) = *guard {
+            if cached_hash == token_hash && fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
+                return Ok(jwt.clone());
             }
         }
     }
 
-    // Cache miss or expired — fetch a new token
-    let token = fetch_token(github_token).await?;
+    // Cache miss, expired, or different token — fetch a new JWT
+    let jwt = fetch_token(github_token).await?;
 
     if let Ok(mut guard) = JWT_CACHE.lock() {
-        *guard = Some((token.clone(), Instant::now()));
+        *guard = Some((token_hash, jwt.clone(), Instant::now()));
     }
 
-    Ok(token)
+    Ok(jwt)
 }
 
 impl CloudProvider for CopilotBackend {

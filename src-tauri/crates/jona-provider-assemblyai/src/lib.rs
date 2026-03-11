@@ -123,9 +123,14 @@ impl CloudProvider for AssemblyAiBackend {
                 break;
             }
 
+            // Per-request timeout capped to remaining time so the 90s deadline is enforced
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            let poll_timeout = remaining.min(std::time::Duration::from_secs(15));
+
             let poll_resp = BLOCKING_CLIENT
                 .get(&poll_url)
                 .header(auth_header.0, auth_header.1)
+                .timeout(poll_timeout)
                 .send()
                 .map_err(|e| ProviderError::Http(e.to_string()))?;
 

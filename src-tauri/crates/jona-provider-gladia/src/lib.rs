@@ -48,7 +48,7 @@ impl CloudProvider for GladiaBackend {
         audio_path: &Path,
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
-        if provider.api_key.is_empty() {
+        if provider.api_key.trim().is_empty() {
             return Err(ProviderError::NotConfigured(
                 "Gladia API key is not configured".into(),
             ));
@@ -124,9 +124,14 @@ impl CloudProvider for GladiaBackend {
                 break;
             }
 
+            // Per-request timeout capped to remaining time so the deadline is enforced
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            let poll_timeout = remaining.min(std::time::Duration::from_secs(15));
+
             let poll_resp = BLOCKING_CLIENT
                 .get(&init.result_url)
                 .header("x-gladia-key", api_key)
+                .timeout(poll_timeout)
                 .send()
                 .map_err(|e| ProviderError::Http(e.to_string()))?;
 
@@ -143,11 +148,10 @@ impl CloudProvider for GladiaBackend {
 
             let status = json
                 .get("status")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+                .and_then(|v| v.as_str());
 
             match status {
-                "done" => {
+                Some("done") => {
                     let text = json
                         .pointer("/result/transcription/full_transcript")
                         .and_then(|v| v.as_str())
@@ -156,14 +160,24 @@ impl CloudProvider for GladiaBackend {
                         ))?;
                     return Ok(TranscriptionResult::text_only(text.to_string()));
                 }
-                "error" => {
+                Some("error") => {
                     let msg = json
                         .get("error")
                         .and_then(|v| v.as_str())
                         .unwrap_or("Unknown error");
                     return Err(ProviderError::InvalidResponse(msg.to_string()));
                 }
-                _ => continue, // "queued" or "processing"
+                Some("queued" | "processing") => continue,
+                Some(other) => {
+                    return Err(ProviderError::InvalidResponse(format!(
+                        "Gladia returned unexpected status: '{other}'"
+                    )));
+                }
+                None => {
+                    return Err(ProviderError::InvalidResponse(
+                        "Gladia response missing 'status' field".into(),
+                    ));
+                }
             }
         }
 
