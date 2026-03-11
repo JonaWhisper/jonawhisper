@@ -39,7 +39,7 @@ const engines = useEnginesStore()
 
 const isEditing = computed(() => !!props.provider)
 
-const kind = ref(props.provider?.kind ?? (engines.providerPresets[0]?.id ?? 'custom'))
+const kind = ref(props.provider?.kind ?? (engines.providerPresets[0]?.id ?? 'openai-compatible'))
 const name = ref(props.provider?.name ?? '')
 const errors = ref<Record<string, string>>({})
 const extraValues = ref<Record<string, string>>({})
@@ -58,24 +58,27 @@ function initExtraValues(kindId: string) {
   }
 }
 
+/** Map top-level Provider fields back into extraValues for editing. */
+function applyEditMappings(provider: Provider) {
+  Object.assign(extraValues.value, provider.extra)
+  if (provider.url && !extraValues.value['base_url']) {
+    extraValues.value['base_url'] = provider.url
+  }
+  if ('supports_asr' in provider) {
+    extraValues.value['supports_asr'] = String(provider.supports_asr)
+  }
+  if ('supports_llm' in provider) {
+    extraValues.value['supports_llm'] = String(provider.supports_llm)
+  }
+  if ('allow_insecure' in provider) {
+    extraValues.value['allow_insecure'] = String(provider.allow_insecure)
+  }
+}
+
 // When editing, start with preset defaults then overlay existing values.
 if (props.provider) {
   initExtraValues(kind.value)
-  Object.assign(extraValues.value, props.provider.extra)
-  // Map top-level fields to extra fields for editing
-  if (props.provider.url && !extraValues.value['base_url']) {
-    extraValues.value['base_url'] = props.provider.url
-  }
-  // Map boolean top-level fields to toggle extra fields
-  if ('supports_asr' in props.provider) {
-    extraValues.value['supports_asr'] = String(props.provider.supports_asr)
-  }
-  if ('supports_llm' in props.provider) {
-    extraValues.value['supports_llm'] = String(props.provider.supports_llm)
-  }
-  if ('allow_insecure' in props.provider) {
-    extraValues.value['allow_insecure'] = String(props.provider.allow_insecure)
-  }
+  applyEditMappings(props.provider)
 } else {
   initExtraValues(kind.value)
 }
@@ -109,6 +112,9 @@ const canTest = computed(() => {
       return false
     }
   }
+  // Custom providers need a URL to test
+  const baseUrl = extraValues.value['base_url']?.trim()
+  if (visibleExtraFields.value.some(f => f.id === 'base_url') && !baseUrl) return false
   return true
 })
 
@@ -164,7 +170,7 @@ watch(() => engines.providerPresets, (presets) => {
   presetsInitialized = true
   initExtraValues(kind.value)
   if (props.provider) {
-    Object.assign(extraValues.value, props.provider.extra)
+    applyEditMappings(props.provider)
   }
 })
 
@@ -183,6 +189,11 @@ function validate(): boolean {
       if (field.sensitive && isEditing.value) continue
       errors.value[field.id] = t('validation.required')
     }
+  }
+  // Enforce HTTPS for custom base_url unless allow_insecure is enabled
+  const baseUrl = extraValues.value['base_url']?.trim() ?? ''
+  if (baseUrl && baseUrl.startsWith('http://') && extraValues.value['allow_insecure'] !== 'true' && !errors.value['base_url']) {
+    errors.value['base_url'] = t('validation.httpsRequired')
   }
   return Object.keys(errors.value).length === 0
 }

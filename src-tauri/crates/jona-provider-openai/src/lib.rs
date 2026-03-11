@@ -219,7 +219,7 @@ inventory::submit! { ProviderRegistration {
 
 // Custom (OpenAI-compatible) — user provides their own URL
 inventory::submit! { ProviderPreset {
-    id: "custom", display_name: "Custom (OpenAI-compatible)",
+    id: "openai-compatible", display_name: "Custom (OpenAI-compatible)",
     base_url: "", backend_id: "openai",
     supports_asr: true, supports_llm: true,
     gradient: "linear-gradient(135deg, #6b7280, #4b5563)",

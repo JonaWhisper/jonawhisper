@@ -2,7 +2,7 @@ use serde_json::Value;
 use crate::state::{config_dir, default_model_id, Provider, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
-const CURRENT_VERSION: u32 = 8;
+const CURRENT_VERSION: u32 = 9;
 
 type MigrationFn = fn(&mut Value, &mut Preferences);
 
@@ -15,6 +15,7 @@ const MIGRATIONS: &[(u32, &str, MigrationFn)] = &[
     (6, "Split punctuation from cleanup model", migrate_v6),
     (7, "Clean up old Candle/safetensors correction models", migrate_v7),
     (8, "Normalize provider kind to lowercase string IDs", migrate_v8),
+    (9, "Rename custom provider kind to openai-compatible", migrate_v9),
 ];
 
 /// Rename data directory from WhisperDictate → JonaWhisper.
@@ -450,6 +451,21 @@ pub(crate) fn migrate_v8(_raw: &mut Value, prefs: &mut Preferences) {
     }
 }
 
+/// v9: Rename provider kind "custom" → "openai-compatible" to avoid conflict
+/// with the reserved "custom" identifier used in backend routing.
+fn migrate_v9(_raw: &mut Value, prefs: &mut Preferences) {
+    let mut migrated = 0;
+    for provider in &mut prefs.providers {
+        if provider.kind == "custom" {
+            provider.kind = "openai-compatible".to_string();
+            migrated += 1;
+        }
+    }
+    if migrated > 0 {
+        log::info!("Migration v9: renamed {} provider(s) from 'custom' to 'openai-compatible'", migrated);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -470,7 +486,7 @@ mod tests {
 
     #[test]
     fn run_applies_pending_migrations() {
-        let mut raw = json!({"_version": 7});
+        let mut raw = json!({"_version": 8});
         let mut prefs = empty_prefs();
         assert!(run(&mut raw, &mut prefs));
         assert_eq!(raw["_version"], CURRENT_VERSION);
@@ -720,6 +736,28 @@ mod tests {
         if !prefs.providers[0].url.is_empty() {
             assert!(prefs.providers[0].url.starts_with("https://"));
         }
+    }
+
+    // -- migrate_v9 --
+
+    #[test]
+    fn v9_renames_custom_to_openai_compatible() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.providers.push(test_provider("custom", "https://my-server.local/v1"));
+        migrate_v9(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers[0].kind, "openai-compatible");
+    }
+
+    #[test]
+    fn v9_ignores_non_custom_providers() {
+        let mut raw = json!({});
+        let mut prefs = empty_prefs();
+        prefs.providers.push(test_provider("openai", "https://api.openai.com/v1"));
+        migrate_v9(&mut raw, &mut prefs);
+
+        assert_eq!(prefs.providers[0].kind, "openai");
     }
 }
 
