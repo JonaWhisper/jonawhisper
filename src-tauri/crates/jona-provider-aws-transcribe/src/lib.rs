@@ -76,14 +76,17 @@ fn aws_config(provider: &Provider) -> Result<aws_config::SdkConfig, ProviderErro
 }
 
 /// Convert a 2-letter language code to an AWS Transcribe language code (BCP-47).
-fn aws_language_code(lang: &str) -> String {
+/// Returns an error for "auto" since AWS Transcribe requires an explicit language.
+fn aws_language_code(lang: &str) -> Result<String, ProviderError> {
     if lang == "auto" {
-        return "en-US".to_string();
+        return Err(ProviderError::NotConfigured(
+            "AWS Transcribe requires an explicit language — 'auto' is not supported".into(),
+        ));
     }
     if lang.contains('-') || lang.contains('_') {
-        return lang.replace('_', "-");
+        return Ok(lang.replace('_', "-"));
     }
-    match lang {
+    Ok(match lang {
         "en" => "en-US",
         "fr" => "fr-FR",
         "de" => "de-DE",
@@ -112,9 +115,9 @@ fn aws_language_code(lang: &str) -> String {
         "vi" => "vi-VN",
         "id" => "id-ID",
         "ms" => "ms-MY",
-        code => return format!("{}-{}", code, code.to_uppercase()),
+        code => return Ok(format!("{}-{}", code, code.to_uppercase())),
     }
-    .to_string()
+    .to_string())
 }
 
 /// Run an async future from a sync context, using the current Tokio handle if available,
@@ -131,15 +134,16 @@ fn run_async<F: std::future::Future>(fut: F) -> F::Output {
     }
 }
 
-/// Read a WAV file and extract raw signed 16-bit PCM bytes + sample rate.
-/// Handles any WAV format (16-bit, 32-bit float, etc.) by converting to i16 PCM.
+/// Read a WAV file and extract raw signed 16-bit mono PCM bytes + sample rate.
+/// Handles any WAV format (16-bit, 32-bit float, multi-channel) by converting to mono i16 PCM.
 fn read_wav_pcm16(audio_path: &Path) -> Result<(Vec<u8>, u32), ProviderError> {
     let reader = hound::WavReader::open(audio_path)
         .map_err(|e| ProviderError::InvalidResponse(format!("Failed to read WAV: {e}")))?;
     let spec = reader.spec();
     let sample_rate = spec.sample_rate;
+    let channels = spec.channels as usize;
 
-    let pcm_i16: Vec<i16> = match (spec.sample_format, spec.bits_per_sample) {
+    let pcm_i16_interleaved: Vec<i16> = match (spec.sample_format, spec.bits_per_sample) {
         (hound::SampleFormat::Int, 16) => reader
             .into_samples::<i16>()
             .collect::<Result<Vec<_>, _>>()
@@ -168,8 +172,21 @@ fn read_wav_pcm16(audio_path: &Path) -> Result<(Vec<u8>, u32), ProviderError> {
             .map_err(|e| ProviderError::InvalidResponse(format!("WAV decode error: {e}")))?,
     };
 
+    // Downmix to mono if multi-channel
+    let pcm_mono = if channels > 1 {
+        pcm_i16_interleaved
+            .chunks_exact(channels)
+            .map(|frame| {
+                let sum: i32 = frame.iter().map(|&s| s as i32).sum();
+                (sum / channels as i32) as i16
+            })
+            .collect()
+    } else {
+        pcm_i16_interleaved
+    };
+
     // Convert i16 samples to little-endian bytes
-    let pcm_bytes: Vec<u8> = pcm_i16.iter().flat_map(|s: &i16| s.to_le_bytes()).collect();
+    let pcm_bytes: Vec<u8> = pcm_mono.iter().flat_map(|s: &i16| s.to_le_bytes()).collect();
     Ok((pcm_bytes, sample_rate))
 }
 
@@ -212,7 +229,7 @@ impl CloudProvider for AwsTranscribeStreamingBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         let config = aws_config(provider)?;
         let (pcm_data, sample_rate) = read_wav_pcm16(audio_path)?;
-        let lang_code = aws_language_code(language);
+        let lang_code = aws_language_code(language)?;
 
         let result = run_async(async {
             streaming_transcribe(&config, pcm_data, sample_rate as i32, &lang_code).await
@@ -353,10 +370,10 @@ impl CloudProvider for AwsTranscribeBatchBackend {
             .ok_or_else(|| ProviderError::NotConfigured("S3 bucket is not configured".into()))?
             .clone();
 
-        let lang_code = aws_language_code(language);
+        let lang_code = aws_language_code(language)?;
 
         let result = run_async(async {
-            batch_transcribe(&config, &audio_bytes, &s3_bucket, &lang_code).await
+            batch_transcribe(&config, audio_bytes, &s3_bucket, &lang_code).await
         })?;
 
         Ok(TranscriptionResult::text_only(result))
@@ -390,7 +407,7 @@ impl CloudProvider for AwsTranscribeBatchBackend {
 /// Perform batch transcription: upload to S3 → start job → poll → download result → cleanup.
 async fn batch_transcribe(
     config: &aws_config::SdkConfig,
-    audio_bytes: &[u8],
+    audio_bytes: Vec<u8>,
     s3_bucket: &str,
     language_code: &str,
 ) -> Result<String, ProviderError> {
@@ -424,7 +441,7 @@ async fn batch_transcribe(
         .bucket(s3_bucket)
         .key(&s3_key)
         .content_type("audio/wav")
-        .body(ByteStream::from(audio_bytes.to_vec()))
+        .body(ByteStream::from(audio_bytes))
         .send()
         .await
         .map_err(|e| ProviderError::Http(format!("S3 upload failed: {e}")))?;
@@ -472,10 +489,23 @@ async fn batch_transcribe(
         if let Some(job) = resp.transcription_job() {
             match job.transcription_job_status() {
                 Some(TranscriptionJobStatus::Completed) => {
-                    if let Some(t) = job.transcript() {
-                        transcript_uri = t.transcript_file_uri().unwrap_or_default().to_string();
+                    let maybe_uri = job
+                        .transcript()
+                        .and_then(|t| t.transcript_file_uri())
+                        .map(|u| u.to_string());
+                    match maybe_uri {
+                        Some(uri) if !uri.is_empty() => {
+                            transcript_uri = uri;
+                            break;
+                        }
+                        _ => {
+                            cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+                            return Err(ProviderError::Api {
+                                status: 502,
+                                body: "Transcription completed but no transcript URI provided".into(),
+                            });
+                        }
                     }
-                    break;
                 }
                 Some(TranscriptionJobStatus::Failed) => {
                     let reason = job.failure_reason().unwrap_or("Unknown error");
@@ -652,25 +682,25 @@ mod tests {
 
     #[test]
     fn aws_language_code_two_letter() {
-        assert_eq!(aws_language_code("fr"), "fr-FR");
-        assert_eq!(aws_language_code("en"), "en-US");
-        assert_eq!(aws_language_code("es"), "es-US");
+        assert_eq!(aws_language_code("fr").unwrap(), "fr-FR");
+        assert_eq!(aws_language_code("en").unwrap(), "en-US");
+        assert_eq!(aws_language_code("es").unwrap(), "es-US");
     }
 
     #[test]
     fn aws_language_code_passthrough() {
-        assert_eq!(aws_language_code("fr-CA"), "fr-CA");
-        assert_eq!(aws_language_code("en_GB"), "en-GB");
+        assert_eq!(aws_language_code("fr-CA").unwrap(), "fr-CA");
+        assert_eq!(aws_language_code("en_GB").unwrap(), "en-GB");
     }
 
     #[test]
-    fn aws_language_code_auto() {
-        assert_eq!(aws_language_code("auto"), "en-US");
+    fn aws_language_code_auto_errors() {
+        assert!(aws_language_code("auto").is_err());
     }
 
     #[test]
     fn aws_language_code_unknown() {
-        assert_eq!(aws_language_code("xx"), "xx-XX");
+        assert_eq!(aws_language_code("xx").unwrap(), "xx-XX");
     }
 
     #[test]
