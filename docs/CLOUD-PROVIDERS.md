@@ -197,7 +197,6 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **Replicate** | API async, pas de modèles propres, complexité élevée |
 | **JetBrains AI** | Pas d'API publique documentée (la clé Anthropic saisie dans l'IDE est exploitable via keychain — voir AUTO-DETECTION.md) |
 | **AWS Bedrock** | Auth SigV4 complexe, niche enterprise |
-| **Azure OpenAI** | Deployment-based, niche enterprise |
 
 ---
 
@@ -263,6 +262,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **Gladia** | `gladia` | Whisper-Zero | — | `api.gladia.io` |
 | **Speechmatics** | `speechmatics` | — (batch ASR) | — | `asr.api.speechmatics.com` |
 | **Azure Speech** | `azure-speech` | multi-lang ASR | — | `cognitiveservices.azure.com` |
+| **Azure OpenAI** | `azure-openai` | Whisper (deployment) | GPT (deployment) | `{resource}.openai.azure.com` |
 | **Google Speech** | `google-speech` | multi-lang ASR | — | `speech.googleapis.com` |
 
 ---
@@ -283,6 +283,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **Gladia** | `jona-provider-gladia` | ✅ | ❌ | ✅ Implémenté |
 | **Speechmatics** | `jona-provider-speechmatics` | ✅ | ❌ | ✅ Implémenté |
 | **Azure Speech** | `jona-provider-azure-speech` | ✅ | ❌ | ✅ Implémenté |
+| **Azure OpenAI** | `jona-provider-azure-openai` | ✅ | ✅ | ✅ Implémenté |
 | **Google Speech** | `jona-provider-google-speech` | ✅ | ❌ | ✅ Implémenté |
 
 ---
