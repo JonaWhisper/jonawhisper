@@ -43,6 +43,13 @@ impl CloudProvider for AssemblyAiBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
+        if provider.api_key.trim().is_empty() {
+            return Err(ProviderError::NotConfigured(format!(
+                "Provider '{}' is missing an API key for AssemblyAI",
+                provider.name
+            )));
+        }
+
         let base = provider.base_url();
         let auth_header = ("authorization", provider.api_key.as_str());
 
@@ -94,11 +101,14 @@ impl CloudProvider for AssemblyAiBackend {
             .json()
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
 
-        // Step 3: Poll until completed or error
+        // Step 3: Poll until completed or error (cap at 90s to stay under pipeline's 120s timeout)
         let poll_url = format!("{}/v2/transcript/{}", base, transcript.id);
-        let max_polls = 60; // 60 * 2s = 2 minutes max
-        for _ in 0..max_polls {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(90);
+        loop {
             std::thread::sleep(std::time::Duration::from_secs(2));
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
 
             let poll_resp = BLOCKING_CLIENT
                 .get(&poll_url)
@@ -125,7 +135,7 @@ impl CloudProvider for AssemblyAiBackend {
                     let msg = result.error.unwrap_or_else(|| "Unknown error".into());
                     return Err(ProviderError::InvalidResponse(msg));
                 }
-                _ => continue, // "queued" or "processing"
+                _ => {} // "queued" or "processing"
             }
         }
 

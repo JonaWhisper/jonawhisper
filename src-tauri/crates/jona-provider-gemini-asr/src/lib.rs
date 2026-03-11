@@ -51,6 +51,13 @@ impl CloudProvider for GeminiAsrBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
+        if provider.api_key.trim().is_empty() {
+            return Err(ProviderError::NotConfigured(format!(
+                "Provider '{}' is missing an API key for Gemini",
+                provider.name
+            )));
+        }
+
         let file_bytes = std::fs::read(audio_path)?;
         let audio_b64 = base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
@@ -77,13 +84,16 @@ impl CloudProvider for GeminiAsrBackend {
             }],
         };
 
+        let base_url = provider.base_url();
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-            model, provider.api_key,
+            "{}/models/{}:generateContent",
+            base_url.trim_end_matches('/'),
+            model,
         );
 
         let response = BLOCKING_CLIENT
             .post(&url)
+            .header("x-goog-api-key", &provider.api_key)
             .json(&request)
             .send()
             .map_err(|e| ProviderError::Http(e.to_string()))?;

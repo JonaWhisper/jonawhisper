@@ -27,6 +27,13 @@ impl CloudProvider for RevAiBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
+        if provider.api_key.trim().is_empty() {
+            return Err(ProviderError::NotConfigured(format!(
+                "Provider '{}' is missing an API key for Rev.ai",
+                provider.name
+            )));
+        }
+
         let file_bytes = std::fs::read(audio_path)?;
         let file_part = reqwest::blocking::multipart::Part::bytes(file_bytes)
             .file_name("audio.wav")
