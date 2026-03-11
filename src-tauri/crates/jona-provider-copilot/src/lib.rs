@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::{LazyLock, Mutex};
+use std::sync::LazyLock;
+use tokio::sync::Mutex;
 use std::time::Instant;
 
 static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
@@ -16,10 +17,10 @@ static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .unwrap_or_else(|_| reqwest::Client::new())
 });
 
-/// Cached Copilot JWT: (oauth_token_hash, jwt, fetched_at). GitHub Copilot JWTs
+/// Cached Copilot JWT: (full_api_key, jwt, fetched_at). GitHub Copilot JWTs
 /// typically last 30 min; we use a 25 min TTL to refresh before expiry.
-/// Keyed by a hash of the OAuth token so switching accounts invalidates the cache.
-static JWT_CACHE: LazyLock<Mutex<Option<(u64, String, Instant)>>> =
+/// Keyed by the full OAuth token string so switching accounts invalidates the cache.
+static JWT_CACHE: LazyLock<Mutex<Option<(String, String, Instant)>>> =
     LazyLock::new(|| Mutex::new(None));
 
 const JWT_TTL_SECS: u64 = 25 * 60; // 25 minutes
@@ -55,37 +56,24 @@ async fn fetch_token(github_token: &str) -> Result<String, ProviderError> {
         .ok_or_else(|| ProviderError::InvalidResponse("No token in response".into()))
 }
 
-/// Simple hash of the OAuth token for cache keying (not cryptographic, just identity).
-fn hash_token(token: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    token.hash(&mut hasher);
-    hasher.finish()
-}
-
 /// Get a cached JWT or exchange for a fresh one if expired/missing.
-/// Cache is keyed by the OAuth token hash so switching accounts invalidates it.
+/// Holds the mutex lock across the full check-fetch-update cycle to prevent
+/// concurrent cold/expired cache misses from triggering duplicate HTTP requests.
 async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
-    let token_hash = hash_token(github_token);
+    // Hold lock across the entire check-fetch-update cycle to prevent races.
+    // tokio::sync::Mutex is Send-safe across .await points.
+    let mut cache = JWT_CACHE.lock().await;
 
-    // Check cache — must match the current OAuth token.
-    // unwrap_or_else recovers from a poisoned mutex (prior panic left stale data).
-    {
-        let guard = JWT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some((cached_hash, ref jwt, fetched_at)) = *guard {
-            if cached_hash == token_hash && fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
-                return Ok(jwt.clone());
-            }
+    if let Some((ref token_key, ref jwt, fetched_at)) = *cache {
+        if token_key == github_token && fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
+            return Ok(jwt.clone());
         }
     }
 
-    // Cache miss, expired, or different token — fetch a new JWT
+    // Still holding lock — other callers wait during the HTTP call (~200ms).
+    // Acceptable for a desktop app where Copilot LLM calls are sequential in practice.
     let jwt = fetch_token(github_token).await?;
-
-    {
-        let mut guard = JWT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        *guard = Some((token_hash, jwt.clone(), Instant::now()));
-    }
+    *cache = Some((github_token.to_string(), jwt.clone(), Instant::now()));
 
     Ok(jwt)
 }
