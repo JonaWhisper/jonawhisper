@@ -67,8 +67,8 @@ APIs ASR avec protocole dédié (non OpenAI-compatible), chacune dans son propre
 | **ElevenLabs** | Scribe v2 | $0.01 | <150ms stream | ~93.5% FLEURS | Oui | Oui | `jona-provider-elevenlabs` | ✅ |
 | **Gladia** | Whisper-Zero | $0.010 | Temps réel | — | Oui | Oui | `jona-provider-gladia` | ✅ |
 | **Speechmatics** | Flow API | Sur devis | ~150ms | — | Oui (55+ lang) | Oui | `jona-provider-speechmatics` | ✅ |
-| **Google Cloud** | Chirp 3 | $0.016 | 1-2s | — | Oui (100+ lang) | Oui | — | Non implémenté |
-| **Azure Speech** | Standard | $0.017 | ~200ms | — | Oui (100+ lang) | Oui | — | Non implémenté |
+| **Google Cloud** | Chirp 3 | $0.016 | 1-2s | — | Oui (100+ lang) | Oui | `jona-provider-google-speech` | ✅ |
+| **Azure Speech** | Standard | $0.017 | ~200ms | — | Oui (100+ lang) | Oui | `jona-provider-azure-speech` | ✅ |
 | **Amazon Transcribe** | Standard | $0.024 | Secondes | — | Oui (100+ lang) | Oui | — | Non implémenté |
 
 ### Détails des APIs intégrées
@@ -236,7 +236,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 
 ## Presets actuels
 
-22 presets cloud répartis dans 11 crates `jona-provider-*` (système `inventory`). L'utilisateur entre juste sa clé API.
+24 presets cloud répartis dans 13 crates `jona-provider-*` (système `inventory`). L'utilisateur entre juste sa clé API.
 
 | Provider | `id` | ASR | LLM | Base URL |
 |----------|------|-----|-----|----------|
@@ -262,6 +262,8 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **Cohere** | `cohere` | — | command-r-plus, command-r | `api.cohere.com` |
 | **Gladia** | `gladia` | Whisper-Zero | — | `api.gladia.io` |
 | **Speechmatics** | `speechmatics` | — (batch ASR) | — | `asr.api.speechmatics.com` |
+| **Azure Speech** | `azure-speech` | multi-lang ASR | — | `cognitiveservices.azure.com` |
+| **Google Speech** | `google-speech` | multi-lang ASR | — | `speech.googleapis.com` |
 
 ---
 
@@ -280,6 +282,8 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **Cohere** | `jona-provider-cohere` | ❌ | ✅ | ✅ Implémenté |
 | **Gladia** | `jona-provider-gladia` | ✅ | ❌ | ✅ Implémenté |
 | **Speechmatics** | `jona-provider-speechmatics` | ✅ | ❌ | ✅ Implémenté |
+| **Azure Speech** | `jona-provider-azure-speech` | ✅ | ❌ | ✅ Implémenté |
+| **Google Speech** | `jona-provider-google-speech` | ✅ | ❌ | ✅ Implémenté |
 
 ---
 

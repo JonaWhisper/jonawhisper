@@ -369,7 +369,7 @@ function save() {
         :model-value="extraValues[field.id] ?? ''"
         @update:model-value="v => extraValues[field.id] = String(v)"
         :type="field.field_type"
-        :placeholder="field.placeholder"
+        :placeholder="isEditing && field.sensitive ? t('provider.apiKeyKeep') : field.placeholder"
         class="h-9 text-sm"
       />
 

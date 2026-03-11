@@ -134,9 +134,9 @@ Defines the `ASREngine` trait, `ASRModel`, `EngineError`, `Preferences`, `Provid
 
 macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future Windows support. Hotkey (CGEvent tap), permissions, paste, audio devices, audio ducking, sound playback, launch-at-login.
 
-#### `jona-provider` + `jona-provider-*` (11 crates) — Cloud backends
+#### `jona-provider` + `jona-provider-*` (13 crates) — Cloud backends
 
-`CloudProvider` trait + provider backends: OpenAI-compatible (12 presets), Anthropic, Deepgram, Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere, Gladia, Speechmatics. Handles ASR transcription, LLM chat completion, and model listing via cloud APIs.
+`CloudProvider` trait + provider backends: OpenAI-compatible (12 presets), Anthropic, Deepgram, Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere, Gladia, Speechmatics, Azure Speech, Google Speech. Handles ASR transcription, LLM chat completion, and model listing via cloud APIs. Each preset declares `extra_fields` (dynamic form fields) and `hidden_fields` (fields to hide from the UI).
 
 #### Engine crates (11)
 
