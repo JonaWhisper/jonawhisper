@@ -302,15 +302,30 @@ function save() {
           <template v-else>{{ t('provider.test') }}</template>
         </Button>
       </div>
-      <!-- Test result -->
-      <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 text-xs text-green-600">
-        <CheckCircle2 class="w-3.5 h-3.5" />
-        <span>{{ testMessage }}</span>
-      </div>
-      <div v-if="testStatus === 'error'" class="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
-        <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
-        <span>{{ testMessage }}</span>
-      </div>
+    </div>
+
+    <!-- Test button (standalone) when API key is hidden -->
+    <div v-if="!showApiKey" class="space-y-2">
+      <Button
+        variant="outline"
+        size="sm"
+        class="w-full h-9"
+        :disabled="!canTest || testStatus === 'loading'"
+        @click="testConnection"
+      >
+        <Loader2 v-if="testStatus === 'loading'" class="w-3.5 h-3.5 animate-spin mr-2" />
+        <template v-else>{{ t('provider.test') }}</template>
+      </Button>
+    </div>
+
+    <!-- Test result -->
+    <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 text-xs text-green-600">
+      <CheckCircle2 class="w-3.5 h-3.5" />
+      <span>{{ testMessage }}</span>
+    </div>
+    <div v-if="testStatus === 'error'" class="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
+      <XCircle class="w-3.5 h-3.5 shrink-0 mt-px" />
+      <span>{{ testMessage }}</span>
     </div>
 
     <!-- Dynamic preset fields -->
