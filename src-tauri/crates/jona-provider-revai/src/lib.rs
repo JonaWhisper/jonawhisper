@@ -27,7 +27,8 @@ impl CloudProvider for RevAiBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
-        if provider.api_key.trim().is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(format!(
                 "Provider '{}' is missing an API key for Rev.ai",
                 provider.name
@@ -52,7 +53,7 @@ impl CloudProvider for RevAiBackend {
 
         let response = BLOCKING_CLIENT
             .post(&url)
-            .header("Authorization", format!("Bearer {}", provider.api_key))
+            .header("Authorization", format!("Bearer {api_key}"))
             .multipart(form)
             .send()
             .map_err(|e| ProviderError::Http(e.to_string()))?;

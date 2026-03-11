@@ -55,7 +55,8 @@ impl CloudProvider for SpeechmaticsBackend {
         audio_path: &Path,
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
-        if provider.api_key.is_empty() {
+        let api_key = provider.api_key.trim();
+        if api_key.is_empty() {
             return Err(ProviderError::NotConfigured(
                 "Speechmatics API key is not configured".into(),
             ));
@@ -63,7 +64,7 @@ impl CloudProvider for SpeechmaticsBackend {
         provider.validate_url().map_err(ProviderError::Http)?;
 
         let base = provider.base_url();
-        let bearer = format!("Bearer {}", provider.api_key);
+        let bearer = format!("Bearer {api_key}");
 
         // Build transcription config JSON
         let operating_point = if model.is_empty() || model == "enhanced" {
@@ -114,12 +115,25 @@ impl CloudProvider for SpeechmaticsBackend {
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
 
         // Step 2: Poll job status until "done" or "rejected"
+        // Stepped backoff: 1s (polls 0-4), 2s (5-14), 3s (15+). ~120s total budget.
         let status_url = format!("{}/v2/jobs/{}", base, job.id);
         let transcript_url = format!("{}/v2/jobs/{}/transcript?format=json-v2", base, job.id);
-        let max_polls = 60; // 60 * 2s = 2 minutes max
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+        let mut poll_count = 0u32;
 
-        for _ in 0..max_polls {
-            std::thread::sleep(std::time::Duration::from_secs(2));
+        loop {
+            let delay = if poll_count < 5 {
+                1
+            } else if poll_count < 15 {
+                2
+            } else {
+                3
+            };
+            std::thread::sleep(std::time::Duration::from_secs(delay));
+            poll_count += 1;
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
 
             let poll_resp = BLOCKING_CLIENT
                 .get(&status_url)

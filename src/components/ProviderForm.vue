@@ -268,6 +268,7 @@ function save() {
         v-model:search-term="searchTerm"
         :reset-search-term-on-select="true"
         :reset-search-term-on-blur="true"
+        :open-on-focus="true"
         @update:model-value="onKindChange"
       >
         <ComboboxAnchor class="flex h-9 w-full items-center rounded-md border border-input bg-transparent shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring">

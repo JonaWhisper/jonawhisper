@@ -39,7 +39,7 @@ impl CloudProvider for AnthropicBackend {
         model: &'a str,
         system: &'a str,
         user_message: &'a str,
-        _temperature: f32,
+        temperature: f32,
         max_tokens: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
@@ -48,6 +48,7 @@ impl CloudProvider for AnthropicBackend {
             let request = AnthropicRequest {
                 model: model.to_string(),
                 max_tokens,
+                temperature,
                 system: system.to_string(),
                 messages: vec![AnthropicMessage {
                     role: "user",
@@ -55,12 +56,13 @@ impl CloudProvider for AnthropicBackend {
                 }],
             };
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT
                 .post(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION)
                 .json(&request);
-            if !provider.api_key.is_empty() {
-                req = req.header("x-api-key", &provider.api_key);
+            if !api_key.is_empty() {
+                req = req.header("x-api-key", api_key);
             }
 
             let response = send_and_check(req).await?;
@@ -86,11 +88,12 @@ impl CloudProvider for AnthropicBackend {
         Box::pin(async move {
             let url = format!("{}/models", provider.base_url());
 
+            let api_key = provider.api_key.trim();
             let mut req = ASYNC_CLIENT
                 .get(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION);
-            if !provider.api_key.is_empty() {
-                req = req.header("x-api-key", &provider.api_key);
+            if !api_key.is_empty() {
+                req = req.header("x-api-key", api_key);
             }
 
             let response = send_and_check(req).await?;
@@ -109,6 +112,7 @@ impl CloudProvider for AnthropicBackend {
 struct AnthropicRequest {
     model: String,
     max_tokens: u32,
+    temperature: f32,
     system: String,
     messages: Vec<AnthropicMessage>,
 }
