@@ -5,6 +5,7 @@ use jona_types::{
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
+use std::sync::LazyLock;
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -27,6 +28,14 @@ const AWS_REGIONS: &[(&str, &str)] = &[
     ("me-south-1", "Middle East (Bahrain)"),
     ("af-south-1", "Africa (Cape Town)"),
 ];
+
+/// Pre-built async reqwest client with timeout for downloading transcripts.
+static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+});
 
 /// Build an AWS SDK config from provider extra fields.
 fn aws_config(provider: &Provider) -> Result<aws_config::SdkConfig, ProviderError> {
@@ -108,6 +117,39 @@ fn aws_language_code(lang: &str) -> String {
     .to_string()
 }
 
+/// Read a WAV file and extract raw signed 16-bit PCM bytes + sample rate.
+/// Handles any WAV format (16-bit, 32-bit float, etc.) by converting to i16 PCM.
+fn read_wav_pcm16(audio_path: &Path) -> Result<(Vec<u8>, u32), ProviderError> {
+    let reader = hound::WavReader::open(audio_path)
+        .map_err(|e| ProviderError::InvalidResponse(format!("Failed to read WAV: {e}")))?;
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate;
+
+    let pcm_i16: Vec<i16> = match (spec.sample_format, spec.bits_per_sample) {
+        (hound::SampleFormat::Int, 16) => reader
+            .into_samples::<i16>()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ProviderError::InvalidResponse(format!("WAV decode error: {e}")))?,
+        (hound::SampleFormat::Int, bps) => {
+            let shift = bps.saturating_sub(16);
+            reader
+                .into_samples::<i32>()
+                .map(|s| s.map(|v| (v >> shift) as i16))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| ProviderError::InvalidResponse(format!("WAV decode error: {e}")))?
+        }
+        (hound::SampleFormat::Float, _) => reader
+            .into_samples::<f32>()
+            .map(|s| s.map(|v| (v.clamp(-1.0, 1.0) * i16::MAX as f32) as i16))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ProviderError::InvalidResponse(format!("WAV decode error: {e}")))?,
+    };
+
+    // Convert i16 samples to little-endian bytes
+    let pcm_bytes: Vec<u8> = pcm_i16.iter().flat_map(|s| s.to_le_bytes()).collect();
+    Ok((pcm_bytes, sample_rate))
+}
+
 // ── Streaming backend ───────────────────────────────────────────────────────
 
 /// AWS Transcribe Streaming — sends audio directly, no S3 needed.
@@ -122,29 +164,11 @@ impl CloudProvider for AwsTranscribeStreamingBackend {
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
         let config = aws_config(provider)?;
-        let audio_bytes = std::fs::read(audio_path)?;
-
-        // Extract sample rate from WAV header (bytes 24-27, little-endian u32)
-        let sample_rate = if audio_bytes.len() >= 28 {
-            u32::from_le_bytes([audio_bytes[24], audio_bytes[25], audio_bytes[26], audio_bytes[27]])
-        } else {
-            16000
-        };
-
-        // Strip WAV header (first 44 bytes) to get raw PCM
-        let pcm_data = if audio_bytes.len() > 44 {
-            &audio_bytes[44..]
-        } else {
-            &audio_bytes
-        };
-
+        let (pcm_data, sample_rate) = read_wav_pcm16(audio_path)?;
         let lang_code = aws_language_code(language);
 
-        // Run the async streaming transcription on the current tokio runtime
-        let result = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                streaming_transcribe(&config, pcm_data, sample_rate as i32, &lang_code).await
-            })
+        let result = tokio::runtime::Handle::current().block_on(async {
+            streaming_transcribe(&config, &pcm_data, sample_rate as i32, &lang_code).await
         })?;
 
         Ok(TranscriptionResult::text_only(result))
@@ -192,22 +216,24 @@ async fn streaming_transcribe(
 
     let lang = language_code
         .parse::<LanguageCode>()
-        .unwrap_or(LanguageCode::EnUs);
+        .map_err(|_| {
+            ProviderError::NotConfigured(format!(
+                "Unsupported AWS Transcribe language code: {language_code}"
+            ))
+        })?;
 
-    // Build the audio stream from PCM chunks
-    let pcm_owned = pcm_data.to_vec();
-    let audio_stream = futures_util::stream::iter(
-        pcm_owned
-            .chunks(8192)
-            .map(|chunk| {
-                Ok(AudioStream::AudioEvent(
-                    AudioEvent::builder()
-                        .audio_chunk(Blob::new(chunk.to_vec()))
-                        .build(),
-                ))
-            })
-            .collect::<Vec<_>>(),
-    );
+    // Build the audio stream directly from chunks — no intermediate Vec collection
+    let chunks: Vec<_> = pcm_data
+        .chunks(8192)
+        .map(|chunk| {
+            Ok(AudioStream::AudioEvent(
+                AudioEvent::builder()
+                    .audio_chunk(Blob::new(chunk.to_vec()))
+                    .build(),
+            ))
+        })
+        .collect();
+    let audio_stream = futures_util::stream::iter(chunks);
 
     let sender = EventStreamSender::from(audio_stream);
 
@@ -275,10 +301,8 @@ impl CloudProvider for AwsTranscribeBatchBackend {
 
         let lang_code = aws_language_code(language);
 
-        let result = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                batch_transcribe(&config, &audio_bytes, &s3_bucket, &lang_code).await
-            })
+        let result = tokio::runtime::Handle::current().block_on(async {
+            batch_transcribe(&config, &audio_bytes, &s3_bucket, &lang_code).await
         })?;
 
         Ok(TranscriptionResult::text_only(result))
@@ -325,6 +349,20 @@ async fn batch_transcribe(
     let job_id = uuid::Uuid::new_v4().to_string();
     let s3_key = format!("jona-whisper/tmp/{}.wav", job_id);
     let s3_uri = format!("s3://{}/{}", s3_bucket, s3_key);
+    let job_name = format!("jona-{}", job_id);
+
+    // Cleanup helper — always delete S3 object and transcription job
+    let cleanup = |s3: &aws_sdk_s3::Client, tc: &aws_sdk_transcribe::Client, bucket: &str, key: &str, name: &str| {
+        let s3 = s3.clone();
+        let tc = tc.clone();
+        let bucket = bucket.to_string();
+        let key = key.to_string();
+        let name = name.to_string();
+        async move {
+            let _ = s3.delete_object().bucket(&bucket).key(&key).send().await;
+            let _ = tc.delete_transcription_job().transcription_job_name(&name).send().await;
+        }
+    };
 
     // 1. Upload audio to S3
     s3_client
@@ -340,10 +378,13 @@ async fn batch_transcribe(
     // 2. Start transcription job
     let lang = language_code
         .parse::<LanguageCode>()
-        .unwrap_or(LanguageCode::EnUs);
+        .map_err(|_| {
+            ProviderError::NotConfigured(format!(
+                "Unsupported AWS Transcribe language code: {language_code}"
+            ))
+        })?;
 
-    let job_name = format!("jona-{}", job_id);
-    transcribe_client
+    if let Err(e) = transcribe_client
         .start_transcription_job()
         .transcription_job_name(&job_name)
         .language_code(lang)
@@ -351,19 +392,28 @@ async fn batch_transcribe(
         .media(Media::builder().media_file_uri(&s3_uri).build())
         .send()
         .await
-        .map_err(|e| ProviderError::Http(format!("StartTranscriptionJob failed: {e}")))?;
+    {
+        cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+        return Err(ProviderError::Http(format!("StartTranscriptionJob failed: {e}")));
+    }
 
     // 3. Poll until complete (max ~120s)
     let mut transcript_uri = String::new();
     for _ in 0..60 {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-        let resp = transcribe_client
+        let resp = match transcribe_client
             .get_transcription_job()
             .transcription_job_name(&job_name)
             .send()
             .await
-            .map_err(|e| ProviderError::Http(format!("GetTranscriptionJob failed: {e}")))?;
+        {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+                return Err(ProviderError::Http(format!("GetTranscriptionJob failed: {e}")));
+            }
+        };
 
         if let Some(job) = resp.transcription_job() {
             match job.transcription_job_status() {
@@ -375,13 +425,7 @@ async fn batch_transcribe(
                 }
                 Some(TranscriptionJobStatus::Failed) => {
                     let reason = job.failure_reason().unwrap_or("Unknown error");
-                    // Cleanup S3 before returning error
-                    let _ = s3_client
-                        .delete_object()
-                        .bucket(s3_bucket)
-                        .key(&s3_key)
-                        .send()
-                        .await;
+                    cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
                     return Err(ProviderError::Api {
                         status: 500,
                         body: format!("Transcription failed: {reason}"),
@@ -392,11 +436,23 @@ async fn batch_transcribe(
         }
     }
 
-    // 4. Download transcript JSON from the result URI
+    // 4. Download transcript JSON from the result URI (with timeout + status check)
     let text = if !transcript_uri.is_empty() {
-        let resp = reqwest::get(&transcript_uri)
+        let resp = HTTP_CLIENT
+            .get(&transcript_uri)
+            .send()
             .await
             .map_err(|e| ProviderError::Http(format!("Failed to download transcript: {e}")))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+            return Err(ProviderError::Api {
+                status,
+                body: format!("Transcript download returned HTTP {status}"),
+            });
+        }
+
         let json: serde_json::Value = resp
             .json()
             .await
@@ -406,23 +462,15 @@ async fn batch_transcribe(
             .unwrap_or("")
             .to_string()
     } else {
+        // Timeout — cleanup before returning error
+        cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
         return Err(ProviderError::Http(
             "Transcription job timed out".to_string(),
         ));
     };
 
     // 5. Cleanup: delete temp S3 object and transcription job
-    let _ = s3_client
-        .delete_object()
-        .bucket(s3_bucket)
-        .key(&s3_key)
-        .send()
-        .await;
-    let _ = transcribe_client
-        .delete_transcription_job()
-        .transcription_job_name(&job_name)
-        .send()
-        .await;
+    cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
 
     Ok(text)
 }

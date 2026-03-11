@@ -3717,6 +3717,7 @@ dependencies = [
  "aws-sdk-transcribestreaming",
  "aws-smithy-http",
  "futures-util",
+ "hound",
  "inventory",
  "jona-types",
  "log",
