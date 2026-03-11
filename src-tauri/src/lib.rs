@@ -477,10 +477,12 @@ mod tests {
     fn provider_catalog_has_backends() {
         ensure_catalog();
         let presets = jona_provider::presets();
-        // At least openai backend should be registered
+        assert!(!presets.is_empty(), "Should have at least one preset");
+        // Verify openai preset exists AND its backend resolves
         let openai = jona_provider::preset("openai");
         assert!(openai.is_some(), "openai preset should exist");
-        assert!(!presets.is_empty(), "Should have at least one preset");
+        // backend() panics if not found — this validates the backend is registered
+        let _ = jona_provider::backend("openai");
     }
 
     #[test]
@@ -603,6 +605,7 @@ mod tests {
     #[test]
     fn backend_for_custom_provider_uses_api_format() {
         ensure_catalog();
+        // Use "anthropic" format (non-default) to verify the override path works
         let provider = jona_types::Provider {
             id: "p2".into(),
             name: "Custom".into(),
@@ -611,10 +614,11 @@ mod tests {
             api_key: String::new(),
             allow_insecure: false,
             cached_models: vec![],
-            supports_asr: true,
+            supports_asr: false,
             supports_llm: true,
-            api_format: Some("openai".into()),
+            api_format: Some("anthropic".into()),
         };
+        // Should resolve to the anthropic backend without panicking
         let _ = jona_provider::backend_for_provider(&provider);
     }
 
