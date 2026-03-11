@@ -1,0 +1,22 @@
+[package]
+name = "jona-provider-aws-transcribe"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+jona-types = { path = "../jona-types" }
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-credential-types = { version = "1", features = ["hardcoded-credentials"] }
+aws-sdk-transcribe = "1"
+aws-sdk-transcribestreaming = "1"
+aws-sdk-s3 = "1"
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+serde.workspace = true
+serde_json.workspace = true
+inventory.workspace = true
+log.workspace = true
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
+uuid = { version = "1", features = ["v4"] }
+futures-util = "0.3"
+aws-smithy-http = "0.63"
