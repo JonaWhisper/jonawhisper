@@ -117,6 +117,20 @@ fn aws_language_code(lang: &str) -> String {
     .to_string()
 }
 
+/// Run an async future from a sync context, using the current Tokio handle if available,
+/// or creating a temporary runtime as fallback.
+fn run_async<F: std::future::Future>(fut: F) -> F::Output {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        handle.block_on(fut)
+    } else {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to create Tokio runtime for AWS Transcribe");
+        rt.block_on(fut)
+    }
+}
+
 /// Read a WAV file and extract raw signed 16-bit PCM bytes + sample rate.
 /// Handles any WAV format (16-bit, 32-bit float, etc.) by converting to i16 PCM.
 fn read_wav_pcm16(audio_path: &Path) -> Result<(Vec<u8>, u32), ProviderError> {
@@ -167,7 +181,7 @@ impl CloudProvider for AwsTranscribeStreamingBackend {
         let (pcm_data, sample_rate) = read_wav_pcm16(audio_path)?;
         let lang_code = aws_language_code(language);
 
-        let result = tokio::runtime::Handle::current().block_on(async {
+        let result = run_async(async {
             streaming_transcribe(&config, &pcm_data, sample_rate as i32, &lang_code).await
         })?;
 
@@ -222,8 +236,8 @@ async fn streaming_transcribe(
             ))
         })?;
 
-    // Build the audio stream directly from chunks — no intermediate Vec collection
-    let chunks: Vec<_> = pcm_data
+    // Build audio events — must collect because EventStreamSender requires 'static
+    let events: Vec<_> = pcm_data
         .chunks(8192)
         .map(|chunk| {
             Ok(AudioStream::AudioEvent(
@@ -233,7 +247,7 @@ async fn streaming_transcribe(
             ))
         })
         .collect();
-    let audio_stream = futures_util::stream::iter(chunks);
+    let audio_stream = futures_util::stream::iter(events);
 
     let sender = EventStreamSender::from(audio_stream);
 
@@ -259,7 +273,8 @@ async fn streaming_transcribe(
             if let Some(t) = te.transcript() {
                 for result in t.results() {
                     if !result.is_partial() {
-                        for alt in result.alternatives() {
+                        // Take only the first (best) alternative per result
+                        if let Some(alt) = result.alternatives().first() {
                             if let Some(text) = alt.transcript() {
                                 if !transcript.is_empty() {
                                     transcript.push(' ');
@@ -301,7 +316,7 @@ impl CloudProvider for AwsTranscribeBatchBackend {
 
         let lang_code = aws_language_code(language);
 
-        let result = tokio::runtime::Handle::current().block_on(async {
+        let result = run_async(async {
             batch_transcribe(&config, &audio_bytes, &s3_bucket, &lang_code).await
         })?;
 
@@ -438,11 +453,13 @@ async fn batch_transcribe(
 
     // 4. Download transcript JSON from the result URI (with timeout + status check)
     let text = if !transcript_uri.is_empty() {
-        let resp = HTTP_CLIENT
-            .get(&transcript_uri)
-            .send()
-            .await
-            .map_err(|e| ProviderError::Http(format!("Failed to download transcript: {e}")))?;
+        let resp = match HTTP_CLIENT.get(&transcript_uri).send().await {
+            Ok(r) => r,
+            Err(e) => {
+                cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+                return Err(ProviderError::Http(format!("Failed to download transcript: {e}")));
+            }
+        };
 
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
@@ -453,14 +470,17 @@ async fn batch_transcribe(
             });
         }
 
-        let json: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
-        json.pointer("/results/transcripts/0/transcript")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string()
+        match resp.json::<serde_json::Value>().await {
+            Ok(json) => json
+                .pointer("/results/transcripts/0/transcript")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            Err(e) => {
+                cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
+                return Err(ProviderError::InvalidResponse(e.to_string()));
+            }
+        }
     } else {
         // Timeout — cleanup before returning error
         cleanup(&s3_client, &transcribe_client, s3_bucket, &s3_key, &job_name).await;
