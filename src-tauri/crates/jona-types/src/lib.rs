@@ -857,6 +857,18 @@ mod tests {
     }
 
     #[test]
+    fn mask_value_non_ascii() {
+        // Multi-byte UTF-8: accented chars
+        assert_eq!(mask_value("clé-sécrète"), "••••rète");
+        // Emoji (4-byte chars) — 9 scalar values, last 4 shown
+        assert_eq!(mask_value("pass🔑🔒🔐💎🎉"), "••••🔒🔐💎🎉");
+        // Exactly 4 multi-byte chars → fully masked
+        assert_eq!(mask_value("àéîö"), "••••");
+        // CJK characters (6 chars, last 4 shown)
+        assert_eq!(mask_value("秘密のキー値"), "••••のキー値");
+    }
+
+    #[test]
     fn provider_validate_url_known_provider() {
         let p = test_provider(|_| {});
         assert!(p.validate_url().is_ok());
