@@ -338,11 +338,58 @@ pub fn keyring_delete(provider_id: &str) {
     }
 }
 
-/// Populate empty api_key fields from the OS keychain.
+/// Store a sensitive extra field value in the OS keychain.
+pub fn keyring_store_extra(provider_id: &str, field_id: &str, value: &str) {
+    if value.is_empty() {
+        return;
+    }
+    let user = format!("provider:{}:extra:{}", provider_id, field_id);
+    match keyring::Entry::new(KEYRING_SERVICE, &user) {
+        Ok(entry) => {
+            if let Err(e) = entry.set_password(value) {
+                log::error!("keyring: failed to store extra field {}:{}: {}", provider_id, field_id, e);
+            }
+        }
+        Err(e) => log::error!("keyring: failed to create entry for {}:{}: {}", provider_id, field_id, e),
+    }
+}
+
+/// Load a sensitive extra field value from the OS keychain. Returns empty string on failure.
+pub fn keyring_load_extra(provider_id: &str, field_id: &str) -> String {
+    let user = format!("provider:{}:extra:{}", provider_id, field_id);
+    match keyring::Entry::new(KEYRING_SERVICE, &user) {
+        Ok(entry) => entry.get_password().unwrap_or_default(),
+        Err(e) => {
+            log::warn!("keyring: failed to create entry for {}:{}: {}", provider_id, field_id, e);
+            String::new()
+        }
+    }
+}
+
+/// Delete a sensitive extra field value from the OS keychain.
+pub fn keyring_delete_extra(provider_id: &str, field_id: &str) {
+    let user = format!("provider:{}:extra:{}", provider_id, field_id);
+    if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, &user) {
+        let _ = entry.delete_credential();
+    }
+}
+
+/// Populate empty api_key fields and sensitive extra fields from the OS keychain.
 pub fn load_api_keys_from_keyring(providers: &mut [Provider]) {
     for provider in providers.iter_mut() {
         if provider.api_key.is_empty() {
             provider.api_key = keyring_load(&provider.id);
+        }
+        // Hydrate sensitive extra fields from keychain
+        if let Some(preset) = preset_by_id(&provider.kind) {
+            for field in preset.extra_fields {
+                if field.sensitive && !provider.extra.contains_key(field.id) {
+                    let val = keyring_load_extra(&provider.id, field.id);
+                    if !val.is_empty() {
+                        provider.extra.insert(field.id.to_string(), val);
+                    }
+                }
+            }
         }
     }
 }
@@ -459,10 +506,18 @@ impl Preferences {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        // Clone and strip API keys — they live in the OS keychain, not on disk
+        // Clone and strip API keys + sensitive extra fields — they live in the OS keychain, not on disk
         let mut prefs_for_disk = self.clone();
         for provider in &mut prefs_for_disk.providers {
             provider.api_key.clear();
+            // Strip sensitive extra fields
+            if let Some(preset) = preset_by_id(&provider.kind) {
+                for field in preset.extra_fields {
+                    if field.sensitive {
+                        provider.extra.remove(field.id);
+                    }
+                }
+            }
         }
         if let Ok(data) = serde_json::to_string_pretty(&prefs_for_disk) {
             match std::fs::write(&path, &data) {

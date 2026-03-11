@@ -108,6 +108,12 @@ pub struct ProviderPreset {
 
 inventory::collect!(ProviderPreset);
 
+/// Look up a preset by ID from the inventory-collected presets.
+/// This is a simple linear scan suitable for infrequent calls (e.g. save/load).
+pub fn preset_by_id(id: &str) -> Option<&'static ProviderPreset> {
+    inventory::iter::<ProviderPreset>.into_iter().find(|p| p.id == id)
+}
+
 /// Parse model IDs from an OpenAI-compatible JSON response.
 /// Handles both `{data:[...]}` and bare `[...]` formats.
 pub fn parse_model_ids_from_json(json: &serde_json::Value) -> Result<Vec<String>, ProviderError> {
