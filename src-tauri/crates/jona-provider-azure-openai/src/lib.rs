@@ -40,25 +40,38 @@ fn required_extra<'a>(provider: &'a Provider, key: &str) -> Result<&'a str, Prov
         })
 }
 
-/// Validate that a resource name contains only safe characters (alphanumeric + hyphens).
-fn validate_resource_name(name: &str) -> Result<(), ProviderError> {
-    if name.is_empty()
-        || !name
+/// Validate that a URL segment contains only safe characters (alphanumeric, hyphens, dots).
+/// Used for resource_name, deployment_name, and api_version to prevent path/query injection.
+fn validate_url_segment(value: &str, field_name: &str) -> Result<(), ProviderError> {
+    if value.is_empty()
+        || !value
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
     {
-        return Err(ProviderError::NotConfigured(
-            "Invalid resource name: must contain only alphanumeric characters and hyphens".into(),
-        ));
+        return Err(ProviderError::NotConfigured(format!(
+            "Invalid {field_name}: must contain only alphanumeric characters, hyphens and dots"
+        )));
     }
     Ok(())
+}
+
+/// Resolve the deployment name: use `model` parameter if non-empty, otherwise fall back
+/// to `extra.deployment_name`. This lets the UI model picker override the default.
+fn resolve_deployment<'a>(provider: &'a Provider, model: &'a str) -> Result<&'a str, ProviderError> {
+    let deployment = if !model.is_empty() && model != "default" {
+        model
+    } else {
+        required_extra(provider, "deployment_name")?
+    };
+    validate_url_segment(deployment, "deployment_name")?;
+    Ok(deployment)
 }
 
 impl CloudProvider for AzureOpenAIBackend {
     fn transcribe(
         &self,
         provider: &Provider,
-        _model: &str,
+        model: &str,
         audio_path: &Path,
         language: &str,
     ) -> Result<TranscriptionResult, ProviderError> {
@@ -70,14 +83,15 @@ impl CloudProvider for AzureOpenAIBackend {
         }
 
         let resource = required_extra(provider, "resource_name")?;
-        validate_resource_name(resource)?;
-        let deployment = required_extra(provider, "deployment_name")?;
+        validate_url_segment(resource, "resource_name")?;
+        let deployment = resolve_deployment(provider, model)?;
         let api_version = provider
             .extra
             .get("api_version")
             .map(|s| s.as_str())
             .filter(|s| !s.is_empty())
             .unwrap_or("2024-10-21");
+        validate_url_segment(api_version, "api_version")?;
 
         let url = format!(
             "https://{resource}.openai.azure.com/openai/deployments/{deployment}/audio/transcriptions?api-version={api_version}"
@@ -135,7 +149,7 @@ impl CloudProvider for AzureOpenAIBackend {
     fn chat_completion<'a>(
         &'a self,
         provider: &'a Provider,
-        _model: &'a str,
+        model: &'a str,
         system: &'a str,
         user_message: &'a str,
         temperature: f32,
@@ -150,14 +164,15 @@ impl CloudProvider for AzureOpenAIBackend {
             }
 
             let resource = required_extra(provider, "resource_name")?;
-            validate_resource_name(resource)?;
-            let deployment = required_extra(provider, "deployment_name")?;
+            validate_url_segment(resource, "resource_name")?;
+            let deployment = resolve_deployment(provider, model)?;
             let api_version = provider
                 .extra
                 .get("api_version")
                 .map(|s| s.as_str())
                 .filter(|s| !s.is_empty())
                 .unwrap_or("2024-10-21");
+            validate_url_segment(api_version, "api_version")?;
 
             let url = format!(
                 "https://{resource}.openai.azure.com/openai/deployments/{deployment}/chat/completions?api-version={api_version}"
@@ -342,18 +357,40 @@ mod tests {
     }
 
     #[test]
-    fn validate_resource_name_valid() {
-        assert!(validate_resource_name("my-resource").is_ok());
-        assert!(validate_resource_name("resource123").is_ok());
-        assert!(validate_resource_name("a").is_ok());
+    fn validate_url_segment_valid() {
+        assert!(validate_url_segment("my-resource", "test").is_ok());
+        assert!(validate_url_segment("resource123", "test").is_ok());
+        assert!(validate_url_segment("2024-10-21", "test").is_ok());
+        assert!(validate_url_segment("gpt-4o", "test").is_ok());
     }
 
     #[test]
-    fn validate_resource_name_invalid() {
-        assert!(validate_resource_name("").is_err());
-        assert!(validate_resource_name("my resource").is_err());
-        assert!(validate_resource_name("my_resource").is_err());
-        assert!(validate_resource_name("resource/name").is_err());
+    fn validate_url_segment_invalid() {
+        assert!(validate_url_segment("", "test").is_err());
+        assert!(validate_url_segment("my resource", "test").is_err());
+        assert!(validate_url_segment("name/path", "test").is_err());
+        assert!(validate_url_segment("ver?a=1", "test").is_err());
+        assert!(validate_url_segment("dep&inject", "test").is_err());
+        assert!(validate_url_segment("../escape", "test").is_err());
+    }
+
+    #[test]
+    fn resolve_deployment_uses_model_param() {
+        let mut extra = HashMap::new();
+        extra.insert("resource_name".into(), "res".into());
+        extra.insert("deployment_name".into(), "fallback-dep".into());
+        let provider = test_provider(extra);
+        assert_eq!(resolve_deployment(&provider, "custom-dep").unwrap(), "custom-dep");
+    }
+
+    #[test]
+    fn resolve_deployment_falls_back_to_extra() {
+        let mut extra = HashMap::new();
+        extra.insert("resource_name".into(), "res".into());
+        extra.insert("deployment_name".into(), "extra-dep".into());
+        let provider = test_provider(extra);
+        assert_eq!(resolve_deployment(&provider, "").unwrap(), "extra-dep");
+        assert_eq!(resolve_deployment(&provider, "default").unwrap(), "extra-dep");
     }
 
     #[test]
