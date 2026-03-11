@@ -50,6 +50,8 @@
   "modelManager.update": "Update",
   "provider.kind": "Type",
   "provider.kind.custom": "Custom Server",
+  "provider.searchPreset": "Search provider\u2026",
+  "provider.noResults": "No provider found.",
   "provider.name": "Name",
   "provider.url": "API URL",
   "provider.apiKey": "API Key",
