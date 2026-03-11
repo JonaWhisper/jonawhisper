@@ -669,6 +669,7 @@ mod tests {
             url: url.into(), api_key: String::new(),
             allow_insecure: false, cached_models: vec![], supports_asr: true,
             supports_llm: true, api_format: None,
+            extra: std::collections::HashMap::new(),
         }
     }
 
