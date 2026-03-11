@@ -22,7 +22,6 @@ const ORPHAN_CLEANUP_SECS: u64 = 300;
 pub enum AudioCmd {
     StartRecording { device_uid: Option<String> },
     StopRecording,
-    GetSpectrum,
     StartMicTest { device_uid: Option<String> },
     StopMicTest,
 }
