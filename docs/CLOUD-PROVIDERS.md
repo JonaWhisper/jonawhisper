@@ -13,14 +13,21 @@ Référence unique pour toutes les APIs cloud pertinentes pour JonaWhisper (ASR 
 | **OpenAI-compatible ASR** | `POST /v1/audio/transcriptions` (multipart) | `jona-provider-openai` |
 | **OpenAI-compatible LLM** | `POST /v1/chat/completions` | `jona-provider-openai` |
 | **Anthropic Messages** | `POST /v1/messages` | `jona-provider-anthropic` |
+| **Deepgram** | `POST /v1/listen` (raw audio) | `jona-provider-deepgram` |
+| **GitHub Copilot** | Token exchange → `POST /chat/completions` | `jona-provider-copilot` |
+| **Gemini ASR** | `POST /v1beta/models/{m}:generateContent` (base64) | `jona-provider-gemini-asr` |
+| **Rev.ai** | `POST /speechtotext/v1/jobs` (multipart) | `jona-provider-revai` |
+| **AssemblyAI** | Upload → create → poll (async 3 étapes) | `jona-provider-assemblyai` |
+| **ElevenLabs** | `POST /v1/speech-to-text` (multipart) | `jona-provider-elevenlabs` |
+| **Cohere v2** | `POST /v2/chat` | `jona-provider-cohere` |
 
 ### Détection ASR vs LLM
 
-Chaque preset déclare explicitement ses capacités via `ProviderPreset.supports_asr` et `supports_llm` (système inventory dans le crate `jona-provider-openai`). Pour les providers Custom, les deux sont considérés comme supportés.
+Chaque preset déclare explicitement ses capacités via `ProviderPreset.supports_asr` et `supports_llm` (système `inventory` dans chaque crate `jona-provider-*`). Pour les providers Custom, les deux sont considérés comme supportés.
 
 ### Sécurité
 
-- Clés API dans le **Keychain macOS** (`keyring` v3), jamais sur disque
+- Clés API dans le **keychain OS** (`keyring` v3), jamais sur disque
 - IPC `get_providers` retourne des clés masquées (`••••abcd`)
 - HTTPS obligatoire sauf `allow_insecure` pour Custom (serveurs locaux)
 
@@ -48,9 +55,9 @@ L'app supporte `POST /v1/audio/transcriptions` avec multipart form. Ces provider
 
 ---
 
-## Cloud ASR — APIs propriétaires (non intégré)
+## Cloud ASR — APIs propriétaires
 
-APIs ASR qui ne suivent pas le format OpenAI et nécessitent un `jona-provider-*` dédié.
+APIs ASR avec protocole dédié (non OpenAI-compatible), chacune dans son propre crate `jona-provider-*`.
 
 | Provider | Modèle | Prix/min | Latence | WER | FR | Streaming FR | API | Complexité | Priorité |
 |----------|--------|----------|---------|-----|-----|-------------|-----|------------|----------|
@@ -77,7 +84,7 @@ APIs ASR qui ne suivent pas le format OpenAI et nécessitent un `jona-provider-*
 | **Modèles** | nova-3 (flagship), nova-2, enhanced, base |
 | **Langues** | 40+ langues, auto-détection, codeswitching |
 | **Features** | Smart formatting (ponctuation, nombres), streaming WebSocket, $200 crédits gratuits |
-| **Crate** | `jona-provider-deepgram` (~50-80 lignes Rust) |
+| **Crate** | `jona-provider-deepgram` |
 
 #### AssemblyAI
 
@@ -89,7 +96,7 @@ APIs ASR qui ne suivent pas le format OpenAI et nécessitent un `jona-provider-*
 | **Modèles** | best, nano (léger), conformer-2 |
 | **Langues** | 99+ langues |
 | **Features** | Speaker diarization, sentiment analysis, résumés. Mode real-time streaming aussi disponible. |
-| **Crate** | `jona-provider-assemblyai` — complexité élevée (workflow async) |
+| **Crate** | `jona-provider-assemblyai` (workflow async : upload → create → poll) |
 
 #### Rev.ai
 
@@ -99,7 +106,18 @@ APIs ASR qui ne suivent pas le format OpenAI et nécessitent un `jona-provider-*
 | **Auth** | `Authorization: Bearer ...` |
 | **Format** | REST simple, multipart upload |
 | **Langues** | Multi (Reverb Foreign = non-anglais) |
-| **Crate** | `jona-provider-revai` (~50 lignes) |
+| **Crate** | `jona-provider-revai` |
+
+#### ElevenLabs
+
+| | Détail |
+|--|--------|
+| **Endpoint** | `POST https://api.elevenlabs.io/v1/speech-to-text` |
+| **Auth** | `xi-api-key: ...` |
+| **Format** | Multipart sync (champ `file` + `model_id`) |
+| **Modèles** | scribe_v2 (flagship), scribe_v1 |
+| **Langues** | 99+ langues, auto-détection |
+| **Crate** | `jona-provider-elevenlabs` |
 
 ---
 
@@ -139,25 +157,26 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **Modèles** | claude-haiku-4-5 ($1/$5), claude-sonnet-4-5 ($3/$15), claude-opus-4 ($15/$75) |
 | **Particularités** | Versioning via header `anthropic-version`, streaming SSE, pas de `/v1/models` standard |
 
-### Google Gemini (ASR natif)
+### Google Gemini ASR (implémenté : `jona-provider-gemini-asr`)
 
 | | Détail |
 |--|--------|
 | **Endpoint** | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
-| **Auth** | `?key=AIza...` (query param) ou `Bearer` OAuth |
+| **Auth** | `?key=AIza...` (query param) |
 | **ASR** | Audio en base64 dans `inline_data` (mime `audio/wav`) — API multimodale |
-| **Statut** | LLM déjà supporté via le layer OpenAI-compat. ASR natif nécessiterait `jona-provider-gemini`. |
+| **Modèles** | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro |
+| **Note** | LLM séparé via le preset `gemini` (layer OpenAI-compat). Ce crate gère uniquement l'ASR natif. |
 
-### Cohere
+### Cohere (implémenté : `jona-provider-cohere`)
 
 | | Détail |
 |--|--------|
 | **Endpoint** | `https://api.cohere.com/v2/chat` |
 | **Auth** | `Authorization: Bearer ...` |
-| **Modèles** | command-r-plus ($2.50/$10), command-r ($0.15/$0.60) |
-| **Particularités** | Spécialisé RAG/search. v2 API proche OpenAI mais réponse différente. Pas prioritaire. |
+| **Modèles** | command-r-plus ($2.50/$10), command-r ($0.15/$0.60), command-a-03-2025 |
+| **Particularités** | v2 API : réponse dans `message.content[0].text` (pas `choices[0]`). Spécialisé RAG/search. |
 
-### GitHub Copilot (token exchange)
+### GitHub Copilot (implémenté : `jona-provider-copilot`)
 
 | | Détail |
 |--|--------|
@@ -166,10 +185,9 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **Token résultat** | JWT court-durée (~30 min) |
 | **Endpoint** | `https://api.githubcopilot.com/chat/completions` (format OpenAI) |
 | **Headers requis** | `Editor-Version`, `Copilot-Integration-Id`, `Openai-Organization: github-copilot` |
-| **Modèles** | GPT-4o, Claude 3.5 Sonnet (choix limité par Copilot) |
+| **Modèles** | GPT-4o, GPT-4o-mini, Claude 3.5 Sonnet (choix limité par Copilot) |
 | **Prix** | Inclus dans l'abonnement Copilot ($10–$39/mois) |
 | **Particularités** | API reverse-engineered. Réfs : `copilot-api`, `copilot-proxy`, LiteLLM `github_copilot/`. |
-| **Crate** | `jona-provider-copilot` — token exchange + requêtes OpenAI-format |
 
 ### Non prioritaires
 
@@ -218,7 +236,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 
 ## Presets actuels
 
-12 providers OpenAI-compatible préconfigurés dans le crate `jona-provider-openai` (système inventory) + 1 provider Anthropic dans le crate `jona-provider-anthropic`. L'utilisateur entre juste sa clé API.
+20 presets cloud répartis dans 9 crates `jona-provider-*` (système `inventory`). L'utilisateur entre juste sa clé API.
 
 | Provider | `id` | ASR | LLM | Base URL |
 |----------|------|-----|-----|----------|
