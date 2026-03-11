@@ -34,13 +34,7 @@ impl CloudProvider for OpenAICompatibleBackend {
     ) -> Result<TranscriptionResult, ProviderError> {
         provider.validate_url().map_err(ProviderError::Http)?;
 
-        // Validate API key before file I/O to fail fast (trim to catch whitespace-only keys)
         let api_key = provider.api_key.trim();
-        if api_key.is_empty() {
-            return Err(ProviderError::NotConfigured(
-                "API key is not configured".into(),
-            ));
-        }
 
         let file_bytes = std::fs::read(audio_path)?;
         let file_name = audio_path

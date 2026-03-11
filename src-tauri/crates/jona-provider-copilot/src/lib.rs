@@ -68,8 +68,10 @@ fn hash_token(token: &str) -> u64 {
 async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
     let token_hash = hash_token(github_token);
 
-    // Check cache — must match the current OAuth token
-    if let Ok(guard) = JWT_CACHE.lock() {
+    // Check cache — must match the current OAuth token.
+    // unwrap_or_else recovers from a poisoned mutex (prior panic left stale data).
+    {
+        let guard = JWT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((cached_hash, ref jwt, fetched_at)) = *guard {
             if cached_hash == token_hash && fetched_at.elapsed().as_secs() < JWT_TTL_SECS {
                 return Ok(jwt.clone());
@@ -80,7 +82,8 @@ async fn exchange_token(github_token: &str) -> Result<String, ProviderError> {
     // Cache miss, expired, or different token — fetch a new JWT
     let jwt = fetch_token(github_token).await?;
 
-    if let Ok(mut guard) = JWT_CACHE.lock() {
+    {
+        let mut guard = JWT_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         *guard = Some((token_hash, jwt.clone(), Instant::now()));
     }
 
@@ -111,7 +114,14 @@ impl CloudProvider for CopilotBackend {
         max_tokens: u32,
     ) -> Pin<Box<dyn Future<Output = Result<String, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
-            let jwt = exchange_token(provider.api_key.trim()).await?;
+            let api_key = provider.api_key.trim();
+            if api_key.is_empty() {
+                return Err(ProviderError::NotConfigured(
+                    "GitHub Copilot requires an OAuth token (gho_...)".into(),
+                ));
+            }
+
+            let jwt = exchange_token(api_key).await?;
 
             let request = ChatRequest {
                 model: model.to_string(),
