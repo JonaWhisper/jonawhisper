@@ -59,6 +59,7 @@
   "provider.testSuccess": "{0} models",
   "provider.apiKeyKeep": "Leave empty to keep current key",
   "provider.allowInsecureDesc": "Allow HTTP (unencrypted) for local APIs.",
+  "provider.editTitle": "Edit Provider",
   "provider.capabilities": "Capabilities",
   "provider.field.base_url": "URL",
   "provider.field.region": "Region",

@@ -245,6 +245,7 @@ pub fn run() {
             commands::providers::get_providers,
             commands::providers::fetch_provider_models,
             commands::providers::get_provider_presets,
+            commands::providers::open_provider_form_window,
             commands::settings::get_settings,
             commands::settings::set_setting,
             commands::settings::get_system_locale,

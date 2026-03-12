@@ -44,6 +44,8 @@ pub fn open_fixed_window(app: &AppHandle, label: &str, title: &str, url: &str, w
         .title(title)
         .inner_size(width, height)
         .resizable(false)
+        .minimizable(false)
+        .maximizable(false)
         .build()
     {
         activate_app();
