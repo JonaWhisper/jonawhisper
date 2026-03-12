@@ -198,14 +198,13 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
         .send()
         .await
         .map_err(|e| ProviderError::Http(e.to_string()))?;
-    let final_url = response.url().to_string();
     if !response.status().is_success() {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_else(|e| {
             log::warn!("Failed to decode error response body: {e}");
             String::new()
         });
-        log::warn!("Provider API error: status={status} url={final_url} body={body}");
+        log::warn!("Provider API error: status={status} body={body}");
         return Err(ProviderError::Api { status, body });
     }
     Ok(response)
