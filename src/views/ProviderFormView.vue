@@ -44,7 +44,12 @@ onMounted(async () => {
 
   if (providerId) {
     await engines.fetchProviders()
-    editProvider.value = engines.providers.find(p => p.id === providerId)
+    const provider = engines.providers.find(p => p.id === providerId)
+    if (!provider) {
+      getCurrentWindow().close()
+      return
+    }
+    editProvider.value = provider
   }
 
   ready.value = true

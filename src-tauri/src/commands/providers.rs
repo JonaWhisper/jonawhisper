@@ -17,7 +17,7 @@ pub fn open_provider_form_window(app: AppHandle, provider_id: Option<String>) {
     };
     // Close any existing provider-form window so it reopens with the new URL/provider
     if let Some(window) = app.get_webview_window("provider-form") {
-        let _ = window.close();
+        let _ = window.destroy();
     }
     crate::ui::tray::open_fixed_window(&app, "provider-form", &title, &url, 420.0, 550.0);
 }
