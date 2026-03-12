@@ -330,6 +330,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     log::warn!("Cloud provider '{}' does not support LLM", provider.name);
                     Err(cleanup::LlmError::NotConfigured)
                 } else {
+                    log::info!("Cloud LLM: provider='{}' url='{}' model='{}' has_key={}",
+                        provider.name, provider.url, llm_model, !provider.api_key.is_empty());
                     cleanup::llm_cloud::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
                 }
             } else {
