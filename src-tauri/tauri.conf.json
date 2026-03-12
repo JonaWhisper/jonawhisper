@@ -65,7 +65,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzMDg4NjNCRjM4Qzc1QTYKUldTbWRZenpPNFlJTXdjaHN5MWZNRXRPM05yL2tnRmVMM0ZPMUx0WXUvbTlXaXpMUUlBZ3RmancK",
       "endpoints": [
-        "https://github.com/JonaWhisper/jonawhisper/releases/latest/download/latest.json"
+        "https://github.com/JonaWhisper/jonawhisper/releases/latest/download/latest-stable.json"
       ]
     }
   }
