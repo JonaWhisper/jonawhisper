@@ -96,6 +96,8 @@ export interface Provider {
   supports_llm: boolean
   api_format?: 'open_ai' | 'anthropic' | null
   extra: Record<string, string>
+  enabled: boolean
+  source: string | null
 }
 
 export interface CleanupModel {

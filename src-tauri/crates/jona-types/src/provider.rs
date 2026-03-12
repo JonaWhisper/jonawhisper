@@ -115,6 +115,33 @@ pub fn preset_by_id(id: &str) -> Option<&'static ProviderPreset> {
     inventory::iter::<ProviderPreset>.into_iter().find(|p| p.id == id)
 }
 
+/// A credential found by an auto-detector.
+#[derive(Debug, Clone)]
+pub struct DetectedCredential {
+    /// Which preset this credential is for (e.g. "anthropic", "openai").
+    pub kind: &'static str,
+    /// Human-readable label for the source (e.g. "Claude Code", "env $OPENAI_API_KEY").
+    pub source_label: &'static str,
+    /// The API key or token.
+    pub api_key: String,
+    /// Base URL override (empty = use preset default).
+    pub url: String,
+    /// Extra fields (e.g. region, deployment).
+    pub extra: std::collections::HashMap<String, String>,
+}
+
+/// Auto-registration entry for credential detectors.
+pub struct DetectorRegistration {
+    /// Unique detector ID (e.g. "claude-code", "env").
+    pub id: &'static str,
+    /// Human-readable name (e.g. "Claude Code", "Environment Variables").
+    pub display_name: &'static str,
+    /// Detection function — returns all credentials found by this detector.
+    pub detect: fn() -> Vec<DetectedCredential>,
+}
+
+inventory::collect!(DetectorRegistration);
+
 /// Parse model IDs from an OpenAI-compatible JSON response.
 /// Handles both `{data:[...]}` and bare `[...]` formats.
 pub fn parse_model_ids_from_json(json: &serde_json::Value) -> Result<Vec<String>, ProviderError> {
@@ -276,5 +303,31 @@ mod tests {
             factory: || panic!("not called"),
         };
         assert_eq!(reg.backend_id, "test-backend");
+    }
+
+    // -- DetectorRegistration --
+
+    #[test]
+    fn detector_registration_is_collectable() {
+        let reg = DetectorRegistration {
+            id: "test",
+            display_name: "Test",
+            detect: || vec![],
+        };
+        assert_eq!(reg.id, "test");
+        assert!((reg.detect)().is_empty());
+    }
+
+    #[test]
+    fn detected_credential_stores_data() {
+        let cred = DetectedCredential {
+            kind: "openai",
+            source_label: "env",
+            api_key: "sk-test".to_string(),
+            url: String::new(),
+            extra: std::collections::HashMap::new(),
+        };
+        assert_eq!(cred.kind, "openai");
+        assert_eq!(cred.api_key, "sk-test");
     }
 }

@@ -243,6 +243,13 @@ pub struct Provider {
     /// Extra field values from preset-specific fields.
     #[serde(default)]
     pub extra: HashMap<String, String>,
+    /// Whether this provider is active (shown in model selectors).
+    /// Manual providers default to true. Auto-detected providers default to false.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Source of this provider: None = manual, Some("claude-code") = auto-detected.
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 /// Mask a sensitive string for display (e.g. "sk-12345678" → "••••5678").
@@ -830,6 +837,7 @@ mod tests {
             url: "https://api.openai.com/v1".into(), api_key: String::new(),
             allow_insecure: false, cached_models: vec![], supports_asr: true, supports_llm: true,
             api_format: None, extra: HashMap::new(),
+            enabled: true, source: None,
         };
         overrides(&mut p);
         p
