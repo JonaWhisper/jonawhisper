@@ -60,7 +60,6 @@
   "provider.apiKeyKeep": "Leave empty to keep current key",
   "provider.allowInsecureDesc": "Allow HTTP (unencrypted) for local APIs.",
   "provider.capabilities": "Capabilities",
-  "provider.field.api_key": "API Key",
   "provider.field.base_url": "URL",
   "provider.field.region": "Region",
   "provider.field.access_key": "Access Key",

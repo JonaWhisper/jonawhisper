@@ -60,7 +60,6 @@
   "provider.apiKeyKeep": "Laisser vide pour conserver la cl\u00e9 actuelle",
   "provider.allowInsecureDesc": "Autoriser HTTP (non chiffr\u00e9) pour les API locales.",
   "provider.capabilities": "Capacit\u00e9s",
-  "provider.field.api_key": "Cl\u00e9 API",
   "provider.field.base_url": "URL",
   "provider.field.region": "R\u00e9gion",
   "provider.field.access_key": "Cl\u00e9 d'acc\u00e8s",
