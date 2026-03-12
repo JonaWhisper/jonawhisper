@@ -49,7 +49,7 @@
     },
     "windows": {
       "digestAlgorithm": "sha256",
-      "timestampUrl": "http://timestamp.comodoca.com",
+      "timestampUrl": "https://timestamp.sectigo.com",
       "webviewInstallMode": { "type": "downloadBootstrapper" },
       "nsis": {
         "installMode": "both",

@@ -1,7 +1,7 @@
 # Build Secrets & Environment Variables
 
-Toutes les variables sont gerees par la CI (GitHub Actions).
-Les builds locaux (`build.sh`) n'ont besoin d'aucun secret — le Keychain macOS gere la signature automatiquement.
+Toutes les variables sont gérées par la CI (GitHub Actions).
+Les builds locaux (`build.sh`) n'ont besoin d'aucun secret — le Keychain macOS gère la signature automatiquement.
 
 ## Secrets GitHub Actions
 
@@ -14,14 +14,14 @@ Les builds locaux (`build.sh`) n'ont besoin d'aucun secret — le Keychain macOS
 | `APPLE_SIGNING_IDENTITY` | Ex: `Developer ID Application: Nom (TEAM_ID)` | `security find-identity -v -p codesigning` |
 | `APPLE_ID` | Email du compte Apple Developer | developer.apple.com |
 | `APPLE_PASSWORD` | App-specific password | appleid.apple.com > Mots de passe pour les apps |
-| `APPLE_TEAM_ID` | Team ID (10 caracteres) | developer.apple.com > Membership |
+| `APPLE_TEAM_ID` | Team ID (10 caractères) | developer.apple.com > Membership |
 
-**Prerequis :** Compte Apple Developer Program (99$/an) + certificat "Developer ID Application"
+**Prérequis :** Compte Apple Developer Program (99$/an) + certificat "Developer ID Application"
 
 ### Windows — Signature via Certum Cloud HSM
 
-Le certificat EV Code Signing est stocke dans le HSM cloud de Certum.
-La signature se fait via SimplySign (emule une carte a puce) + `signtool.exe` sur le runner Windows.
+Le certificat EV Code Signing est stocké dans le HSM cloud de Certum.
+La signature se fait via SimplySign (émule une carte à puce) + `signtool.exe` sur le runner Windows.
 
 #### Achat et activation
 
@@ -34,23 +34,23 @@ La signature se fait via SimplySign (emule une carte a puce) + `signtool.exe` su
 
 | Secret | Description | Comment l'obtenir |
 |--------|-------------|-------------------|
-| `CERTUM_OTP_URI` | URI otpauth extraite du QR code SimplySign | Scanner le QR code affiche lors de l'activation |
-| `CERTUM_USER_ID` | Identifiant du compte Certum | Email ou ID numerique |
-| `CERTUM_PASSWORD` | Mot de passe du compte Certum | Choisi a l'inscription |
+| `CERTUM_OTP_URI` | URI otpauth extraite du QR code SimplySign | Scanner le QR code affiché lors de l'activation |
+| `CERTUM_USER_ID` | Identifiant du compte Certum | Email ou ID numérique |
+| `CERTUM_PASSWORD` | Mot de passe du compte Certum | Choisi à l'inscription |
 
-#### Comment ca marche en CI
+#### Comment ça marche en CI
 
 1. Le runner Windows installe SimplySign Desktop
-2. Un script PowerShell genere le code TOTP a partir de `CERTUM_OTP_URI`
-3. SimplySign s'active et emule une carte a puce
-4. `signtool.exe` signe l'exe via la carte a puce virtuelle
+2. Un script PowerShell génère le code TOTP à partir de `CERTUM_OTP_URI`
+3. SimplySign s'active et émule une carte à puce
+4. `signtool.exe` signe l'exe via la carte à puce virtuelle
 5. Le timestamp server `http://timestamp.certum.pl` horodate la signature
 
 #### Config Tauri (`tauri.conf.json`)
 
-La config actuelle utilise `signtool.exe` qui detecte automatiquement le certificat
+La config actuelle utilise `signtool.exe` qui détecte automatiquement le certificat
 via SimplySign. Pas besoin de `signCommand` — Tauri appelle signtool nativement
-quand `certificateThumbprint` est configure :
+quand `certificateThumbprint` est configuré :
 
 ```json
 {
@@ -67,26 +67,39 @@ quand `certificateThumbprint` est configure :
 Le thumbprint est visible dans SimplySign Desktop ou via PowerShell :
 `Get-ChildItem Cert:\CurrentUser\My | Format-Table Thumbprint, Subject`
 
-#### References
+#### Références
 
 - [Defguard: Tauri + Certum HSM](https://defguard.net/blog/windows-codesign-certum-hsm/)
 - [Automatiser SimplySign en CI](https://www.devas.life/how-to-automate-signing-your-windows-app-with-certum/)
 - [certum-container (Linux CI)](https://github.com/hpvb/certum-container)
 
-### Auto-Updater — Signature des mises a jour
+### Auto-Updater — Signature des mises à jour
 
 | Secret | Description | Comment l'obtenir |
 |--------|-------------|-------------------|
 | `TAURI_SIGNING_PRIVATE_KEY` | Contenu de `~/.tauri/jona-whisper.key` | `npx tauri signer generate -w ~/.tauri/jona-whisper.key` |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Mot de passe de la cle (vide actuellement) | Choisi a la generation |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Mot de passe de la clé (vide actuellement) | Choisi à la génération |
 
-La cle publique est embarquee dans `tauri.conf.json` > `plugins.updater.pubkey`.
+La clé publique est embarquée dans `tauri.conf.json` > `plugins.updater.pubkey`.
 
-**IMPORTANT :** Ne jamais perdre la cle privee — sans elle, impossible de publier des mises a jour pour les installations existantes. Backup : `~/.tauri/jona-whisper.key`
+**IMPORTANT :** Ne jamais perdre la clé privée — sans elle, impossible de publier des mises à jour pour les installations existantes. Backup : `~/.tauri/jona-whisper.key`
+
+### Canaux de mise à jour
+
+Deux canaux de mise à jour sont générés par la CI :
+
+| Fichier | Canal | Contenu |
+|---------|-------|---------|
+| `latest-stable.json` | Stable | Uniquement les builds signés (codesign Apple / EV Certum) |
+| `latest-unstable.json` | Unstable | Uniquement les builds non signés (pre-release / dev) |
+
+- Les builds **signés** pointent vers `latest-stable.json` — les utilisateurs stable ne voient que des mises à jour signées
+- Les builds **non signés** pointent vers `latest-unstable.json` — les testeurs restent sur le canal dev
+- L'endpoint est configuré dans `tauri.conf.json` et réécrit en CI selon la disponibilité des secrets de signature
 
 ---
 
-## Recapitulatif des secrets
+## Récapitulatif des secrets
 
 | Secret | macOS | Windows | Updater |
 |--------|:-----:|:-------:|:-------:|
@@ -104,9 +117,9 @@ La cle publique est embarquee dans `tauri.conf.json` > `plugins.updater.pubkey`.
 
 ---
 
-## Couts annuels
+## Coûts annuels
 
-| Service | Cout |
+| Service | Coût |
 |---------|------|
 | Apple Developer Program | 99$/an |
 | Certum EV Code Signing Cloud | ~226 EUR/an |

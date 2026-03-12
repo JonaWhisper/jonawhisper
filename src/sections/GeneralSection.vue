@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
-import { FolderOpen } from 'lucide-vue-next'
+import { FolderOpen, RefreshCw, Download } from 'lucide-vue-next'
 import { useSettingsStore } from '@/stores/settings'
 import i18n from '@/i18n'
 import {
@@ -24,9 +24,41 @@ const launchAtLoginPending = ref(false)
 
 const launchAtLoginEnabled = computed(() => launchAtLoginStatus.value !== 'disabled')
 
+// App update state
+const updateAvailable = ref<{ version: string; body: string | null } | null>(null)
+const updateChecking = ref(false)
+const updateInstalling = ref(false)
+const updateError = ref('')
+
+async function checkForUpdate() {
+  updateChecking.value = true
+  updateError.value = ''
+  try {
+    const result = await invoke<{ version: string; body: string | null } | null>('check_for_update')
+    updateAvailable.value = result
+  } catch (e) {
+    updateError.value = String(e)
+  } finally {
+    updateChecking.value = false
+  }
+}
+
+async function installUpdate() {
+  updateInstalling.value = true
+  updateError.value = ''
+  try {
+    await invoke('install_update')
+    // App will restart automatically
+  } catch (e) {
+    updateError.value = String(e)
+    updateInstalling.value = false
+  }
+}
+
 onMounted(async () => {
   appVersion.value = await getVersion()
   launchAtLoginStatus.value = await invoke<string>('get_launch_at_login_status')
+  checkForUpdate()
 })
 
 async function onLaunchAtLoginChange(checked: boolean) {
@@ -185,6 +217,43 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
         <div class="text-base font-bold">JonaWhisper</div>
         <div v-if="appVersion" class="text-xs text-muted-foreground mt-0.5">v{{ appVersion }}</div>
         <div class="text-[10px] text-muted-foreground/60 mt-1">GPL-3.0</div>
+
+        <!-- Update section -->
+        <div class="mt-3">
+          <div v-if="updateAvailable" class="flex flex-col items-center gap-1.5">
+            <div class="text-xs text-emerald-500">{{ t('general.update.available', { version: updateAvailable.version }) }}</div>
+            <button
+              :disabled="updateInstalling"
+              class="inline-flex items-center gap-1.5 px-3 h-7 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              @click="installUpdate"
+            >
+              <Download v-if="!updateInstalling" class="w-3.5 h-3.5" />
+              <RefreshCw v-else class="w-3.5 h-3.5 animate-spin" />
+              {{ updateInstalling ? t('general.update.installing') : t('general.update.install') }}
+            </button>
+          </div>
+          <div v-else-if="updateChecking" class="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+            <RefreshCw class="w-3 h-3 animate-spin" />
+            {{ t('general.update.checking') }}
+          </div>
+          <div v-else class="flex items-center justify-center gap-1.5">
+            <span class="text-xs text-muted-foreground">{{ t('general.update.upToDate') }}</span>
+            <TooltipProvider :delay-duration="200">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="h-5 w-5 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-colors"
+                    @click="checkForUpdate"
+                  >
+                    <RefreshCw class="w-3 h-3" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" :side-offset="4">{{ t('general.update.check') }}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div v-if="updateError" class="text-[11px] text-red-500 mt-1">{{ updateError }}</div>
+        </div>
       </div>
     </div>
   </div>
