@@ -58,7 +58,7 @@ fn generate_inventory_links() {
         // Match lines like: jona-engine-whisper = { ... } or jona-provider-openai = { ... }
         if let Some(name) = trimmed.strip_suffix(|_: char| true).and(None).or_else(|| {
             let dep = trimmed.split('=').next()?.trim();
-            if dep.starts_with("jona-engine-") || dep.starts_with("jona-provider-") {
+            if dep.starts_with("jona-engine-") || dep.starts_with("jona-provider-") || dep.starts_with("jona-detector-") {
                 Some(dep)
             } else {
                 None

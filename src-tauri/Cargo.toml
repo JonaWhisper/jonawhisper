@@ -14,6 +14,7 @@ members = [
     "crates/jona-engine-bert", "crates/jona-engine-pcs", "crates/jona-engine-correction",
     "crates/jona-engine-spellcheck",
     "crates/jona-engine-lm",
+    "crates/jona-detector-claude-code",
 ]
 
 [workspace.dependencies]
@@ -71,6 +72,7 @@ jona-engine-pcs = { path = "crates/jona-engine-pcs" }
 jona-engine-correction = { path = "crates/jona-engine-correction" }
 jona-engine-spellcheck = { path = "crates/jona-engine-spellcheck" }
 jona-engine-lm = { path = "crates/jona-engine-lm" }
+jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
 
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 
