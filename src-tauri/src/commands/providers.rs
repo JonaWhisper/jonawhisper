@@ -107,8 +107,10 @@ pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
         p.api_key = p.masked_api_key();
         // Resolve capabilities and URL from preset for known providers
         if let Some(preset) = jona_provider::preset(&p.kind) {
-            p.supports_asr = preset.supports_asr;
-            p.supports_llm = preset.supports_llm;
+            // Only override capabilities if the preset doesn't expose them as user-configurable toggles
+            let has_toggle = |id: &str| preset.extra_fields.iter().any(|f| f.id == id && f.field_type == jona_types::FieldType::Toggle);
+            if !has_toggle("supports_asr") { p.supports_asr = preset.supports_asr; }
+            if !has_toggle("supports_llm") { p.supports_llm = preset.supports_llm; }
             if p.url.is_empty() {
                 p.url = preset.base_url.to_string();
             }
