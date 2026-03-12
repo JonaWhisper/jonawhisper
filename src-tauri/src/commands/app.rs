@@ -1,6 +1,7 @@
 use crate::state::AppState;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_updater::UpdaterExt;
 
 #[tauri::command]
 pub fn get_app_state(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
@@ -169,4 +170,28 @@ pub async fn simulate_pill_test(app: AppHandle, _count: Option<u32>) {
     crate::ui::tray::close_pill_window(&app);
 
     log::info!("=== Pill test complete ===");
+}
+
+#[tauri::command]
+pub async fn check_for_update(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    match updater.check().await {
+        Ok(Some(update)) => Ok(Some(serde_json::json!({
+            "version": update.version,
+            "body": update.body,
+        }))),
+        Ok(None) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let update = updater.check().await.map_err(|e| e.to_string())?;
+    if let Some(update) = update {
+        update.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+        app.restart();
+    }
+    Ok(())
 }
