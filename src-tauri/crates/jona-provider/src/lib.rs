@@ -1,6 +1,7 @@
 //! Provider catalog — orchestrates cloud provider backends registered via inventory.
 
 use jona_types::{CloudProvider, Provider, ProviderPreset, ProviderRegistration};
+use jona_types::provider::{DetectedCredential, DetectorRegistration};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -87,4 +88,18 @@ pub fn presets() -> &'static [&'static ProviderPreset] {
 /// Look up a preset by ID.
 pub fn preset(id: &str) -> Option<&'static ProviderPreset> {
     ProviderCatalog::global().preset_map.get(id).copied()
+}
+
+/// Run all registered detectors and return found credentials with their detector ID.
+pub fn detect_all() -> Vec<(DetectedCredential, &'static str)> {
+    let mut results = Vec::new();
+    for reg in inventory::iter::<DetectorRegistration> {
+        log::info!("Running detector: {} ({})", reg.display_name, reg.id);
+        let creds = (reg.detect)();
+        log::info!("  \u{2192} {} credential(s) found", creds.len());
+        for cred in creds {
+            results.push((cred, reg.id));
+        }
+    }
+    results
 }
