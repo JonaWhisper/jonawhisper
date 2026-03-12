@@ -39,6 +39,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       )
       "
     >
+      <slot name="header" />
       <SelectScrollUpButton />
       <SelectViewport :class="cn('p-1', position === 'popper' && 'h-[--reka-select-trigger-height] w-full min-w-[--reka-select-trigger-width]')">
         <slot />
