@@ -310,8 +310,13 @@ fn keyring_user(provider_id: &str) -> String {
 }
 
 /// Store an API key in the OS keychain.
+/// Rejects masked values (containing bullet chars) to prevent accidental corruption.
 pub fn keyring_store(provider_id: &str, api_key: &str) {
     if api_key.is_empty() {
+        return;
+    }
+    if api_key.contains('\u{2022}') {
+        log::error!("keyring: refusing to store masked value for {} (contains bullet chars)", provider_id);
         return;
     }
     match keyring::Entry::new(KEYRING_SERVICE, &keyring_user(provider_id)) {
@@ -343,8 +348,13 @@ pub fn keyring_delete(provider_id: &str) {
 }
 
 /// Store a sensitive extra field value in the OS keychain.
+/// Rejects masked values (containing bullet chars) to prevent accidental corruption.
 pub fn keyring_store_extra(provider_id: &str, field_id: &str, value: &str) {
     if value.is_empty() {
+        return;
+    }
+    if value.contains('\u{2022}') {
+        log::error!("keyring: refusing to store masked extra value for {}:{} (contains bullet chars)", provider_id, field_id);
         return;
     }
     let user = format!("provider:{}:extra:{}", provider_id, field_id);
