@@ -44,7 +44,7 @@ La signature se fait via SimplySign (émule une carte à puce) + `signtool.exe` 
 2. Un script PowerShell génère le code TOTP à partir de `CERTUM_OTP_URI`
 3. SimplySign s'active et émule une carte à puce
 4. `signtool.exe` signe l'exe via la carte à puce virtuelle
-5. Le timestamp server `https://timestamp.certum.pl` horodate la signature
+5. Le timestamp server `http://timestamp.certum.pl` horodate la signature
 
 #### Config Tauri (`tauri.conf.json`)
 
@@ -58,7 +58,7 @@ quand `certificateThumbprint` est configuré :
     "windows": {
       "certificateThumbprint": "THUMBPRINT_DU_CERT_CERTUM",
       "digestAlgorithm": "sha256",
-      "timestampUrl": "https://timestamp.certum.pl"
+      "timestampUrl": "http://timestamp.certum.pl"
     }
   }
 }
