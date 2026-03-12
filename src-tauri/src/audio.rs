@@ -314,7 +314,7 @@ fn process_samples(
         }
     } else {
         let misses = FFT_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
-        if misses % 50 == 0 {
+        if misses.is_multiple_of(50) {
             log::warn!("process_samples: fft_buffer lock contention x{} (callbacks: {})", misses, count);
         }
         None
@@ -331,14 +331,14 @@ fn process_samples(
             }
         } else {
             let misses = SPECTRUM_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
-            if misses % 50 == 0 {
+            if misses.is_multiple_of(50) {
                 log::warn!("process_samples: spectrum lock contention x{} (callbacks: {})", misses, count);
             }
         }
     }
 
     // Log contention stats every ~500 callbacks (~1s at 16kHz/512 buffer)
-    if count > 0 && count % 500 == 0 {
+    if count > 0 && count.is_multiple_of(500) {
         let fft_m = FFT_LOCK_MISS.load(AO::Relaxed);
         let spec_m = SPECTRUM_LOCK_MISS.load(AO::Relaxed);
         if fft_m > 0 || spec_m > 0 {

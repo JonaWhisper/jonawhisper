@@ -189,7 +189,7 @@ pub fn spawn_spectrum_emitter(
                 flat_frames_since_active += 1;
                 if flat_frames_since_active == FLAT_GRACE_FRAMES + 1 {
                     log::warn!("Spectrum flat while recording after grace period (frame {})", flat_frames_since_active);
-                } else if flat_frames_since_active > FLAT_GRACE_FRAMES && flat_frames_since_active % 30 == 0 {
+                } else if flat_frames_since_active > FLAT_GRACE_FRAMES && flat_frames_since_active.is_multiple_of(30) {
                     // Log every ~1s while still flat
                     log::warn!("Spectrum still flat (frame {}, ~{:.1}s)", flat_frames_since_active,
                         flat_frames_since_active as f32 * SPECTRUM_INTERVAL_MS as f32 / 1000.0);
