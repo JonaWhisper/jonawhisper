@@ -18,42 +18,75 @@ Les builds locaux (`build.sh`) n'ont besoin d'aucun secret — le Keychain macOS
 
 **Prerequis :** Compte Apple Developer Program (99$/an) + certificat "Developer ID Application"
 
-### Windows — Signature du code
+### Windows — Signature via Certum Cloud HSM
 
-#### Option A : Certificat PFX
+Le certificat EV Code Signing est stocke dans le HSM cloud de Certum.
+La signature se fait via SimplySign (emule une carte a puce) + `signtool.exe` sur le runner Windows.
+
+#### Achat et activation
+
+1. Acheter "EV Code Signing in the Cloud" sur [shop.certum.eu](https://shop.certum.eu/ev-code-signing-in-the-cloud.html) (~226 EUR/an)
+2. Activer le certificat dans Mon compte > Data security products > Activate
+3. Installer SimplySign Desktop sur une machine Windows
+4. Se connecter et scanner le QR code (contient le seed TOTP pour l'automatisation CI)
+
+#### Secrets GitHub
 
 | Secret | Description | Comment l'obtenir |
 |--------|-------------|-------------------|
-| `WINDOWS_CERTIFICATE` | Fichier .pfx en base64 | `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx")) \| Set-Clipboard` |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Mot de passe du .pfx | Choisi lors de l'export |
+| `CERTUM_OTP_URI` | URI otpauth extraite du QR code SimplySign | Scanner le QR code affiche lors de l'activation |
+| `CERTUM_USER_ID` | Identifiant du compte Certum | Email ou ID numerique |
+| `CERTUM_PASSWORD` | Mot de passe du compte Certum | Choisi a l'inscription |
 
-Et dans `tauri.conf.json` > `bundle.windows` :
-- `certificateThumbprint` : `Get-ChildItem Cert:\CurrentUser\My \| Format-Table Thumbprint, Subject`
+#### Comment ca marche en CI
 
-#### Option B : Cloud HSM (recommande)
+1. Le runner Windows installe SimplySign Desktop
+2. Un script PowerShell genere le code TOTP a partir de `CERTUM_OTP_URI`
+3. SimplySign s'active et emule une carte a puce
+4. `signtool.exe` signe l'exe via la carte a puce virtuelle
+5. Le timestamp server `http://timestamp.certum.pl` horodate la signature
 
-Pour Certum HSM ou SSL.com eSigner, utiliser `signCommand` dans `tauri.conf.json` :
+#### Config Tauri (`tauri.conf.json`)
+
+La config actuelle utilise `signtool.exe` qui detecte automatiquement le certificat
+via SimplySign. Pas besoin de `signCommand` — Tauri appelle signtool nativement
+quand `certificateThumbprint` est configure :
+
 ```json
-{ "bundle": { "windows": { "signCommand": "votre-commande %1" } } }
+{
+  "bundle": {
+    "windows": {
+      "certificateThumbprint": "THUMBPRINT_DU_CERT_CERTUM",
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.certum.pl"
+    }
+  }
+}
 ```
-Les credentials du HSM sont stockes en secrets GitHub selon le fournisseur.
 
-**Prerequis :** Certificat EV Code Signing (~226-500$/an)
+Le thumbprint est visible dans SimplySign Desktop ou via PowerShell :
+`Get-ChildItem Cert:\CurrentUser\My | Format-Table Thumbprint, Subject`
+
+#### References
+
+- [Defguard: Tauri + Certum HSM](https://defguard.net/blog/windows-codesign-certum-hsm/)
+- [Automatiser SimplySign en CI](https://www.devas.life/how-to-automate-signing-your-windows-app-with-certum/)
+- [certum-container (Linux CI)](https://github.com/hpvb/certum-container)
 
 ### Auto-Updater — Signature des mises a jour
 
 | Secret | Description | Comment l'obtenir |
 |--------|-------------|-------------------|
 | `TAURI_SIGNING_PRIVATE_KEY` | Contenu de `~/.tauri/jona-whisper.key` | `npx tauri signer generate -w ~/.tauri/jona-whisper.key` |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Mot de passe de la cle | Choisi a la generation (vide si aucun) |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Mot de passe de la cle (vide actuellement) | Choisi a la generation |
 
 La cle publique est embarquee dans `tauri.conf.json` > `plugins.updater.pubkey`.
 
-**IMPORTANT :** Ne jamais perdre la cle privee — sans elle, impossible de publier des mises a jour pour les installations existantes.
+**IMPORTANT :** Ne jamais perdre la cle privee — sans elle, impossible de publier des mises a jour pour les installations existantes. Backup : `~/.tauri/jona-whisper.key`
 
 ---
 
-## Recapitulatif
+## Recapitulatif des secrets
 
 | Secret | macOS | Windows | Updater |
 |--------|:-----:|:-------:|:-------:|
@@ -63,8 +96,9 @@ La cle publique est embarquee dans `tauri.conf.json` > `plugins.updater.pubkey`.
 | `APPLE_ID` | x | | |
 | `APPLE_PASSWORD` | x | | |
 | `APPLE_TEAM_ID` | x | | |
-| `WINDOWS_CERTIFICATE` | | x | |
-| `WINDOWS_CERTIFICATE_PASSWORD` | | x | |
+| `CERTUM_OTP_URI` | | x | |
+| `CERTUM_USER_ID` | | x | |
+| `CERTUM_PASSWORD` | | x | |
 | `TAURI_SIGNING_PRIVATE_KEY` | x | x | x |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | x | x | x |
 
@@ -75,5 +109,5 @@ La cle publique est embarquee dans `tauri.conf.json` > `plugins.updater.pubkey`.
 | Service | Cout |
 |---------|------|
 | Apple Developer Program | 99$/an |
-| Certificat EV Windows (Certum) | ~226$/an |
+| Certum EV Code Signing Cloud | ~226 EUR/an |
 | **Total** | **~325$/an** |
