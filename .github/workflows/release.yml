@@ -296,7 +296,8 @@ jobs:
             "JonaWhisper_${VERSION}_windows_x64.exe"
 
           # Updater artifacts (only exist if TAURI_SIGNING_PRIVATE_KEY is set)
-          if [ -f src-tauri/target/release/bundle/nsis/*.nsis.zip ]; then
+          NSIS_ZIP=$(ls src-tauri/target/release/bundle/nsis/*.nsis.zip 2>/dev/null || true)
+          if [ -n "$NSIS_ZIP" ]; then
             cp src-tauri/target/release/bundle/nsis/*.nsis.zip \
               "JonaWhisper_${VERSION}_windows_x64.nsis.zip"
             cp src-tauri/target/release/bundle/nsis/*.nsis.zip.sig \
@@ -353,7 +354,7 @@ jobs:
 
           # macOS platform (only if updater sig exists)
           if [ -f "artifacts/JonaWhisper_${VERSION}_macos_aarch64.app.tar.gz.sig" ]; then
-            SIG=$(cat "artifacts/JonaWhisper_${VERSION}_macos_aarch64.app.tar.gz.sig")
+            SIG=$(tr -d '\n' < "artifacts/JonaWhisper_${VERSION}_macos_aarch64.app.tar.gz.sig")
             ENTRY="    \"darwin-aarch64\": { \"signature\": \"${SIG}\", \"url\": \"${BASE_URL}/JonaWhisper_${VERSION}_macos_aarch64.app.tar.gz\" }"
             if [ "$HAS_MACOS_SIGNING" == "true" ]; then
               SIGNED_PLATFORMS="${SIGNED_PLATFORMS}${ENTRY}"
@@ -364,7 +365,7 @@ jobs:
 
           # Windows platform (only if updater sig exists)
           if [ -f "artifacts/JonaWhisper_${VERSION}_windows_x64.nsis.zip.sig" ]; then
-            SIG=$(cat "artifacts/JonaWhisper_${VERSION}_windows_x64.nsis.zip.sig")
+            SIG=$(tr -d '\n' < "artifacts/JonaWhisper_${VERSION}_windows_x64.nsis.zip.sig")
             ENTRY="    \"windows-x86_64\": { \"signature\": \"${SIG}\", \"url\": \"${BASE_URL}/JonaWhisper_${VERSION}_windows_x64.nsis.zip\" }"
             if [ "$HAS_WINDOWS_SIGNING" == "true" ]; then
               [ -n "$SIGNED_PLATFORMS" ] && SIGNED_PLATFORMS="${SIGNED_PLATFORMS},"$'\n'

@@ -189,9 +189,11 @@ pub async fn check_for_update(app: AppHandle) -> Result<Option<serde_json::Value
 pub async fn install_update(app: AppHandle) -> Result<(), String> {
     let updater = app.updater().map_err(|e| e.to_string())?;
     let update = updater.check().await.map_err(|e| e.to_string())?;
-    if let Some(update) = update {
-        update.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
-        app.restart();
+    match update {
+        Some(update) => {
+            update.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+            app.restart();
+        }
+        None => return Err("Update no longer available".to_string()),
     }
-    Ok(())
 }
