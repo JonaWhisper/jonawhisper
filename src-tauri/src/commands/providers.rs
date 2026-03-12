@@ -2,7 +2,7 @@ use crate::errors::AppError;
 use crate::events;
 use crate::state::{AppState, Provider, mask_value, keyring_store_extra, keyring_delete_extra};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 #[tauri::command]
 pub fn open_provider_form_window(app: AppHandle, provider_id: Option<String>) {
@@ -15,6 +15,10 @@ pub fn open_provider_form_window(app: AppHandle, provider_id: Option<String>) {
         Some(id) => format!("/provider-form?id={}", id),
         None => "/provider-form".to_string(),
     };
+    // Close any existing provider-form window so it reopens with the new URL/provider
+    if let Some(window) = app.get_webview_window("provider-form") {
+        let _ = window.close();
+    }
     crate::ui::tray::open_fixed_window(&app, "provider-form", &title, &url, 420.0, 550.0);
 }
 

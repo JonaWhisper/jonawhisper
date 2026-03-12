@@ -61,14 +61,21 @@ onUnmounted(() => {
   observer?.disconnect()
 })
 
+const saveError = ref('')
+
 async function onSave(provider: Provider) {
-  if (providerId) {
-    await invoke('update_provider', { provider })
-  } else {
-    await invoke('add_provider', { provider })
+  saveError.value = ''
+  try {
+    if (providerId) {
+      await invoke('update_provider', { provider })
+    } else {
+      await invoke('add_provider', { provider })
+    }
+    await emit('provider-saved')
+    getCurrentWindow().close()
+  } catch (e) {
+    saveError.value = String(e)
   }
-  await emit('provider-saved')
-  getCurrentWindow().close()
 }
 
 function onCancel() {
@@ -81,6 +88,7 @@ function onCancel() {
     <h2 class="text-base font-semibold mb-4">
       {{ providerId ? t('provider.editTitle') : t('settings.providers.add') }}
     </h2>
+    <p v-if="saveError" class="text-xs text-destructive mb-2">{{ saveError }}</p>
     <ProviderForm
       v-if="ready"
       :provider="editProvider"
