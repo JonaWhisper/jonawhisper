@@ -523,6 +523,9 @@ mod tests {
     fn preset_base_urls_are_https() {
         ensure_catalog();
         for p in jona_provider::presets() {
+            if p.id == "openai-compatible" {
+                continue; // User-provided URL, no preset base_url
+            }
             assert!(
                 p.base_url.starts_with("https://"),
                 "Preset {} has non-HTTPS URL: {}",
@@ -545,8 +548,8 @@ mod tests {
     fn asr_presets_have_default_models() {
         ensure_catalog();
         for p in jona_provider::presets() {
-            if p.supports_asr && p.id != "azure-openai" {
-                // Azure OpenAI models depend on user deployments
+            if p.supports_asr && !matches!(p.id, "azure-openai" | "openai-compatible") {
+                // Azure OpenAI models depend on user deployments, openai-compatible is user-provided
                 assert!(
                     !p.default_asr_models.is_empty(),
                     "Preset {} supports ASR but has no default ASR models",
@@ -560,8 +563,8 @@ mod tests {
     fn llm_presets_have_default_models() {
         ensure_catalog();
         for p in jona_provider::presets() {
-            if p.supports_llm && !matches!(p.id, "openrouter" | "azure-openai") {
-                // OpenRouter/Azure OpenAI: models depend on user config
+            if p.supports_llm && !matches!(p.id, "openrouter" | "azure-openai" | "openai-compatible") {
+                // OpenRouter/Azure OpenAI/openai-compatible: models depend on user config
                 assert!(
                     !p.default_llm_models.is_empty(),
                     "Preset {} supports LLM but has no default LLM models",
@@ -614,6 +617,7 @@ mod tests {
     fn backend_for_custom_provider_uses_api_format() {
         ensure_catalog();
         // Use "anthropic" format (non-default) to verify the override path works
+        // Legacy "custom" kind has no preset match → falls back to api_format
         let provider = jona_types::Provider {
             id: "p2".into(),
             name: "Custom".into(),

@@ -262,7 +262,7 @@ pub fn mask_value(s: &str) -> String {
 }
 
 impl Provider {
-    pub fn is_custom(&self) -> bool { self.kind == "custom" }
+    pub fn is_custom(&self) -> bool { self.kind == "custom" || self.kind == "openai-compatible" }
 
     pub fn has_asr(&self) -> bool { self.supports_asr }
     pub fn has_llm(&self) -> bool { self.supports_llm }
@@ -905,6 +905,7 @@ mod tests {
     fn provider_is_custom() {
         assert!(!test_provider(|_| {}).is_custom());
         assert!(test_provider(|p| p.kind = "custom".into()).is_custom());
+        assert!(test_provider(|p| p.kind = "openai-compatible".into()).is_custom());
     }
 
     #[test]

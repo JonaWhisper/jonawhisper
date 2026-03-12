@@ -13,6 +13,7 @@ pub enum FieldType {
     Text,
     Password,
     Select,
+    Toggle,
 }
 
 /// A custom field defined by a provider preset.

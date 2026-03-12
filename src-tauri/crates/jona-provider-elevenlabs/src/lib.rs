@@ -1,6 +1,6 @@
 use jona_types::{
-    CloudProvider, Provider, ProviderError, ProviderPreset, ProviderRegistration,
-    TranscriptionResult,
+    CloudProvider, FieldType, PresetField, Provider, ProviderError, ProviderPreset,
+    ProviderRegistration, TranscriptionResult,
 };
 use std::future::Future;
 use std::path::Path;
@@ -126,6 +126,17 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #f97316, #ea580c)",
     default_asr_models: &["scribe_v2", "scribe_v1"],
     default_llm_models: &[],
-    extra_fields: &[],
+    extra_fields: &[
+        PresetField {
+            id: "api_key",
+            label: "API Key",
+            field_type: FieldType::Password,
+            required: true,
+            placeholder: "xi_...",
+            default_value: "",
+            options: &[],
+            sensitive: true,
+        },
+    ],
     hidden_fields: &[],
 }}

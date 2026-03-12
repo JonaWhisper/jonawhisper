@@ -214,6 +214,16 @@ inventory::submit! { ProviderPreset {
     default_llm_models: &[],
     extra_fields: &[
         PresetField {
+            id: "api_key",
+            label: "Subscription Key",
+            field_type: FieldType::Password,
+            required: true,
+            placeholder: "",
+            default_value: "",
+            options: &[],
+            sensitive: true,
+        },
+        PresetField {
             id: "region",
             label: "Region",
             field_type: FieldType::Select,
@@ -224,7 +234,7 @@ inventory::submit! { ProviderPreset {
             sensitive: false,
         },
     ],
-    hidden_fields: &["base_url"],
+    hidden_fields: &[],
 }}
 
 #[cfg(test)]

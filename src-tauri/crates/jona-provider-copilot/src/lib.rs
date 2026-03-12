@@ -1,6 +1,6 @@
 use jona_types::{
-    CloudProvider, Provider, ProviderError, ProviderPreset, ProviderRegistration,
-    TranscriptionResult,
+    CloudProvider, FieldType, PresetField, Provider, ProviderError, ProviderPreset,
+    ProviderRegistration, TranscriptionResult,
 };
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -214,6 +214,17 @@ inventory::submit! { ProviderPreset {
     gradient: "linear-gradient(135deg, #24292e, #586069)",
     default_asr_models: &[],
     default_llm_models: &["gpt-4o", "gpt-4o-mini"],
-    extra_fields: &[],
-    hidden_fields: &["base_url"],
+    extra_fields: &[
+        PresetField {
+            id: "api_key",
+            label: "GitHub Token",
+            field_type: FieldType::Password,
+            required: true,
+            placeholder: "ghu_...",
+            default_value: "",
+            options: &[],
+            sensitive: true,
+        },
+    ],
+    hidden_fields: &[],
 }}

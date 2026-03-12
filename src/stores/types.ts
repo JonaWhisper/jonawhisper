@@ -63,7 +63,7 @@ export type ProviderKind = string
 export interface PresetFieldInfo {
   id: string
   label: string
-  field_type: 'text' | 'password' | 'select'
+  field_type: 'text' | 'password' | 'select' | 'toggle'
   required: boolean
   placeholder: string
   default_value: string
