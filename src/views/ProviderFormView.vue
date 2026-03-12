@@ -21,13 +21,25 @@ const WIDTH = 420
 
 function fitWindow() {
   if (!container.value) return
-  const height = Math.min(container.value.scrollHeight, 800)
-  getCurrentWindow().setSize(new LogicalSize(WIDTH, height))
+  const height = Math.ceil(Math.min(container.value.scrollHeight + 40, 800))
+  if (height > 0) {
+    getCurrentWindow().setSize(new LogicalSize(WIDTH, height))
+  }
 }
 
 let observer: ResizeObserver | null = null
 
 onMounted(async () => {
+  // Remove global height:100% constraints so content flows naturally
+  document.documentElement.style.height = 'auto'
+  document.body.style.height = 'auto'
+  document.body.style.overflow = 'visible'
+  const app = document.getElementById('app')
+  if (app) {
+    app.style.height = 'auto'
+    app.style.overflow = 'visible'
+  }
+
   await engines.fetchProviderPresets()
 
   if (providerId) {
@@ -37,10 +49,12 @@ onMounted(async () => {
 
   ready.value = true
   await nextTick()
-  fitWindow()
-
-  observer = new ResizeObserver(fitWindow)
-  if (container.value) observer.observe(container.value)
+  // Wait for layout reflow after height:auto override
+  requestAnimationFrame(() => {
+    fitWindow()
+    observer = new ResizeObserver(fitWindow)
+    if (container.value) observer.observe(container.value)
+  })
 })
 
 onUnmounted(() => {
