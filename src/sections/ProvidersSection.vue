@@ -3,7 +3,8 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { getCurrentWindow, WebviewWindow } from '@tauri-apps/api/window'
+import { getCurrentWindow } from '@tauri-apps/api/window'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { useEnginesStore } from '@/stores/engines'
 import type { Provider } from '@/stores/types'
 import { Button } from '@/components/ui/button'
@@ -26,11 +27,11 @@ onMounted(async () => {
     engines.fetchProviders()
   })
 
-  unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+  unlistenFocus = await getCurrentWindow().onFocusChanged(async ({ payload: focused }) => {
     if (!focused) return
-    const formWindow = WebviewWindow.getByLabel('provider-form')
+    const formWindow = await WebviewWindow.getByLabel('provider-form')
     if (formWindow) {
-      formWindow.setFocus()
+      await formWindow.setFocus()
     }
   })
 })
