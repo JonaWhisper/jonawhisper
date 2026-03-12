@@ -59,6 +59,7 @@
   "provider.testSuccess": "{0} mod\u00e8les",
   "provider.apiKeyKeep": "Laisser vide pour conserver la cl\u00e9 actuelle",
   "provider.allowInsecureDesc": "Autoriser HTTP (non chiffr\u00e9) pour les API locales.",
+  "provider.editTitle": "Modifier le fournisseur",
   "provider.capabilities": "Capacit\u00e9s",
   "provider.field.base_url": "URL",
   "provider.field.region": "R\u00e9gion",

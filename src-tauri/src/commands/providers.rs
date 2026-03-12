@@ -4,6 +4,20 @@ use crate::state::{AppState, Provider, mask_value, keyring_store_extra, keyring_
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
+#[tauri::command]
+pub fn open_provider_form_window(app: AppHandle, provider_id: Option<String>) {
+    let title = if provider_id.is_some() {
+        rust_i18n::t!("provider.editTitle")
+    } else {
+        rust_i18n::t!("settings.providers.add")
+    };
+    let url = match &provider_id {
+        Some(id) => format!("/provider-form?id={}", id),
+        None => "/provider-form".to_string(),
+    };
+    crate::ui::tray::open_fixed_window(&app, "provider-form", &title, &url, 420.0, 550.0);
+}
+
 /// Sentinel value: when a sensitive extra field is set to this, the field is
 /// explicitly cleared (deleted from keychain and removed from `extra`).
 /// Uses a null-byte prefix so it cannot collide with any user-typed value

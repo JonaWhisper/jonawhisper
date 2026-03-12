@@ -1,47 +1,51 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import { getCurrentWindow, WebviewWindow } from '@tauri-apps/api/window'
 import { useEnginesStore } from '@/stores/engines'
 import type { Provider } from '@/stores/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import ProviderForm from '@/components/ProviderForm.vue'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Plus, Pencil, X } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const engines = useEnginesStore()
 
-const showAddDialog = ref(false)
-const addFormKey = ref(0)
-const showEditDialog = ref(false)
-const editingProvider = ref<Provider | null>(null)
 const showRemoveConfirm = ref(false)
 const removeTarget = ref<Provider | null>(null)
 
-function openAddDialog() {
-  addFormKey.value++
-  showAddDialog.value = true
+let unlisten: (() => void) | null = null
+let unlistenFocus: (() => void) | null = null
+
+onMounted(async () => {
+  unlisten = await listen('provider-saved', () => {
+    engines.fetchProviders()
+  })
+
+  unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+    if (!focused) return
+    const formWindow = WebviewWindow.getByLabel('provider-form')
+    if (formWindow) {
+      formWindow.setFocus()
+    }
+  })
+})
+
+onUnmounted(() => {
+  unlisten?.()
+  unlistenFocus?.()
+})
+
+function openAddForm() {
+  invoke('open_provider_form_window', { providerId: null })
 }
 
-async function saveNewProvider(provider: Provider) {
-  await engines.addProvider(provider)
-  showAddDialog.value = false
-}
-
-function openEditDialog(provider: Provider) {
-  editingProvider.value = { ...provider }
-  showEditDialog.value = true
-}
-
-async function saveEditedProvider(provider: Provider) {
-  await engines.updateProvider(provider)
-  showEditDialog.value = false
-  editingProvider.value = null
+function openEditForm(provider: Provider) {
+  invoke('open_provider_form_window', { providerId: provider.id })
 }
 
 function requestRemoveProvider(provider: Provider) {
@@ -79,7 +83,7 @@ function providerGradient(provider: Provider): string {
           <TooltipTrigger as-child>
             <button
               class="w-7 h-7 flex items-center justify-center rounded-md border-none cursor-pointer transition-colors bg-sidebar-hover-bg text-muted-foreground hover:text-foreground"
-              @click="openAddDialog"
+              @click="openAddForm"
             >
               <Plus class="w-4 h-4" />
             </button>
@@ -117,7 +121,7 @@ function providerGradient(provider: Provider): string {
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
-          <Button variant="outline" size="icon" class="h-7 w-7" :aria-label="t('aria.edit')" @click="openEditDialog(provider)">
+          <Button variant="outline" size="icon" class="h-7 w-7" :aria-label="t('aria.edit')" @click="openEditForm(provider)">
             <Pencil class="w-3.5 h-3.5" />
           </Button>
           <Button variant="destructive" size="icon" class="h-7 w-7" :aria-label="t('aria.delete')" @click="requestRemoveProvider(provider)">
@@ -126,37 +130,6 @@ function providerGradient(provider: Provider): string {
         </div>
       </div>
     </div>
-
-    <!-- Add provider dialog -->
-    <Dialog v-model:open="showAddDialog">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{{ t('settings.providers.add') }}</DialogTitle>
-          <DialogDescription></DialogDescription>
-        </DialogHeader>
-        <ProviderForm
-          :key="addFormKey"
-          @save="saveNewProvider"
-          @cancel="showAddDialog = false"
-        />
-      </DialogContent>
-    </Dialog>
-
-    <!-- Edit provider dialog -->
-    <Dialog v-model:open="showEditDialog">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{{ editingProvider?.name }}</DialogTitle>
-          <DialogDescription></DialogDescription>
-        </DialogHeader>
-        <ProviderForm
-          v-if="editingProvider"
-          :provider="editingProvider"
-          @save="saveEditedProvider"
-          @cancel="showEditDialog = false"
-        />
-      </DialogContent>
-    </Dialog>
 
     <!-- Remove confirmation -->
     <ConfirmDialog
