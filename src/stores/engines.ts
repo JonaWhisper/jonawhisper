@@ -60,7 +60,7 @@ export const useEnginesStore = defineStore('engines', () => {
       result.push({ id: m.id, label: m.label, group: 'llm', params: m.params, ram: m.ram, lang_codes: m.lang_codes, quantization: m.quantization, recommended: !!m.recommended })
     }
     for (const p of providers.value) {
-      if (hasLlmSupport(p)) {
+      if (p.enabled && hasLlmSupport(p)) {
         result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, lang_codes: null, quantization: null, recommended: false })
       }
     }
@@ -76,7 +76,7 @@ export const useEnginesStore = defineStore('engines', () => {
       }
     }
     for (const p of providers.value) {
-      if (hasAsrSupport(p)) {
+      if (p.enabled && hasAsrSupport(p)) {
         result.push({ id: `cloud:${p.id}`, label: p.name, group: 'cloud', params: null, ram: null, wer: null, rtf: null, lang_codes: null, quantization: null, recommended: false })
       }
     }
@@ -170,6 +170,20 @@ export const useEnginesStore = defineStore('engines', () => {
     } catch (e) { console.error('updateProvider failed:', e) }
   }
 
+  async function detectProviders() {
+    try {
+      await invoke('detect_providers')
+      await fetchProviders()
+    } catch (e) { console.error('detectProviders failed:', e) }
+  }
+
+  async function toggleProviderEnabled(id: string, enabled: boolean) {
+    try {
+      await invoke('toggle_provider_enabled', { id, enabled })
+      await fetchProviders()
+    } catch (e) { console.error('toggleProviderEnabled failed:', e) }
+  }
+
   function hasUpdate(modelId: string): boolean {
     return updatableModelIds.value.has(modelId)
   }
@@ -205,6 +219,7 @@ export const useEnginesStore = defineStore('engines', () => {
     fetchEngines, fetchModels, fetchLanguages, fetchAudioDevices,
     fetchPermissions, fetchProviderPresets, fetchProviders,
     requestPermission, addProvider, removeProvider, updateProvider,
+    detectProviders, toggleProviderEnabled,
     setupListeners,
   }
 })

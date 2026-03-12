@@ -104,7 +104,11 @@ function providerGradient(provider: Provider): string {
       </div>
 
       <!-- Provider rows -->
-      <div v-for="provider in engines.providers" :key="provider.id" class="flex items-center gap-3 py-2.5 [&+&]:border-t-[0.5px] [&+&]:border-panel-divider">
+      <div
+        v-for="provider in engines.providers" :key="provider.id"
+        class="flex items-center gap-3 py-2.5 [&+&]:border-t-[0.5px] [&+&]:border-panel-divider"
+        :class="{ 'opacity-50': !provider.enabled }"
+      >
         <div
           class="flex items-center justify-center w-8 h-8 rounded-lg text-white text-base font-bold shrink-0"
           :style="{ background: providerGradient(provider) }"
@@ -116,18 +120,33 @@ function providerGradient(provider: Provider): string {
             <span class="text-[13px] font-semibold truncate">{{ provider.name }}</span>
             <Badge v-if="provider.supports_asr" variant="outline" class="text-[9px] px-1 py-0 shrink-0">ASR</Badge>
             <Badge v-if="provider.supports_llm" variant="outline" class="text-[9px] px-1 py-0 shrink-0">LLM</Badge>
+            <Badge v-if="provider.source" variant="secondary" class="text-[9px] px-1 py-0 shrink-0 bg-blue-500/10 text-blue-400 border-blue-500/20">
+              {{ t('settings.providers.auto') }}
+            </Badge>
           </div>
           <div class="text-[11px] text-muted-foreground truncate">
             {{ provider.api_key || '' }}
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
-          <Button variant="outline" size="icon" class="h-7 w-7" :aria-label="t('aria.edit')" @click="openEditForm(provider)">
-            <Pencil class="w-3.5 h-3.5" />
-          </Button>
-          <Button variant="destructive" size="icon" class="h-7 w-7" :aria-label="t('aria.delete')" @click="requestRemoveProvider(provider)">
-            <X class="w-3.5 h-3.5" />
-          </Button>
+          <template v-if="provider.source">
+            <Button
+              :variant="provider.enabled ? 'default' : 'outline'"
+              size="sm"
+              class="h-7 text-xs"
+              @click="engines.toggleProviderEnabled(provider.id, !provider.enabled)"
+            >
+              {{ provider.enabled ? t('settings.providers.disable') : t('settings.providers.enable') }}
+            </Button>
+          </template>
+          <template v-else>
+            <Button variant="outline" size="icon" class="h-7 w-7" :aria-label="t('aria.edit')" @click="openEditForm(provider)">
+              <Pencil class="w-3.5 h-3.5" />
+            </Button>
+            <Button variant="destructive" size="icon" class="h-7 w-7" :aria-label="t('aria.delete')" @click="requestRemoveProvider(provider)">
+              <X class="w-3.5 h-3.5" />
+            </Button>
+          </template>
         </div>
       </div>
     </div>
