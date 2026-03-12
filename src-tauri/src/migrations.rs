@@ -92,6 +92,8 @@ pub(crate) fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         supports_llm: true,
                         api_format: None,
                         extra: std::collections::HashMap::new(),
+                        enabled: true,
+                        source: None,
                     });
                     // Migrate ASR model to settings
                     if !model.is_empty() && !prefs.selected_model_id.starts_with("cloud:") {
@@ -139,6 +141,8 @@ pub(crate) fn migrate_v1(raw: &mut Value, prefs: &mut Preferences) {
                         supports_llm: has_llm,
                         api_format: None,
                         extra: std::collections::HashMap::new(),
+                        enabled: true,
+                        source: None,
                     });
                     prefs.llm_provider_id = id;
                 }
@@ -685,6 +689,7 @@ mod tests {
             url: url.into(), api_key: String::new(),
             allow_insecure: false, cached_models: vec![], supports_asr: true,
             supports_llm: true, api_format: None, extra: Default::default(),
+            enabled: true, source: None,
         }
     }
 

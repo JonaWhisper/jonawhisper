@@ -203,6 +203,7 @@ pub fn run() {
     jona_provider::ProviderCatalog::init_auto();
 
     let app_state = Arc::new(AppState::default());
+    app_state.run_detection();
 
     // Read log retention before initializing logging (needs prefs)
     let log_retention = app_state.settings.lock().unwrap().log_retention.clone();
@@ -246,6 +247,8 @@ pub fn run() {
             commands::providers::fetch_provider_models,
             commands::providers::get_provider_presets,
             commands::providers::open_provider_form_window,
+            commands::providers::detect_providers,
+            commands::providers::toggle_provider_enabled,
             commands::settings::get_settings,
             commands::settings::set_setting,
             commands::settings::get_system_locale,
@@ -609,6 +612,8 @@ mod tests {
             supports_llm: true,
             api_format: None,
             extra: Default::default(),
+            enabled: true,
+            source: None,
         };
         // Should not panic — resolves preset → backend
         let _ = jona_provider::backend_for_provider(&provider);
@@ -631,6 +636,8 @@ mod tests {
             supports_llm: true,
             api_format: Some("anthropic".into()),
             extra: Default::default(),
+            enabled: true,
+            source: None,
         };
         // Should resolve to the anthropic backend without panicking
         let _ = jona_provider::backend_for_provider(&provider);

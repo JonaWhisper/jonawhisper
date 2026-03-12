@@ -118,29 +118,32 @@ pub fn update_provider(mut provider: Provider, state: tauri::State<'_, Arc<AppSt
     let _ = app.emit(events::SETTINGS_CHANGED, "providers");
 }
 
-#[tauri::command]
-pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
-    let providers = state.settings.lock().unwrap().providers.clone();
-    providers.into_iter().map(|mut p| {
-        p.api_key = p.masked_api_key();
-        // Resolve capabilities and URL from preset for known providers
-        if let Some(preset) = jona_provider::preset(&p.kind) {
-            // Only override capabilities if the preset doesn't expose them as user-configurable toggles
-            let has_toggle = |id: &str| preset.extra_fields.iter().any(|f| f.id == id && f.field_type == jona_types::FieldType::Toggle);
-            if !has_toggle("supports_asr") { p.supports_asr = preset.supports_asr; }
-            if !has_toggle("supports_llm") { p.supports_llm = preset.supports_llm; }
-            if p.url.is_empty() {
-                p.url = preset.base_url.to_string();
-            }
-            // Mask sensitive extra fields
-            for field in preset.extra_fields.iter().filter(|f| f.sensitive) {
-                if let Some(val) = p.extra.get_mut(field.id) {
-                    *val = mask_value(val);
-                }
+fn mask_provider(mut p: Provider) -> Provider {
+    p.api_key = p.masked_api_key();
+    if let Some(preset) = jona_provider::preset(&p.kind) {
+        let has_toggle = |id: &str| preset.extra_fields.iter().any(|f| f.id == id && f.field_type == jona_types::FieldType::Toggle);
+        if !has_toggle("supports_asr") { p.supports_asr = preset.supports_asr; }
+        if !has_toggle("supports_llm") { p.supports_llm = preset.supports_llm; }
+        if p.url.is_empty() {
+            p.url = preset.base_url.to_string();
+        }
+        for field in preset.extra_fields.iter().filter(|f| f.sensitive) {
+            if let Some(val) = p.extra.get_mut(field.id) {
+                *val = mask_value(val);
             }
         }
-        p
-    }).collect()
+    }
+    p
+}
+
+#[tauri::command]
+pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
+    let mut result: Vec<Provider> = state.settings.lock().unwrap().providers.clone()
+        .into_iter().map(mask_provider).collect();
+    // Append auto-detected providers (masked)
+    let detected = state.detected_providers.lock().unwrap().clone();
+    result.extend(detected.into_iter().map(mask_provider));
+    result
 }
 
 #[derive(serde::Serialize)]
@@ -249,4 +252,31 @@ pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, A
         .list_models(&resolved)
         .await
         .map_err(|e| AppError::Other(e.to_string()))
+}
+
+#[tauri::command]
+pub fn detect_providers(state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    state.run_detection();
+    let _ = app.emit(events::SETTINGS_CHANGED, "providers");
+}
+
+#[tauri::command]
+pub fn toggle_provider_enabled(id: String, enabled: bool, state: tauri::State<'_, Arc<AppState>>, app: AppHandle) {
+    // Check manual providers first
+    {
+        let mut s = state.settings.lock().unwrap();
+        if let Some(p) = s.providers.iter_mut().find(|p| p.id == id) {
+            p.enabled = enabled;
+            drop(s);
+            state.save_preferences();
+            let _ = app.emit(events::SETTINGS_CHANGED, "providers");
+            return;
+        }
+    }
+    // Check detected providers
+    let mut detected = state.detected_providers.lock().unwrap();
+    if let Some(p) = detected.iter_mut().find(|p| p.id == id) {
+        p.enabled = enabled;
+    }
+    let _ = app.emit(events::SETTINGS_CHANGED, "providers");
 }

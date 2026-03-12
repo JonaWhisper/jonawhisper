@@ -17,6 +17,8 @@ pub struct AppState {
     pub contexts: ContextMap,
     /// Lock-free flags for spectrum emitter hot path.
     pub audio_flags: AudioFlags,
+    /// Providers auto-detected from other tools (ephemeral, not saved to prefs).
+    pub detected_providers: Mutex<Vec<Provider>>,
 }
 
 fn open_history_db() -> Connection {
@@ -106,11 +108,52 @@ impl Default for AppState {
             tray_menu: Mutex::new(None),
             contexts: ContextMap::new(),
             audio_flags: AudioFlags::default(),
+            detected_providers: Mutex::new(vec![]),
         }
     }
 }
 
 impl AppState {
+    /// Run all registered credential detectors and populate `detected_providers`.
+    pub fn run_detection(&self) {
+        let results = jona_provider::detect_all();
+        let mut detected = Vec::new();
+        for (cred, detector_id) in results {
+            let id = format!("auto-{}-{}", detector_id, cred.kind);
+            let preset_name = jona_provider::preset(cred.kind)
+                .map(|p| p.display_name)
+                .unwrap_or(cred.kind);
+            detected.push(Provider {
+                id,
+                name: format!("{} ({})", preset_name, cred.source_label),
+                kind: cred.kind.to_string(),
+                url: cred.url,
+                api_key: cred.api_key,
+                allow_insecure: false,
+                cached_models: vec![],
+                supports_asr: jona_provider::preset(cred.kind).map(|p| p.supports_asr).unwrap_or(false),
+                supports_llm: jona_provider::preset(cred.kind).map(|p| p.supports_llm).unwrap_or(true),
+                api_format: None,
+                extra: cred.extra,
+                enabled: false,
+                source: Some(detector_id.to_string()),
+            });
+        }
+        log::info!("Auto-detection: {} provider(s) found", detected.len());
+        *self.detected_providers.lock().unwrap() = detected;
+    }
+
+    /// Find a provider by ID across both manual and detected providers.
+    pub fn find_provider(&self, id: &str) -> Option<Provider> {
+        let s = self.settings.lock().unwrap();
+        if let Some(p) = s.providers.iter().find(|p| p.id == id) {
+            return Some(p.clone());
+        }
+        drop(s);
+        let detected = self.detected_providers.lock().unwrap();
+        detected.iter().find(|p| p.id == id).cloned()
+    }
+
     /// Save current preferences to disk.
     pub fn save_preferences(&self) {
         let settings = self.settings.lock().unwrap();
@@ -274,6 +317,7 @@ impl AppState {
             tray_menu: Mutex::new(None),
             contexts: ContextMap::new(),
             audio_flags: AudioFlags::default(),
+            detected_providers: Mutex::new(vec![]),
         }
     }
 
