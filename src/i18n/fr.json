@@ -198,6 +198,7 @@
   "general.logRetention.7days": "7 derniers jours",
   "general.logRetention.30days": "30 derniers jours",
   "general.logRetention.all": "Ind\u00e9finie",
+  "general.update.title": "Mise \u00e0 jour",
   "general.update.available": "v{version} disponible",
   "general.update.install": "Mettre \u00e0 jour",
   "general.update.installing": "Installation\u2026",

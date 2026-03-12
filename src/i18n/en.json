@@ -198,6 +198,7 @@
   "general.logRetention.7days": "Last 7 days",
   "general.logRetention.30days": "Last 30 days",
   "general.logRetention.all": "Unlimited",
+  "general.update.title": "Update",
   "general.update.available": "v{version} available",
   "general.update.install": "Update",
   "general.update.installing": "Installing\u2026",
