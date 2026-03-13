@@ -144,7 +144,7 @@ impl AppState {
                 allow_insecure: false,
                 cached_models: vec![],
                 supports_asr: preset.map(|p| p.supports_asr).unwrap_or(false),
-                supports_llm: preset.map(|p| p.supports_llm).unwrap_or(true),
+                supports_llm: preset.map(|p| p.supports_llm).unwrap_or(false),
                 api_format: None,
                 extra: cred.extra,
                 enabled,
