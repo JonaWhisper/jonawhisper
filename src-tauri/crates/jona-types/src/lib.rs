@@ -1184,6 +1184,7 @@ mod tests {
             api_key: String::new(), allow_insecure,
             cached_models: vec![], supports_asr: true, supports_llm: true,
             api_format: None, extra: std::collections::HashMap::new(),
+            enabled: true, source: None,
         }
     }
 
