@@ -35,11 +35,13 @@ jobs:
       - name: Detect available secrets
         id: check
         run: |
-          # macOS: need certificate + signing identity + password + team ID for codesign + notarization
+          # macOS: need all 6 secrets for a fully signed + notarized build
           if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && \
              [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ] && \
              [ -n "${{ secrets.APPLE_SIGNING_IDENTITY }}" ] && \
-             [ -n "${{ secrets.APPLE_TEAM_ID }}" ]; then
+             [ -n "${{ secrets.APPLE_TEAM_ID }}" ] && \
+             [ -n "${{ secrets.APPLE_ID }}" ] && \
+             [ -n "${{ secrets.APPLE_PASSWORD }}" ]; then
             echo "has-macos-signing=true" >> "$GITHUB_OUTPUT"
             echo "✅ macOS signing secrets available"
           else
@@ -47,16 +49,11 @@ jobs:
             echo "⚠️ macOS signing secrets missing — build will be unsigned"
           fi
 
-          # Windows: need Certum HSM credentials for EV code signing
-          if [ -n "${{ secrets.CERTUM_OTP_URI }}" ] && \
-             [ -n "${{ secrets.CERTUM_PASSWORD }}" ] && \
-             [ -n "${{ secrets.CERTUM_USER_ID }}" ]; then
-            echo "has-windows-signing=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Windows signing secrets available"
-          else
-            echo "has-windows-signing=false" >> "$GITHUB_OUTPUT"
-            echo "⚠️ Windows signing secrets missing — build will be unsigned"
-          fi
+          # Windows: force false — the Certum HSM signing step is not yet
+          # implemented (TODO block in build-windows job). Flip to true once
+          # the SimplySign setup + signtool invocation is wired up.
+          echo "has-windows-signing=false" >> "$GITHUB_OUTPUT"
+          echo "⚠️ Windows signing not yet implemented — build will be unsigned"
 
   # ───────────────────────────────────────────────
   # Job 1: Bump version, generate changelog, tag
