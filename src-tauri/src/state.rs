@@ -17,6 +17,8 @@ pub struct AppState {
     pub contexts: ContextMap,
     /// Lock-free flags for spectrum emitter hot path.
     pub audio_flags: AudioFlags,
+    /// Providers auto-detected from other tools (ephemeral, not saved to prefs).
+    pub detected_providers: Mutex<Vec<Provider>>,
 }
 
 fn open_history_db() -> Connection {
@@ -106,11 +108,87 @@ impl Default for AppState {
             tray_menu: Mutex::new(None),
             contexts: ContextMap::new(),
             audio_flags: AudioFlags::default(),
+            detected_providers: Mutex::new(vec![]),
         }
     }
 }
 
 impl AppState {
+    /// Run all registered credential detectors and populate `detected_providers`.
+    pub fn run_detection(&self) {
+        let results = jona_provider::detect_all();
+        // Restore persisted enabled states for detected providers
+        let enabled_states: std::collections::HashMap<String, bool> = self.settings.lock().unwrap()
+            .detected_enabled.clone();
+        let mut detected = Vec::new();
+        let mut id_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for (cred, detector_id) in results {
+            let base_id = format!("auto-{}-{}", detector_id, cred.kind);
+            let count = id_counts.entry(base_id.clone()).or_insert(0);
+            let id = if *count == 0 { base_id.clone() } else { format!("{}-{}", base_id, count) };
+            *count += 1;
+            let preset = jona_provider::preset(cred.kind);
+            let preset_name = preset.map(|p| p.display_name).unwrap_or(cred.kind);
+            let url = if cred.url.is_empty() {
+                preset.map(|p| p.base_url.to_string()).unwrap_or_default()
+            } else {
+                cred.url
+            };
+            let enabled = enabled_states.get(&id).copied().unwrap_or(false);
+            detected.push(Provider {
+                id,
+                name: format!("{} ({})", preset_name, cred.source_label),
+                kind: cred.kind.to_string(),
+                url,
+                api_key: cred.api_key,
+                allow_insecure: false,
+                cached_models: vec![],
+                supports_asr: preset.map(|p| p.supports_asr).unwrap_or(false),
+                supports_llm: preset.map(|p| p.supports_llm).unwrap_or(false),
+                api_format: None,
+                extra: cred.extra,
+                enabled,
+                source: Some(detector_id.to_string()),
+            });
+        }
+        log::info!("Auto-detection: {} provider(s) found", detected.len());
+
+        // Prune orphan entries from detected_enabled (detectors that no longer return credentials)
+        let detected_ids: std::collections::HashSet<&str> = detected.iter().map(|p| p.id.as_str()).collect();
+        let mut s = self.settings.lock().unwrap();
+        let before = s.detected_enabled.len();
+        s.detected_enabled.retain(|id, _| detected_ids.contains(id.as_str()));
+        if s.detected_enabled.len() != before {
+            drop(s);
+            self.save_preferences();
+        }
+
+        *self.detected_providers.lock().unwrap() = detected;
+    }
+
+    /// Find a provider by ID across both manual and detected providers.
+    /// For detected providers, re-reads credentials from the source (e.g. Keychain)
+    /// to get fresh tokens that may have been rotated.
+    pub fn find_provider(&self, id: &str) -> Option<Provider> {
+        let s = self.settings.lock().unwrap();
+        if let Some(p) = s.providers.iter().find(|p| p.id == id) {
+            return Some(p.clone());
+        }
+        drop(s);
+        let mut provider = self.detected_providers.lock().unwrap()
+            .iter().find(|p| p.id == id).cloned();
+        // Drop the mutex before doing Keychain I/O
+        if let Some(ref mut p) = provider {
+            // Re-read fresh credentials from the detector (handles token rotation)
+            if let Some(source) = &p.source {
+                if let Some(cred) = jona_provider::refresh_credential(source, &p.kind) {
+                    p.api_key = cred.api_key;
+                }
+            }
+        }
+        provider
+    }
+
     /// Save current preferences to disk.
     pub fn save_preferences(&self) {
         let settings = self.settings.lock().unwrap();
@@ -246,7 +324,7 @@ impl AppState {
 #[cfg(test)]
 impl AppState {
     /// Create an AppState with in-memory SQLite for testing.
-    fn test_instance() -> Self {
+    pub(crate) fn test_instance() -> Self {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS history (
@@ -274,6 +352,7 @@ impl AppState {
             tray_menu: Mutex::new(None),
             contexts: ContextMap::new(),
             audio_flags: AudioFlags::default(),
+            detected_providers: Mutex::new(vec![]),
         }
     }
 

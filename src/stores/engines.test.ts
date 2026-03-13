@@ -65,6 +65,8 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
     cached_models: [],
     supports_asr: false,
     supports_llm: false,
+    enabled: true,
+    source: null,
     extra: {},
     ...overrides,
   }
@@ -294,6 +296,78 @@ describe('engines store actions', () => {
     })
     await store.fetchModels()
 
+    expect(settings.cleanupModelId).toBe('')
+  })
+
+  it('validateSelections resets when cloud provider is disabled (ASR)', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    store.providers = [makeProvider({ id: 'openai', supports_asr: true, enabled: false })]
+    settings.selectedModelId = 'cloud:openai'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Disabled provider should cause reset to first available model
+    expect(settings.selectedModelId).toBe('whisper:tiny')
+  })
+
+  it('validateSelections resets when cloud provider is disabled (cleanup)', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = []
+    store.models = []
+    store.providers = [makeProvider({ id: 'anthropic', supports_llm: true, enabled: false })]
+    settings.cleanupModelId = 'cloud:anthropic'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Disabled provider should cause reset
+    expect(settings.cleanupModelId).toBe('')
+  })
+
+  it('validateSelections resets when cloud provider is removed entirely', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    store.providers = [] // provider removed
+    settings.selectedModelId = 'cloud:openai'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Provider no longer exists — selection should reset to first available
+    expect(settings.selectedModelId).toBe('whisper:tiny')
+  })
+
+  it('validateSelections resets cleanup when cloud provider is removed entirely', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = []
+    store.models = []
+    store.providers = [] // provider removed
+    settings.cleanupModelId = 'cloud:anthropic'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Provider no longer exists — selection should reset
     expect(settings.cleanupModelId).toBe('')
   })
 

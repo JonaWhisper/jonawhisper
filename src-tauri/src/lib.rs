@@ -219,6 +219,9 @@ pub fn run() {
         rust_i18n::set_locale(&resolve_locale(&s.app_locale));
     }
 
+    // Run auto-detection after logging is initialized
+    app_state.run_detection();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
 
@@ -246,6 +249,8 @@ pub fn run() {
             commands::providers::fetch_provider_models,
             commands::providers::get_provider_presets,
             commands::providers::open_provider_form_window,
+            commands::providers::detect_providers,
+            commands::providers::toggle_provider_enabled,
             commands::settings::get_settings,
             commands::settings::set_setting,
             commands::settings::get_system_locale,
@@ -609,6 +614,8 @@ mod tests {
             supports_llm: true,
             api_format: None,
             extra: Default::default(),
+            enabled: true,
+            source: None,
         };
         // Should not panic — resolves preset → backend
         let _ = jona_provider::backend_for_provider(&provider);
@@ -631,6 +638,8 @@ mod tests {
             supports_llm: true,
             api_format: Some("anthropic".into()),
             extra: Default::default(),
+            enabled: true,
+            source: None,
         };
         // Should resolve to the anthropic backend without panicking
         let _ = jona_provider::backend_for_provider(&provider);
@@ -669,5 +678,103 @@ mod tests {
         // auto depends on system locale, just ensure it returns something valid
         let result = super::resolve_locale("auto");
         assert!(result == "fr" || result == "en", "auto should resolve to fr or en, got: {}", result);
+    }
+
+    // -- Auto-detection tests --
+
+    fn test_provider(id: &str, source: Option<&str>, enabled: bool) -> jona_types::Provider {
+        jona_types::Provider {
+            id: id.into(),
+            name: "Test".into(),
+            kind: "anthropic".into(),
+            url: "https://api.anthropic.com/v1".into(),
+            api_key: "sk-test".into(),
+            allow_insecure: false,
+            cached_models: vec![],
+            supports_asr: false,
+            supports_llm: true,
+            api_format: None,
+            extra: Default::default(),
+            enabled,
+            source: source.map(|s| s.to_string()),
+        }
+    }
+
+    #[test]
+    fn find_provider_manual() {
+        let state = crate::state::AppState::test_instance();
+        state.settings.lock().unwrap().providers.push(test_provider("manual-1", None, true));
+        let found = state.find_provider("manual-1");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "manual-1");
+    }
+
+    #[test]
+    fn find_provider_detected() {
+        let state = crate::state::AppState::test_instance();
+        state.detected_providers.lock().unwrap().push(test_provider("auto-det-1", Some("test-detector"), true));
+        let found = state.find_provider("auto-det-1");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "auto-det-1");
+    }
+
+    #[test]
+    fn find_provider_not_found() {
+        let state = crate::state::AppState::test_instance();
+        assert!(state.find_provider("nonexistent").is_none());
+    }
+
+    #[test]
+    fn find_provider_manual_takes_precedence() {
+        let state = crate::state::AppState::test_instance();
+        state.settings.lock().unwrap().providers.push(test_provider("same-id", None, true));
+        state.detected_providers.lock().unwrap().push(test_provider("same-id", Some("det"), false));
+        let found = state.find_provider("same-id").unwrap();
+        // Manual provider wins (no source)
+        assert!(found.source.is_none());
+    }
+
+    #[test]
+    fn get_providers_includes_detected() {
+        let state = crate::state::AppState::test_instance();
+        state.settings.lock().unwrap().providers.push(test_provider("manual-1", None, true));
+        state.detected_providers.lock().unwrap().push(test_provider("auto-1", Some("det"), false));
+        let s = state.settings.lock().unwrap();
+        let manual: Vec<_> = s.providers.clone();
+        drop(s);
+        let detected = state.detected_providers.lock().unwrap().clone();
+        assert_eq!(manual.len() + detected.len(), 2);
+    }
+
+    #[test]
+    fn toggle_detected_provider_enabled() {
+        let state = crate::state::AppState::test_instance();
+        state.detected_providers.lock().unwrap().push(test_provider("auto-1", Some("det"), false));
+        // Simulate toggle
+        {
+            let mut detected = state.detected_providers.lock().unwrap();
+            if let Some(p) = detected.iter_mut().find(|p| p.id == "auto-1") {
+                p.enabled = true;
+            }
+        }
+        let detected = state.detected_providers.lock().unwrap();
+        assert!(detected[0].enabled);
+    }
+
+    #[test]
+    fn mask_provider_hides_detected_api_key() {
+        let p = test_provider("auto-1", Some("det"), true);
+        assert!(!p.api_key.is_empty());
+        // mask_value is the same function used in mask_provider
+        let masked = crate::state::mask_value(&p.api_key);
+        assert!(masked.starts_with('\u{2022}')); // bullet char
+        assert!(!masked.contains("sk-test"));
+    }
+
+    #[test]
+    fn refresh_credential_returns_none_for_unknown_detector() {
+        ensure_catalog();
+        let result = jona_provider::refresh_credential("nonexistent-detector", "anthropic");
+        assert!(result.is_none());
     }
 }

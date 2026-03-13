@@ -214,6 +214,8 @@ function buildProvider(): Provider {
     cached_models: fetchedModels.value,
     supports_asr: ev['supports_asr'] != null ? ev['supports_asr'] === 'true' : (preset?.supports_asr ?? true),
     supports_llm: ev['supports_llm'] != null ? ev['supports_llm'] === 'true' : (preset?.supports_llm ?? true),
+    enabled: props.provider?.enabled ?? true,
+    source: props.provider?.source ?? null,
     extra: Object.fromEntries(
       Object.entries(ev).filter(([k]) => !TOP_LEVEL_FIELDS.has(k)),
     ),

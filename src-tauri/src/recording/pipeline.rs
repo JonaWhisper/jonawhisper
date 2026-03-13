@@ -218,9 +218,8 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
          spellcheck_enabled, punctuation_model_id, text_cleanup_enabled,
          cleanup_model_id, llm_model, llm_max_tokens, cleanup_provider) = {
         let s = state.settings.lock().unwrap();
-        let provider = s.cleanup_model_id.strip_prefix("cloud:")
-            .and_then(|pid| s.providers.iter().find(|p| p.id == pid).cloned());
-        (
+        let cleanup_provider_id = s.cleanup_model_id.strip_prefix("cloud:").map(|s| s.to_string());
+        let result = (
             s.selected_model_id.clone(),
             s.selected_language.clone(),
             s.hallucination_filter_enabled,
@@ -232,8 +231,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.cleanup_model_id.clone(),
             s.llm_model.clone(),
             s.llm_max_tokens,
-            provider,
-        )
+            cleanup_provider_id,
+        );
+        drop(s);
+        let (a, b, c, d, e, f, g, h, i, j, k, pid) = result;
+        (a, b, c, d, e, f, g, h, i, j, k, pid.as_deref().and_then(|id| state.find_provider(id)))
     };
 
     // Step 1: preprocess (hallucination filter + dictation commands + disfluency removal)
@@ -534,15 +536,16 @@ fn transcribe(
 ) -> Result<TranscriptionResult, EngineError> {
     let (model_id, language, gpu_mode, asr_cloud_model, asr_provider) = {
         let s = state.settings.lock().unwrap();
-        let provider = s.selected_model_id.strip_prefix("cloud:")
-            .and_then(|pid| s.providers.iter().find(|p| p.id == pid).cloned());
-        (
+        let provider_id = s.selected_model_id.strip_prefix("cloud:").map(|s| s.to_string());
+        let result = (
             s.selected_model_id.clone(),
             s.selected_language.clone(),
             s.gpu_mode,
             s.asr_cloud_model.clone(),
-            provider,
-        )
+        );
+        drop(s);
+        let (mid, lang, gpu, acm) = result;
+        (mid, lang, gpu, acm, provider_id.as_deref().and_then(|id| state.find_provider(id)))
     };
 
     // Cloud dispatch: selected_model_id = "cloud:<provider_id>"
