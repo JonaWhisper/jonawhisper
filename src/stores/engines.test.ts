@@ -299,7 +299,7 @@ describe('engines store actions', () => {
     expect(settings.cleanupModelId).toBe('')
   })
 
-  it('validateSelections does NOT reset when cloud provider exists but is disabled (ASR)', async () => {
+  it('validateSelections resets when cloud provider is disabled (ASR)', async () => {
     const store = useEnginesStore()
     const settings = useSettingsStore()
     store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
@@ -313,11 +313,11 @@ describe('engines store actions', () => {
 
     await store.fetchModels()
 
-    // Provider exists but is disabled — selection should be preserved
-    expect(settings.selectedModelId).toBe('cloud:openai')
+    // Disabled provider should cause reset to first available model
+    expect(settings.selectedModelId).toBe('whisper:tiny')
   })
 
-  it('validateSelections does NOT reset when cloud provider exists but is disabled (cleanup)', async () => {
+  it('validateSelections resets when cloud provider is disabled (cleanup)', async () => {
     const store = useEnginesStore()
     const settings = useSettingsStore()
     store.engines = []
@@ -331,8 +331,8 @@ describe('engines store actions', () => {
 
     await store.fetchModels()
 
-    // Provider exists but is disabled — selection should be preserved
-    expect(settings.cleanupModelId).toBe('cloud:anthropic')
+    // Disabled provider should cause reset
+    expect(settings.cleanupModelId).toBe('')
   })
 
   it('validateSelections resets when cloud provider is removed entirely', async () => {

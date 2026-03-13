@@ -102,17 +102,12 @@ export const useEnginesStore = defineStore('engines', () => {
     catch (e) { console.error('fetchModels failed:', e) }
   }
 
-  /** Reset selected model IDs if they point to models that no longer exist. */
+  /** Reset selected model IDs if they point to models that no longer exist or are disabled. */
   function validateSelections() {
     const asrIds = new Set(asrModels.value.map(m => m.id))
     if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
-      // Don't reset cloud providers that exist but are just disabled
-      const cloudProviderId = parseCloudId(settingsStore.selectedModelId)
-      const existsDisabled = cloudProviderId != null && providers.value.some(p => p.id === cloudProviderId && !p.enabled)
-      if (!existsDisabled) {
-        const first = asrModels.value[0]
-        settingsStore.setSetting('selected_model_id', first?.id ?? '')
-      }
+      const first = asrModels.value[0]
+      settingsStore.setSetting('selected_model_id', first?.id ?? '')
     }
     const punctIds = new Set(punctuationModels.value.map(m => m.id))
     if (settingsStore.punctuationModelId && !punctIds.has(settingsStore.punctuationModelId)) {
@@ -120,12 +115,7 @@ export const useEnginesStore = defineStore('engines', () => {
     }
     const cleanupIds = new Set(cleanupModels.value.map(m => m.id))
     if (settingsStore.cleanupModelId && !cleanupIds.has(settingsStore.cleanupModelId)) {
-      // Don't reset cloud providers that exist but are just disabled
-      const cloudProviderId = parseCloudId(settingsStore.cleanupModelId)
-      const existsDisabled = cloudProviderId != null && providers.value.some(p => p.id === cloudProviderId && !p.enabled)
-      if (!existsDisabled) {
-        settingsStore.setSetting('cleanup_model_id', '')
-      }
+      settingsStore.setSetting('cleanup_model_id', '')
     }
   }
 
@@ -191,7 +181,7 @@ export const useEnginesStore = defineStore('engines', () => {
     try {
       await invoke('toggle_provider_enabled', { id, enabled })
       await fetchProviders()
-      // Re-validate: if a disabled provider was selected for ASR/cleanup, reset it
+      // Disabling a selected provider resets the selection to the next available
       validateSelections()
     } catch (e) { console.error('toggleProviderEnabled failed:', e) }
   }

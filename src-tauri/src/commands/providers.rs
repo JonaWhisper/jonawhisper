@@ -214,43 +214,58 @@ pub fn get_provider_presets() -> Vec<ProviderPresetInfo> {
 pub async fn fetch_provider_models(provider: Provider, state: tauri::State<'_, Arc<AppState>>) -> Result<Vec<String>, AppError> {
     provider.validate_url().map_err(|e| AppError::Other(e.to_string()))?;
 
-    // Resolve stored credentials: single lock to get both api_key and extra fields
-    let mut resolved = provider.clone();
-    let (stored_key, stored_extras) = {
-        let s = state.settings.lock().unwrap();
-        let stored = s.providers.iter().find(|p| p.id == provider.id);
-        (
-            stored.map(|p| p.api_key.clone()).unwrap_or_default(),
-            stored.map(|p| p.extra.clone()).unwrap_or_default(),
-        )
-    };
+    // Resolve real credentials server-side (frontend sends masked keys).
+    // For auto-detected providers, use find_provider() which re-reads fresh
+    // credentials from the source. For manual providers, hydrate from settings.
+    let resolved = if provider.source.is_some() {
+        // Auto-detected provider: resolve via find_provider() for fresh credentials
+        let mut p = state.find_provider(&provider.id)
+            .ok_or_else(|| AppError::Other(format!("Provider '{}' not found", provider.id)))?;
+        // Keep URL from the frontend in case it was customized
+        if !provider.url.is_empty() {
+            p.url = provider.url.clone();
+        }
+        p
+    } else {
+        // Manual provider: hydrate credentials from settings/keychain
+        let mut resolved = provider.clone();
+        let (stored_key, stored_extras) = {
+            let s = state.settings.lock().unwrap();
+            let stored = s.providers.iter().find(|p| p.id == provider.id);
+            (
+                stored.map(|p| p.api_key.clone()).unwrap_or_default(),
+                stored.map(|p| p.extra.clone()).unwrap_or_default(),
+            )
+        };
 
-    // If api_key is empty or matches the masked version of the stored key, use the stored key
-    if resolved.api_key.is_empty() || resolved.api_key == mask_value(&stored_key) {
-        resolved.api_key = stored_key;
-    }
+        // If api_key is empty or matches the masked version of the stored key, use the stored key
+        if resolved.api_key.is_empty() || resolved.api_key == mask_value(&stored_key) {
+            resolved.api_key = stored_key;
+        }
 
-    // Hydrate sensitive extra fields:
-    // - CLEAR_SENTINEL → leave empty (don't hydrate)
-    // - empty or matches masked version of stored value → use stored value
-    // - anything else → use as-is (new value from user)
-    if let Some(preset) = jona_provider::preset(&resolved.kind) {
-        for field in preset.extra_fields {
-            if !field.sensitive {
-                continue;
-            }
-            let val = resolved.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
-            if val == CLEAR_SENTINEL {
-                resolved.extra.remove(field.id);
-            } else {
-                let stored = stored_extras.get(field.id).cloned().unwrap_or_default();
-                let masked = mask_value(&stored);
-                if (val.is_empty() || val == masked) && !stored.is_empty() {
-                    resolved.extra.insert(field.id.to_string(), stored);
+        // Hydrate sensitive extra fields:
+        // - CLEAR_SENTINEL → leave empty (don't hydrate)
+        // - empty or matches masked version of stored value → use stored value
+        // - anything else → use as-is (new value from user)
+        if let Some(preset) = jona_provider::preset(&resolved.kind) {
+            for field in preset.extra_fields {
+                if !field.sensitive {
+                    continue;
+                }
+                let val = resolved.extra.get(field.id).map(|s| s.as_str()).unwrap_or("");
+                if val == CLEAR_SENTINEL {
+                    resolved.extra.remove(field.id);
+                } else {
+                    let stored = stored_extras.get(field.id).cloned().unwrap_or_default();
+                    let masked = mask_value(&stored);
+                    if (val.is_empty() || val == masked) && !stored.is_empty() {
+                        resolved.extra.insert(field.id.to_string(), stored);
+                    }
                 }
             }
         }
-    }
+        resolved
+    };
 
     jona_provider::backend_for_provider(&resolved)
         .list_models(&resolved)
