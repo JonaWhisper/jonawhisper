@@ -358,6 +358,8 @@ mod tests {
             supports_llm: true,
             api_format: None,
             extra,
+            enabled: true,
+            source: None,
         }
     }
 
