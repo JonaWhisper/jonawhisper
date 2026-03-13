@@ -746,6 +746,8 @@ mod tests {
             supports_llm: false,
             api_format: None,
             extra: Default::default(),
+            enabled: true,
+            source: None,
         };
         assert!(aws_config(&p).is_err());
     }
