@@ -13,7 +13,8 @@ const ENV_MAPPINGS: &[(&str, &str, &str)] = &[
     ("TOGETHER_API_KEY",   "together",   "env:TOGETHER_API_KEY"),
     ("FIREWORKS_API_KEY",  "fireworks",  "env:FIREWORKS_API_KEY"),
     ("CEREBRAS_API_KEY",   "cerebras",   "env:CEREBRAS_API_KEY"),
-    ("OPENROUTER_API_KEY", "openrouter", "env:OPENROUTER_API_KEY"),
+    ("OPENROUTER_API_KEY",        "openrouter", "env:OPENROUTER_API_KEY"),
+    ("CLAUDE_CODE_OAUTH_TOKEN",   "anthropic",  "env:CLAUDE_CODE_OAUTH_TOKEN"),
 ];
 
 /// Testable detection from an arbitrary list of (var_name, value) pairs.
