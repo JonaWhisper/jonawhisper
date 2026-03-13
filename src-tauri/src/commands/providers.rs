@@ -140,9 +140,13 @@ fn mask_provider(mut p: Provider) -> Provider {
 pub fn get_providers(state: tauri::State<'_, Arc<AppState>>) -> Vec<Provider> {
     let mut result: Vec<Provider> = state.settings.lock().unwrap().providers.clone()
         .into_iter().map(mask_provider).collect();
-    // Append auto-detected providers (masked)
+    // Append auto-detected providers (masked), skipping any whose ID already
+    // exists in the manual list to avoid duplicates.
+    let manual_ids: std::collections::HashSet<&str> = result.iter().map(|p| p.id.as_str()).collect();
     let detected = state.detected_providers.lock().unwrap().clone();
-    result.extend(detected.into_iter().map(mask_provider));
+    result.extend(detected.into_iter()
+        .filter(|p| !manual_ids.contains(p.id.as_str()))
+        .map(mask_provider));
     result
 }
 
