@@ -290,7 +290,7 @@ fn process_samples(
     static SPECTRUM_LOCK_MISS: AtomicU32 = AtomicU32::new(0);
     static CALLBACK_COUNT: AtomicU32 = AtomicU32::new(0);
 
-    let count = CALLBACK_COUNT.fetch_add(1, AO::Relaxed);
+    let count = CALLBACK_COUNT.fetch_add(1, AO::Relaxed) + 1;
 
     // Write to WAV — use try_lock to avoid blocking the realtime audio thread
     if let Ok(mut guard) = writer.try_lock() {
@@ -315,7 +315,7 @@ fn process_samples(
     } else {
         let misses = FFT_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
         if misses.is_multiple_of(50) {
-            log::warn!("process_samples: fft_buffer lock contention x{} (callbacks: {})", misses, count);
+            log::debug!("process_samples: fft_buffer lock contention x{} (callbacks: {})", misses, count);
         }
         None
     };
@@ -332,7 +332,7 @@ fn process_samples(
         } else {
             let misses = SPECTRUM_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
             if misses.is_multiple_of(50) {
-                log::warn!("process_samples: spectrum lock contention x{} (callbacks: {})", misses, count);
+                log::debug!("process_samples: spectrum lock contention x{} (callbacks: {})", misses, count);
             }
         }
     }
