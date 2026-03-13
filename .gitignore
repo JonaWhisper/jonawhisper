@@ -34,3 +34,6 @@ coverage/
 
 # Histoire
 .histoire/
+
+# Claude Code
+.claude/
