@@ -10,88 +10,102 @@
 //!
 //! This detector caches the token internally and only re-reads the Keychain
 //! when the token has expired (based on `expiresAt` from the JSON).
+//!
+//! On non-macOS platforms, the detector is registered but always returns empty results.
 
 use jona_types::provider::{DetectedCredential, DetectorRegistration};
-use std::sync::Mutex;
 
-const KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
+#[cfg(target_os = "macos")]
+mod keychain {
+    use jona_types::provider::DetectedCredential;
+    use std::sync::Mutex;
 
-struct CachedToken {
-    token: String,
-    expires_at_ms: u64,
-}
+    const KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
-static CACHE: Mutex<Option<CachedToken>> = Mutex::new(None);
+    struct CachedToken {
+        token: String,
+        expires_at_ms: u64,
+    }
 
-fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as u64
+    static CACHE: Mutex<Option<CachedToken>> = Mutex::new(None);
+
+    fn now_ms() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64
+    }
+
+    pub(crate) fn detect() -> Vec<DetectedCredential> {
+        // Check cache first
+        {
+            let cache = CACHE.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if now_ms() < cached.expires_at_ms {
+                    log::debug!("claude-code detector: using cached token (expires in {}s)",
+                        (cached.expires_at_ms - now_ms()) / 1000);
+                    return vec![DetectedCredential {
+                        kind: "anthropic",
+                        source_label: "Claude Code",
+                        api_key: cached.token.clone(),
+                        url: String::new(),
+                        extra: std::collections::HashMap::new(),
+                    }];
+                }
+                log::debug!("claude-code detector: cached token expired, re-reading Keychain");
+            }
+        }
+
+        // Cache miss or expired — read from Keychain
+        let username = whoami::username();
+        let entry = match keyring::Entry::new(KEYCHAIN_SERVICE, &username) {
+            Ok(e) => e,
+            Err(e) => {
+                log::debug!("claude-code detector: keyring entry error: {e}");
+                return vec![];
+            }
+        };
+
+        let json_str = match entry.get_password() {
+            Ok(s) => s,
+            Err(keyring::Error::NoEntry) => return vec![],
+            Err(e) => {
+                log::debug!("claude-code detector: keyring read error: {e}");
+                return vec![];
+            }
+        };
+
+        let (token, expires_at_ms) = match super::extract_token_and_expiry(&json_str) {
+            Some(t) => t,
+            None => return vec![],
+        };
+
+        log::debug!(
+            "claude-code detector: found OAuth token, expires in {}s",
+            expires_at_ms.saturating_sub(now_ms()) / 1000
+        );
+
+        // Update cache
+        *CACHE.lock().unwrap() = Some(CachedToken {
+            token: token.clone(),
+            expires_at_ms,
+        });
+
+        vec![DetectedCredential {
+            kind: "anthropic",
+            source_label: "Claude Code",
+            api_key: token,
+            url: String::new(),
+            extra: std::collections::HashMap::new(),
+        }]
+    }
 }
 
 fn detect() -> Vec<DetectedCredential> {
-    // Check cache first
-    {
-        let cache = CACHE.lock().unwrap();
-        if let Some(ref cached) = *cache {
-            if now_ms() < cached.expires_at_ms {
-                log::debug!("claude-code detector: using cached token (expires in {}s)",
-                    (cached.expires_at_ms - now_ms()) / 1000);
-                return vec![DetectedCredential {
-                    kind: "anthropic",
-                    source_label: "Claude Code",
-                    api_key: cached.token.clone(),
-                    url: String::new(),
-                    extra: std::collections::HashMap::new(),
-                }];
-            }
-            log::debug!("claude-code detector: cached token expired, re-reading Keychain");
-        }
-    }
-
-    // Cache miss or expired — read from Keychain
-    let username = whoami::username();
-    let entry = match keyring::Entry::new(KEYCHAIN_SERVICE, &username) {
-        Ok(e) => e,
-        Err(e) => {
-            log::debug!("claude-code detector: keyring entry error: {e}");
-            return vec![];
-        }
-    };
-
-    let json_str = match entry.get_password() {
-        Ok(s) => s,
-        Err(keyring::Error::NoEntry) => return vec![],
-        Err(e) => {
-            log::debug!("claude-code detector: keyring read error: {e}");
-            return vec![];
-        }
-    };
-
-    let (token, expires_at_ms) = match extract_token_and_expiry(&json_str) {
-        Some(t) => t,
-        None => return vec![],
-    };
-
-    log::debug!(
-        "claude-code detector: found OAuth token, expires in {}s",
-        expires_at_ms.saturating_sub(now_ms()) / 1000
-    );
-
-    // Update cache
-    *CACHE.lock().unwrap() = Some(CachedToken {
-        token: token.clone(),
-        expires_at_ms,
-    });
-
-    vec![DetectedCredential {
-        kind: "anthropic",
-        source_label: "Claude Code",
-        api_key: token,
-        url: String::new(),
-        extra: std::collections::HashMap::new(),
-    }]
+    #[cfg(target_os = "macos")]
+    { keychain::detect() }
+    #[cfg(not(target_os = "macos"))]
+    { vec![] }
 }
 
 fn extract_token_and_expiry(json_str: &str) -> Option<(String, u64)> {

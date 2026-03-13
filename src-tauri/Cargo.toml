@@ -72,7 +72,6 @@ jona-engine-pcs = { path = "crates/jona-engine-pcs" }
 jona-engine-correction = { path = "crates/jona-engine-correction" }
 jona-engine-spellcheck = { path = "crates/jona-engine-spellcheck" }
 jona-engine-lm = { path = "crates/jona-engine-lm" }
-jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
 
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 
@@ -108,6 +107,7 @@ rphonetic = { version = "3.0", features = ["embedded_bm"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }
+jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
 
 core-graphics = "0.24"
 core-foundation = "0.10"

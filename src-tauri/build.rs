@@ -45,16 +45,33 @@ fn main() {
     tauri_build::build()
 }
 
-/// Scan Cargo.toml for `jona-engine-*` and `jona-provider-*` dependencies
-/// and emit a file with `extern crate` declarations. This makes registration
-/// truly plug-and-play: add a dep in Cargo.toml → done.
+/// Scan Cargo.toml for `jona-engine-*`, `jona-provider-*` and `jona-detector-*`
+/// dependencies and emit a file with `extern crate` declarations. This makes
+/// registration truly plug-and-play: add a dep in Cargo.toml → done.
+///
+/// Dependencies under `[target.'cfg(...)'.dependencies]` sections get wrapped
+/// with the corresponding `#[cfg(...)]` attribute.
 fn generate_inventory_links() {
     let cargo_toml = std::fs::read_to_string("Cargo.toml")
         .expect("Failed to read Cargo.toml");
 
     let mut extern_lines = Vec::new();
+    // Track current target cfg from section headers like [target.'cfg(target_os = "macos")'.dependencies]
+    let mut current_cfg: Option<String> = None;
+
     for line in cargo_toml.lines() {
         let trimmed = line.trim();
+
+        // Detect TOML section headers
+        if trimmed.starts_with('[') {
+            if let Some(cfg) = extract_target_cfg(trimmed) {
+                current_cfg = Some(cfg);
+            } else {
+                current_cfg = None;
+            }
+            continue;
+        }
+
         // Match lines like: jona-engine-whisper = { ... } or jona-provider-openai = { ... }
         if let Some(name) = trimmed.strip_suffix(|_: char| true).and(None).or_else(|| {
             let dep = trimmed.split('=').next()?.trim();
@@ -65,7 +82,11 @@ fn generate_inventory_links() {
             }
         }) {
             let crate_name = name.replace('-', "_");
-            extern_lines.push(format!("extern crate {};", crate_name));
+            if let Some(ref cfg) = current_cfg {
+                extern_lines.push(format!("#[cfg({cfg})]\nextern crate {crate_name};"));
+            } else {
+                extern_lines.push(format!("extern crate {crate_name};"));
+            }
         }
     }
 
@@ -74,4 +95,20 @@ fn generate_inventory_links() {
     std::fs::write(&path, extern_lines.join("\n")).expect("Failed to write inventory_links.rs");
 
     println!("cargo:rerun-if-changed=Cargo.toml");
+}
+
+/// Extract the cfg predicate from a target section header.
+/// e.g. `[target.'cfg(target_os = "macos")'.dependencies]` → `target_os = "macos"`
+/// The returned string is the inner predicate, ready to use in `#[cfg(...)]`.
+fn extract_target_cfg(header: &str) -> Option<String> {
+    // Match: [target.'cfg(...)'.dependencies]
+    let inner = header.trim_start_matches('[').trim_end_matches(']').trim();
+    if !inner.starts_with("target.") || !inner.ends_with(".dependencies") {
+        return None;
+    }
+    // Extract the predicate inside cfg(...)
+    let cfg_start = inner.find("cfg(")? + 4; // skip "cfg("
+    let cfg_end = inner[cfg_start..].rfind(')')? + cfg_start;
+    let predicate = &inner[cfg_start..cfg_end];
+    Some(predicate.to_string())
 }
