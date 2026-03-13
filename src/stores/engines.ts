@@ -106,8 +106,9 @@ export const useEnginesStore = defineStore('engines', () => {
   function validateSelections() {
     const asrIds = new Set(asrModels.value.map(m => m.id))
     if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
-      const cloudId = settingsStore.selectedModelId.replace('cloud:', '')
-      const existsDisabled = providers.value.some(p => p.id === cloudId && !p.enabled)
+      // Don't reset cloud providers that exist but are just disabled
+      const cloudProviderId = parseCloudId(settingsStore.selectedModelId)
+      const existsDisabled = cloudProviderId != null && providers.value.some(p => p.id === cloudProviderId && !p.enabled)
       if (!existsDisabled) {
         const first = asrModels.value[0]
         settingsStore.setSetting('selected_model_id', first?.id ?? '')
@@ -119,9 +120,9 @@ export const useEnginesStore = defineStore('engines', () => {
     }
     const cleanupIds = new Set(cleanupModels.value.map(m => m.id))
     if (settingsStore.cleanupModelId && !cleanupIds.has(settingsStore.cleanupModelId)) {
-      // Don't reset cloud providers that exist but are disabled
-      const cloudId = settingsStore.cleanupModelId.replace('cloud:', '')
-      const existsDisabled = providers.value.some(p => p.id === cloudId && !p.enabled)
+      // Don't reset cloud providers that exist but are just disabled
+      const cloudProviderId = parseCloudId(settingsStore.cleanupModelId)
+      const existsDisabled = cloudProviderId != null && providers.value.some(p => p.id === cloudProviderId && !p.enabled)
       if (!existsDisabled) {
         settingsStore.setSetting('cleanup_model_id', '')
       }
