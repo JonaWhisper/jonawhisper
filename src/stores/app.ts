@@ -111,6 +111,7 @@ export const useAppStore = defineStore('app', () => {
     updateChecking.value = true
     updateError.value = ''
     try {
+      updateAvailable.value = null
       updateAvailable.value = await invoke<{ version: string; body: string | null } | null>('check_for_update')
     } catch (e) {
       updateError.value = String(e)
