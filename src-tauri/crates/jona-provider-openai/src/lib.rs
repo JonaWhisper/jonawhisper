@@ -204,7 +204,8 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
             log::warn!("Failed to decode error response body: {e}");
             String::new()
         });
-        log::warn!("Provider API error: status={status} body={body}");
+        let truncated = if body.len() > 500 { &body[..500] } else { &body };
+        log::warn!("Provider API error: status={status} body={truncated}");
         return Err(ProviderError::Api { status, body });
     }
     Ok(response)

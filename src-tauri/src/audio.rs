@@ -337,7 +337,7 @@ fn process_samples(
         }
     }
 
-    // Log contention stats every ~500 callbacks (~1s at 16kHz/512 buffer)
+    // Log contention stats every ~500 callbacks (~16s at 16kHz/512 buffer)
     if count > 0 && count.is_multiple_of(500) {
         let fft_m = FFT_LOCK_MISS.load(AO::Relaxed);
         let spec_m = SPECTRUM_LOCK_MISS.load(AO::Relaxed);
