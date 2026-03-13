@@ -11,7 +11,8 @@
 //! This detector caches the token internally and only re-reads the Keychain
 //! when the token has expired (based on `expiresAt` from the JSON).
 //!
-//! On non-macOS platforms, the detector is registered but always returns empty results.
+//! This crate is macOS-only: it is listed under `[target.'cfg(target_os = "macos")'.dependencies]`
+//! in the main Cargo.toml and is not compiled on other platforms.
 
 use jona_types::provider::{DetectedCredential, DetectorRegistration};
 
