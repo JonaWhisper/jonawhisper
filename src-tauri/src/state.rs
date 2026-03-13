@@ -117,33 +117,54 @@ impl AppState {
     /// Run all registered credential detectors and populate `detected_providers`.
     pub fn run_detection(&self) {
         let results = jona_provider::detect_all();
+        // Restore persisted enabled states for detected providers
+        let enabled_states: std::collections::HashMap<String, bool> = self.settings.lock().unwrap()
+            .detected_enabled.clone();
         let mut detected = Vec::new();
         for (cred, detector_id) in results {
             let id = format!("auto-{}-{}", detector_id, cred.kind);
-            let preset_name = jona_provider::preset(cred.kind)
-                .map(|p| p.display_name)
-                .unwrap_or(cred.kind);
+            let preset = jona_provider::preset(cred.kind);
+            let preset_name = preset.map(|p| p.display_name).unwrap_or(cred.kind);
+            let url = if cred.url.is_empty() {
+                preset.map(|p| p.base_url.to_string()).unwrap_or_default()
+            } else {
+                cred.url
+            };
+            let enabled = enabled_states.get(&id).copied().unwrap_or(false);
             detected.push(Provider {
                 id,
                 name: format!("{} ({})", preset_name, cred.source_label),
                 kind: cred.kind.to_string(),
-                url: cred.url,
+                url,
                 api_key: cred.api_key,
                 allow_insecure: false,
                 cached_models: vec![],
-                supports_asr: jona_provider::preset(cred.kind).map(|p| p.supports_asr).unwrap_or(false),
-                supports_llm: jona_provider::preset(cred.kind).map(|p| p.supports_llm).unwrap_or(true),
+                supports_asr: preset.map(|p| p.supports_asr).unwrap_or(false),
+                supports_llm: preset.map(|p| p.supports_llm).unwrap_or(true),
                 api_format: None,
                 extra: cred.extra,
-                enabled: false,
+                enabled,
                 source: Some(detector_id.to_string()),
             });
         }
         log::info!("Auto-detection: {} provider(s) found", detected.len());
+
+        // Prune orphan entries from detected_enabled (detectors that no longer return credentials)
+        let detected_ids: std::collections::HashSet<&str> = detected.iter().map(|p| p.id.as_str()).collect();
+        let mut s = self.settings.lock().unwrap();
+        let before = s.detected_enabled.len();
+        s.detected_enabled.retain(|id, _| detected_ids.contains(id.as_str()));
+        if s.detected_enabled.len() != before {
+            drop(s);
+            self.save_preferences();
+        }
+
         *self.detected_providers.lock().unwrap() = detected;
     }
 
     /// Find a provider by ID across both manual and detected providers.
+    /// For detected providers, re-reads credentials from the source (e.g. Keychain)
+    /// to get fresh tokens that may have been rotated.
     pub fn find_provider(&self, id: &str) -> Option<Provider> {
         let s = self.settings.lock().unwrap();
         if let Some(p) = s.providers.iter().find(|p| p.id == id) {
@@ -151,7 +172,16 @@ impl AppState {
         }
         drop(s);
         let detected = self.detected_providers.lock().unwrap();
-        detected.iter().find(|p| p.id == id).cloned()
+        let mut provider = detected.iter().find(|p| p.id == id).cloned();
+        if let Some(ref mut p) = provider {
+            // Re-read fresh credentials from the detector (handles token rotation)
+            if let Some(source) = &p.source {
+                if let Some(cred) = jona_provider::refresh_credential(source, &p.kind) {
+                    p.api_key = cred.api_key;
+                }
+            }
+        }
+        provider
     }
 
     /// Save current preferences to disk.
@@ -289,7 +319,7 @@ impl AppState {
 #[cfg(test)]
 impl AppState {
     /// Create an AppState with in-memory SQLite for testing.
-    fn test_instance() -> Self {
+    pub(crate) fn test_instance() -> Self {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS history (

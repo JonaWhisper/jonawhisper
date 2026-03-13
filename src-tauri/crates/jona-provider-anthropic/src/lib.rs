@@ -17,6 +17,21 @@ static ASYNC_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
+/// Add the correct auth header and beta flags.
+/// OAuth tokens (sk-ant-oat*) use Bearer + oauth beta header.
+/// Standard API keys use x-api-key.
+fn add_auth(req: reqwest::RequestBuilder, api_key: &str) -> reqwest::RequestBuilder {
+    if api_key.is_empty() {
+        return req;
+    }
+    if api_key.starts_with("sk-ant-oat") {
+        req.header("Authorization", format!("Bearer {}", api_key))
+            .header("anthropic-beta", "oauth-2025-04-20")
+    } else {
+        req.header("x-api-key", api_key)
+    }
+}
+
 pub struct AnthropicBackend;
 
 impl CloudProvider for AnthropicBackend {
@@ -59,13 +74,11 @@ impl CloudProvider for AnthropicBackend {
             };
 
             let api_key = provider.api_key.trim();
-            let mut req = ASYNC_CLIENT
+            let req = ASYNC_CLIENT
                 .post(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION)
                 .json(&request);
-            if !api_key.is_empty() {
-                req = req.header("x-api-key", api_key);
-            }
+            let req = add_auth(req, api_key);
 
             let response = send_and_check(req).await?;
 
@@ -91,12 +104,10 @@ impl CloudProvider for AnthropicBackend {
             let url = format!("{}/models", provider.base_url());
 
             let api_key = provider.api_key.trim();
-            let mut req = ASYNC_CLIENT
+            let req = ASYNC_CLIENT
                 .get(&url)
                 .header("anthropic-version", ANTHROPIC_VERSION);
-            if !api_key.is_empty() {
-                req = req.header("x-api-key", api_key);
-            }
+            let req = add_auth(req, api_key);
 
             let response = send_and_check(req).await?;
             let json: serde_json::Value = response

@@ -129,17 +129,15 @@ function providerGradient(provider: Provider): string {
           </div>
         </div>
         <div class="flex gap-1 shrink-0">
-          <template v-if="provider.source">
-            <Button
-              :variant="provider.enabled ? 'default' : 'outline'"
-              size="sm"
-              class="h-7 text-xs"
-              @click="engines.toggleProviderEnabled(provider.id, !provider.enabled)"
-            >
-              {{ provider.enabled ? t('settings.providers.disable') : t('settings.providers.enable') }}
-            </Button>
-          </template>
-          <template v-else>
+          <Button
+            :variant="provider.enabled ? 'default' : 'outline'"
+            size="sm"
+            class="h-7 text-xs"
+            @click="engines.toggleProviderEnabled(provider.id, !provider.enabled)"
+          >
+            {{ provider.enabled ? t('settings.providers.disable') : t('settings.providers.enable') }}
+          </Button>
+          <template v-if="!provider.source">
             <Button variant="outline" size="icon" class="h-7 w-7" :aria-label="t('aria.edit')" @click="openEditForm(provider)">
               <Pencil class="w-3.5 h-3.5" />
             </Button>

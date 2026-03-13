@@ -65,6 +65,8 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
     cached_models: [],
     supports_asr: false,
     supports_llm: false,
+    enabled: true,
+    source: null,
     extra: {},
     ...overrides,
   }

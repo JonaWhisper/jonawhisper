@@ -277,6 +277,10 @@ pub fn toggle_provider_enabled(id: String, enabled: bool, state: tauri::State<'_
     let mut detected = state.detected_providers.lock().unwrap();
     if let Some(p) = detected.iter_mut().find(|p| p.id == id) {
         p.enabled = enabled;
+        drop(detected);
+        // Persist enabled state so it survives restarts
+        state.settings.lock().unwrap().detected_enabled.insert(id, enabled);
+        state.save_preferences();
     }
     let _ = app.emit(events::SETTINGS_CHANGED, "providers");
 }

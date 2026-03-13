@@ -90,6 +90,17 @@ pub fn preset(id: &str) -> Option<&'static ProviderPreset> {
     ProviderCatalog::global().preset_map.get(id).copied()
 }
 
+/// Re-run a specific detector to get fresh credentials (e.g. refreshed OAuth tokens).
+pub fn refresh_credential(detector_id: &str, kind: &str) -> Option<DetectedCredential> {
+    for reg in inventory::iter::<DetectorRegistration> {
+        if reg.id == detector_id {
+            let creds = (reg.detect)();
+            return creds.into_iter().find(|c| c.kind == kind);
+        }
+    }
+    None
+}
+
 /// Run all registered detectors and return found credentials with their detector ID.
 pub fn detect_all() -> Vec<(DetectedCredential, &'static str)> {
     let mut results = Vec::new();

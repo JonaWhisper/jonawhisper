@@ -496,6 +496,9 @@ pub struct Preferences {
     /// Log retention mode: "previous" (current+prev), "3days", "7days", "30days", "all" (keep forever)
     #[serde(default = "default_log_retention")]
     pub log_retention: String,
+    /// Persisted enabled state for auto-detected providers (key = provider id)
+    #[serde(default)]
+    pub detected_enabled: std::collections::HashMap<String, bool>,
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }

@@ -106,8 +106,12 @@ export const useEnginesStore = defineStore('engines', () => {
   function validateSelections() {
     const asrIds = new Set(asrModels.value.map(m => m.id))
     if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
-      const first = asrModels.value[0]
-      settingsStore.setSetting('selected_model_id', first?.id ?? '')
+      const cloudId = settingsStore.selectedModelId.replace('cloud:', '')
+      const existsDisabled = providers.value.some(p => p.id === cloudId && !p.enabled)
+      if (!existsDisabled) {
+        const first = asrModels.value[0]
+        settingsStore.setSetting('selected_model_id', first?.id ?? '')
+      }
     }
     const punctIds = new Set(punctuationModels.value.map(m => m.id))
     if (settingsStore.punctuationModelId && !punctIds.has(settingsStore.punctuationModelId)) {
@@ -115,7 +119,12 @@ export const useEnginesStore = defineStore('engines', () => {
     }
     const cleanupIds = new Set(cleanupModels.value.map(m => m.id))
     if (settingsStore.cleanupModelId && !cleanupIds.has(settingsStore.cleanupModelId)) {
-      settingsStore.setSetting('cleanup_model_id', '')
+      // Don't reset cloud providers that exist but are disabled
+      const cloudId = settingsStore.cleanupModelId.replace('cloud:', '')
+      const existsDisabled = providers.value.some(p => p.id === cloudId && !p.enabled)
+      if (!existsDisabled) {
+        settingsStore.setSetting('cleanup_model_id', '')
+      }
     }
   }
 
