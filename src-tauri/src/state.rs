@@ -121,8 +121,12 @@ impl AppState {
         let enabled_states: std::collections::HashMap<String, bool> = self.settings.lock().unwrap()
             .detected_enabled.clone();
         let mut detected = Vec::new();
+        let mut id_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for (cred, detector_id) in results {
-            let id = format!("auto-{}-{}", detector_id, cred.kind);
+            let base_id = format!("auto-{}-{}", detector_id, cred.kind);
+            let count = id_counts.entry(base_id.clone()).or_insert(0);
+            let id = if *count == 0 { base_id.clone() } else { format!("{}-{}", base_id, count) };
+            *count += 1;
             let preset = jona_provider::preset(cred.kind);
             let preset_name = preset.map(|p| p.display_name).unwrap_or(cred.kind);
             let url = if cred.url.is_empty() {
@@ -171,8 +175,9 @@ impl AppState {
             return Some(p.clone());
         }
         drop(s);
-        let detected = self.detected_providers.lock().unwrap();
-        let mut provider = detected.iter().find(|p| p.id == id).cloned();
+        let mut provider = self.detected_providers.lock().unwrap()
+            .iter().find(|p| p.id == id).cloned();
+        // Drop the mutex before doing Keychain I/O
         if let Some(ref mut p) = provider {
             // Re-read fresh credentials from the detector (handles token rotation)
             if let Some(source) = &p.source {
