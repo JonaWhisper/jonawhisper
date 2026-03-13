@@ -299,6 +299,78 @@ describe('engines store actions', () => {
     expect(settings.cleanupModelId).toBe('')
   })
 
+  it('validateSelections does NOT reset when cloud provider exists but is disabled (ASR)', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    store.providers = [makeProvider({ id: 'openai', supports_asr: true, enabled: false })]
+    settings.selectedModelId = 'cloud:openai'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Provider exists but is disabled — selection should be preserved
+    expect(settings.selectedModelId).toBe('cloud:openai')
+  })
+
+  it('validateSelections does NOT reset when cloud provider exists but is disabled (cleanup)', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = []
+    store.models = []
+    store.providers = [makeProvider({ id: 'anthropic', supports_llm: true, enabled: false })]
+    settings.cleanupModelId = 'cloud:anthropic'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Provider exists but is disabled — selection should be preserved
+    expect(settings.cleanupModelId).toBe('cloud:anthropic')
+  })
+
+  it('validateSelections resets when cloud provider is removed entirely', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    store.providers = [] // provider removed
+    settings.selectedModelId = 'cloud:openai'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Provider no longer exists — selection should reset to first available
+    expect(settings.selectedModelId).toBe('whisper:tiny')
+  })
+
+  it('validateSelections resets cleanup when cloud provider is removed entirely', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    store.engines = []
+    store.models = []
+    store.providers = [] // provider removed
+    settings.cleanupModelId = 'cloud:anthropic'
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    // Provider no longer exists — selection should reset
+    expect(settings.cleanupModelId).toBe('')
+  })
+
   it('model-updates-available event updates updatableModelIds', () => {
     const store = useEnginesStore()
     store.setupListeners()
