@@ -74,9 +74,8 @@ fn detect() -> Vec<DetectedCredential> {
         None => return vec![],
     };
 
-    log::info!(
-        "claude-code detector: found OAuth token ({}...), expires in {}s",
-        &token[..token.len().min(12)],
+    log::debug!(
+        "claude-code detector: found OAuth token, expires in {}s",
         expires_at_ms.saturating_sub(now_ms()) / 1000
     );
 

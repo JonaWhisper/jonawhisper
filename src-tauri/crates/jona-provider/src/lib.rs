@@ -105,9 +105,9 @@ pub fn refresh_credential(detector_id: &str, kind: &str) -> Option<DetectedCrede
 pub fn detect_all() -> Vec<(DetectedCredential, &'static str)> {
     let mut results = Vec::new();
     for reg in inventory::iter::<DetectorRegistration> {
-        log::info!("Running detector: {} ({})", reg.display_name, reg.id);
+        log::debug!("Running detector: {} ({})", reg.display_name, reg.id);
         let creds = (reg.detect)();
-        log::info!("  \u{2192} {} credential(s) found", creds.len());
+        log::debug!("  {} credential(s) found from {}", creds.len(), reg.id);
         for cred in creds {
             results.push((cred, reg.id));
         }
