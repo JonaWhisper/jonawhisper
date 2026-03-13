@@ -192,7 +192,7 @@ impl AppState {
     /// Save current preferences to disk.
     pub fn save_preferences(&self) {
         let settings = self.settings.lock().unwrap();
-        log::info!("save_preferences: hallucination_filter={}", settings.hallucination_filter_enabled);
+        log::debug!("save_preferences: {} provider(s)", settings.providers.len());
         settings.save();
     }
 
