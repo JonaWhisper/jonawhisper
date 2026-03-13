@@ -1,5 +1,5 @@
 use jona_engines::llm_prompt::{sanitize_output, system_prompt, LlmError};
-use crate::state::Provider;
+use jona_types::Provider;
 
 /// Clean up transcribed text using a cloud LLM.
 pub async fn cleanup_text(text: &str, language: &str, provider: &Provider, model: &str, max_tokens: u32) -> Result<String, LlmError> {

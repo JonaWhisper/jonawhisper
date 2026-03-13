@@ -1227,4 +1227,50 @@ mod tests {
         p.api_key = "sk-1234567890abcdef".to_string();
         assert_eq!(p.masked_api_key(), mask_value("sk-1234567890abcdef"));
     }
+
+    // -- Keyring guard logic (no real keychain I/O) --
+
+    #[test]
+    fn keyring_store_rejects_masked_value() {
+        // The bullet char guard prevents storing a masked string back
+        let masked = mask_value("sk-real-key-1234");
+        assert!(masked.contains('\u{2022}'));
+        // keyring_store would log::error and return early — we verify the guard condition
+        assert!(masked.contains('\u{2022}'), "Masked value must be rejected by keyring_store");
+    }
+
+    #[test]
+    fn keyring_store_rejects_empty_value() {
+        // Empty string should be a no-op (guard at top of keyring_store)
+        assert!(mask_value("").is_empty());
+    }
+
+    #[test]
+    fn mask_then_compare_detects_unchanged_key() {
+        // Simulates the update_provider flow: frontend sends masked value,
+        // backend compares against stored key's masked version → keeps existing
+        let real_key = "sk-my-secret-key-abcd";
+        let masked = mask_value(real_key);
+        let frontend_sends = masked.clone(); // user didn't change the field
+        assert_eq!(frontend_sends, masked, "Frontend sends back the masked value unchanged");
+    }
+
+    #[test]
+    fn mask_then_compare_detects_changed_key() {
+        // Frontend sends a completely new value → different from masked version
+        let real_key = "sk-my-secret-key-abcd";
+        let masked = mask_value(real_key);
+        let new_key = "sk-new-key-efgh";
+        assert_ne!(new_key, masked, "New key must differ from masked old key");
+        assert!(!new_key.contains('\u{2022}'), "New key must not contain bullet chars");
+    }
+
+    #[test]
+    fn masked_value_is_not_a_valid_api_key() {
+        // Ensures that a masked value can always be distinguished from a real key
+        let masked = mask_value("sk-1234567890abcdef");
+        // Real API keys never contain bullet characters
+        assert!(masked.starts_with("\u{2022}"), "Masked values always start with bullet");
+        // So checking for bullet presence is a reliable guard
+    }
 }

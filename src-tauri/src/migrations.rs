@@ -1,5 +1,5 @@
 use serde_json::Value;
-use crate::state::{config_dir, default_model_id, Provider, Preferences};
+use jona_types::{config_dir, default_model_id, Provider, Preferences};
 
 /// Current schema version. Bump when adding a new migration.
 const CURRENT_VERSION: u32 = 9;
@@ -320,7 +320,7 @@ pub(crate) fn migrate_v3(_raw: &mut Value, prefs: &mut Preferences) {
 /// v4: Migrate plaintext API keys from preferences.json into the OS keychain.
 /// After this migration, api_key fields are cleared from JSON and stored in keyring.
 fn migrate_v4(_raw: &mut Value, prefs: &mut Preferences) {
-    use crate::state::keyring_store;
+    use jona_types::keyring_store;
 
     let mut migrated = 0;
     for provider in &mut prefs.providers {

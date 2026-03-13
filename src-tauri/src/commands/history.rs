@@ -1,5 +1,6 @@
 use crate::errors::AppError;
-use crate::state::{AppState, HistoryEntry};
+use crate::state::AppState;
+use jona_types::HistoryEntry;
 use serde::Serialize;
 use std::sync::Arc;
 

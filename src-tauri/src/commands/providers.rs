@@ -1,7 +1,8 @@
 use crate::errors::AppError;
 use crate::events;
-use crate::state::{AppState, Provider, mask_value, keyring_store, keyring_delete,
-                    keyring_store_extra, keyring_delete_extra};
+use crate::state::AppState;
+use jona_types::{Provider, mask_value, keyring_store, keyring_delete,
+                 keyring_store_extra, keyring_delete_extra};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
