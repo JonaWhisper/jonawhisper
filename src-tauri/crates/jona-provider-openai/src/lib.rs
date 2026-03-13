@@ -201,7 +201,8 @@ async fn send_and_check(req: reqwest::RequestBuilder) -> Result<reqwest::Respons
     if !response.status().is_success() {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_default();
-        log::debug!("API error response body: {}", &body[..body.len().min(200)]);
+        let truncated: String = body.chars().take(200).collect();
+        log::debug!("API error response body: {truncated}");
         return Err(ProviderError::Api { status, body });
     }
     Ok(response)
