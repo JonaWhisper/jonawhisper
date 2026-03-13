@@ -35,8 +35,11 @@ jobs:
       - name: Detect available secrets
         id: check
         run: |
-          # macOS: need certificate + signing identity for codesign + notarization
-          if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && [ -n "${{ secrets.APPLE_SIGNING_IDENTITY }}" ]; then
+          # macOS: need certificate + signing identity + password + team ID for codesign + notarization
+          if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && \
+             [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ] && \
+             [ -n "${{ secrets.APPLE_SIGNING_IDENTITY }}" ] && \
+             [ -n "${{ secrets.APPLE_TEAM_ID }}" ]; then
             echo "has-macos-signing=true" >> "$GITHUB_OUTPUT"
             echo "✅ macOS signing secrets available"
           else
@@ -45,7 +48,9 @@ jobs:
           fi
 
           # Windows: need Certum HSM credentials for EV code signing
-          if [ -n "${{ secrets.CERTUM_OTP_URI }}" ] && [ -n "${{ secrets.CERTUM_PASSWORD }}" ]; then
+          if [ -n "${{ secrets.CERTUM_OTP_URI }}" ] && \
+             [ -n "${{ secrets.CERTUM_PASSWORD }}" ] && \
+             [ -n "${{ secrets.CERTUM_USER_ID }}" ]; then
             echo "has-windows-signing=true" >> "$GITHUB_OUTPUT"
             echo "✅ Windows signing secrets available"
           else

@@ -193,7 +193,8 @@ pub async fn install_update(app: AppHandle) -> Result<(), String> {
         Some(update) => {
             update.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
             app.restart();
+            Ok(())
         }
-        None => return Err("Update no longer available".to_string()),
+        None => Err("Update no longer available".to_string()),
     }
 }

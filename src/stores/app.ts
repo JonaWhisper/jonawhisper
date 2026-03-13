@@ -124,6 +124,8 @@ export const useAppStore = defineStore('app', () => {
     updateError.value = ''
     try {
       await invoke('install_update')
+      // App restarts after successful install — this line is a safety fallback
+      updateInstalling.value = false
     } catch (e) {
       updateError.value = String(e)
       updateInstalling.value = false
