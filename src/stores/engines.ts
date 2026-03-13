@@ -191,6 +191,8 @@ export const useEnginesStore = defineStore('engines', () => {
     try {
       await invoke('toggle_provider_enabled', { id, enabled })
       await fetchProviders()
+      // Re-validate: if a disabled provider was selected for ASR/cleanup, reset it
+      validateSelections()
     } catch (e) { console.error('toggleProviderEnabled failed:', e) }
   }
 
