@@ -1,0 +1,9 @@
+[package]
+name = "jona-detector-env"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+jona-types = { path = "../jona-types" }
+inventory = "0.3"
+log = "0.4"
