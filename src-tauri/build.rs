@@ -72,15 +72,11 @@ fn generate_inventory_links() {
             continue;
         }
 
-        // Match lines like: jona-engine-whisper = { ... } or jona-provider-openai = { ... }
-        if let Some(name) = trimmed.strip_suffix(|_: char| true).and(None).or_else(|| {
-            let dep = trimmed.split('=').next()?.trim();
-            if dep.starts_with("jona-engine-") || dep.starts_with("jona-provider-") || dep.starts_with("jona-detector-") {
-                Some(dep)
-            } else {
-                None
-            }
-        }) {
+        // Match dependency lines like: jona-engine-whisper = { ... }
+        // Take the part before '=' or whitespace, then check for our prefixes.
+        let dep = trimmed.split('=').next().unwrap_or("").trim();
+        if dep.starts_with("jona-engine-") || dep.starts_with("jona-provider-") || dep.starts_with("jona-detector-") {
+            let name = dep;
             let crate_name = name.replace('-', "_");
             if let Some(ref cfg) = current_cfg {
                 extern_lines.push(format!("#[cfg({cfg})]\nextern crate {crate_name};"));
