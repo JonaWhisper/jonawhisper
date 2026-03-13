@@ -285,6 +285,13 @@ fn process_samples(
     fft_buffer: &Mutex<Vec<f32>>,
     spectrum: &Mutex<Vec<f32>>,
 ) {
+    use std::sync::atomic::{AtomicU32, Ordering as AO};
+    static FFT_LOCK_MISS: AtomicU32 = AtomicU32::new(0);
+    static SPECTRUM_LOCK_MISS: AtomicU32 = AtomicU32::new(0);
+    static CALLBACK_COUNT: AtomicU32 = AtomicU32::new(0);
+
+    let count = CALLBACK_COUNT.fetch_add(1, AO::Relaxed) + 1;
+
     // Write to WAV — use try_lock to avoid blocking the realtime audio thread
     if let Ok(mut guard) = writer.try_lock() {
         if let Some(ref mut w) = *guard {
@@ -306,7 +313,10 @@ fn process_samples(
             None
         }
     } else {
-        log::trace!("process_samples: fft_buffer lock contention, skipping");
+        let misses = FFT_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
+        if misses.is_multiple_of(50) {
+            log::debug!("process_samples: fft_buffer lock contention x{} (callbacks: {})", misses, count);
+        }
         None
     };
 
@@ -319,6 +329,20 @@ fn process_samples(
             for (s, &ns) in spec.iter_mut().zip(new_spectrum.iter()) {
                 *s = *s * old_weight + ns * SPECTRUM_SMOOTHING;
             }
+        } else {
+            let misses = SPECTRUM_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
+            if misses.is_multiple_of(50) {
+                log::debug!("process_samples: spectrum lock contention x{} (callbacks: {})", misses, count);
+            }
+        }
+    }
+
+    // Log contention stats every ~500 callbacks (~16s at 16kHz/512 buffer)
+    if count > 0 && count.is_multiple_of(500) {
+        let fft_m = FFT_LOCK_MISS.load(AO::Relaxed);
+        let spec_m = SPECTRUM_LOCK_MISS.load(AO::Relaxed);
+        if fft_m > 0 || spec_m > 0 {
+            log::debug!("Audio callback stats: {} calls, fft_lock_miss={}, spectrum_lock_miss={}", count, fft_m, spec_m);
         }
     }
 }

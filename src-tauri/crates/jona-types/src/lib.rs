@@ -317,8 +317,13 @@ fn keyring_user(provider_id: &str) -> String {
 }
 
 /// Store an API key in the OS keychain.
+/// Rejects masked values (containing bullet chars) to prevent accidental corruption.
 pub fn keyring_store(provider_id: &str, api_key: &str) {
     if api_key.is_empty() {
+        return;
+    }
+    if api_key.contains('\u{2022}') {
+        log::error!("keyring: refusing to store masked value for {} (contains bullet chars)", provider_id);
         return;
     }
     match keyring::Entry::new(KEYRING_SERVICE, &keyring_user(provider_id)) {
@@ -350,8 +355,13 @@ pub fn keyring_delete(provider_id: &str) {
 }
 
 /// Store a sensitive extra field value in the OS keychain.
+/// Rejects masked values (containing bullet chars) to prevent accidental corruption.
 pub fn keyring_store_extra(provider_id: &str, field_id: &str, value: &str) {
     if value.is_empty() {
+        return;
+    }
+    if value.contains('\u{2022}') {
+        log::error!("keyring: refusing to store masked extra value for {}:{} (contains bullet chars)", provider_id, field_id);
         return;
     }
     let user = format!("provider:{}:extra:{}", provider_id, field_id);
@@ -1128,5 +1138,92 @@ mod tests {
         assert_eq!(langs[0].code, "auto");
         assert!(langs.iter().any(|l| l.code == "fr"));
         assert!(langs.iter().any(|l| l.code == "en"));
+    }
+
+    // -- mask_value --
+
+    #[test]
+    fn mask_value_empty_string() {
+        assert_eq!(mask_value(""), "");
+    }
+
+    #[test]
+    fn mask_value_short_key_shows_only_bullets() {
+        // Keys <= 4 chars should show only bullets, no suffix
+        assert_eq!(mask_value("ab"), "\u{2022}\u{2022}\u{2022}\u{2022}");
+        assert_eq!(mask_value("abcd"), "\u{2022}\u{2022}\u{2022}\u{2022}");
+    }
+
+    #[test]
+    fn mask_value_long_key_shows_last_four() {
+        assert_eq!(mask_value("sk-1234567890abcdef"), "\u{2022}\u{2022}\u{2022}\u{2022}cdef");
+    }
+
+    #[test]
+    fn mask_value_is_idempotent_guard() {
+        // Masking an already-masked value should still contain bullets
+        let masked = mask_value("sk-1234567890abcdef");
+        assert!(masked.contains('\u{2022}'));
+        // Double-masking: the result contains bullets, so our keyring guard would reject it
+        let double = mask_value(&masked);
+        assert!(double.contains('\u{2022}'));
+    }
+
+    #[test]
+    fn masked_value_contains_bullet_char() {
+        let masked = mask_value("sk-test-key-5f13");
+        assert!(masked.contains('\u{2022}'), "Masked value must contain bullet chars for guard detection");
+    }
+
+    // -- Provider::validate_url --
+
+    fn make_provider(kind: &str, url: &str, allow_insecure: bool) -> Provider {
+        Provider {
+            id: String::new(), name: String::new(),
+            kind: kind.to_string(), url: url.to_string(),
+            api_key: String::new(), allow_insecure,
+            cached_models: vec![], supports_asr: true, supports_llm: true,
+            api_format: None, extra: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn validate_url_known_provider_always_ok() {
+        // Non-custom providers skip URL validation (they use hardcoded HTTPS)
+        let p = make_provider("openai", "http://evil.com", false);
+        assert!(p.validate_url().is_ok());
+    }
+
+    #[test]
+    fn validate_url_custom_https_ok() {
+        let p = make_provider("custom", "https://my-server.com/v1", false);
+        assert!(p.validate_url().is_ok());
+    }
+
+    #[test]
+    fn validate_url_custom_http_rejected() {
+        let p = make_provider("custom", "http://my-server.com/v1", false);
+        assert!(p.validate_url().is_err());
+    }
+
+    #[test]
+    fn validate_url_custom_http_allowed_with_insecure() {
+        let p = make_provider("custom", "http://localhost:8080/v1", true);
+        assert!(p.validate_url().is_ok());
+    }
+
+    #[test]
+    fn validate_url_openai_compatible_is_custom() {
+        let p = make_provider("openai-compatible", "http://local:8080", false);
+        assert!(p.validate_url().is_err());
+    }
+
+    // -- Provider::masked_api_key --
+
+    #[test]
+    fn masked_api_key_delegates_to_mask_value() {
+        let mut p = make_provider("custom", "https://x.com", false);
+        p.api_key = "sk-1234567890abcdef".to_string();
+        assert_eq!(p.masked_api_key(), mask_value("sk-1234567890abcdef"));
     }
 }

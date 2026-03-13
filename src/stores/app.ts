@@ -24,6 +24,12 @@ export const useAppStore = defineStore('app', () => {
   const isTranscribing = ref(false)
   const queueCount = ref(0)
 
+  // Update state — checking=true initially to avoid flash of "up to date"
+  const updateAvailable = ref<{ version: string; body: string | null } | null>(null)
+  const updateChecking = ref(true)
+  const updateInstalling = ref(false)
+  const updateError = ref('')
+
   const isBusy = computed(() =>
     isRecording.value || isTranscribing.value || queueCount.value > 0
     || Object.keys(downloadStore.activeDownloads).length > 0
@@ -101,6 +107,32 @@ export const useAppStore = defineStore('app', () => {
     })
   }
 
+  async function checkForUpdate() {
+    updateChecking.value = true
+    updateError.value = ''
+    try {
+      updateAvailable.value = null
+      updateAvailable.value = await invoke<{ version: string; body: string | null } | null>('check_for_update')
+    } catch (e) {
+      updateError.value = String(e)
+    } finally {
+      updateChecking.value = false
+    }
+  }
+
+  async function installUpdate() {
+    updateInstalling.value = true
+    updateError.value = ''
+    try {
+      await invoke('install_update')
+      // App restarts after successful install — this line is a safety fallback
+      updateInstalling.value = false
+    } catch (e) {
+      updateError.value = String(e)
+      updateInstalling.value = false
+    }
+  }
+
   // Initialize all stores
   let initialized = false
   async function init() {
@@ -115,11 +147,14 @@ export const useAppStore = defineStore('app', () => {
       enginesStore.fetchProviderPresets(),
       enginesStore.fetchProviders(),
     ])
+    checkForUpdate()
   }
+
 
   return {
     isRecording, isTranscribing, queueCount,
     isBusy,
-    init, fetchState, startMonitoring,
+    updateAvailable, updateChecking, updateInstalling, updateError,
+    init, fetchState, startMonitoring, checkForUpdate, installUpdate,
   }
 })

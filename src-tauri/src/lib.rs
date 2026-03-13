@@ -224,6 +224,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
 
 
         .manage(app_state.clone())
@@ -267,6 +269,8 @@ pub fn run() {
             commands::app::start_shortcut_capture,
             commands::app::stop_shortcut_capture,
             commands::app::simulate_pill_test,
+            commands::app::check_for_update,
+            commands::app::install_update,
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]

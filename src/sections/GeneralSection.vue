@@ -3,8 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { getVersion } from '@tauri-apps/api/app'
-import { FolderOpen } from 'lucide-vue-next'
+import { FolderOpen, RefreshCw, Download } from 'lucide-vue-next'
 import { useSettingsStore } from '@/stores/settings'
+import { useAppStore } from '@/stores/app'
 import i18n from '@/i18n'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -15,6 +16,7 @@ import SegmentedToggle from '@/components/SegmentedToggle.vue'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
+const app = useAppStore()
 const appVersion = ref('')
 
 // "disabled" | "requires_approval" | "enabled"
@@ -176,6 +178,57 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
           </SelectContent>
         </Select>
       </div>
+    </div>
+
+    <!-- Update card -->
+    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.update.title') }}</div>
+
+      <!-- Update available -->
+      <div v-if="app.updateAvailable" class="flex items-center justify-between py-2 gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="text-[13px] text-emerald-500 font-medium">{{ t('general.update.available', { version: app.updateAvailable.version }) }}</div>
+          <div v-if="app.updateAvailable.body" class="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{{ app.updateAvailable.body }}</div>
+        </div>
+        <button
+          :disabled="app.updateInstalling"
+          class="inline-flex items-center gap-1.5 px-3 h-8 rounded-md bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors shrink-0"
+          @click="app.installUpdate()"
+        >
+          <Download v-if="!app.updateInstalling" class="w-3.5 h-3.5" />
+          <RefreshCw v-else class="w-3.5 h-3.5 animate-spin" />
+          {{ app.updateInstalling ? t('general.update.installing') : t('general.update.install') }}
+        </button>
+      </div>
+
+      <!-- Checking -->
+      <div v-else-if="app.updateChecking" class="flex items-center justify-between py-2 gap-3">
+        <div class="text-[13px] text-muted-foreground">{{ t('general.update.checking') }}</div>
+        <RefreshCw class="w-4 h-4 text-muted-foreground animate-spin shrink-0" />
+      </div>
+
+      <!-- Up to date / error -->
+      <div v-else class="flex items-center justify-between py-2 gap-3">
+        <div>
+          <div class="text-[13px]" :class="app.updateError ? 'text-amber-500 font-medium' : 'text-foreground'">v{{ appVersion }}</div>
+          <div v-if="!app.updateError" class="text-[11px] text-muted-foreground mt-0.5">{{ t('general.update.upToDate') }}</div>
+          <div v-else class="text-[11px] text-amber-500/70 mt-0.5">{{ app.updateError }}</div>
+        </div>
+        <TooltipProvider :delay-duration="200">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="h-8 w-8 flex items-center justify-center rounded-md border border-input text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+                @click="app.checkForUpdate()"
+              >
+                <RefreshCw class="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="4">{{ t('general.update.check') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
     </div>
 
     <!-- About card -->

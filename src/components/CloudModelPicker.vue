@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { RefreshCw, Loader2 } from 'lucide-vue-next'
+import { RefreshCw, Loader2, Search } from 'lucide-vue-next'
 
 const props = defineProps<{
   modelOptions: string[]
@@ -23,6 +23,10 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const CUSTOM_VALUE = '_custom'
+const SEARCH_THRESHOLD = 10
+
+const search = ref('')
+const searchInput = ref<HTMLInputElement | null>()
 
 const isCustom = computed(() => {
   if (props.modelOptions.length === 0) return true
@@ -35,6 +39,14 @@ const selectValue = computed(() => {
   return CUSTOM_VALUE
 })
 
+const filteredOptions = computed(() => {
+  if (!search.value) return props.modelOptions
+  const q = search.value.toLowerCase()
+  return props.modelOptions.filter(m => m.toLowerCase().includes(q))
+})
+
+const showSearch = computed(() => props.modelOptions.length >= SEARCH_THRESHOLD)
+
 function onSelect(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
   if (value === CUSTOM_VALUE) {
@@ -42,6 +54,18 @@ function onSelect(value: string | number | bigint | Record<string, unknown> | nu
     return
   }
   emit('update:modelValue', value)
+}
+
+function onOpenChange(open: boolean) {
+  if (open) {
+    search.value = ''
+    nextTick(() => searchInput.value?.focus())
+  }
+}
+
+// Prevent select from closing when typing in search
+function onSearchKeydown(e: KeyboardEvent) {
+  e.stopPropagation()
 }
 
 let debounce: ReturnType<typeof setTimeout> | null = null
@@ -59,13 +83,29 @@ function onInput(event: Event) {
 
 <template>
   <div class="flex items-center gap-2">
-    <Select v-if="modelOptions.length > 0" :model-value="selectValue" @update:model-value="onSelect">
-      <SelectTrigger class="w-auto min-w-[140px] h-8 text-xs">
+    <Select v-if="modelOptions.length > 0" :model-value="selectValue" @update:model-value="onSelect" @update:open="onOpenChange">
+      <SelectTrigger class="w-auto min-w-[140px] max-w-[260px] h-8 text-xs">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem v-for="m in modelOptions" :key="m" :value="m">{{ m }}</SelectItem>
-        <SelectItem :value="CUSTOM_VALUE">{{ t('settings.cloudAsr.custom') }}</SelectItem>
+        <template v-if="showSearch" #header>
+          <div class="flex items-center gap-1.5 px-2 py-1.5 border-b border-border/50">
+            <Search class="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <input
+              ref="searchInput"
+              v-model="search"
+              type="text"
+              class="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+              :placeholder="t('provider.searchPreset')"
+              @keydown="onSearchKeydown"
+            />
+          </div>
+        </template>
+        <div v-if="showSearch && filteredOptions.length === 0" class="py-3 text-center text-xs text-muted-foreground">
+          {{ t('provider.noResults') }}
+        </div>
+        <SelectItem v-for="m in filteredOptions" :key="m" :value="m">{{ m }}</SelectItem>
+        <SelectItem :value="CUSTOM_VALUE" class="border-t border-border/50 mt-1">{{ t('settings.cloudAsr.custom') }}</SelectItem>
       </SelectContent>
     </Select>
     <Input

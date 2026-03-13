@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import type { Provider } from '@/stores/types'
@@ -8,14 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-} from '@/components/ui/combobox'
-import { ComboboxAnchor, ComboboxTrigger } from 'reka-ui'
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,7 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Loader2, CheckCircle2, XCircle, ChevronsUpDown, ShieldAlert } from 'lucide-vue-next'
+import { Loader2, CheckCircle2, XCircle, ShieldAlert, Search } from 'lucide-vue-next'
 
 const props = defineProps<{
   provider?: Provider
@@ -118,15 +110,16 @@ const canTest = computed(() => {
   return true
 })
 
-const searchTerm = ref('')
+const kindSearch = ref('')
+const kindSearchInput = ref<HTMLInputElement | null>()
 
 const allOptions = computed(() =>
   engines.providerPresets.map(p => ({ value: p.id, label: p.display_name })),
 )
 
-const filteredOptions = computed(() => {
-  if (!searchTerm.value) return allOptions.value
-  const q = searchTerm.value.toLowerCase()
+const filteredKindOptions = computed(() => {
+  if (!kindSearch.value) return allOptions.value
+  const q = kindSearch.value.toLowerCase()
   return allOptions.value.filter(o => o.label.toLowerCase().includes(q))
 })
 
@@ -135,10 +128,15 @@ const presetDisplayName = computed(() => {
   return preset?.display_name ?? kind.value
 })
 
-function displayValue(val: unknown): string {
-  if (typeof val !== 'string') return ''
-  const opt = allOptions.value.find(o => o.value === val)
-  return opt?.label ?? val
+function onKindOpenChange(open: boolean) {
+  if (open) {
+    kindSearch.value = ''
+    nextTick(() => kindSearchInput.value?.focus())
+  }
+}
+
+function onKindSearchKeydown(e: KeyboardEvent) {
+  e.stopPropagation()
 }
 
 /** Resolve i18n label for an extra field: use i18n key if it exists, otherwise fallback to field.label. */
@@ -252,35 +250,36 @@ function save() {
     <!-- Add mode: kind selector -->
     <div v-if="!isEditing" class="space-y-2">
       <Label class="text-xs text-muted-foreground">{{ t('provider.kind') }}</Label>
-      <Combobox
-        :model-value="kind"
-        v-model:search-term="searchTerm"
-        :reset-search-term-on-select="true"
-        :reset-search-term-on-blur="true"
-        :open-on-focus="true"
-        @update:model-value="onKindChange"
-      >
-        <ComboboxAnchor class="flex h-9 w-full items-center rounded-md border border-input bg-transparent shadow-sm ring-offset-background focus-within:ring-1 focus-within:ring-ring">
-          <ComboboxInput
-            :display-value="displayValue"
-            :placeholder="t('provider.searchPreset')"
-            class="h-full w-full bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none"
-          />
-          <ComboboxTrigger class="px-2 text-muted-foreground">
-            <ChevronsUpDown class="w-4 h-4 opacity-50 shrink-0" />
-          </ComboboxTrigger>
-        </ComboboxAnchor>
-        <ComboboxContent>
-          <ComboboxEmpty>{{ t('provider.noResults') }}</ComboboxEmpty>
-          <ComboboxItem
-            v-for="option in filteredOptions"
+      <Select :model-value="kind" @update:model-value="onKindChange" @update:open="onKindOpenChange">
+        <SelectTrigger class="w-full h-9 text-sm">
+          <SelectValue>{{ presetDisplayName }}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <template #header>
+            <div class="flex items-center gap-1.5 px-2 py-1.5 border-b border-border/50">
+              <Search class="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <input
+                ref="kindSearchInput"
+                v-model="kindSearch"
+                type="text"
+                class="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+                :placeholder="t('provider.searchPreset')"
+                @keydown="onKindSearchKeydown"
+              />
+            </div>
+          </template>
+          <div v-if="filteredKindOptions.length === 0" class="py-3 text-center text-xs text-muted-foreground">
+            {{ t('provider.noResults') }}
+          </div>
+          <SelectItem
+            v-for="option in filteredKindOptions"
             :key="option.value"
             :value="option.value"
           >
             {{ option.label }}
-          </ComboboxItem>
-        </ComboboxContent>
-      </Combobox>
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <div class="space-y-2">

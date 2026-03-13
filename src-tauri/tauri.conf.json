@@ -32,6 +32,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -45,11 +46,27 @@
       "signingIdentity": null,
       "hardenedRuntime": true,
       "entitlements": "./entitlements.plist"
+    },
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "https://timestamp.sectigo.com",
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "both",
+        "languages": ["English", "French"],
+        "displayLanguageSelector": true
+      }
     }
   },
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzMDg4NjNCRjM4Qzc1QTYKUldTbWRZenpPNFlJTXdjaHN5MWZNRXRPM05yL2tnRmVMM0ZPMUx0WXUvbTlXaXpMUUlBZ3RmancK",
+      "endpoints": [
+        "https://github.com/JonaWhisper/jonawhisper/releases/latest/download/latest-stable.json"
+      ]
     }
   }
 }

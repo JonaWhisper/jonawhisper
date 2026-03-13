@@ -332,6 +332,11 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
                     log::warn!("Cloud provider '{}' does not support LLM", provider.name);
                     Err(cleanup::LlmError::NotConfigured)
                 } else {
+                    let host = reqwest::Url::parse(&provider.url)
+                        .map(|u| u.host_str().unwrap_or("?").to_string())
+                        .unwrap_or_else(|_| "?".to_string());
+                    log::info!("Cloud LLM: provider='{}' host='{}' model='{}' has_key={}",
+                        provider.name, host, llm_model, !provider.api_key.is_empty());
                     cleanup::llm_cloud::cleanup_text(&processed, &lang, provider, &llm_model, effective_max_tokens).await
                 }
             } else {

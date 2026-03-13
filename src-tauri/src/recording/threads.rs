@@ -187,10 +187,17 @@ pub fn spawn_spectrum_emitter(
                 && samples_received.load(Ordering::Relaxed)
             {
                 flat_frames_since_active += 1;
-                if flat_frames_since_active > FLAT_GRACE_FRAMES {
-                    log::warn!("Spectrum flat while recording (queue depth: {})", cmd_tx.len());
+                if flat_frames_since_active == FLAT_GRACE_FRAMES + 1 {
+                    log::warn!("Spectrum flat while recording after grace period (frame {})", flat_frames_since_active);
+                } else if flat_frames_since_active > FLAT_GRACE_FRAMES && flat_frames_since_active.is_multiple_of(30) {
+                    // Log every ~1s while still flat
+                    log::warn!("Spectrum still flat (frame {}, ~{:.1}s)", flat_frames_since_active,
+                        flat_frames_since_active as f32 * SPECTRUM_INTERVAL_MS as f32 / 1000.0);
                 }
             } else if !is_flat {
+                if flat_frames_since_active > FLAT_GRACE_FRAMES {
+                    log::info!("Spectrum recovered after {} flat frames", flat_frames_since_active);
+                }
                 flat_frames_since_active = 0;
             }
             if is_mic_testing {

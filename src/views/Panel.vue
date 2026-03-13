@@ -2,8 +2,9 @@
 import { ref, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { getVersion } from '@tauri-apps/api/app'
 import { useAppStore } from '@/stores/app'
-import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2, BookOpen } from 'lucide-vue-next'
+import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2, BookOpen, Download, RefreshCw, AlertTriangle } from 'lucide-vue-next'
 
 // Lazy-load sections — only the active one is loaded
 const RecentsSection = defineAsyncComponent(() => import('@/sections/RecentsSection.vue'))
@@ -47,8 +48,11 @@ const statusClass = () => {
   return 'idle'
 }
 
+const appVersion = ref('')
+
 onMounted(async () => {
   getCurrentWindow().setTitle(t('window.panel'))
+  appVersion.value = await getVersion()
 })
 </script>
 
@@ -75,8 +79,39 @@ onMounted(async () => {
         </button>
       </nav>
 
+      <!-- Update / version indicator -->
+      <div class="px-2.5 pt-2 pb-1 border-t border-panel-divider">
+        <!-- Update available -->
+        <button
+          v-if="store.updateAvailable"
+          class="flex items-center gap-1.5 w-full text-left"
+          :disabled="store.updateInstalling"
+          @click="store.updateInstalling ? undefined : store.installUpdate()"
+        >
+          <Download v-if="!store.updateInstalling" class="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          <RefreshCw v-else class="w-3.5 h-3.5 text-emerald-500 animate-spin shrink-0" />
+          <span class="text-[11px] text-emerald-500 font-medium truncate">
+            {{ store.updateInstalling ? t('general.update.installing') : t('general.update.available', { version: store.updateAvailable.version }) }}
+          </span>
+        </button>
+        <!-- Update error -->
+        <button v-else-if="store.updateError" class="flex items-center gap-1.5 w-full text-left" @click="activeSection = 'general'">
+          <AlertTriangle class="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <span class="text-[11px] text-amber-500 font-medium truncate">v{{ appVersion }}</span>
+        </button>
+        <!-- Up to date -->
+        <button v-else-if="!store.updateChecking" class="flex items-center gap-1.5 w-full text-left" @click="store.checkForUpdate()">
+          <span class="text-[11px] text-muted-foreground">v{{ appVersion }}</span>
+        </button>
+        <!-- Checking -->
+        <div v-else class="flex items-center gap-1.5">
+          <RefreshCw class="w-3 h-3 text-muted-foreground animate-spin shrink-0" />
+          <span class="text-[11px] text-muted-foreground">{{ t('general.update.checking') }}</span>
+        </div>
+      </div>
+
       <!-- Status indicator -->
-      <div class="px-2.5 py-2 border-t border-panel-divider">
+      <div class="px-2.5 py-2">
         <div class="flex items-center gap-1.5">
           <span
             class="inline-block w-2 h-2 rounded-full"
