@@ -66,6 +66,7 @@ jobs:
           cp coverage-frontend-pr.lcov /tmp/coverage-frontend-pr.lcov
 
           git stash --include-untracked || true
+          git checkout -- . || true
           git checkout ${{ github.event.pull_request.base.sha }}
 
           # Rust base
