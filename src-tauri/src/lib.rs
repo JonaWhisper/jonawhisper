@@ -268,6 +268,7 @@ pub fn run() {
             commands::app::get_app_state,
             commands::app::start_shortcut_capture,
             commands::app::stop_shortcut_capture,
+            #[cfg(debug_assertions)]
             commands::app::simulate_pill_test,
             commands::app::check_for_update,
             commands::app::install_update,

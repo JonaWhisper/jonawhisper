@@ -211,7 +211,7 @@ export const useEnginesStore = defineStore('engines', () => {
 
   return {
     engines, models, languages, audioDevices, providers, providerPresets, permissions,
-    downloadedModels, asrEngines, llmEngines,
+    asrEngines, llmEngines,
     punctuationEngines,
     correctionEngines,
     spellcheckEngines, hasSpellcheckDict, languageModelEngines,

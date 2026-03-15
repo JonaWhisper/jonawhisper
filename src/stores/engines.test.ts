@@ -79,16 +79,6 @@ describe('engines store computed properties', () => {
     Object.keys(listeners).forEach(k => delete listeners[k])
   })
 
-  it('downloadedModels filters to available models', () => {
-    const store = useEnginesStore()
-    store.models = [
-      makeModel({ id: 'a', is_downloaded: true }),
-      makeModel({ id: 'b', is_downloaded: false }),
-      makeModel({ id: 'c', download_type: { type: 'RemoteAPI' }, is_downloaded: false }),
-    ]
-    expect(store.downloadedModels.map(m => m.id)).toEqual(['a', 'c'])
-  })
-
   it('asrEngines filters by category', () => {
     const store = useEnginesStore()
     store.engines = [

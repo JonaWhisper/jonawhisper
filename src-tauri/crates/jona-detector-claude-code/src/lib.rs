@@ -129,9 +129,14 @@ fn extract_token_and_expiry(json_str: &str) -> Option<(String, u64)> {
         return None;
     }
 
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
     let expires_at_ms = oauth.get("expiresAt")
         .and_then(|v| v.as_u64())
-        .unwrap_or(0);
+        .filter(|&t| t > 0)
+        .unwrap_or(now + 3_600_000); // 1h fallback if missing/zero
 
     Some((token.to_string(), expires_at_ms))
 }
@@ -157,11 +162,15 @@ mod tests {
     }
 
     #[test]
-    fn parse_valid_without_expiry() {
+    fn parse_valid_without_expiry_uses_fallback() {
         let json = r#"{"claudeAiOauth":{"accessToken":"sk-ant-oat01-test123"}}"#;
         let (token, expires) = extract_token_and_expiry(json).unwrap();
         assert_eq!(token, "sk-ant-oat01-test123");
-        assert_eq!(expires, 0);
+        // Fallback: ~1h from now (not 0)
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+        assert!(expires > now_ms);
+        assert!(expires <= now_ms + 3_600_100); // 1h + small margin
     }
 
     #[test]

@@ -225,6 +225,8 @@ impl AppState {
         })
     }
 
+    /// Insert a history entry with the current timestamp.
+    /// Note: `entry.timestamp` is ignored — a fresh timestamp is always generated.
     pub fn add_history(&self, entry: HistoryEntry) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
