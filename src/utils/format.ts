@@ -27,10 +27,10 @@ export function formatSpeed(bytesPerSec: number): string {
   return formatBytes(bytesPerSec, '/s')
 }
 
-/** Format a RAM amount in human-readable form (e.g. "1.5 GB", "800 MB"). */
+/** Format a RAM amount in human-readable form (e.g. "1.5 Go", "800 Mo"). */
 export function formatRam(bytes: number): string {
   const gb = bytes / 1_000_000_000
-  if (gb >= 1) return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} GB`
+  if (gb >= 1) return `${gb % 1 === 0 ? gb.toFixed(0) : gb.toFixed(1)} ${t('units.gb')}`
   const mb = bytes / 1_000_000
-  return `${Math.round(mb)} MB`
+  return `${Math.round(mb)} ${t('units.mb')}`
 }

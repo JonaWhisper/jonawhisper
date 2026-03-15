@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, defineAsyncComponent, onMounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
@@ -36,17 +36,17 @@ const sections = [
   { id: 'general', icon: Settings2, label: 'panel.general' },
 ]
 
-const statusLabel = () => {
+const statusLabel = computed(() => {
   if (store.isRecording) return t('status.recording')
   if (store.isTranscribing) return t('status.transcribing')
   return t('status.idle')
-}
+})
 
-const statusClass = () => {
+const statusClass = computed(() => {
   if (store.isRecording) return 'recording'
   if (store.isTranscribing) return 'transcribing'
   return 'idle'
-}
+})
 
 const appVersion = ref('')
 
@@ -116,12 +116,12 @@ onMounted(async () => {
           <span
             class="inline-block w-2 h-2 rounded-full"
             :class="{
-              'bg-emerald-500': statusClass() === 'idle',
-              'bg-red-500 animate-status-pulse': statusClass() === 'recording',
-              'bg-amber-500 animate-status-pulse': statusClass() === 'transcribing',
+              'bg-emerald-500': statusClass === 'idle',
+              'bg-red-500 animate-status-pulse': statusClass === 'recording',
+              'bg-amber-500 animate-status-pulse': statusClass === 'transcribing',
             }"
           />
-          <span class="text-[11px] text-muted-foreground">{{ statusLabel() }}</span>
+          <span class="text-[11px] text-muted-foreground">{{ statusLabel }}</span>
         </div>
       </div>
     </div>
