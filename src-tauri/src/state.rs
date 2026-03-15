@@ -120,8 +120,30 @@ impl Default for AppState {
 
 impl AppState {
     /// Run all registered credential detectors and populate `detected_providers`.
+    /// Detectors whose providers are ALL explicitly disabled are skipped to avoid
+    /// unnecessary Keychain popups on macOS.
     pub fn run_detection(&self) {
-        let results = jona_provider::detect_all();
+        // Build set of detector IDs to skip: a detector is skipped when every
+        // provider it previously produced has been explicitly disabled by the user.
+        let skip_owned: std::collections::HashSet<String> = {
+            let settings = self.settings.lock().unwrap();
+            let detected = self.detected_providers.lock().unwrap();
+            let mut detector_ids: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
+            for p in detected.iter() {
+                if let Some(source) = p.source.as_deref() {
+                    let all_disabled = detector_ids.entry(source.to_string()).or_insert(true);
+                    if settings.detected_enabled.get(&p.id).copied().unwrap_or(false) {
+                        *all_disabled = false;
+                    }
+                }
+            }
+            detector_ids.into_iter()
+                .filter(|(_, all_disabled)| *all_disabled)
+                .map(|(id, _)| id)
+                .collect()
+        };
+        let skip: std::collections::HashSet<&str> = skip_owned.iter().map(|s| s.as_str()).collect();
+        let results = jona_provider::detect_all(&skip);
         // Restore persisted enabled states for detected providers
         let enabled_states: std::collections::HashMap<String, bool> = self.settings.lock().unwrap()
             .detected_enabled.clone();

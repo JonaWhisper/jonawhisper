@@ -102,9 +102,15 @@ pub fn refresh_credential(detector_id: &str, kind: &str) -> Option<DetectedCrede
 }
 
 /// Run all registered detectors and return found credentials with their detector ID.
-pub fn detect_all() -> Vec<(DetectedCredential, &'static str)> {
+/// Detectors whose ID is in `skip` are not executed (avoids e.g. Keychain popups
+/// for providers the user has explicitly disabled).
+pub fn detect_all(skip: &std::collections::HashSet<&str>) -> Vec<(DetectedCredential, &'static str)> {
     let mut results = Vec::new();
     for reg in inventory::iter::<DetectorRegistration> {
+        if skip.contains(reg.id) {
+            log::debug!("Skipping disabled detector: {} ({})", reg.display_name, reg.id);
+            continue;
+        }
         log::debug!("Running detector: {} ({})", reg.display_name, reg.id);
         let creds = (reg.detect)();
         log::debug!("  {} credential(s) found from {}", creds.len(), reg.id);
