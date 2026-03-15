@@ -3953,8 +3953,6 @@ dependencies = [
  "cpal",
  "crossbeam-channel",
  "dirs",
- "encoding_rs",
- "futures-util",
  "hound",
  "jona-detector-claude-code",
  "jona-detector-env",

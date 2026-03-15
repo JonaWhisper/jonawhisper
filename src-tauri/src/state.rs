@@ -252,16 +252,18 @@ impl AppState {
                 vec![Box::new(c), Box::new(limit)],
             ),
             (false, None) => {
-                let pattern = format!("%{}%", query);
+                let escaped = query.replace('%', "\\%").replace('_', "\\_");
+                let pattern = format!("%{}%", escaped);
                 (
-                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2"),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ESCAPE '\\' ORDER BY timestamp DESC LIMIT ?2"),
                     vec![Box::new(pattern), Box::new(limit)],
                 )
             }
             (false, Some(c)) => {
-                let pattern = format!("%{}%", query);
+                let escaped = query.replace('%', "\\%").replace('_', "\\_");
+                let pattern = format!("%{}%", escaped);
                 (
-                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ESCAPE '\\' AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
                     vec![Box::new(pattern), Box::new(c), Box::new(limit)],
                 )
             }
@@ -293,8 +295,9 @@ impl AppState {
         if query.is_empty() {
             db.query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0))
         } else {
-            let pattern = format!("%{}%", query);
-            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1", [&pattern], |row| row.get(0))
+            let escaped = query.replace('%', "\\%").replace('_', "\\_");
+            let pattern = format!("%{}%", escaped);
+            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1 ESCAPE '\\'", [&pattern], |row| row.get(0))
         }
     }
 

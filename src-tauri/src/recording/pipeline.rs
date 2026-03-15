@@ -217,7 +217,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     // Read settings once
     let (model_id, lang, hall_filter, disfluency_removal, itn_enabled,
          spellcheck_enabled, punctuation_model_id, text_cleanup_enabled,
-         cleanup_model_id, llm_model, llm_max_tokens, cleanup_provider) = {
+         cleanup_model_id, llm_model, llm_max_tokens, gpu, cleanup_provider) = {
         let s = state.settings.lock().unwrap();
         let cleanup_provider_id = s.cleanup_model_id.strip_prefix("cloud:").map(|s| s.to_string());
         let result = (
@@ -232,11 +232,12 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
             s.cleanup_model_id.clone(),
             s.llm_model.clone(),
             s.llm_max_tokens,
+            s.gpu_mode,
             cleanup_provider_id,
         );
         drop(s);
-        let (a, b, c, d, e, f, g, h, i, j, k, pid) = result;
-        (a, b, c, d, e, f, g, h, i, j, k, pid.as_deref().and_then(|id| state.find_provider(id)))
+        let (a, b, c, d, e, f, g, h, i, j, k, gpu, pid) = result;
+        (a, b, c, d, e, f, g, h, i, j, k, gpu, pid.as_deref().and_then(|id| state.find_provider(id)))
     };
 
     // Step 1: preprocess (hallucination filter + dictation commands + disfluency removal)
@@ -260,7 +261,6 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     let mut effective_cleanup_model_id = String::new();
-    let gpu = state.settings.lock().unwrap().gpu_mode;
 
     // Step 2a: punctuation (PCS/BERT) — runs first if configured
     if !punctuation_model_id.is_empty() {

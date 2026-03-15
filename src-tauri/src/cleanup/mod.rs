@@ -9,7 +9,7 @@ pub use jona_engines::llm_prompt::LlmError;
 /// Full text-only cleanup pipeline: preprocess → ITN → finalize.
 /// This chains the text transformations that don't require ML models.
 /// ML-based steps (punctuation, correction, LLM) are applied separately.
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn text_cleanup_pipeline(
     raw_asr: &str,
     language: &str,
