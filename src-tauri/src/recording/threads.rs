@@ -5,15 +5,15 @@ use crate::platform;
 use crate::platform::hotkey;
 use crate::state::AppState;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 /// Named return type for `spawn_audio_thread`.
 pub struct AudioThreadHandles {
     pub cmd_tx: crossbeam_channel::Sender<AudioCmd>,
-    /// Live spectrum data — shared directly with the cpal callback (no intermediate copy).
-    pub spectrum_data: Arc<Mutex<Vec<f32>>>,
+    /// Live spectrum data — lock-free atomic array shared with the cpal callback.
+    pub spectrum_data: Arc<audio::AtomicSpectrum>,
     pub reply_rx: crossbeam_channel::Receiver<AudioReply>,
     pub stream_error: Arc<AtomicBool>,
     pub samples_received: Arc<AtomicBool>,
@@ -31,7 +31,7 @@ pub fn spawn_audio_thread() -> AudioThreadHandles {
     let samples_received_clone = Arc::clone(&samples_received);
 
     // Channel to send back the recorder's live spectrum handle once created.
-    let (spectrum_tx, spectrum_rx) = crossbeam_channel::bounded::<Arc<Mutex<Vec<f32>>>>(1);
+    let (spectrum_tx, spectrum_rx) = crossbeam_channel::bounded::<Arc<audio::AtomicSpectrum>>(1);
 
     std::thread::spawn(move || {
         let mut recorder = audio::AudioRecorder::new(stream_error_clone, samples_received_clone);
@@ -133,7 +133,7 @@ pub fn spawn_spectrum_emitter(
     app: AppHandle,
     state: Arc<AppState>,
     cmd_tx: crossbeam_channel::Sender<AudioCmd>,
-    spectrum_data: Arc<Mutex<Vec<f32>>>,
+    spectrum_data: Arc<audio::AtomicSpectrum>,
     stream_error: Arc<AtomicBool>,
     samples_received: Arc<AtomicBool>,
 ) {
@@ -141,25 +141,29 @@ pub fn spawn_spectrum_emitter(
     // FFT needs 1024 samples (~64ms at 16kHz), spectrum emitter runs at ~33ms intervals,
     // so ~4-6 frames will be flat before the first real spectrum is computed.
     const FLAT_GRACE_FRAMES: u32 = 8;
+    const SMOOTHING: f32 = 0.55; // new data weight (old = 1 - this)
 
     std::thread::spawn(move || {
         let mut flat_frames_since_active = 0u32;
         let mut was_active = false;
+        let mut smoothed = [0.0f32; 12];
 
         loop {
             std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
 
-            // Fast lock-free check — avoids mutex contention when idle
+            // Fast lock-free check — avoids contention when idle
             if !state.audio_flags.is_active() {
                 was_active = false;
                 flat_frames_since_active = 0;
+                smoothed = [0.0; 12];
                 continue;
             }
 
-            // Reset grace counter on new recording session
+            // Reset on new recording session
             if !was_active {
                 was_active = true;
                 flat_frames_since_active = 0;
+                smoothed = [0.0; 12];
             }
 
             let is_mic_testing = state.audio_flags.is_mic_testing();
@@ -180,9 +184,16 @@ pub fn spawn_spectrum_emitter(
                 continue;
             }
 
-            // Read spectrum directly from the recorder's Arc (no GetSpectrum roundtrip).
-            let spectrum = spectrum_data.lock().unwrap().clone();
-            let is_flat = spectrum.iter().all(|&v| v < 0.001);
+            // Read spectrum atomically — lock-free, never blocks, never lost
+            let raw = spectrum_data.load();
+
+            // Smooth locally (was previously done in the cpal callback under a mutex)
+            let old_weight = 1.0 - SMOOTHING;
+            for (s, &r) in smoothed.iter_mut().zip(raw.iter()) {
+                *s = *s * old_weight + r * SMOOTHING;
+            }
+
+            let is_flat = smoothed.iter().all(|&v| v < 0.001);
             if is_flat && !is_mic_testing && state.audio_flags.is_recording()
                 && samples_received.load(Ordering::Relaxed)
             {
@@ -190,7 +201,6 @@ pub fn spawn_spectrum_emitter(
                 if flat_frames_since_active == FLAT_GRACE_FRAMES + 1 {
                     log::warn!("Spectrum flat while recording after grace period (frame {})", flat_frames_since_active);
                 } else if flat_frames_since_active > FLAT_GRACE_FRAMES && flat_frames_since_active.is_multiple_of(30) {
-                    // Log every ~1s while still flat
                     log::warn!("Spectrum still flat (frame {}, ~{:.1}s)", flat_frames_since_active,
                         flat_frames_since_active as f32 * SPECTRUM_INTERVAL_MS as f32 / 1000.0);
                 }
@@ -201,10 +211,10 @@ pub fn spawn_spectrum_emitter(
                 flat_frames_since_active = 0;
             }
             if is_mic_testing {
-                let _ = app.emit(events::MIC_TEST_SPECTRUM, &spectrum);
+                let _ = app.emit(events::MIC_TEST_SPECTRUM, smoothed.as_slice());
             } else {
                 // Feed spectrum directly to native pill (no Tauri event needed)
-                crate::ui::pill::set_spectrum(&spectrum);
+                crate::ui::pill::set_spectrum(&smoothed);
             }
         }
     });

@@ -10,7 +10,43 @@ use std::sync::{Arc, Mutex};
 const SAMPLE_RATE: u32 = 16000;
 const NUM_BANDS: usize = 12;
 const FFT_SIZE: usize = 1024;
-const SPECTRUM_SMOOTHING: f32 = 0.55; // new data weight (old = 1 - this)
+
+/// Lock-free spectrum data shared between the cpal audio callback and the spectrum emitter.
+/// Uses atomic f32-to-bits conversion — zero contention, zero lost updates.
+pub struct AtomicSpectrum {
+    bands: [std::sync::atomic::AtomicU32; NUM_BANDS],
+}
+
+impl AtomicSpectrum {
+    pub fn new() -> Self {
+        Self {
+            bands: std::array::from_fn(|_| std::sync::atomic::AtomicU32::new(0u32)),
+        }
+    }
+
+    /// Store raw FFT spectrum bands (called from cpal callback — must be lock-free).
+    pub fn store(&self, data: &[f32]) {
+        for (atom, &val) in self.bands.iter().zip(data.iter()) {
+            atom.store(val.to_bits(), Ordering::Relaxed);
+        }
+    }
+
+    /// Load current spectrum bands (called from emitter thread).
+    pub fn load(&self) -> [f32; NUM_BANDS] {
+        let mut out = [0.0f32; NUM_BANDS];
+        for (val, atom) in out.iter_mut().zip(self.bands.iter()) {
+            *val = f32::from_bits(atom.load(Ordering::Relaxed));
+        }
+        out
+    }
+
+    /// Reset all bands to zero.
+    pub fn reset(&self) {
+        for atom in &self.bands {
+            atom.store(0u32, Ordering::Relaxed);
+        }
+    }
+}
 
 /// List input devices from CoreAudio, filtered to only those cpal can use for recording.
 pub fn list_usable_devices() -> Vec<crate::platform::audio_devices::AudioDevice> {
@@ -30,7 +66,7 @@ pub struct AudioRecorder {
     stream: Option<cpal::Stream>,
     writer: Arc<Mutex<Option<WavWriter<BufWriter<std::fs::File>>>>>,
     current_file: Arc<Mutex<Option<PathBuf>>>,
-    spectrum: Arc<Mutex<Vec<f32>>>,
+    spectrum: Arc<AtomicSpectrum>,
     fft_buffer: Arc<Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
     samples_received: Arc<AtomicBool>,
@@ -42,7 +78,7 @@ impl AudioRecorder {
             stream: None,
             writer: Arc::new(Mutex::new(None)),
             current_file: Arc::new(Mutex::new(None)),
-            spectrum: Arc::new(Mutex::new(vec![0.0; NUM_BANDS])),
+            spectrum: Arc::new(AtomicSpectrum::new()),
             fft_buffer: Arc::new(Mutex::new(Vec::with_capacity(FFT_SIZE))),
             stream_error,
             samples_received,
@@ -149,14 +185,14 @@ impl AudioRecorder {
 
         *self.current_file.lock().unwrap() = Some(filepath);
         *self.writer.lock().unwrap() = Some(writer);
-        *self.spectrum.lock().unwrap() = vec![0.0; NUM_BANDS];
+        self.spectrum.reset();
         *self.fft_buffer.lock().unwrap() = Vec::with_capacity(FFT_SIZE);
         self.stream_error.store(false, Ordering::Relaxed);
         self.samples_received.store(false, Ordering::Relaxed);
 
         let writer_clone = Arc::clone(&self.writer);
         let fft_buffer_clone = Arc::clone(&self.fft_buffer);
-        let spectrum_clone = Arc::clone(&self.spectrum);
+        let spectrum_clone = Arc::clone(&self.spectrum);  // AtomicSpectrum — lock-free
 
         let sample_format = default_cfg
             .map(|c| c.sample_format())
@@ -244,7 +280,7 @@ impl AudioRecorder {
     }
 
     /// Returns a shared handle to the live spectrum data (updated by the cpal callback).
-    pub fn spectrum_handle(&self) -> Arc<Mutex<Vec<f32>>> {
+    pub fn spectrum_handle(&self) -> Arc<AtomicSpectrum> {
         Arc::clone(&self.spectrum)
     }
 }
@@ -283,15 +319,8 @@ fn process_samples(
     data: &[f32],
     writer: &Mutex<Option<WavWriter<BufWriter<std::fs::File>>>>,
     fft_buffer: &Mutex<Vec<f32>>,
-    spectrum: &Mutex<Vec<f32>>,
+    spectrum: &AtomicSpectrum,
 ) {
-    use std::sync::atomic::{AtomicU32, Ordering as AO};
-    static FFT_LOCK_MISS: AtomicU32 = AtomicU32::new(0);
-    static SPECTRUM_LOCK_MISS: AtomicU32 = AtomicU32::new(0);
-    static CALLBACK_COUNT: AtomicU32 = AtomicU32::new(0);
-
-    let count = CALLBACK_COUNT.fetch_add(1, AO::Relaxed) + 1;
-
     // Write to WAV — use try_lock to avoid blocking the realtime audio thread
     if let Ok(mut guard) = writer.try_lock() {
         if let Some(ref mut w) = *guard {
@@ -304,7 +333,8 @@ fn process_samples(
         log::trace!("process_samples: writer lock contention, skipping chunk");
     }
 
-    // Accumulate FFT buffer and compute spectrum outside lock
+    // Accumulate FFT buffer — only the cpal callback thread accesses this, so try_lock
+    // should always succeed (but we use try_lock to be safe on the realtime thread).
     let fft_samples = if let Ok(mut buf) = fft_buffer.try_lock() {
         buf.extend_from_slice(data);
         if buf.len() >= FFT_SIZE {
@@ -313,37 +343,14 @@ fn process_samples(
             None
         }
     } else {
-        let misses = FFT_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
-        if misses.is_multiple_of(50) {
-            log::debug!("process_samples: fft_buffer lock contention x{} (callbacks: {})", misses, count);
-        }
+        log::trace!("process_samples: fft_buffer lock contention");
         None
     };
 
-    // FFT computation runs without any lock held
+    // FFT computation + atomic store — completely lock-free, never lost
     if let Some(samples) = fft_samples {
         let new_spectrum = compute_spectrum(&samples);
-
-        if let Ok(mut spec) = spectrum.try_lock() {
-            let old_weight = 1.0 - SPECTRUM_SMOOTHING;
-            for (s, &ns) in spec.iter_mut().zip(new_spectrum.iter()) {
-                *s = *s * old_weight + ns * SPECTRUM_SMOOTHING;
-            }
-        } else {
-            let misses = SPECTRUM_LOCK_MISS.fetch_add(1, AO::Relaxed) + 1;
-            if misses.is_multiple_of(50) {
-                log::debug!("process_samples: spectrum lock contention x{} (callbacks: {})", misses, count);
-            }
-        }
-    }
-
-    // Log contention stats every ~500 callbacks (~16s at 16kHz/512 buffer)
-    if count > 0 && count.is_multiple_of(500) {
-        let fft_m = FFT_LOCK_MISS.load(AO::Relaxed);
-        let spec_m = SPECTRUM_LOCK_MISS.load(AO::Relaxed);
-        if fft_m > 0 || spec_m > 0 {
-            log::debug!("Audio callback stats: {} calls, fft_lock_miss={}, spectrum_lock_miss={}", count, fft_m, spec_m);
-        }
+        spectrum.store(&new_spectrum);
     }
 }
 
