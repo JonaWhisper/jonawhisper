@@ -17,7 +17,7 @@ function onCommit(v: number[]) {
 </script>
 
 <template>
-  <div class="flex items-center justify-between py-2 gap-3" :class="$attrs.class">
+  <div class="flex items-center justify-between py-2 gap-3" :class="($attrs.class as string)">
     <div>
       <div class="text-[13px] text-foreground">{{ t('settings.llm.maxTokens') }}</div>
     </div>

@@ -164,6 +164,6 @@ export const useAppStore = defineStore('app', () => {
     isRecording, isTranscribing, queueCount,
     isBusy,
     updateAvailable, updateChecking, updateInstalling, updateError,
-    init, fetchState, startMonitoring, checkForUpdate, installUpdate,
+    init, fetchState, startMonitoring, checkForUpdate, installUpdate, cleanup,
   }
 })

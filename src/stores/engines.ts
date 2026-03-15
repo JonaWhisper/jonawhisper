@@ -21,7 +21,6 @@ export const useEnginesStore = defineStore('engines', () => {
   const updatableModelIds = ref<Set<string>>(new Set())
 
   // Computed
-  const downloadedModels = computed(() => models.value.filter(isModelAvailable))
   const asrEngines = computed(() => engines.value.filter(e => e.category === 'asr'))
   const llmEngines = computed(() => engines.value.filter(e => e.category === 'llm'))
   const downloadedLlmModels = computed(() => {
