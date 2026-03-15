@@ -71,18 +71,18 @@ describe('formatSpeed', () => {
 
 describe('formatRam', () => {
   it('formats gigabytes with one decimal', () => {
-    expect(formatRam(1_500_000_000)).toBe('1.5 GB')
+    expect(formatRam(1_500_000_000)).toBe('1.5 Go')
   })
 
   it('formats exact gigabytes without decimal', () => {
-    expect(formatRam(2_000_000_000)).toBe('2 GB')
+    expect(formatRam(2_000_000_000)).toBe('2 Go')
   })
 
   it('formats megabytes', () => {
-    expect(formatRam(800_000_000)).toBe('800 MB')
+    expect(formatRam(800_000_000)).toBe('800 Mo')
   })
 
   it('formats small megabytes', () => {
-    expect(formatRam(50_000_000)).toBe('50 MB')
+    expect(formatRam(50_000_000)).toBe('50 Mo')
   })
 })
