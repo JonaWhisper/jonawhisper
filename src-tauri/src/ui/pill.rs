@@ -28,19 +28,30 @@ pub enum PillMode {
     Idle,
 }
 
+/// Wrapper for raw AppKit pointers that are created on the main thread and
+/// accessed exclusively through `run_on_main_thread`.
+///
+/// # Safety
+/// These pointers are only dereferenced inside closures dispatched to the main
+/// thread via `AppHandle::run_on_main_thread`. The `Mutex<Option<PillInner>>`
+/// ensures no concurrent access. Sending the wrapper across threads is safe
+/// because it is never dereferenced off the main thread.
+#[cfg(target_os = "macos")]
+struct MainThreadPtr(*mut AnyObject);
+
+#[cfg(target_os = "macos")]
+unsafe impl Send for MainThreadPtr {}
+
 #[cfg(target_os = "macos")]
 struct PillInner {
-    ns_window: *mut AnyObject,
-    image_view: *mut AnyObject,
+    ns_window: MainThreadPtr,
+    image_view: MainThreadPtr,
     mode: PillMode,
     spectrum: [f32; 12],
     smoothed: [f32; 12],
     dot_phase: f32,
     pending_count: u32,
 }
-
-#[cfg(target_os = "macos")]
-unsafe impl Send for PillInner {}
 
 #[cfg(target_os = "macos")]
 static PILL: Mutex<Option<PillInner>> = Mutex::new(None);
@@ -57,10 +68,10 @@ pub fn open(app: &AppHandle, initial_mode: PillMode) {
         log::debug!("Pill: opening with mode {:?}", initial_mode);
         let handle = app.clone();
         let _ = app.run_on_main_thread(move || {
-            let (ns_win, image_view) = unsafe { create_pill_window() };
+            let (ns_win, iv) = unsafe { create_pill_window() };
             let mut inner = PillInner {
-                ns_window: ns_win,
-                image_view,
+                ns_window: MainThreadPtr(ns_win),
+                image_view: MainThreadPtr(iv),
                 mode: initial_mode,
                 spectrum: [0.0; 12],
                 smoothed: [0.0; 12],
@@ -69,7 +80,7 @@ pub fn open(app: &AppHandle, initial_mode: PillMode) {
             };
             // Render first frame, then show — no flash possible
             let rgba = render_frame(&inner);
-            unsafe { update_image_view(image_view, &rgba) };
+            unsafe { update_image_view(iv, &rgba) };
             unsafe {
                 let _: () = msg_send![ns_win, orderFrontRegardless];
             }
@@ -94,7 +105,7 @@ pub fn close(app: &AppHandle) {
         log::debug!("Pill: closing");
         let ns_win_addr = {
             let mut pill = PILL.lock().unwrap();
-            pill.take().map(|p| p.ns_window as usize)
+            pill.take().map(|p| p.ns_window.0 as usize)
         };
         if let Some(addr) = ns_win_addr {
             let _ = app.run_on_main_thread(move || unsafe {
@@ -170,7 +181,7 @@ fn animation_loop(app: AppHandle) {
                 p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
             }
             let rgba = render_frame(p);
-            let iv = p.image_view;
+            let iv = p.image_view.0;
             drop(pill); // unlock before AppKit call
             unsafe { update_image_view(iv, &rgba) };
             let _ = h; // keep handle alive
@@ -670,8 +681,8 @@ mod tests {
     #[test]
     fn render_frame_produces_correct_buffer_size() {
         let p = PillInner {
-            ns_window: std::ptr::null_mut(),
-            image_view: std::ptr::null_mut(),
+            ns_window: MainThreadPtr(std::ptr::null_mut()),
+            image_view: MainThreadPtr(std::ptr::null_mut()),
             mode: PillMode::Recording,
             spectrum: [0.5; 12],
             smoothed: [0.5; 12],
@@ -686,8 +697,8 @@ mod tests {
     #[test]
     fn render_frame_has_transparent_corners() {
         let p = PillInner {
-            ns_window: std::ptr::null_mut(),
-            image_view: std::ptr::null_mut(),
+            ns_window: MainThreadPtr(std::ptr::null_mut()),
+            image_view: MainThreadPtr(std::ptr::null_mut()),
             mode: PillMode::Recording,
             spectrum: [0.5; 12],
             smoothed: [0.5; 12],
@@ -704,8 +715,8 @@ mod tests {
     #[test]
     fn render_frame_has_opaque_center() {
         let p = PillInner {
-            ns_window: std::ptr::null_mut(),
-            image_view: std::ptr::null_mut(),
+            ns_window: MainThreadPtr(std::ptr::null_mut()),
+            image_view: MainThreadPtr(std::ptr::null_mut()),
             mode: PillMode::Idle,
             spectrum: [0.0; 12],
             smoothed: [0.0; 12],

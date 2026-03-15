@@ -172,6 +172,7 @@
   "benchmark.rtf.fast": "Fast",
   "benchmark.rtf.normal": "Normal",
   "benchmark.rtf.slow": "Slow",
+  "panel.navigation": "Navigation",
   "panel.recents": "Recents",
   "panel.models": "Models",
   "panel.transcription": "Transcription",
