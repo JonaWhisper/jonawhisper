@@ -10,7 +10,7 @@ const listeners: Record<string, (event: unknown) => void> = {}
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn((event: string, handler: (event: unknown) => void) => {
     listeners[event] = handler
-    return () => { delete listeners[event] }
+    return Promise.resolve(() => { delete listeners[event] })
   }),
 }))
 

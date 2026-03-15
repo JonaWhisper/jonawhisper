@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type Event } from '@tauri-apps/api/event'
+import { listen, type Event, type UnlistenFn } from '@tauri-apps/api/event'
 import { useEnginesStore } from './engines'
 import type { DownloadProgressPayload } from './types'
 
@@ -102,6 +102,8 @@ export const useDownloadStore = defineStore('downloads', () => {
   }
 
   // Listeners
+  const unlistenFns: UnlistenFn[] = []
+
   function setupListeners() {
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
       const { model_id, progress, downloaded, total_size, speed } = event.payload ?? {}
@@ -114,12 +116,17 @@ export const useDownloadStore = defineStore('downloads', () => {
           if (speed !== undefined) entry.speed = speed
         }
       }
-    })
+    }).then(fn => unlistenFns.push(fn))
+  }
+
+  function cleanup() {
+    unlistenFns.forEach(fn => fn())
+    unlistenFns.length = 0
   }
 
   return {
     activeDownloads, deletingModels,
     downloadModel, pauseDownload, cancelDownload, deleteModel,
-    hydrateFromBackend, setupListeners,
+    hydrateFromBackend, setupListeners, cleanup,
   }
 })

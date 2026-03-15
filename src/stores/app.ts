@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type Event } from '@tauri-apps/api/event'
+import { listen, type Event, type UnlistenFn } from '@tauri-apps/api/event'
 import { useSettingsStore } from './settings'
 import { useHistoryStore } from './history'
 import { useEnginesStore } from './engines'
@@ -52,27 +52,29 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // Event listeners (cross-domain: recording + transcription)
+  const unlistenFns: UnlistenFn[] = []
+
   function setupListeners() {
     enginesStore.setupListeners()
     downloadStore.setupListeners()
 
     listen('recording-started', () => {
       isRecording.value = true
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen<RecordingStoppedPayload>('recording-stopped', (event: Event<RecordingStoppedPayload>) => {
       isRecording.value = false
       if (event.payload?.queue_count !== undefined) {
         queueCount.value = event.payload.queue_count
       }
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen<TranscriptionStartedPayload>('transcription-started', (event: Event<TranscriptionStartedPayload>) => {
       isTranscribing.value = true
       if (event.payload?.queue_count !== undefined) {
         queueCount.value = event.payload.queue_count
       }
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen<TranscriptionCompletePayload>('transcription-complete', (event: Event<TranscriptionCompletePayload>) => {
       isTranscribing.value = false
@@ -94,17 +96,24 @@ export const useAppStore = defineStore('app', () => {
           word_scores: event.payload.word_scores ?? '',
         })
       }
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen('transcription-error', () => {
       isTranscribing.value = false
       queueCount.value = Math.max(0, queueCount.value - 1)
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen('transcription-cancelled', () => {
       isTranscribing.value = false
       queueCount.value = 0
-    })
+    }).then(fn => unlistenFns.push(fn))
+  }
+
+  function cleanup() {
+    unlistenFns.forEach(fn => fn())
+    unlistenFns.length = 0
+    enginesStore.cleanup()
+    downloadStore.cleanup()
   }
 
   async function checkForUpdate() {

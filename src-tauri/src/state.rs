@@ -1,6 +1,11 @@
-// Re-export everything from jona-types for backward compatibility
-pub use jona_types::*;
+// Re-export only the types that other modules access via `crate::state::`.
+pub use jona_types::{GpuMode, RecordingMode};
 
+use jona_types::{
+    AudioFlags, ContextMap, DownloadState, HistoryEntry, Preferences, Provider,
+    RuntimeState, HISTORY_DB, HISTORY_JSON_LEGACY, config_dir,
+    load_api_keys_from_keyring, prefs_path,
+};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 

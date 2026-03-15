@@ -771,7 +771,7 @@ mod tests {
         let p = test_provider("auto-1", Some("det"), true);
         assert!(!p.api_key.is_empty());
         // mask_value is the same function used in mask_provider
-        let masked = crate::state::mask_value(&p.api_key);
+        let masked = jona_types::mask_value(&p.api_key);
         assert!(masked.starts_with('\u{2022}')); // bullet char
         assert!(!masked.contains("sk-test"));
     }
