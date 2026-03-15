@@ -8,7 +8,7 @@ use std::any::Any;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 // -- Dynamic context map (plug-and-play engine contexts) --
 
@@ -23,11 +23,18 @@ struct ContextEntry {
 /// the context_key changes (different model, different gpu_mode, etc.).
 pub struct ContextMap {
     entries: Mutex<HashMap<String, ContextEntry>>,
+    /// Tracks engine IDs currently being loaded to prevent duplicate loads.
+    loading: Mutex<std::collections::HashSet<String>>,
+    loading_done: Condvar,
 }
 
 impl Default for ContextMap {
     fn default() -> Self {
-        Self { entries: Mutex::new(HashMap::new()) }
+        Self {
+            entries: Mutex::new(HashMap::new()),
+            loading: Mutex::new(std::collections::HashSet::new()),
+            loading_done: Condvar::new(),
+        }
     }
 }
 
@@ -43,6 +50,9 @@ impl ContextMap {
     /// The lock is NOT held during `loader()` or `action()` — only brief lock
     /// acquisitions to check/insert/remove entries. This prevents engines from
     /// blocking each other during inference.
+    ///
+    /// A loading sentinel prevents two threads from loading the same engine
+    /// concurrently (e.g. a 8 GB model loaded twice would exhaust memory).
     pub fn run_with<R>(
         &self,
         engine_id: &str,
@@ -56,17 +66,45 @@ impl ContextMap {
             map.get(engine_id).is_none_or(|e| e.key != context_key)
         };
 
-        // Phase 2: load outside lock
+        // Phase 2: load outside lock, with loading sentinel to prevent duplicates
         if needs_load {
-            log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
-            let start = std::time::Instant::now();
-            let ctx = loader()?;
-            log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
-            let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
-            map.insert(engine_id.to_string(), ContextEntry {
-                key: context_key.to_string(),
-                ctx,
-            });
+            // Wait if another thread is already loading this engine
+            {
+                let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
+                while loading.contains(engine_id) {
+                    loading = self.loading_done.wait(loading).unwrap_or_else(|e| e.into_inner());
+                }
+                // Re-check after waiting — the other thread may have loaded it
+                let map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+                if map.get(engine_id).is_some_and(|e| e.key == context_key) {
+                    // Already loaded by another thread, skip loading
+                } else {
+                    loading.insert(engine_id.to_string());
+                }
+            }
+
+            // Only load if we inserted the sentinel
+            let we_are_loading = self.loading.lock().unwrap_or_else(|e| e.into_inner()).contains(engine_id);
+            if we_are_loading {
+                log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
+                let start = std::time::Instant::now();
+                let result = loader();
+
+                // Remove sentinel and notify waiters regardless of success/failure
+                {
+                    let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
+                    loading.remove(engine_id);
+                    self.loading_done.notify_all();
+                }
+
+                let ctx = result?;
+                log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
+                let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+                map.insert(engine_id.to_string(), ContextEntry {
+                    key: context_key.to_string(),
+                    ctx,
+                });
+            }
         }
 
         // Phase 3: remove entry → run action without lock → insert back
@@ -91,6 +129,7 @@ impl ContextMap {
     }
 
     /// Drop the context for a specific engine.
+    #[cfg(test)]
     pub fn invalidate(&self, engine_id: &str) {
         self.entries.lock().unwrap_or_else(|e| e.into_inner()).remove(engine_id);
     }

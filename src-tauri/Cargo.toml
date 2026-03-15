@@ -92,7 +92,6 @@ dirs = "6"
 log.workspace = true
 simplelog = "0.12"
 rustfft = "6"
-futures-util = "0.3"
 shellexpand = "3"
 thiserror.workspace = true
 crossbeam-channel = "0.5.15"
@@ -100,7 +99,6 @@ keyring = { version = "3", features = ["apple-native", "windows-native"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 rust-i18n = "3"
 sys-locale = "0.3"
-encoding_rs = "0.8"
 ort.workspace = true
 ndarray = "0.17"
 tokenizers.workspace = true

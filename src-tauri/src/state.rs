@@ -1,6 +1,11 @@
-// Re-export everything from jona-types for backward compatibility
-pub use jona_types::*;
+// Re-export only the types that other modules access via `crate::state::`.
+pub use jona_types::{GpuMode, RecordingMode};
 
+use jona_types::{
+    AudioFlags, ContextMap, DownloadState, HistoryEntry, Preferences, Provider,
+    RuntimeState, HISTORY_DB, HISTORY_JSON_LEGACY, config_dir,
+    load_api_keys_from_keyring, prefs_path,
+};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 
@@ -225,6 +230,8 @@ impl AppState {
         })
     }
 
+    /// Insert a history entry with the current timestamp.
+    /// Note: `entry.timestamp` is ignored — a fresh timestamp is always generated.
     pub fn add_history(&self, entry: HistoryEntry) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -252,16 +259,18 @@ impl AppState {
                 vec![Box::new(c), Box::new(limit)],
             ),
             (false, None) => {
-                let pattern = format!("%{}%", query);
+                let escaped = query.replace('%', "\\%").replace('_', "\\_");
+                let pattern = format!("%{}%", escaped);
                 (
-                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2"),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ESCAPE '\\' ORDER BY timestamp DESC LIMIT ?2"),
                     vec![Box::new(pattern), Box::new(limit)],
                 )
             }
             (false, Some(c)) => {
-                let pattern = format!("%{}%", query);
+                let escaped = query.replace('%', "\\%").replace('_', "\\_");
+                let pattern = format!("%{}%", escaped);
                 (
-                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ESCAPE '\\' AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
                     vec![Box::new(pattern), Box::new(c), Box::new(limit)],
                 )
             }
@@ -293,8 +302,9 @@ impl AppState {
         if query.is_empty() {
             db.query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0))
         } else {
-            let pattern = format!("%{}%", query);
-            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1", [&pattern], |row| row.get(0))
+            let escaped = query.replace('%', "\\%").replace('_', "\\_");
+            let pattern = format!("%{}%", escaped);
+            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1 ESCAPE '\\'", [&pattern], |row| row.get(0))
         }
     }
 

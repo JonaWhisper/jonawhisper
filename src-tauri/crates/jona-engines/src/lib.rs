@@ -18,18 +18,6 @@ use jona_types::EngineRegistration;
 /// Global engine catalog singleton — initialized by the app at startup.
 static CATALOG: OnceLock<EngineCatalog> = OnceLock::new();
 
-/// Resolve a model ID from the catalog and verify it's downloaded.
-pub fn resolve_model(model_id: &str) -> Result<(ASRModel, std::path::PathBuf), String> {
-    let catalog = EngineCatalog::global();
-    let model = catalog.model_by_id(model_id)
-        .ok_or_else(|| format!("Model not found: {}", model_id))?;
-    if !model.is_downloaded() {
-        return Err(format!("Model not downloaded: {}", model_id));
-    }
-    let path = model.local_path();
-    Ok((model, path))
-}
-
 // -- Catalog --
 
 pub struct EngineCatalog {

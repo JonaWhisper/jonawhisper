@@ -10,7 +10,7 @@ const listeners: Record<string, (event: unknown) => void> = {}
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn((event: string, handler: (event: unknown) => void) => {
     listeners[event] = handler
-    return () => { delete listeners[event] }
+    return Promise.resolve(() => { delete listeners[event] })
   }),
 }))
 
@@ -77,16 +77,6 @@ describe('engines store computed properties', () => {
     setActivePinia(createPinia())
     mockInvoke.mockReset()
     Object.keys(listeners).forEach(k => delete listeners[k])
-  })
-
-  it('downloadedModels filters to available models', () => {
-    const store = useEnginesStore()
-    store.models = [
-      makeModel({ id: 'a', is_downloaded: true }),
-      makeModel({ id: 'b', is_downloaded: false }),
-      makeModel({ id: 'c', download_type: { type: 'RemoteAPI' }, is_downloaded: false }),
-    ]
-    expect(store.downloadedModels.map(m => m.id)).toEqual(['a', 'c'])
   })
 
   it('asrEngines filters by category', () => {

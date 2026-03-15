@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import { emit } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { LogicalSize } from '@tauri-apps/api/dpi'
@@ -72,9 +71,9 @@ async function onSave(provider: Provider) {
   saveError.value = ''
   try {
     if (providerId) {
-      await invoke('update_provider', { provider })
+      await engines.updateProvider(provider)
     } else {
-      await invoke('add_provider', { provider })
+      await engines.addProvider(provider)
     }
     await emit('provider-saved')
     getCurrentWindow().close()

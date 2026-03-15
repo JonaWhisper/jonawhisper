@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { hasAsrSupport, hasLlmSupport } from '@/config/providers'
 import { useSettingsStore } from './settings'
 import { isModelAvailable, parseCloudId } from './types'
@@ -195,23 +195,30 @@ export const useEnginesStore = defineStore('engines', () => {
   }
 
   // Listeners
+  const unlistenFns: UnlistenFn[] = []
+
   function setupListeners() {
     listen('permission-changed', () => {
       fetchPermissions()
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen('models-changed', () => {
       fetchModels()
-    })
+    }).then(fn => unlistenFns.push(fn))
 
     listen<string[]>('model-updates-available', (event) => {
       updatableModelIds.value = new Set(event.payload)
-    })
+    }).then(fn => unlistenFns.push(fn))
+  }
+
+  function cleanup() {
+    unlistenFns.forEach(fn => fn())
+    unlistenFns.length = 0
   }
 
   return {
     engines, models, languages, audioDevices, providers, providerPresets, permissions,
-    downloadedModels, asrEngines, llmEngines,
+    asrEngines, llmEngines,
     punctuationEngines,
     correctionEngines,
     spellcheckEngines, hasSpellcheckDict, languageModelEngines,
@@ -222,6 +229,6 @@ export const useEnginesStore = defineStore('engines', () => {
     fetchPermissions, fetchProviderPresets, fetchProviders,
     requestPermission, addProvider, removeProvider, updateProvider,
     detectProviders, toggleProviderEnabled,
-    setupListeners,
+    setupListeners, cleanup,
   }
 })
