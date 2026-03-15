@@ -137,7 +137,13 @@ pub struct DetectorRegistration {
     /// Human-readable name (e.g. "Claude Code", "Environment Variables").
     pub display_name: &'static str,
     /// Detection function — returns all credentials found by this detector.
+    /// May return credentials with empty `api_key` for probe-only detection
+    /// (e.g. Keychain existence check without reading the secret).
     pub detect: fn() -> Vec<DetectedCredential>,
+    /// Optional refresh function that actually reads the credential secret.
+    /// Used by `refresh_credential()` when the provider is activated.
+    /// If `None`, falls back to `detect`.
+    pub refresh: Option<fn() -> Vec<DetectedCredential>>,
 }
 
 inventory::collect!(DetectorRegistration);
@@ -313,6 +319,7 @@ mod tests {
             id: "test",
             display_name: "Test",
             detect: || vec![],
+            refresh: None,
         };
         assert_eq!(reg.id, "test");
         assert!((reg.detect)().is_empty());

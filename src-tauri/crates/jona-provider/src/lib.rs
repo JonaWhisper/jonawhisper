@@ -91,10 +91,12 @@ pub fn preset(id: &str) -> Option<&'static ProviderPreset> {
 }
 
 /// Re-run a specific detector to get fresh credentials (e.g. refreshed OAuth tokens).
+/// Uses the `refresh` function if available (reads the actual secret), otherwise falls back to `detect`.
 pub fn refresh_credential(detector_id: &str, kind: &str) -> Option<DetectedCredential> {
     for reg in inventory::iter::<DetectorRegistration> {
         if reg.id == detector_id {
-            let creds = (reg.detect)();
+            let func = reg.refresh.unwrap_or(reg.detect);
+            let creds = func();
             return creds.into_iter().find(|c| c.kind == kind);
         }
     }

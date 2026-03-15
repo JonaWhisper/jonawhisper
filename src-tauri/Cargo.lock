@@ -3534,10 +3534,12 @@ dependencies = [
 name = "jona-detector-claude-code"
 version = "0.1.0"
 dependencies = [
+ "core-foundation 0.10.1",
  "inventory",
  "jona-types",
  "keyring",
  "log",
+ "security-framework-sys",
  "serde_json",
  "whoami",
 ]

@@ -8,8 +8,16 @@
 //! The token is tied to the user's Claude subscription (Pro/Max/Team).
 //! It expires ~8h and is refreshed by Claude Code.
 //!
-//! This detector caches the token internally and only re-reads the Keychain
-//! when the token has expired (based on `expiresAt` from the JSON).
+//! ## Two-phase detection
+//!
+//! 1. **Probe** (`detect()`): checks if the Keychain entry *exists* via
+//!    `SecItemCopyMatching` with attributes-only (no `kSecReturnData`).
+//!    This does NOT trigger a macOS authorization popup. Returns a
+//!    `DetectedCredential` with an empty `api_key`.
+//!
+//! 2. **Read** (`refresh_credential`): called when the provider is actually
+//!    used for an API call. Reads the secret from the Keychain (may prompt
+//!    once for authorization) and caches the token until it expires.
 //!
 //! This crate is macOS-only: it is listed under `[target.'cfg(target_os = "macos")'.dependencies]`
 //! in the main Cargo.toml and is not compiled on other platforms.
@@ -37,8 +45,50 @@ mod keychain {
             .as_millis() as u64
     }
 
+    /// Check if the Keychain entry exists WITHOUT reading the secret.
+    /// Uses `SecItemCopyMatching` with attributes-only — no authorization popup.
+    fn entry_exists() -> bool {
+        use core_foundation::base::{CFType, TCFType};
+        use core_foundation::boolean::CFBoolean;
+        use core_foundation::dictionary::CFDictionary;
+        use core_foundation::string::CFString;
+
+        let username = whoami::username();
+
+        let keys = vec![
+            unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecClass) },
+            unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecAttrService) },
+            unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecAttrAccount) },
+            unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecReturnAttributes) },
+        ];
+        let values: Vec<CFType> = vec![
+            unsafe { CFType::wrap_under_get_rule(security_framework_sys::item::kSecClassGenericPassword as *const _) },
+            CFString::new(KEYCHAIN_SERVICE).as_CFType(),
+            CFString::new(&username).as_CFType(),
+            CFBoolean::true_value().as_CFType(),
+        ];
+
+        let query = CFDictionary::from_CFType_pairs(&keys.iter().zip(values.iter()).map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>());
+
+        let mut result = std::ptr::null();
+        let status = unsafe {
+            security_framework_sys::keychain_item::SecItemCopyMatching(
+                query.as_concrete_TypeRef(),
+                &mut result,
+            )
+        };
+
+        if !result.is_null() {
+            unsafe { core_foundation::base::CFRelease(result) };
+        }
+
+        status == 0 // errSecSuccess
+    }
+
+    /// Probe-only: check if Claude Code credentials exist in the Keychain.
+    /// Returns a credential with empty api_key (token is read lazily via refresh).
     pub(crate) fn detect() -> Vec<DetectedCredential> {
-        // Check cache first
+        // If we have a valid cached token, return it directly
         {
             let cache = CACHE.lock().unwrap();
             if let Some(ref cached) = *cache {
@@ -53,11 +103,44 @@ mod keychain {
                         extra: std::collections::HashMap::new(),
                     }];
                 }
-                log::debug!("claude-code detector: cached token expired, re-reading Keychain");
             }
         }
 
-        // Cache miss or expired — read from Keychain
+        // Probe without reading the secret — no popup
+        if entry_exists() {
+            log::debug!("claude-code detector: Keychain entry exists (probe, no secret read)");
+            vec![DetectedCredential {
+                kind: "anthropic",
+                source_label: "Claude Code",
+                api_key: String::new(), // empty = not yet read
+                url: String::new(),
+                extra: std::collections::HashMap::new(),
+            }]
+        } else {
+            log::debug!("claude-code detector: no Keychain entry found");
+            vec![]
+        }
+    }
+
+    /// Actually read the token from Keychain (called via refresh_credential).
+    /// This MAY trigger a macOS authorization popup on first access.
+    pub(crate) fn read_token() -> Vec<DetectedCredential> {
+        // Check cache first
+        {
+            let cache = CACHE.lock().unwrap();
+            if let Some(ref cached) = *cache {
+                if now_ms() < cached.expires_at_ms {
+                    return vec![DetectedCredential {
+                        kind: "anthropic",
+                        source_label: "Claude Code",
+                        api_key: cached.token.clone(),
+                        url: String::new(),
+                        extra: std::collections::HashMap::new(),
+                    }];
+                }
+            }
+        }
+
         let username = whoami::username();
         let entry = match keyring::Entry::new(KEYCHAIN_SERVICE, &username) {
             Ok(e) => e,
@@ -82,11 +165,10 @@ mod keychain {
         };
 
         log::debug!(
-            "claude-code detector: found OAuth token, expires in {}s",
+            "claude-code detector: read OAuth token, expires in {}s",
             expires_at_ms.saturating_sub(now_ms()) / 1000
         );
 
-        // Update cache
         *CACHE.lock().unwrap() = Some(CachedToken {
             token: token.clone(),
             expires_at_ms,
@@ -105,6 +187,13 @@ mod keychain {
 fn detect() -> Vec<DetectedCredential> {
     #[cfg(target_os = "macos")]
     { keychain::detect() }
+    #[cfg(not(target_os = "macos"))]
+    { vec![] }
+}
+
+fn refresh() -> Vec<DetectedCredential> {
+    #[cfg(target_os = "macos")]
+    { keychain::read_token() }
     #[cfg(not(target_os = "macos"))]
     { vec![] }
 }
@@ -146,6 +235,7 @@ inventory::submit! {
         id: "claude-code",
         display_name: "Claude Code",
         detect,
+        refresh: Some(refresh),
     }
 }
 
@@ -196,6 +286,7 @@ mod tests {
             id: "claude-code",
             display_name: "Claude Code",
             detect,
+            refresh: Some(refresh),
         };
         assert_eq!(reg.id, "claude-code");
     }
