@@ -126,15 +126,16 @@ impl AppState {
         // Build set of detector IDs to skip: a detector is skipped when every
         // provider it previously produced has been explicitly disabled by the user.
         let skip_owned: std::collections::HashSet<String> = {
-            // Copy settings data first, then drop lock before taking detected_providers
-            // (avoids inverted lock ordering with toggle_provider_enabled).
-            let enabled_map = self.settings.lock().unwrap().detected_enabled.clone();
-            let detected = self.detected_providers.lock().unwrap();
+            // Use persisted maps (survive restarts) to decide which detectors to skip.
+            // A detector is skipped when ALL its providers are explicitly disabled.
+            let settings = self.settings.lock().unwrap();
+            let enabled_map = &settings.detected_enabled;
+            let sources_map = &settings.detected_sources;
             let mut detector_ids: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
-            for p in detected.iter() {
-                if let Some(source) = p.source.as_deref() {
-                    let all_disabled = detector_ids.entry(source.to_string()).or_insert(true);
-                    if enabled_map.get(&p.id).copied().unwrap_or(false) {
+            for (provider_id, &enabled) in enabled_map {
+                if let Some(detector_id) = sources_map.get(provider_id) {
+                    let all_disabled = detector_ids.entry(detector_id.clone()).or_insert(true);
+                    if enabled {
                         *all_disabled = false;
                     }
                 }
@@ -182,13 +183,22 @@ impl AppState {
         }
         log::info!("Auto-detection: {} provider(s) found", detected.len());
 
-        // Prune orphan entries from detected_enabled (detectors that no longer return credentials)
+        // Persist detector sources and prune orphan entries
         let detected_ids: std::collections::HashSet<&str> = detected.iter().map(|p| p.id.as_str()).collect();
         let mut s = self.settings.lock().unwrap();
-        let before = s.detected_enabled.len();
+        // Update detected_sources mapping (provider_id → detector_id)
+        for p in &detected {
+            if let Some(source) = &p.source {
+                s.detected_sources.insert(p.id.clone(), source.clone());
+            }
+        }
+        // Prune orphan entries (detectors that no longer return credentials)
+        let before = s.detected_enabled.len() + s.detected_sources.len();
         s.detected_enabled.retain(|id, _| detected_ids.contains(id.as_str()));
-        if s.detected_enabled.len() != before {
-            drop(s);
+        s.detected_sources.retain(|id, _| detected_ids.contains(id.as_str()));
+        let after = s.detected_enabled.len() + s.detected_sources.len();
+        drop(s);
+        if before != after || !detected.is_empty() {
             self.save_preferences();
         }
 

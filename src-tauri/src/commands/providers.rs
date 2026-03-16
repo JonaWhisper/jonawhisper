@@ -308,9 +308,15 @@ pub fn toggle_provider_enabled(id: String, enabled: bool, state: tauri::State<'_
     let mut detected = state.detected_providers.lock().unwrap();
     if let Some(p) = detected.iter_mut().find(|p| p.id == id) {
         p.enabled = enabled;
+        let source = p.source.clone();
         drop(detected);
-        // Persist enabled state so it survives restarts
-        state.settings.lock().unwrap().detected_enabled.insert(id, enabled);
+        // Persist enabled state + source mapping so it survives restarts
+        let mut s = state.settings.lock().unwrap();
+        s.detected_enabled.insert(id.clone(), enabled);
+        if let Some(src) = source {
+            s.detected_sources.insert(id, src);
+        }
+        drop(s);
         state.save_preferences();
     }
     let _ = app.emit(events::SETTINGS_CHANGED, "providers");
