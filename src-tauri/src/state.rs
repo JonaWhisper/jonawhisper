@@ -126,13 +126,15 @@ impl AppState {
         // Build set of detector IDs to skip: a detector is skipped when every
         // provider it previously produced has been explicitly disabled by the user.
         let skip_owned: std::collections::HashSet<String> = {
-            let settings = self.settings.lock().unwrap();
+            // Copy settings data first, then drop lock before taking detected_providers
+            // (avoids inverted lock ordering with toggle_provider_enabled).
+            let enabled_map = self.settings.lock().unwrap().detected_enabled.clone();
             let detected = self.detected_providers.lock().unwrap();
             let mut detector_ids: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
             for p in detected.iter() {
                 if let Some(source) = p.source.as_deref() {
                     let all_disabled = detector_ids.entry(source.to_string()).or_insert(true);
-                    if settings.detected_enabled.get(&p.id).copied().unwrap_or(false) {
+                    if enabled_map.get(&p.id).copied().unwrap_or(false) {
                         *all_disabled = false;
                     }
                 }

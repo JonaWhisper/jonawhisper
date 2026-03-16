@@ -43,6 +43,29 @@ impl Default for ContextMap {
     }
 }
 
+/// RAII guard that removes an engine from the busy set on drop (including panic unwind).
+struct BusyGuard<'a> {
+    map: &'a ContextMap,
+    engine_id: String,
+}
+
+impl<'a> BusyGuard<'a> {
+    /// Explicit release (avoids relying solely on Drop for the normal path).
+    fn release(self) {
+        // Drop runs the same logic
+    }
+}
+
+impl Drop for BusyGuard<'_> {
+    fn drop(&mut self) {
+        {
+            let mut busy = self.map.busy.lock().unwrap_or_else(|e| e.into_inner());
+            busy.remove(&self.engine_id);
+        }
+        self.map.ready.notify_all();
+    }
+}
+
 impl ContextMap {
     pub fn new() -> Self {
         Self::default()
@@ -70,14 +93,11 @@ impl ContextMap {
             }
             busy.insert(engine_id.to_string());
         }
-        // From here we "own" this engine_id — run_with on a helper that
-        // always releases the busy flag, even on early return / panic.
+        // Drop guard ensures the busy flag is always released, even on panic.
+        let engine_id_owned = engine_id.to_string();
+        let guard = BusyGuard { map: self, engine_id: engine_id_owned };
         let result = self.run_with_inner(engine_id, context_key, loader, action);
-        {
-            let mut busy = self.busy.lock().unwrap_or_else(|e| e.into_inner());
-            busy.remove(engine_id);
-        }
-        self.ready.notify_all();
+        guard.release();
         result
     }
 
