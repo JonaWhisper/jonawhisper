@@ -742,8 +742,8 @@ mod tests {
         let mut frames: Vec<Vec<u8>> = Vec::new();
         for mode in modes {
             let p = PillInner {
-                ns_window: std::ptr::null_mut(),
-                image_view: std::ptr::null_mut(),
+                ns_window: MainThreadPtr(std::ptr::null_mut()),
+                image_view: MainThreadPtr(std::ptr::null_mut()),
                 mode,
                 spectrum: [0.5; 12],
                 smoothed: [0.5; 12],
