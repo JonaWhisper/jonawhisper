@@ -148,7 +148,7 @@ async fn run_transcription(
 
     // Release ORT memory pools after long transcriptions to prevent unbounded growth.
     // The model will be reloaded on next use (~1-2s, happens while user speaks).
-    const ORT_RELEASE_THRESHOLD: f64 = 5.0;
+    const ORT_RELEASE_THRESHOLD: f64 = 30.0;
     if elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
         let rss_before = get_rss_bytes();
         let model_id = state.settings.lock().unwrap().selected_model_id.clone();
