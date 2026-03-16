@@ -126,16 +126,24 @@ impl AppState {
         // Build set of detector IDs to skip: a detector is skipped when every
         // provider it previously produced has been explicitly disabled by the user.
         let skip_owned: std::collections::HashSet<String> = {
-            // Copy settings data first, then drop lock before taking detected_providers
-            // (avoids inverted lock ordering with toggle_provider_enabled).
+            // Use persisted detected_enabled (survives restarts) to decide which
+            // detectors to skip. A detector is skipped when ALL its provider IDs
+            // in detected_enabled are explicitly set to false.
+            // Format of detected_enabled keys: "auto-{detector_id}-{kind}"
             let enabled_map = self.settings.lock().unwrap().detected_enabled.clone();
-            let detected = self.detected_providers.lock().unwrap();
+            // Group by detector_id (extracted from the provider ID pattern)
             let mut detector_ids: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
-            for p in detected.iter() {
-                if let Some(source) = p.source.as_deref() {
-                    let all_disabled = detector_ids.entry(source.to_string()).or_insert(true);
-                    if enabled_map.get(&p.id).copied().unwrap_or(false) {
-                        *all_disabled = false;
+            for (provider_id, &enabled) in &enabled_map {
+                // Provider IDs follow "auto-{detector_id}-{kind}" pattern
+                // e.g. "auto-claude-code-anthropic" → detector "claude-code"
+                if let Some(rest) = provider_id.strip_prefix("auto-") {
+                    // Find the detector_id: everything before the last '-' segment
+                    if let Some(last_dash) = rest.rfind('-') {
+                        let detector_id = &rest[..last_dash];
+                        let all_disabled = detector_ids.entry(detector_id.to_string()).or_insert(true);
+                        if enabled {
+                            *all_disabled = false;
+                        }
                     }
                 }
             }
