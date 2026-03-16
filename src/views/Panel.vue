@@ -68,8 +68,10 @@ onMounted(async () => {
         <button
           v-for="section in sections"
           :key="section.id"
+          :id="`tab-${section.id}`"
           role="tab"
           :aria-selected="activeSection === section.id"
+          :aria-controls="`panel-${section.id}`"
           @click="activeSection = section.id"
           class="rounded-lg px-2.5 py-1.5 text-sm transition-all border border-transparent hover:bg-sidebar-hover-bg w-full text-left"
           :class="activeSection === section.id ? 'bg-sidebar-active-bg border-sidebar-active-border font-medium' : ''"
@@ -134,7 +136,7 @@ onMounted(async () => {
       <!-- Drag region for content area -->
       <div class="h-9 shrink-0" data-tauri-drag-region />
 
-      <div role="tabpanel" class="flex-1 overflow-y-auto px-5 pb-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-panel-scrollbar [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-track]:bg-transparent">
+      <div role="tabpanel" :id="`panel-${activeSection}`" :aria-labelledby="`tab-${activeSection}`" class="flex-1 overflow-y-auto px-5 pb-5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-panel-scrollbar [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-track]:bg-transparent">
         <Transition name="fade" mode="out-in">
           <RecentsSection v-if="activeSection === 'recents'" key="recents" />
           <ModelsSection v-else-if="activeSection === 'models'" key="models" />

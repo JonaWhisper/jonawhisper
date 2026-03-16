@@ -132,7 +132,7 @@ impl AppState {
             for p in detected.iter() {
                 if let Some(source) = p.source.as_deref() {
                     let all_disabled = detector_ids.entry(source.to_string()).or_insert(true);
-                    if settings.detected_enabled.get(&p.id).copied().unwrap_or(false) {
+                    if settings.detected_enabled.get(&p.id).copied().unwrap_or(true) {
                         *all_disabled = false;
                     }
                 }
@@ -161,7 +161,7 @@ impl AppState {
             } else {
                 cred.url
             };
-            let enabled = enabled_states.get(&id).copied().unwrap_or(false);
+            let enabled = enabled_states.get(&id).copied().unwrap_or(true);
             detected.push(Provider {
                 id,
                 name: format!("{} ({})", preset_name, cred.source_label),
