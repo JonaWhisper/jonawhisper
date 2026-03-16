@@ -3,8 +3,6 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { Slider } from '@/components/ui/slider'
 
-defineOptions({ inheritAttrs: false })
-
 const { t } = useI18n()
 const settings = useSettingsStore()
 
@@ -19,7 +17,7 @@ function onCommit(v: number[]) {
 </script>
 
 <template>
-  <div class="flex items-center justify-between py-2 gap-3" :class="$attrs.class">
+  <div class="flex items-center justify-between py-2 gap-3">
     <div>
       <div class="text-[13px] text-foreground">{{ t('settings.llm.maxTokens') }}</div>
     </div>

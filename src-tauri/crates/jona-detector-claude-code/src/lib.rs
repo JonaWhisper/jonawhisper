@@ -55,7 +55,7 @@ mod keychain {
 
         let username = whoami::username();
 
-        let keys = vec![
+        let keys = [
             unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecClass) },
             unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecAttrService) },
             unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecAttrAccount) },
