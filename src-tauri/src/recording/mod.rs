@@ -71,6 +71,7 @@ fn show_error_then_close(app: &tauri::AppHandle) {
     });
 }
 
+pub use pipeline::get_rss_bytes;
 pub use threads::{spawn_audio_thread, spawn_hotkey_handler, spawn_spectrum_emitter, AudioThreadHandles};
 
 pub fn cleanup_orphan_audio_files() {

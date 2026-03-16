@@ -143,7 +143,26 @@ async fn run_transcription(
         transcribe(&state_clone, &path)
     });
     let result = tokio::time::timeout(Duration::from_secs(120), task).await;
-    log::info!("Transcription total: {:.1}s", t0.elapsed().as_secs_f64());
+    let elapsed = t0.elapsed();
+    log::info!("Transcription total: {:.1}s | RSS: {}", elapsed.as_secs_f64(), format_rss());
+
+    // Release ORT memory pools after long transcriptions to prevent unbounded growth.
+    // The model will be reloaded on next use (~1-2s, happens while user speaks).
+    const ORT_RELEASE_THRESHOLD: f64 = 5.0;
+    if elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
+        let rss_before = get_rss_bytes();
+        let model_id = state.settings.lock().unwrap().selected_model_id.clone();
+        // Find the engine_id for this model to invalidate only the ASR context
+        if let Some(model) = EngineCatalog::global().model_by_id(&model_id) {
+            state.contexts.invalidate(&model.engine_id);
+            let rss_after = get_rss_bytes();
+            let freed_mb = rss_before.saturating_sub(rss_after) as f64 / (1024.0 * 1024.0);
+            log::info!(
+                "ORT memory released for engine={} after {:.1}s transcription (freed ~{:.0} MB, RSS: {})",
+                model.engine_id, elapsed.as_secs_f64(), freed_mb, format_rss()
+            );
+        }
+    }
 
     match result {
         Ok(Ok(Ok(tr))) => {
@@ -622,6 +641,43 @@ fn vad_preprocess(audio_path: &std::path::Path) -> VadResult {
             }
             VadResult::Trimmed
         }
+    }
+}
+
+/// Get the RSS (Resident Set Size) of the current process in bytes.
+#[cfg(target_os = "macos")]
+#[allow(deprecated)] // libc::mach_task_self deprecated in favor of mach2, but mach2 lacks task_basic_info
+pub fn get_rss_bytes() -> u64 {
+    use std::mem::MaybeUninit;
+    let mut info = MaybeUninit::<libc::mach_task_basic_info_data_t>::uninit();
+    let mut count = (std::mem::size_of::<libc::mach_task_basic_info_data_t>()
+        / std::mem::size_of::<libc::natural_t>()) as libc::mach_msg_type_number_t;
+    let kr = unsafe {
+        libc::task_info(
+            libc::mach_task_self(),
+            libc::MACH_TASK_BASIC_INFO,
+            info.as_mut_ptr() as libc::task_info_t,
+            &mut count,
+        )
+    };
+    if kr == libc::KERN_SUCCESS {
+        unsafe { info.assume_init() }.resident_size
+    } else {
+        0
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn get_rss_bytes() -> u64 { 0 }
+
+fn format_rss() -> String {
+    let bytes = get_rss_bytes();
+    if bytes == 0 { return "N/A".to_string(); }
+    let mb = bytes as f64 / (1024.0 * 1024.0);
+    if mb >= 1024.0 {
+        format!("{:.1} GB", mb / 1024.0)
+    } else {
+        format!("{:.0} MB", mb)
     }
 }
 

@@ -152,6 +152,14 @@ impl ContextMap {
     pub fn invalidate(&self, engine_id: &str) {
         self.entries.lock().unwrap_or_else(|e| e.into_inner()).remove(engine_id);
     }
+
+    /// List loaded engine IDs and their context keys (for diagnostics).
+    pub fn list_entries(&self) -> Vec<(String, String)> {
+        self.entries.lock().unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(id, e)| (id.clone(), e.key.clone()))
+            .collect()
+    }
 }
 
 // -- History --

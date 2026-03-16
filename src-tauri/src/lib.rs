@@ -270,6 +270,7 @@ pub fn run() {
             commands::app::stop_shortcut_capture,
             #[cfg(debug_assertions)]
             commands::app::simulate_pill_test,
+            commands::app::get_memory_info,
             commands::app::check_for_update,
             commands::app::install_update,
         ])
