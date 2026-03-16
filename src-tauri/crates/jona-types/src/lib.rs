@@ -567,6 +567,8 @@ pub struct Preferences {
     pub spellcheck_enabled: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_true")]
+    pub auto_release_memory: bool,
     #[serde(default = "default_log_level")]
     pub log_level: String,
     /// Log retention mode: "previous" (current+prev), "3days", "7days", "30days", "all" (keep forever)

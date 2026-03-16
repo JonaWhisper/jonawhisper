@@ -250,6 +250,8 @@
   "diagnostic.rss": "Memory usage (RSS)",
   "diagnostic.loadedContexts": "Loaded models",
   "diagnostic.noContexts": "No models loaded",
+  "diagnostic.autoRelease": "Automatic memory release",
+  "diagnostic.autoReleaseHint": "Frees model memory after long dictations",
   "diagnostic.loading": "Loading\u2026",
   "menu.panel": "Settings\u2026",
   "window.panel": "JonaWhisper"

@@ -3,8 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { invoke } from '@tauri-apps/api/core'
 import { Activity, Cpu } from 'lucide-vue-next'
+import { useSettingsStore } from '@/stores/settings'
+import { Switch } from '@/components/ui/switch'
 
 const { t } = useI18n()
+const settings = useSettingsStore()
 
 interface MemoryInfo {
   rss_mb: number
@@ -35,6 +38,10 @@ function formatRss(mb: number): string {
   if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
   return `${Math.round(mb)} MB`
 }
+
+function onAutoReleaseChange(checked: boolean) {
+  settings.setSetting('auto_release_memory', String(checked))
+}
 </script>
 
 <template>
@@ -54,6 +61,18 @@ function formatRss(mb: number): string {
           <span class="text-[13px] font-mono tabular-nums" :class="memoryInfo.rss_mb > 3000 ? 'text-red-500' : memoryInfo.rss_mb > 2000 ? 'text-amber-500' : 'text-foreground'">
             {{ formatRss(memoryInfo.rss_mb) }}
           </span>
+        </div>
+
+        <!-- Auto release toggle -->
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-[13px] text-foreground">{{ t('diagnostic.autoRelease') }}</div>
+            <div class="text-[11px] text-muted-foreground">{{ t('diagnostic.autoReleaseHint') }}</div>
+          </div>
+          <Switch
+            :checked="settings.autoReleaseMemory"
+            @update:checked="onAutoReleaseChange"
+          />
         </div>
 
         <!-- Loaded contexts -->

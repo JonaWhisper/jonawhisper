@@ -26,6 +26,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const spellcheckEnabled = ref(false)
   const appLocale = ref('auto')
   const theme = ref('system')
+  const autoReleaseMemory = ref(true)
   const logLevel = ref('info')
   const logRetention = ref('previous')
 
@@ -47,6 +48,7 @@ export const useSettingsStore = defineStore('settings', () => {
       asrCloudModel.value = s.asr_cloud_model ?? 'whisper-1'
       gpuMode.value = s.gpu_mode ?? 'auto'
       llmMaxTokens.value = s.llm_max_tokens ?? 4096
+      autoReleaseMemory.value = s.auto_release_memory ?? true
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
       vadEnabled.value = s.vad_enabled ?? true
@@ -76,6 +78,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'asr_cloud_model': return asrCloudModel.value
       case 'gpu_mode': return gpuMode.value
       case 'llm_max_tokens': return String(llmMaxTokens.value)
+      case 'auto_release_memory': return String(autoReleaseMemory.value)
       case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
       case 'audio_ducking_level': return String(audioDuckingLevel.value)
       case 'vad_enabled': return String(vadEnabled.value)
@@ -106,6 +109,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'asr_cloud_model': asrCloudModel.value = value; break
       case 'gpu_mode': gpuMode.value = value; break
       case 'llm_max_tokens': llmMaxTokens.value = parseInt(value, 10) || 4096; break
+      case 'auto_release_memory': autoReleaseMemory.value = value === 'true'; break
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
@@ -142,6 +146,7 @@ export const useSettingsStore = defineStore('settings', () => {
     textCleanupEnabled, punctuationModelId, cleanupModelId, llmModel, llmMaxTokens,
     hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
+    autoReleaseMemory,
     hotkey, cancelShortcut, recordingMode, appLocale, theme, logLevel, logRetention,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,
     selectModel, selectLanguageAction,
