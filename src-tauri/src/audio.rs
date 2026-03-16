@@ -343,7 +343,13 @@ fn process_samples(
             None
         }
     } else {
-        log::warn!("process_samples: fft_buffer lock contention, FFT skipped");
+        // Rate-limit: log only once per ~1000 misses to avoid spamming from the realtime thread
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static FFT_MISS_COUNT: AtomicU32 = AtomicU32::new(0);
+        let n = FFT_MISS_COUNT.fetch_add(1, Ordering::Relaxed);
+        if n == 0 || n.is_multiple_of(1000) {
+            log::warn!("process_samples: fft_buffer lock contention, FFT skipped (total: {})", n + 1);
+        }
         None
     };
 
