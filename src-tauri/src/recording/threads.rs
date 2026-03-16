@@ -142,11 +142,15 @@ pub fn spawn_spectrum_emitter(
     // so ~4-6 frames will be flat before the first real spectrum is computed.
     const FLAT_GRACE_FRAMES: u32 = 8;
     const SMOOTHING: f32 = 0.55; // new data weight (old = 1 - this)
+    // Visual flat threshold: bars below this value render at minimum height (4px),
+    // appearing flat to the user. Must match pill.rs: (val * max_h).max(2*DPR).
+    const VISUAL_FLAT_THRESHOLD: f32 = 0.12;
 
     std::thread::spawn(move || {
         let mut flat_frames_since_active = 0u32;
         let mut was_active = false;
         let mut smoothed = [0.0f32; 12];
+        let mut frames_since_active = 0u32;
 
         loop {
             std::thread::sleep(Duration::from_millis(SPECTRUM_INTERVAL_MS));
@@ -155,6 +159,7 @@ pub fn spawn_spectrum_emitter(
             if !state.audio_flags.is_active() {
                 was_active = false;
                 flat_frames_since_active = 0;
+                frames_since_active = 0;
                 smoothed = [0.0; 12];
                 continue;
             }
@@ -163,9 +168,11 @@ pub fn spawn_spectrum_emitter(
             if !was_active {
                 was_active = true;
                 flat_frames_since_active = 0;
+                frames_since_active = 0;
                 smoothed = [0.0; 12];
             }
 
+            frames_since_active += 1;
             let is_mic_testing = state.audio_flags.is_mic_testing();
 
             // Detect audio stream error (e.g. device disconnected)
@@ -193,20 +200,46 @@ pub fn spawn_spectrum_emitter(
                 *s = *s * old_weight + r * SMOOTHING;
             }
 
-            let is_flat = smoothed.iter().all(|&v| v < 0.001);
-            if is_flat && !is_mic_testing && state.audio_flags.is_recording()
+            let max_raw = raw.iter().cloned().fold(0.0f32, f32::max);
+            let max_smoothed = smoothed.iter().cloned().fold(0.0f32, f32::max);
+
+            // Diagnostic: log spectrum values periodically (~1s intervals) while recording
+            if !is_mic_testing && state.audio_flags.is_recording()
+                && samples_received.load(Ordering::Relaxed)
+                && frames_since_active > FLAT_GRACE_FRAMES
+                && frames_since_active.is_multiple_of(30)
+            {
+                log::debug!(
+                    "Spectrum diagnostic (frame {}): raw_max={:.4}, smoothed_max={:.4}, raw=[{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3},{:.3}]",
+                    frames_since_active, max_raw, max_smoothed,
+                    raw[0], raw[1], raw[2], raw[3], raw[4], raw[5],
+                    raw[6], raw[7], raw[8], raw[9], raw[10], raw[11],
+                );
+            }
+
+            // Flat detection: use visual threshold (bars appear flat below this)
+            let is_visually_flat = max_smoothed < VISUAL_FLAT_THRESHOLD;
+            let is_numerically_flat = max_smoothed < 0.001;
+            if (is_numerically_flat || is_visually_flat) && !is_mic_testing
+                && state.audio_flags.is_recording()
                 && samples_received.load(Ordering::Relaxed)
             {
                 flat_frames_since_active += 1;
                 if flat_frames_since_active == FLAT_GRACE_FRAMES + 1 {
-                    log::warn!("Spectrum flat while recording after grace period (frame {})", flat_frames_since_active);
+                    if is_numerically_flat {
+                        log::warn!("Spectrum flat while recording (frame {}, raw_max={:.6})", flat_frames_since_active, max_raw);
+                    } else {
+                        log::warn!("Spectrum visually flat while recording (frame {}, smoothed_max={:.4}, raw_max={:.4})", flat_frames_since_active, max_smoothed, max_raw);
+                    }
                 } else if flat_frames_since_active > FLAT_GRACE_FRAMES && flat_frames_since_active.is_multiple_of(30) {
-                    log::warn!("Spectrum still flat (frame {}, ~{:.1}s)", flat_frames_since_active,
-                        flat_frames_since_active as f32 * SPECTRUM_INTERVAL_MS as f32 / 1000.0);
+                    log::warn!("Spectrum still flat (frame {}, ~{:.1}s, smoothed_max={:.4}, raw_max={:.4})",
+                        flat_frames_since_active,
+                        flat_frames_since_active as f32 * SPECTRUM_INTERVAL_MS as f32 / 1000.0,
+                        max_smoothed, max_raw);
                 }
-            } else if !is_flat {
+            } else if !is_visually_flat {
                 if flat_frames_since_active > FLAT_GRACE_FRAMES {
-                    log::info!("Spectrum recovered after {} flat frames", flat_frames_since_active);
+                    log::info!("Spectrum recovered after {} flat frames (smoothed_max={:.4})", flat_frames_since_active, max_smoothed);
                 }
                 flat_frames_since_active = 0;
             }

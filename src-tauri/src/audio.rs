@@ -343,7 +343,7 @@ fn process_samples(
             None
         }
     } else {
-        log::trace!("process_samples: fft_buffer lock contention");
+        log::warn!("process_samples: fft_buffer lock contention, FFT skipped");
         None
     };
 
