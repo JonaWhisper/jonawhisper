@@ -149,10 +149,8 @@ export const useEnginesStore = defineStore('engines', () => {
   }
 
   async function addProvider(provider: Provider) {
-    try {
-      await invoke('add_provider', { provider })
-      await fetchProviders()
-    } catch (e) { console.error('addProvider failed:', e) }
+    await invoke('add_provider', { provider })
+    await fetchProviders()
   }
 
   async function removeProvider(id: string) {
@@ -163,10 +161,8 @@ export const useEnginesStore = defineStore('engines', () => {
   }
 
   async function updateProvider(provider: Provider) {
-    try {
-      await invoke('update_provider', { provider })
-      await fetchProviders()
-    } catch (e) { console.error('updateProvider failed:', e) }
+    await invoke('update_provider', { provider })
+    await fetchProviders()
   }
 
   async function detectProviders() {

@@ -83,27 +83,35 @@ impl ContextMap {
                 }
             }
 
-            // Only load if we inserted the sentinel
+            // Only load if we inserted the sentinel (use local flag to avoid re-locking)
             let we_are_loading = self.loading.lock().unwrap_or_else(|e| e.into_inner()).contains(engine_id);
             if we_are_loading {
                 log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
                 let start = std::time::Instant::now();
                 let result = loader();
 
-                // Remove sentinel and notify waiters regardless of success/failure
-                {
-                    let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
-                    loading.remove(engine_id);
-                    self.loading_done.notify_all();
+                match result {
+                    Ok(ctx) => {
+                        log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
+                        // Insert BEFORE removing sentinel — waiters must see the entry
+                        let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+                        map.insert(engine_id.to_string(), ContextEntry {
+                            key: context_key.to_string(),
+                            ctx,
+                        });
+                        drop(map);
+                        let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
+                        loading.remove(engine_id);
+                        self.loading_done.notify_all();
+                    }
+                    Err(e) => {
+                        // Remove sentinel on failure so waiters can retry
+                        let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
+                        loading.remove(engine_id);
+                        self.loading_done.notify_all();
+                        return Err(e);
+                    }
                 }
-
-                let ctx = result?;
-                log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
-                let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
-                map.insert(engine_id.to_string(), ContextEntry {
-                    key: context_key.to_string(),
-                    ctx,
-                });
             }
         }
 
