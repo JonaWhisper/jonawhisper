@@ -126,24 +126,17 @@ impl AppState {
         // Build set of detector IDs to skip: a detector is skipped when every
         // provider it previously produced has been explicitly disabled by the user.
         let skip_owned: std::collections::HashSet<String> = {
-            // Use persisted detected_enabled (survives restarts) to decide which
-            // detectors to skip. A detector is skipped when ALL its provider IDs
-            // in detected_enabled are explicitly set to false.
-            // Format of detected_enabled keys: "auto-{detector_id}-{kind}"
-            let enabled_map = self.settings.lock().unwrap().detected_enabled.clone();
-            // Group by detector_id (extracted from the provider ID pattern)
+            // Use persisted maps (survive restarts) to decide which detectors to skip.
+            // A detector is skipped when ALL its providers are explicitly disabled.
+            let settings = self.settings.lock().unwrap();
+            let enabled_map = &settings.detected_enabled;
+            let sources_map = &settings.detected_sources;
             let mut detector_ids: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
-            for (provider_id, &enabled) in &enabled_map {
-                // Provider IDs follow "auto-{detector_id}-{kind}" pattern
-                // e.g. "auto-claude-code-anthropic" → detector "claude-code"
-                if let Some(rest) = provider_id.strip_prefix("auto-") {
-                    // Find the detector_id: everything before the last '-' segment
-                    if let Some(last_dash) = rest.rfind('-') {
-                        let detector_id = &rest[..last_dash];
-                        let all_disabled = detector_ids.entry(detector_id.to_string()).or_insert(true);
-                        if enabled {
-                            *all_disabled = false;
-                        }
+            for (provider_id, &enabled) in enabled_map {
+                if let Some(detector_id) = sources_map.get(provider_id) {
+                    let all_disabled = detector_ids.entry(detector_id.clone()).or_insert(true);
+                    if enabled {
+                        *all_disabled = false;
                     }
                 }
             }
@@ -190,13 +183,22 @@ impl AppState {
         }
         log::info!("Auto-detection: {} provider(s) found", detected.len());
 
-        // Prune orphan entries from detected_enabled (detectors that no longer return credentials)
+        // Persist detector sources and prune orphan entries
         let detected_ids: std::collections::HashSet<&str> = detected.iter().map(|p| p.id.as_str()).collect();
         let mut s = self.settings.lock().unwrap();
-        let before = s.detected_enabled.len();
+        // Update detected_sources mapping (provider_id → detector_id)
+        for p in &detected {
+            if let Some(source) = &p.source {
+                s.detected_sources.insert(p.id.clone(), source.clone());
+            }
+        }
+        // Prune orphan entries (detectors that no longer return credentials)
+        let before = s.detected_enabled.len() + s.detected_sources.len();
         s.detected_enabled.retain(|id, _| detected_ids.contains(id.as_str()));
-        if s.detected_enabled.len() != before {
-            drop(s);
+        s.detected_sources.retain(|id, _| detected_ids.contains(id.as_str()));
+        let after = s.detected_enabled.len() + s.detected_sources.len();
+        drop(s);
+        if before != after || !detected.is_empty() {
             self.save_preferences();
         }
 

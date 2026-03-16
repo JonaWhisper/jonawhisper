@@ -567,6 +567,9 @@ pub struct Preferences {
     /// Persisted enabled state for auto-detected providers (key = provider id)
     #[serde(default)]
     pub detected_enabled: std::collections::HashMap<String, bool>,
+    /// Maps provider IDs to their detector IDs (persisted for skip logic on restart)
+    #[serde(default)]
+    pub detected_sources: std::collections::HashMap<String, String>,
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
