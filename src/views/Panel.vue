@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
 import { useAppStore } from '@/stores/app'
-import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2, BookOpen, Download, RefreshCw, AlertTriangle } from 'lucide-vue-next'
+import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2, BookOpen, Activity, Download, RefreshCw, AlertTriangle } from 'lucide-vue-next'
 
 // Lazy-load sections — only the active one is loaded
 const RecentsSection = defineAsyncComponent(() => import('@/sections/RecentsSection.vue'))
@@ -17,6 +17,7 @@ const ProvidersSection = defineAsyncComponent(() => import('@/sections/Providers
 const PermissionsSection = defineAsyncComponent(() => import('@/sections/PermissionsSection.vue'))
 const GeneralSection = defineAsyncComponent(() => import('@/sections/GeneralSection.vue'))
 const DictionarySection = defineAsyncComponent(() => import('@/sections/DictionarySection.vue'))
+const DiagnosticSection = defineAsyncComponent(() => import('@/sections/DiagnosticSection.vue'))
 
 const { t } = useI18n()
 const store = useAppStore()
@@ -33,6 +34,7 @@ const sections = [
   { id: 'microphone', icon: Mic, label: 'panel.microphone' },
   { id: 'providers', icon: Cloud, label: 'panel.providers' },
   { id: 'permissions', icon: Shield, label: 'panel.permissions' },
+  { id: 'diagnostic', icon: Activity, label: 'panel.diagnostic' },
   { id: 'general', icon: Settings2, label: 'panel.general' },
 ]
 
@@ -147,6 +149,7 @@ onMounted(async () => {
           <MicrophoneSection v-else-if="activeSection === 'microphone'" key="microphone" />
           <ProvidersSection v-else-if="activeSection === 'providers'" key="providers" />
           <PermissionsSection v-else-if="activeSection === 'permissions'" key="permissions" />
+          <DiagnosticSection v-else-if="activeSection === 'diagnostic'" key="diagnostic" />
           <GeneralSection v-else-if="activeSection === 'general'" key="general" />
         </Transition>
       </div>
