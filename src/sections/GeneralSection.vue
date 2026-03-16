@@ -139,10 +139,10 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="error">Error</SelectItem>
-              <SelectItem value="warn">Warning</SelectItem>
-              <SelectItem value="info">Info</SelectItem>
-              <SelectItem value="debug">Debug</SelectItem>
+              <SelectItem value="error">{{ t('logLevel.error') }}</SelectItem>
+              <SelectItem value="warn">{{ t('logLevel.warn') }}</SelectItem>
+              <SelectItem value="info">{{ t('logLevel.info') }}</SelectItem>
+              <SelectItem value="debug">{{ t('logLevel.debug') }}</SelectItem>
             </SelectContent>
           </Select>
           <TooltipProvider :delay-duration="200">

@@ -234,6 +234,7 @@ fn get_ss(language: &str) -> bool {
 }
 
 /// Run a closure with the SymSpell instance for the given language.
+#[cfg(test)]
 fn with_ss<T>(language: &str, f: impl FnOnce(&SymSpell<UnicodeStringStrategy>) -> T) -> Option<T> {
     if !get_ss(language) {
         return None;
@@ -637,7 +638,7 @@ fn score_candidates_in_context(
 /// Correct an entire phrase using SymSpell's compound lookup.
 /// This handles word boundary errors (e.g. "jesuisallé" → "je suis allé").
 /// Returns text unchanged if the dict for the language is not downloaded.
-#[allow(dead_code)]
+#[cfg(test)]
 pub fn correct_compound(text: &str, language: &str) -> String {
     with_ss(language, |ss| {
         let mut result = String::with_capacity(text.len());

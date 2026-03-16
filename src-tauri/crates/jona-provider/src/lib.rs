@@ -91,10 +91,12 @@ pub fn preset(id: &str) -> Option<&'static ProviderPreset> {
 }
 
 /// Re-run a specific detector to get fresh credentials (e.g. refreshed OAuth tokens).
+/// Uses the `refresh` function if available (reads the actual secret), otherwise falls back to `detect`.
 pub fn refresh_credential(detector_id: &str, kind: &str) -> Option<DetectedCredential> {
     for reg in inventory::iter::<DetectorRegistration> {
         if reg.id == detector_id {
-            let creds = (reg.detect)();
+            let func = reg.refresh.unwrap_or(reg.detect);
+            let creds = func();
             return creds.into_iter().find(|c| c.kind == kind);
         }
     }
@@ -102,9 +104,15 @@ pub fn refresh_credential(detector_id: &str, kind: &str) -> Option<DetectedCrede
 }
 
 /// Run all registered detectors and return found credentials with their detector ID.
-pub fn detect_all() -> Vec<(DetectedCredential, &'static str)> {
+/// Detectors whose ID is in `skip` are not executed (avoids e.g. Keychain popups
+/// for providers the user has explicitly disabled).
+pub fn detect_all(skip: &std::collections::HashSet<&str>) -> Vec<(DetectedCredential, &'static str)> {
     let mut results = Vec::new();
     for reg in inventory::iter::<DetectorRegistration> {
+        if skip.contains(reg.id) {
+            log::debug!("Skipping disabled detector: {} ({})", reg.display_name, reg.id);
+            continue;
+        }
         log::debug!("Running detector: {} ({})", reg.display_name, reg.id);
         let creds = (reg.detect)();
         log::debug!("  {} credential(s) found from {}", creds.len(), reg.id);

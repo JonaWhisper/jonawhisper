@@ -1,6 +1,11 @@
-// Re-export everything from jona-types for backward compatibility
-pub use jona_types::*;
+// Re-export only the types that other modules access via `crate::state::`.
+pub use jona_types::{GpuMode, RecordingMode};
 
+use jona_types::{
+    AudioFlags, ContextMap, DownloadState, HistoryEntry, Preferences, Provider,
+    RuntimeState, HISTORY_DB, HISTORY_JSON_LEGACY, config_dir,
+    load_api_keys_from_keyring, prefs_path,
+};
 use rusqlite::Connection;
 use std::sync::{Arc, Mutex};
 
@@ -115,8 +120,32 @@ impl Default for AppState {
 
 impl AppState {
     /// Run all registered credential detectors and populate `detected_providers`.
+    /// Detectors whose providers are ALL explicitly disabled are skipped to avoid
+    /// unnecessary Keychain popups on macOS.
     pub fn run_detection(&self) {
-        let results = jona_provider::detect_all();
+        // Build set of detector IDs to skip: a detector is skipped when every
+        // provider it previously produced has been explicitly disabled by the user.
+        let skip_owned: std::collections::HashSet<String> = {
+            // Copy settings data first, then drop lock before taking detected_providers
+            // (avoids inverted lock ordering with toggle_provider_enabled).
+            let enabled_map = self.settings.lock().unwrap().detected_enabled.clone();
+            let detected = self.detected_providers.lock().unwrap();
+            let mut detector_ids: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
+            for p in detected.iter() {
+                if let Some(source) = p.source.as_deref() {
+                    let all_disabled = detector_ids.entry(source.to_string()).or_insert(true);
+                    if enabled_map.get(&p.id).copied().unwrap_or(false) {
+                        *all_disabled = false;
+                    }
+                }
+            }
+            detector_ids.into_iter()
+                .filter(|(_, all_disabled)| *all_disabled)
+                .map(|(id, _)| id)
+                .collect()
+        };
+        let skip: std::collections::HashSet<&str> = skip_owned.iter().map(|s| s.as_str()).collect();
+        let results = jona_provider::detect_all(&skip);
         // Restore persisted enabled states for detected providers
         let enabled_states: std::collections::HashMap<String, bool> = self.settings.lock().unwrap()
             .detected_enabled.clone();
@@ -225,6 +254,8 @@ impl AppState {
         })
     }
 
+    /// Insert a history entry with the current timestamp.
+    /// Note: `entry.timestamp` is ignored — a fresh timestamp is always generated.
     pub fn add_history(&self, entry: HistoryEntry) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -252,16 +283,18 @@ impl AppState {
                 vec![Box::new(c), Box::new(limit)],
             ),
             (false, None) => {
-                let pattern = format!("%{}%", query);
+                let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+                let pattern = format!("%{}%", escaped);
                 (
-                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ORDER BY timestamp DESC LIMIT ?2"),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ESCAPE '\\' ORDER BY timestamp DESC LIMIT ?2"),
                     vec![Box::new(pattern), Box::new(limit)],
                 )
             }
             (false, Some(c)) => {
-                let pattern = format!("%{}%", query);
+                let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+                let pattern = format!("%{}%", escaped);
                 (
-                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
+                    format!("SELECT {COLS} FROM history WHERE text LIKE ?1 ESCAPE '\\' AND timestamp < ?2 ORDER BY timestamp DESC LIMIT ?3"),
                     vec![Box::new(pattern), Box::new(c), Box::new(limit)],
                 )
             }
@@ -293,8 +326,9 @@ impl AppState {
         if query.is_empty() {
             db.query_row("SELECT COUNT(*) FROM history", [], |row| row.get(0))
         } else {
-            let pattern = format!("%{}%", query);
-            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1", [&pattern], |row| row.get(0))
+            let escaped = query.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            let pattern = format!("%{}%", escaped);
+            db.query_row("SELECT COUNT(*) FROM history WHERE text LIKE ?1 ESCAPE '\\'", [&pattern], |row| row.get(0))
         }
     }
 

@@ -55,6 +55,7 @@ inventory::submit! {
         id: "env",
         display_name: "Environment Variables",
         detect,
+        refresh: None,
     }
 }
 

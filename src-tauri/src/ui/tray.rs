@@ -409,6 +409,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 "panel" => {
                     show_panel(app);
                 }
+                #[cfg(debug_assertions)]
                 "test_pill" => {
                     let app_clone = app.clone();
                     tauri::async_runtime::spawn(async move {

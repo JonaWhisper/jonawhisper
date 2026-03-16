@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getAsrModels } from '@/config/providers'
+import { useProviderModels } from '@/composables/useProviderModels'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -30,30 +30,12 @@ async function onGpuModeChange(mode: string) {
   await settings.setSetting('gpu_mode', mode)
 }
 
-const asrSelectedProvider = computed(() =>
-  engines.providers.find(p => p.id === engines.asrCloudProviderId)
-)
-
-const asrModelOptions = computed(() => {
-  const provider = asrSelectedProvider.value
-  return provider ? getAsrModels(provider, engines.providerPresets) : []
-})
-
-const refreshingAsr = ref(false)
-
-async function refreshAsrModels() {
-  const provider = asrSelectedProvider.value
-  if (!provider || refreshingAsr.value) return
-  refreshingAsr.value = true
-  try {
-    const models = await invoke<string[]>('fetch_provider_models', { provider })
-    await engines.updateProvider({ ...provider, cached_models: models })
-  } catch (e) {
-    console.error('refreshModels failed:', e)
-  } finally {
-    refreshingAsr.value = false
-  }
-}
+const {
+  selectedProvider: asrSelectedProvider,
+  modelOptions: asrModelOptions,
+  refreshing: refreshingAsr,
+  refreshModels: refreshAsrModels,
+} = useProviderModels(() => engines.asrCloudProviderId, getAsrModels)
 
 async function onAsrCloudModelChange(value: string) {
   await settings.setSetting('asr_cloud_model', value)

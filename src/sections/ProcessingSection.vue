@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import { useSettingsStore } from '@/stores/settings'
 import { useEnginesStore } from '@/stores/engines'
 import { getLlmModels } from '@/config/providers'
-import { Slider } from '@/components/ui/slider'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from '@/components/ui/select'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
 import ModelOption from '@/components/ModelOption.vue'
+import MaxTokensSlider from '@/components/MaxTokensSlider.vue'
 import SettingToggle from '@/components/SettingToggle.vue'
+import { useProviderModels } from '@/composables/useProviderModels'
 import { BookOpen } from 'lucide-vue-next'
 
 const emit = defineEmits<{
@@ -57,41 +57,15 @@ const selectedCleanupModel = computed(() =>
 )
 
 // LLM config (shown when cloud cleanup selected)
-const llmSelectedProvider = computed(() =>
-  engines.providers.find(p => p.id === engines.cleanupCloudProviderId)
-)
-
-const llmModelOptions = computed(() => {
-  const provider = llmSelectedProvider.value
-  return provider ? getLlmModels(provider, engines.providerPresets) : []
-})
-
-const refreshingLlm = ref(false)
-
-async function refreshLlmModels() {
-  const provider = llmSelectedProvider.value
-  if (!provider || refreshingLlm.value) return
-  refreshingLlm.value = true
-  try {
-    const models = await invoke<string[]>('fetch_provider_models', { provider })
-    await engines.updateProvider({ ...provider, cached_models: models })
-  } catch (e) {
-    console.error('refreshLlmModels failed:', e)
-  } finally {
-    refreshingLlm.value = false
-  }
-}
+const {
+  selectedProvider: llmSelectedProvider,
+  modelOptions: llmModelOptions,
+  refreshing: refreshingLlm,
+  refreshModels: refreshLlmModels,
+} = useProviderModels(() => engines.cleanupCloudProviderId, getLlmModels)
 
 async function onLlmModelChange(value: string) {
   await settings.setSetting('llm_model', value)
-}
-
-function onMaxTokensSliderUpdate(v: number[] | undefined) {
-  if (v?.[0] != null) settings.llmMaxTokens = v[0]
-}
-function onMaxTokensSliderCommit(v: number[]) {
-  const val = v[0] ?? settings.llmMaxTokens
-  settings.setSetting('llm_max_tokens', String(val))
 }
 
 function onToggle(v: boolean, key: string) {
@@ -256,23 +230,7 @@ function onToggle(v: boolean, key: string) {
             @refresh="refreshLlmModels"
           />
         </div>
-        <div class="flex items-center justify-between py-2 gap-3 border-t-[0.5px] border-panel-divider">
-          <div>
-            <div class="text-[13px] text-foreground">{{ t('settings.llm.maxTokens') }}</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <Slider
-              class="w-24"
-              :model-value="[settings.llmMaxTokens]"
-              :min="128"
-              :max="8192"
-              :step="128"
-              @update:model-value="onMaxTokensSliderUpdate"
-              @value-commit="onMaxTokensSliderCommit"
-            />
-            <span class="text-xs text-muted-foreground tabular-nums min-w-8 text-right">{{ settings.llmMaxTokens }}</span>
-          </div>
-        </div>
+        <MaxTokensSlider class="border-t-[0.5px] border-panel-divider" />
       </div>
     </template>
 
@@ -280,23 +238,7 @@ function onToggle(v: boolean, key: string) {
     <template v-if="settings.textCleanupEnabled && engines.isLocalLlm">
       <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
         <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.llm.maxTokens') }}</div>
-        <div class="flex items-center justify-between py-2 gap-3">
-          <div>
-            <div class="text-[13px] text-foreground">{{ t('settings.llm.maxTokens') }}</div>
-          </div>
-          <div class="flex items-center gap-2">
-            <Slider
-              class="w-24"
-              :model-value="[settings.llmMaxTokens]"
-              :min="128"
-              :max="8192"
-              :step="128"
-              @update:model-value="onMaxTokensSliderUpdate"
-              @value-commit="onMaxTokensSliderCommit"
-            />
-            <span class="text-xs text-muted-foreground tabular-nums min-w-8 text-right">{{ settings.llmMaxTokens }}</span>
-          </div>
-        </div>
+        <MaxTokensSlider />
       </div>
     </template>
   </div>

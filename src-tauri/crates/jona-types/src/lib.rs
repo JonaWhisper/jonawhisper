@@ -8,7 +8,7 @@ use std::any::Any;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 // -- Dynamic context map (plug-and-play engine contexts) --
 
@@ -21,13 +21,48 @@ struct ContextEntry {
 /// Replaces typed `ContextSlot<T>` and `context_group!` with a single map
 /// keyed by engine_id. Contexts are lazily loaded and invalidated when
 /// the context_key changes (different model, different gpu_mode, etc.).
+///
+/// Concurrency model: a `busy` set tracks engines currently being loaded or
+/// used for inference. Concurrent calls for the SAME engine serialize via
+/// Condvar wait. Concurrent calls for DIFFERENT engines run in parallel.
+/// This prevents duplicate model loads (OOM) and data races on ORT sessions.
 pub struct ContextMap {
     entries: Mutex<HashMap<String, ContextEntry>>,
+    /// Engine IDs currently being loaded or running inference — callers wait.
+    busy: Mutex<std::collections::HashSet<String>>,
+    ready: Condvar,
 }
 
 impl Default for ContextMap {
     fn default() -> Self {
-        Self { entries: Mutex::new(HashMap::new()) }
+        Self {
+            entries: Mutex::new(HashMap::new()),
+            busy: Mutex::new(std::collections::HashSet::new()),
+            ready: Condvar::new(),
+        }
+    }
+}
+
+/// RAII guard that removes an engine from the busy set on drop (including panic unwind).
+struct BusyGuard<'a> {
+    map: &'a ContextMap,
+    engine_id: String,
+}
+
+impl<'a> BusyGuard<'a> {
+    /// Explicit release (avoids relying solely on Drop for the normal path).
+    fn release(self) {
+        // Drop runs the same logic
+    }
+}
+
+impl Drop for BusyGuard<'_> {
+    fn drop(&mut self) {
+        {
+            let mut busy = self.map.busy.lock().unwrap_or_else(|e| e.into_inner());
+            busy.remove(&self.engine_id);
+        }
+        self.map.ready.notify_all();
     }
 }
 
@@ -40,9 +75,9 @@ impl ContextMap {
     /// If the stored context_key differs from the requested one, the old context
     /// is dropped and `loader` creates a fresh one.
     ///
-    /// The lock is NOT held during `loader()` or `action()` — only brief lock
-    /// acquisitions to check/insert/remove entries. This prevents engines from
-    /// blocking each other during inference.
+    /// Neither `loader()` nor `action()` run under any lock — only brief
+    /// acquisitions to check/insert/remove entries. Different engines never
+    /// block each other; same-engine calls serialize via the `busy` set.
     pub fn run_with<R>(
         &self,
         engine_id: &str,
@@ -50,13 +85,35 @@ impl ContextMap {
         loader: impl FnOnce() -> Result<Box<dyn Any + Send>, EngineError>,
         action: impl FnOnce(&mut dyn Any) -> Result<R, EngineError>,
     ) -> Result<R, EngineError> {
-        // Phase 1: check if load needed (short lock)
+        // Acquire exclusive access to this engine (wait if busy loading or in use)
+        {
+            let mut busy = self.busy.lock().unwrap_or_else(|e| e.into_inner());
+            while busy.contains(engine_id) {
+                busy = self.ready.wait(busy).unwrap_or_else(|e| e.into_inner());
+            }
+            busy.insert(engine_id.to_string());
+        }
+        // Drop guard ensures the busy flag is always released, even on panic.
+        let engine_id_owned = engine_id.to_string();
+        let guard = BusyGuard { map: self, engine_id: engine_id_owned };
+        let result = self.run_with_inner(engine_id, context_key, loader, action);
+        guard.release();
+        result
+    }
+
+    fn run_with_inner<R>(
+        &self,
+        engine_id: &str,
+        context_key: &str,
+        loader: impl FnOnce() -> Result<Box<dyn Any + Send>, EngineError>,
+        action: impl FnOnce(&mut dyn Any) -> Result<R, EngineError>,
+    ) -> Result<R, EngineError> {
+        // Check if we need to (re)load
         let needs_load = {
             let map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
             map.get(engine_id).is_none_or(|e| e.key != context_key)
         };
 
-        // Phase 2: load outside lock
         if needs_load {
             log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
             let start = std::time::Instant::now();
@@ -69,7 +126,8 @@ impl ContextMap {
             });
         }
 
-        // Phase 3: remove entry → run action without lock → insert back
+        // Take entry out, run action, put it back (entry stays "owned" by us
+        // since busy prevents any other thread from touching this engine)
         let mut entry = {
             let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
             map.remove(engine_id)
@@ -78,7 +136,7 @@ impl ContextMap {
 
         let result = action(&mut *entry.ctx);
 
-        // Re-insert even on error (context is still valid)
+        // Re-insert even on error (context is still valid for next call)
         let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         map.insert(engine_id.to_string(), entry);
 

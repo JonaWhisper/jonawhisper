@@ -323,6 +323,7 @@ watch(() => props.entry.timestamp, () => {
             <Tooltip>
               <TooltipTrigger as-child>
                 <button
+                  :aria-label="step.tooltip"
                   class="relative w-5 h-5 flex items-center justify-center rounded-full transition-all duration-150 shrink-0"
                   :class="[
                     !step.active

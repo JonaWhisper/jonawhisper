@@ -18,6 +18,7 @@ pub fn stop_shortcut_capture(capture: tauri::State<'_, Arc<crate::platform::hotk
     capture.exit();
 }
 
+#[cfg(debug_assertions)]
 #[tauri::command]
 pub async fn simulate_pill_test(app: AppHandle, _count: Option<u32>) {
     use crate::ui::pill::{self, PillMode};

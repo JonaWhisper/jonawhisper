@@ -31,7 +31,7 @@ const bars = computed(() =>
       v-for="(height, i) in bars"
       :key="i"
       class="rounded-full transition-[height] duration-75"
-      :class="[config.barWidth, barColor ?? 'bg-foreground']"
+      :class="[config.barWidth, barColor]"
       :style="{ height: `${height}px` }"
     />
   </div>
