@@ -21,19 +21,24 @@ struct ContextEntry {
 /// Replaces typed `ContextSlot<T>` and `context_group!` with a single map
 /// keyed by engine_id. Contexts are lazily loaded and invalidated when
 /// the context_key changes (different model, different gpu_mode, etc.).
+///
+/// Concurrency model: a `busy` set tracks engines currently being loaded or
+/// used for inference. Concurrent calls for the SAME engine serialize via
+/// Condvar wait. Concurrent calls for DIFFERENT engines run in parallel.
+/// This prevents duplicate model loads (OOM) and data races on ORT sessions.
 pub struct ContextMap {
     entries: Mutex<HashMap<String, ContextEntry>>,
-    /// Tracks engine IDs currently being loaded to prevent duplicate loads.
-    loading: Mutex<std::collections::HashSet<String>>,
-    loading_done: Condvar,
+    /// Engine IDs currently being loaded or running inference — callers wait.
+    busy: Mutex<std::collections::HashSet<String>>,
+    ready: Condvar,
 }
 
 impl Default for ContextMap {
     fn default() -> Self {
         Self {
             entries: Mutex::new(HashMap::new()),
-            loading: Mutex::new(std::collections::HashSet::new()),
-            loading_done: Condvar::new(),
+            busy: Mutex::new(std::collections::HashSet::new()),
+            ready: Condvar::new(),
         }
     }
 }
@@ -47,12 +52,9 @@ impl ContextMap {
     /// If the stored context_key differs from the requested one, the old context
     /// is dropped and `loader` creates a fresh one.
     ///
-    /// The lock is NOT held during `loader()` or `action()` — only brief lock
-    /// acquisitions to check/insert/remove entries. This prevents engines from
-    /// blocking each other during inference.
-    ///
-    /// A loading sentinel prevents two threads from loading the same engine
-    /// concurrently (e.g. a 8 GB model loaded twice would exhaust memory).
+    /// Neither `loader()` nor `action()` run under any lock — only brief
+    /// acquisitions to check/insert/remove entries. Different engines never
+    /// block each other; same-engine calls serialize via the `busy` set.
     pub fn run_with<R>(
         &self,
         engine_id: &str,
@@ -60,60 +62,52 @@ impl ContextMap {
         loader: impl FnOnce() -> Result<Box<dyn Any + Send>, EngineError>,
         action: impl FnOnce(&mut dyn Any) -> Result<R, EngineError>,
     ) -> Result<R, EngineError> {
-        // Phase 1: check if load needed (short lock)
+        // Acquire exclusive access to this engine (wait if busy loading or in use)
+        {
+            let mut busy = self.busy.lock().unwrap_or_else(|e| e.into_inner());
+            while busy.contains(engine_id) {
+                busy = self.ready.wait(busy).unwrap_or_else(|e| e.into_inner());
+            }
+            busy.insert(engine_id.to_string());
+        }
+        // From here we "own" this engine_id — run_with on a helper that
+        // always releases the busy flag, even on early return / panic.
+        let result = self.run_with_inner(engine_id, context_key, loader, action);
+        {
+            let mut busy = self.busy.lock().unwrap_or_else(|e| e.into_inner());
+            busy.remove(engine_id);
+        }
+        self.ready.notify_all();
+        result
+    }
+
+    fn run_with_inner<R>(
+        &self,
+        engine_id: &str,
+        context_key: &str,
+        loader: impl FnOnce() -> Result<Box<dyn Any + Send>, EngineError>,
+        action: impl FnOnce(&mut dyn Any) -> Result<R, EngineError>,
+    ) -> Result<R, EngineError> {
+        // Check if we need to (re)load
         let needs_load = {
             let map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
             map.get(engine_id).is_none_or(|e| e.key != context_key)
         };
 
-        // Phase 2: load outside lock, with loading sentinel to prevent duplicates.
-        // Lock order: always `loading` then `entries` (never reversed) to avoid deadlock.
         if needs_load {
-            let we_should_load = {
-                let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
-                // Wait if another thread is already loading this engine
-                while loading.contains(engine_id) {
-                    loading = self.loading_done.wait(loading).unwrap_or_else(|e| e.into_inner());
-                }
-                // Re-check after waiting — the other thread may have loaded it.
-                // Lock entries while still holding loading to prevent races.
-                let map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
-                if map.get(engine_id).is_some_and(|e| e.key == context_key) {
-                    false // Already loaded by another thread
-                } else {
-                    loading.insert(engine_id.to_string());
-                    true
-                }
-            };
-
-            if we_should_load {
-                log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
-                let start = std::time::Instant::now();
-                let result = loader();
-
-                // Always remove sentinel under consistent lock order: loading → entries
-                let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
-                loading.remove(engine_id);
-                match result {
-                    Ok(ctx) => {
-                        log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
-                        let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
-                        map.insert(engine_id.to_string(), ContextEntry {
-                            key: context_key.to_string(),
-                            ctx,
-                        });
-                        drop(map);
-                        self.loading_done.notify_all();
-                    }
-                    Err(e) => {
-                        self.loading_done.notify_all();
-                        return Err(e);
-                    }
-                }
-            }
+            log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
+            let start = std::time::Instant::now();
+            let ctx = loader()?;
+            log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
+            let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
+            map.insert(engine_id.to_string(), ContextEntry {
+                key: context_key.to_string(),
+                ctx,
+            });
         }
 
-        // Phase 3: remove entry → run action without lock → insert back
+        // Take entry out, run action, put it back (entry stays "owned" by us
+        // since busy prevents any other thread from touching this engine)
         let mut entry = {
             let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
             map.remove(engine_id)
@@ -122,7 +116,7 @@ impl ContextMap {
 
         let result = action(&mut *entry.ctx);
 
-        // Re-insert even on error (context is still valid)
+        // Re-insert even on error (context is still valid for next call)
         let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
         map.insert(engine_id.to_string(), entry);
 
@@ -135,7 +129,6 @@ impl ContextMap {
     }
 
     /// Drop the context for a specific engine.
-    #[cfg(test)]
     pub fn invalidate(&self, engine_id: &str) {
         self.entries.lock().unwrap_or_else(|e| e.into_inner()).remove(engine_id);
     }
