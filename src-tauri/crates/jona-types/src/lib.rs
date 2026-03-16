@@ -66,48 +66,46 @@ impl ContextMap {
             map.get(engine_id).is_none_or(|e| e.key != context_key)
         };
 
-        // Phase 2: load outside lock, with loading sentinel to prevent duplicates
+        // Phase 2: load outside lock, with loading sentinel to prevent duplicates.
+        // Lock order: always `loading` then `entries` (never reversed) to avoid deadlock.
         if needs_load {
-            // Wait if another thread is already loading this engine
-            {
+            let we_should_load = {
                 let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
+                // Wait if another thread is already loading this engine
                 while loading.contains(engine_id) {
                     loading = self.loading_done.wait(loading).unwrap_or_else(|e| e.into_inner());
                 }
-                // Re-check after waiting — the other thread may have loaded it
+                // Re-check after waiting — the other thread may have loaded it.
+                // Lock entries while still holding loading to prevent races.
                 let map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
                 if map.get(engine_id).is_some_and(|e| e.key == context_key) {
-                    // Already loaded by another thread, skip loading
+                    false // Already loaded by another thread
                 } else {
                     loading.insert(engine_id.to_string());
+                    true
                 }
-            }
+            };
 
-            // Only load if we inserted the sentinel (use local flag to avoid re-locking)
-            let we_are_loading = self.loading.lock().unwrap_or_else(|e| e.into_inner()).contains(engine_id);
-            if we_are_loading {
+            if we_should_load {
                 log::info!("ContextMap: loading context for engine={} key={}", engine_id, context_key);
                 let start = std::time::Instant::now();
                 let result = loader();
 
+                // Always remove sentinel under consistent lock order: loading → entries
+                let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
+                loading.remove(engine_id);
                 match result {
                     Ok(ctx) => {
                         log::info!("ContextMap: loaded engine={} in {:.1}s", engine_id, start.elapsed().as_secs_f64());
-                        // Insert BEFORE removing sentinel — waiters must see the entry
                         let mut map = self.entries.lock().unwrap_or_else(|e| e.into_inner());
                         map.insert(engine_id.to_string(), ContextEntry {
                             key: context_key.to_string(),
                             ctx,
                         });
                         drop(map);
-                        let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
-                        loading.remove(engine_id);
                         self.loading_done.notify_all();
                     }
                     Err(e) => {
-                        // Remove sentinel on failure so waiters can retry
-                        let mut loading = self.loading.lock().unwrap_or_else(|e| e.into_inner());
-                        loading.remove(engine_id);
                         self.loading_done.notify_all();
                         return Err(e);
                     }
