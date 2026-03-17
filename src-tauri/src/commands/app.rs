@@ -1,6 +1,6 @@
 use crate::state::AppState;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tauri_plugin_updater::UpdaterExt;
 
 #[tauri::command]
@@ -23,6 +23,7 @@ pub fn stop_shortcut_capture(capture: tauri::State<'_, Arc<crate::platform::hotk
 pub async fn simulate_pill_test(app: AppHandle, _count: Option<u32>) {
     use crate::ui::pill::{self, PillMode};
     use std::time::Duration;
+    use tauri::Emitter;
 
     fn fake_spectrum(frame: u32) -> Vec<f32> {
         (0..12)
