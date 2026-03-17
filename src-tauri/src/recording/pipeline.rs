@@ -153,9 +153,9 @@ async fn run_transcription(
     // Auto-release helper — called only after task has finished (success/error), never on timeout
     // where the spawn_blocking task may still be running and using the context.
     let maybe_auto_release = |state: &AppState, elapsed: Duration| {
-        const ORT_RELEASE_THRESHOLD: f64 = 30.0;
+        const CONTEXT_RELEASE_THRESHOLD: f64 = 30.0;
         let auto_release = state.settings.lock().unwrap().auto_release_memory;
-        if auto_release && elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
+        if auto_release && elapsed.as_secs_f64() > CONTEXT_RELEASE_THRESHOLD {
             let rss_before = get_rss_bytes();
             if let Some(model) = EngineCatalog::global().model_by_id(&transcription_model_id) {
                 state.contexts.invalidate(&model.engine_id);
@@ -704,6 +704,7 @@ pub fn get_rss_bytes() -> u64 {
         pagefile_usage: usize,
         peak_pagefile_usage: usize,
     }
+    #[link(name = "kernel32")]
     extern "system" {
         fn GetCurrentProcess() -> isize;
         fn K32GetProcessMemoryInfo(process: isize, ppsmemcounters: *mut ProcessMemoryCounters, cb: u32) -> i32;
