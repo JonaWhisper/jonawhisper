@@ -114,6 +114,7 @@ fn activate_app() {
 #[cfg(not(target_os = "macos"))]
 fn activate_app() {}
 
+#[cfg(debug_assertions)]
 pub fn open_pill_window(app: &AppHandle) {
     super::pill::open(app, super::pill::PillMode::Recording);
 }
