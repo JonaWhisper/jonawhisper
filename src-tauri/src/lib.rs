@@ -340,7 +340,8 @@ pub fn run() {
 
             // Check permissions and setup completion
             let report = platform::check_permissions();
-            let setup_done = app.state::<Arc<AppState>>().settings.lock().unwrap().setup_completed;
+            let setup_done = app_state.settings.lock().unwrap().setup_completed;
+            log::info!("Startup: permissions_ok={}, setup_completed={}", report.all_granted(), setup_done);
             if report.all_granted() {
                 monitor_enabled.store(true, Ordering::Relaxed);
             }
