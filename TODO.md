@@ -52,9 +52,9 @@
 
 ## Mémoire / Performance
 
-- [ ] **Libération mémoire ORT après longues dictées** — ORT alloue des memory pools proportionnelles à la durée de l'audio qui ne sont jamais rendues à l'OS. Après une transcription longue (>30s), invalider le contexte dans `ContextMap` pour forcer le drop de la session ORT. Le modèle sera rechargé au prochain enregistrement (~1-2s, invisible pour l'utilisateur car ça arrive pendant qu'il parle). Transparent côté UX.
-- [ ] **Section Diagnostic dans les settings** — Nouvelle page dans le panneau de réglages affichant en temps réel : RSS mémoire du process, modèles chargés dans le ContextMap, taille des caches (SymSpell, KenLM). Poll via commande Tauri toutes les 2-3s. Permet de diagnostiquer les problèmes de mémoire sans regarder les logs.
-- [ ] **Logging mémoire après chaque transcription** — Logger le RSS du process (`mach_task_basic_info`) à la fin de chaque `handle_transcription_result()` dans pipeline.rs. Permet de corréler les pics mémoire avec les dictées longues ou les changements de modèle.
+- [x] **Libération mémoire ORT après longues dictées** — Résolu (PR #35). Auto-release des contextes engine après transcriptions >30s via `maybe_auto_release` dans pipeline.rs. Toggle `auto_release_memory` dans les préférences (défaut: activé). Model_id capturé avant le spawn pour invalider le bon engine.
+- [x] **Section Diagnostic dans les settings** — Résolu (PR #35). `DiagnosticSection.vue` avec RSS en temps réel (cross-platform: macOS/Linux/Windows), contextes chargés dans ContextMap, toggle auto-release. Struct typé `MemoryInfo` dans jona-types.
+- [x] **Logging mémoire après chaque transcription** — Résolu (PR #35). `log::info!("Transcription total: {:.1}s | RSS: {}")` dans pipeline.rs après chaque transcription.
 
 ## Technique / Infra
 
