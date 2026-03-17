@@ -72,6 +72,9 @@ if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
     touch node_modules
 fi
 
+# Remove previous bundle so stale builds aren't mistaken for success
+rm -rf "$APP_PATH"
+
 npx tauri build --bundles app $TAURI_FLAGS || true
 
 if [ ! -d "$APP_PATH" ]; then
