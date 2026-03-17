@@ -146,27 +146,29 @@ async fn run_transcription(
     let elapsed = t0.elapsed();
     log::info!("Transcription total: {:.1}s | RSS: {}", elapsed.as_secs_f64(), format_rss());
 
-    // Release ORT memory pools after long transcriptions to prevent unbounded growth.
-    // The model will be reloaded on next use (~1-2s, happens while user speaks).
-    const ORT_RELEASE_THRESHOLD: f64 = 30.0;
-    let auto_release = state.settings.lock().unwrap().auto_release_memory;
-    if auto_release && elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
-        let rss_before = get_rss_bytes();
-        let model_id = state.settings.lock().unwrap().selected_model_id.clone();
-        // Find the engine_id for this model to invalidate only the ASR context
-        if let Some(model) = EngineCatalog::global().model_by_id(&model_id) {
-            state.contexts.invalidate(&model.engine_id);
-            let rss_after = get_rss_bytes();
-            let freed_mb = rss_before.saturating_sub(rss_after) as f64 / (1024.0 * 1024.0);
-            log::info!(
-                "ORT memory released for engine={} after {:.1}s transcription (freed ~{:.0} MB, RSS: {})",
-                model.engine_id, elapsed.as_secs_f64(), freed_mb, format_rss()
-            );
+    // Auto-release helper — called only after task has finished (success/error), never on timeout
+    // where the spawn_blocking task may still be running and using the context.
+    let maybe_auto_release = |state: &AppState, elapsed: Duration| {
+        const ORT_RELEASE_THRESHOLD: f64 = 30.0;
+        let auto_release = state.settings.lock().unwrap().auto_release_memory;
+        if auto_release && elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
+            let rss_before = get_rss_bytes();
+            let model_id = state.settings.lock().unwrap().selected_model_id.clone();
+            if let Some(model) = EngineCatalog::global().model_by_id(&model_id) {
+                state.contexts.invalidate(&model.engine_id);
+                let rss_after = get_rss_bytes();
+                let freed_mb = rss_before.saturating_sub(rss_after) as f64 / (1024.0 * 1024.0);
+                log::info!(
+                    "ORT memory released for engine={} after {:.1}s transcription (freed ~{:.0} MB, RSS: {})",
+                    model.engine_id, elapsed.as_secs_f64(), freed_mb, format_rss()
+                );
+            }
         }
-    }
+    };
 
     match result {
         Ok(Ok(Ok(tr))) => {
+            maybe_auto_release(&state, elapsed);
             if state.runtime.lock().unwrap().transcription_cancelled {
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
@@ -175,6 +177,7 @@ async fn run_transcription(
             false
         }
         Ok(Ok(Err(e))) => {
+            maybe_auto_release(&state, elapsed);
             log::error!("Transcription error: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -184,6 +187,7 @@ async fn run_transcription(
             true
         }
         Ok(Err(e)) => {
+            maybe_auto_release(&state, elapsed);
             log::error!("Transcription task panicked: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -193,6 +197,7 @@ async fn run_transcription(
             true
         }
         Err(_) => {
+            // Timeout: spawn_blocking task may still be running — do NOT release context
             log::error!("Transcription timed out after 120s");
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -668,7 +673,48 @@ pub fn get_rss_bytes() -> u64 {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+pub fn get_rss_bytes() -> u64 {
+    // /proc/self/statm: fields are in pages, RSS is the second field
+    std::fs::read_to_string("/proc/self/statm")
+        .ok()
+        .and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok())
+        .map(|pages| pages * 4096)
+        .unwrap_or(0)
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_rss_bytes() -> u64 {
+    use std::mem::{self, MaybeUninit};
+    #[repr(C)]
+    struct ProcessMemoryCounters {
+        cb: u32,
+        page_fault_count: u32,
+        peak_working_set_size: usize,
+        working_set_size: usize,
+        quota_peak_paged_pool_usage: usize,
+        quota_paged_pool_usage: usize,
+        quota_peak_non_paged_pool_usage: usize,
+        quota_non_paged_pool_usage: usize,
+        pagefile_usage: usize,
+        peak_pagefile_usage: usize,
+    }
+    extern "system" {
+        fn GetCurrentProcess() -> isize;
+        fn K32GetProcessMemoryInfo(process: isize, ppsmemcounters: *mut ProcessMemoryCounters, cb: u32) -> i32;
+    }
+    unsafe {
+        let mut pmc = MaybeUninit::<ProcessMemoryCounters>::zeroed().assume_init();
+        pmc.cb = mem::size_of::<ProcessMemoryCounters>() as u32;
+        if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) != 0 {
+            pmc.working_set_size as u64
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 pub fn get_rss_bytes() -> u64 { 0 }
 
 fn format_rss() -> String {

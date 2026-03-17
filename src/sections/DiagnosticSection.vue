@@ -10,7 +10,7 @@ const { t } = useI18n()
 const settings = useSettingsStore()
 
 interface MemoryInfo {
-  rss_mb: number
+  rss_mb: number | null
   contexts: [string, string][]
 }
 
@@ -34,7 +34,8 @@ onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
 })
 
-function formatRss(mb: number): string {
+function formatRss(mb: number | null): string {
+  if (mb == null || mb <= 0) return 'N/A'
   if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
   return `${Math.round(mb)} MB`
 }
@@ -58,7 +59,7 @@ function onAutoReleaseChange(checked: boolean) {
       <div v-if="memoryInfo" class="space-y-2">
         <div class="flex items-center justify-between">
           <span class="text-[13px] text-muted-foreground">{{ t('diagnostic.rss') }}</span>
-          <span class="text-[13px] font-mono tabular-nums" :class="memoryInfo.rss_mb > 3000 ? 'text-red-500' : memoryInfo.rss_mb > 2000 ? 'text-amber-500' : 'text-foreground'">
+          <span class="text-[13px] font-mono tabular-nums" :class="memoryInfo.rss_mb != null && memoryInfo.rss_mb > 3000 ? 'text-red-500' : memoryInfo.rss_mb != null && memoryInfo.rss_mb > 2000 ? 'text-amber-500' : 'text-foreground'">
             {{ formatRss(memoryInfo.rss_mb) }}
           </span>
         </div>

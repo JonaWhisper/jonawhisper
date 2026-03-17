@@ -154,11 +154,14 @@ impl ContextMap {
     }
 
     /// List loaded engine IDs and their context keys (for diagnostics).
+    /// Sorted by engine_id for stable display order.
     pub fn list_entries(&self) -> Vec<(String, String)> {
-        self.entries.lock().unwrap_or_else(|e| e.into_inner())
+        let mut entries: Vec<_> = self.entries.lock().unwrap_or_else(|e| e.into_inner())
             .iter()
             .map(|(id, e)| (id.clone(), e.key.clone()))
-            .collect()
+            .collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
     }
 }
 

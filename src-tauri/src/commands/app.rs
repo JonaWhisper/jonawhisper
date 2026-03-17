@@ -176,10 +176,14 @@ pub async fn simulate_pill_test(app: AppHandle, _count: Option<u32>) {
 #[tauri::command]
 pub fn get_memory_info(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value {
     let rss = crate::recording::get_rss_bytes();
-    let rss_mb = rss as f64 / (1024.0 * 1024.0);
+    let rss_mb = if rss > 0 {
+        Some((rss as f64 / (1024.0 * 1024.0) * 10.0).round() / 10.0)
+    } else {
+        None
+    };
     let contexts = state.contexts.list_entries();
     serde_json::json!({
-        "rss_mb": (rss_mb * 10.0).round() / 10.0,
+        "rss_mb": rss_mb,
         "contexts": contexts,
     })
 }
