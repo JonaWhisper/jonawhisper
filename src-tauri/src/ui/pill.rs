@@ -193,7 +193,7 @@ fn animation_loop(app: AppHandle) {
                 p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
             }
             // Diagnostic: log pill state every ~1s during Recording
-            if p.mode == PillMode::Recording && fc % 30 == 0 {
+            if p.mode == PillMode::Recording && fc.is_multiple_of(30) {
                 let spec_max = p.spectrum.iter().cloned().fold(0.0f32, f32::max);
                 let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
                 if smooth_max < 0.12 {

@@ -78,7 +78,7 @@ fn check_input_monitoring_permission() -> PermissionStatus {
             1,           // kCGSessionEventTap
             0,           // kCGHeadInsertEventTap
             1,           // kCGEventTapOptionListenOnly
-            1u64 << 12,  // CGEventMaskBit(kCGEventFlagsChanged)
+            (1u64 << 10) | (1u64 << 11) | (1u64 << 12),  // keyDown + keyUp + flagsChanged
             noop_callback,
             std::ptr::null_mut(),
         );
