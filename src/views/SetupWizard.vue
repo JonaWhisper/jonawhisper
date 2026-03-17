@@ -82,12 +82,18 @@ watch(step, async (newStep) => {
   }
 })
 
-onMounted(() => {
+onMounted(async () => {
   getCurrentWindow().setTitle(t('window.setup'))
-  enginesStore.fetchPermissions()
-  pollInterval = setInterval(() => {
-    enginesStore.fetchPermissions()
-  }, 1500)
+  await enginesStore.fetchPermissions()
+  // If all permissions already granted (e.g. relaunched after granting Input Monitoring),
+  // skip directly to step 2
+  if (canContinue.value) {
+    await goToStep2()
+  } else {
+    pollInterval = setInterval(() => {
+      enginesStore.fetchPermissions()
+    }, 1500)
+  }
 })
 
 onUnmounted(() => {

@@ -338,11 +338,14 @@ pub fn run() {
                 rec_state,
             );
 
-            // Check permissions and show setup if needed
+            // Check permissions and setup completion
             let report = platform::check_permissions();
+            let setup_done = app_state.settings.lock().unwrap().setup_completed;
+            log::info!("Startup: permissions_ok={}, setup_completed={}", report.all_granted(), setup_done);
             if report.all_granted() {
                 monitor_enabled.store(true, Ordering::Relaxed);
-            } else {
+            }
+            if !setup_done || !report.all_granted() {
                 ui::tray::open_fixed_window(app.handle(), "setup", &rust_i18n::t!("window.setup"), "/setup", 420.0, 450.0);
             }
 
