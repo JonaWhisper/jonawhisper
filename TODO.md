@@ -58,9 +58,5 @@
 
 ## Technique / Infra
 
-- [ ] **Refonte du système de logging** — Le logging actuel est insuffisant pour diagnostiquer les bugs en production (pill grisé, latence aléatoire). Problèmes identifiés :
-  - Pas de fichier de log persistant (uniquement `os_log` via `log show`, éphémère et filtrage laborieux)
-  - Logs critiques manquants dans les chemins chauds (pill rendering, spectrum pipeline, lock contention)
-  - Pas de niveaux de log configurables par module (tout ou rien)
-  - **Plan** : ajouter un fichier de log rotatif (`~/Library/Logs/JonaWhisper/`) en plus de `os_log`, avec filtrage par module configurable dans les préférences. Enrichir les logs dans : `ui/pill.rs` (état rendu, frames, transitions), `recording/threads.rs` (spectrum pipeline), `audio.rs` (try_lock contention), `cleanup/` (durées par étape). Format structuré avec timestamps précis pour corréler les événements.
+- [x] **Refonte du système de logging** — Résolu. Fichier de log persistant (`~/Library/Application Support/JonaWhisper/logs/`, rotation par lancement, rétention configurable). Niveaux de log configurables dans les préférences (`log_level`). Logs enrichis dans : pill rendering (mode transitions, flat detection, smoothed values), spectrum pipeline (diagnostic périodique, seuil visuel, recovery), audio.rs (fft_buffer contention en warn), pipeline.rs (RSS après chaque transcription). Reste à faire éventuellement : filtrage par module (nice-to-have).
 - [ ] **Windows support** — Implémenter les vrais bindings (hotkey via `SetWindowsHookEx`, permissions, paste, audio devices)
