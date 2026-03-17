@@ -138,15 +138,40 @@ async fn run_transcription(
     let path = audio_path.to_path_buf();
     let t0 = std::time::Instant::now();
 
+    // Capture model_id before spawning — if user changes model during transcription,
+    // we still invalidate the engine that was actually used.
+    let transcription_model_id = state.settings.lock().unwrap().selected_model_id.clone();
+
     // Timeout: if transcription + cleanup takes more than 120s, abort
     let task = tokio::task::spawn_blocking(move || {
         transcribe(&state_clone, &path)
     });
     let result = tokio::time::timeout(Duration::from_secs(120), task).await;
-    log::info!("Transcription total: {:.1}s", t0.elapsed().as_secs_f64());
+    let elapsed = t0.elapsed();
+    log::info!("Transcription total: {:.1}s | RSS: {}", elapsed.as_secs_f64(), format_rss());
+
+    // Auto-release helper — called only after task has finished (success/error), never on timeout
+    // where the spawn_blocking task may still be running and using the context.
+    let maybe_auto_release = |state: &AppState, elapsed: Duration| {
+        const CONTEXT_RELEASE_THRESHOLD: f64 = 30.0;
+        let auto_release = state.settings.lock().unwrap().auto_release_memory;
+        if auto_release && elapsed.as_secs_f64() > CONTEXT_RELEASE_THRESHOLD {
+            let rss_before = get_rss_bytes();
+            if let Some(model) = EngineCatalog::global().model_by_id(&transcription_model_id) {
+                state.contexts.invalidate(&model.engine_id);
+                let rss_after = get_rss_bytes();
+                let freed_mb = rss_before.saturating_sub(rss_after) as f64 / (1024.0 * 1024.0);
+                log::info!(
+                    "Context released for engine={} after {:.1}s transcription (freed ~{:.0} MB, RSS: {})",
+                    model.engine_id, elapsed.as_secs_f64(), freed_mb, format_rss()
+                );
+            }
+        }
+    };
 
     match result {
         Ok(Ok(Ok(tr))) => {
+            maybe_auto_release(state, elapsed);
             if state.runtime.lock().unwrap().transcription_cancelled {
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
@@ -155,6 +180,7 @@ async fn run_transcription(
             false
         }
         Ok(Ok(Err(e))) => {
+            maybe_auto_release(state, elapsed);
             log::error!("Transcription error: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -164,6 +190,7 @@ async fn run_transcription(
             true
         }
         Ok(Err(e)) => {
+            maybe_auto_release(state, elapsed);
             log::error!("Transcription task panicked: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -173,6 +200,7 @@ async fn run_transcription(
             true
         }
         Err(_) => {
+            // Timeout: spawn_blocking task may still be running — do NOT release context
             log::error!("Transcription timed out after 120s");
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -622,6 +650,87 @@ fn vad_preprocess(audio_path: &std::path::Path) -> VadResult {
             }
             VadResult::Trimmed
         }
+    }
+}
+
+/// Get the RSS (Resident Set Size) of the current process in bytes.
+#[cfg(target_os = "macos")]
+#[allow(deprecated)] // libc::mach_task_self deprecated in favor of mach2, but mach2 lacks task_basic_info
+pub fn get_rss_bytes() -> u64 {
+    use std::mem::MaybeUninit;
+    let mut info = MaybeUninit::<libc::mach_task_basic_info_data_t>::uninit();
+    let mut count = (std::mem::size_of::<libc::mach_task_basic_info_data_t>()
+        / std::mem::size_of::<libc::natural_t>()) as libc::mach_msg_type_number_t;
+    let kr = unsafe {
+        libc::task_info(
+            libc::mach_task_self(),
+            libc::MACH_TASK_BASIC_INFO,
+            info.as_mut_ptr() as libc::task_info_t,
+            &mut count,
+        )
+    };
+    if kr == libc::KERN_SUCCESS {
+        unsafe { info.assume_init() }.resident_size
+    } else {
+        0
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn get_rss_bytes() -> u64 {
+    // /proc/self/statm: fields are in pages, RSS is the second field
+    let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+    let page_size = if page_size > 0 { page_size as u64 } else { 4096 };
+    std::fs::read_to_string("/proc/self/statm")
+        .ok()
+        .and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok())
+        .map(|pages| pages * page_size)
+        .unwrap_or(0)
+}
+
+#[cfg(target_os = "windows")]
+pub fn get_rss_bytes() -> u64 {
+    use std::mem::{self, MaybeUninit};
+    #[repr(C)]
+    struct ProcessMemoryCounters {
+        cb: u32,
+        page_fault_count: u32,
+        peak_working_set_size: usize,
+        working_set_size: usize,
+        quota_peak_paged_pool_usage: usize,
+        quota_paged_pool_usage: usize,
+        quota_peak_non_paged_pool_usage: usize,
+        quota_non_paged_pool_usage: usize,
+        pagefile_usage: usize,
+        peak_pagefile_usage: usize,
+    }
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetCurrentProcess() -> isize;
+        fn K32GetProcessMemoryInfo(process: isize, ppsmemcounters: *mut ProcessMemoryCounters, cb: u32) -> i32;
+    }
+    unsafe {
+        let mut pmc = MaybeUninit::<ProcessMemoryCounters>::zeroed().assume_init();
+        pmc.cb = mem::size_of::<ProcessMemoryCounters>() as u32;
+        if K32GetProcessMemoryInfo(GetCurrentProcess(), &mut pmc, pmc.cb) != 0 {
+            pmc.working_set_size as u64
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+pub fn get_rss_bytes() -> u64 { 0 }
+
+fn format_rss() -> String {
+    let bytes = get_rss_bytes();
+    if bytes == 0 { return "N/A".to_string(); }
+    let mb = bytes as f64 / (1024.0 * 1024.0);
+    if mb >= 1024.0 {
+        format!("{:.1} GB", mb / 1024.0)
+    } else {
+        format!("{:.0} MB", mb)
     }
 }
 

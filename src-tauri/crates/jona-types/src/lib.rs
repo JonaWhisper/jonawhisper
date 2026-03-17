@@ -152,6 +152,27 @@ impl ContextMap {
     pub fn invalidate(&self, engine_id: &str) {
         self.entries.lock().unwrap_or_else(|e| e.into_inner()).remove(engine_id);
     }
+
+    /// List loaded engine IDs and their context keys (for diagnostics).
+    /// Sorted by engine_id for stable display order.
+    pub fn list_entries(&self) -> Vec<(String, String)> {
+        let mut entries: Vec<_> = self.entries.lock().unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|(id, e)| (id.clone(), e.key.clone()))
+            .collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
+    }
+}
+
+// -- Memory diagnostics --
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryInfo {
+    /// RSS in MB, or None if unavailable on this platform.
+    pub rss_mb: Option<f64>,
+    /// Loaded engine contexts: (engine_id, context_key).
+    pub contexts: Vec<(String, String)>,
 }
 
 // -- History --
@@ -559,6 +580,8 @@ pub struct Preferences {
     pub spellcheck_enabled: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_true")]
+    pub auto_release_memory: bool,
     #[serde(default = "default_log_level")]
     pub log_level: String,
     /// Log retention mode: "previous" (current+prev), "3days", "7days", "30days", "all" (keep forever)

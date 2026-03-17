@@ -245,6 +245,15 @@
   "dictionary.toggleKind": "Toggle between word and mapping",
   "dictionary.kind.word": "Protected word",
   "dictionary.kind.mapping": "Replacement mapping",
+  "panel.diagnostic": "Diagnostic",
+  "diagnostic.memory": "Memory",
+  "diagnostic.rss": "Memory usage (RSS)",
+  "diagnostic.loadedContexts": "Loaded models",
+  "diagnostic.noContexts": "No models loaded",
+  "diagnostic.autoRelease": "Automatic memory release",
+  "diagnostic.autoReleaseHint": "Frees model memory after long dictations",
+  "diagnostic.loading": "Loading\u2026",
+  "diagnostic.na": "N/A",
   "menu.panel": "Settings\u2026",
   "window.panel": "JonaWhisper"
 }

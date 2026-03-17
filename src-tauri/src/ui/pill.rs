@@ -124,6 +124,15 @@ pub fn set_mode(mode: PillMode) {
         let mut guard = PILL.lock().unwrap();
         if let Some(ref mut p) = *guard {
             log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
+            // Reset spectrum state when entering Recording to avoid stale smoothed values
+            if mode == PillMode::Recording {
+                let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
+                if smooth_max > 0.001 {
+                    log::debug!("Pill: resetting smoothed (was max={:.4})", smooth_max);
+                }
+                p.smoothed = [0.0; 12];
+                p.spectrum = [0.0; 12];
+            }
             p.mode = mode;
         } else {
             log::warn!("Pill: set_mode({:?}) called but pill is not open", mode);
@@ -166,12 +175,17 @@ pub fn is_open() -> bool {
 
 #[cfg(target_os = "macos")]
 fn animation_loop(app: AppHandle) {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    let frame_count = std::sync::Arc::new(AtomicU32::new(0));
+    let flat_frames = std::sync::Arc::new(AtomicU32::new(0));
     loop {
         std::thread::sleep(Duration::from_millis(33));
         if PILL.lock().unwrap().is_none() {
             break;
         }
+        let fc = frame_count.fetch_add(1, Ordering::Relaxed) + 1;
         let h = app.clone();
+        let ff = flat_frames.clone();
         let _ = app.run_on_main_thread(move || {
             let mut pill = PILL.lock().unwrap();
             let Some(ref mut p) = *pill else { return };
@@ -179,6 +193,24 @@ fn animation_loop(app: AppHandle) {
             p.dot_phase += 0.05;
             for i in 0..12 {
                 p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
+            }
+            // Diagnostic: log pill state every ~1s during Recording
+            if p.mode == PillMode::Recording && fc.is_multiple_of(30) {
+                let spec_max = p.spectrum.iter().cloned().fold(0.0f32, f32::max);
+                let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
+                if smooth_max < 0.12 {
+                    let count = ff.fetch_add(30, Ordering::Relaxed) + 30;
+                    // Only warn after ~3s of sustained flat, then every ~3s
+                    if count >= 90 && count.is_multiple_of(90) {
+                        log::warn!("Pill render flat ({:.1}s): spec_max={:.4}, smooth_max={:.4}, spectrum={:.3?}",
+                            count as f32 / 30.0, spec_max, smooth_max, &p.spectrum);
+                    }
+                } else {
+                    let prev = ff.swap(0, Ordering::Relaxed);
+                    if prev >= 90 {
+                        log::info!("Pill render recovered after {:.1}s flat", prev as f32 / 30.0);
+                    }
+                }
             }
             let rgba = render_frame(p);
             let iv = p.image_view.0;

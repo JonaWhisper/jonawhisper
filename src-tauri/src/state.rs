@@ -85,7 +85,7 @@ fn load_preferences() -> Preferences {
     let path = prefs_path();
     let data = match std::fs::read_to_string(&path) {
         Ok(d) => d,
-        Err(_) => return Preferences::default(),
+        Err(_) => return serde_json::from_str("{}").unwrap_or_default(),
     };
 
     let mut raw: serde_json::Value = serde_json::from_str(&data).unwrap_or_default();

@@ -174,6 +174,20 @@ pub async fn simulate_pill_test(app: AppHandle, _count: Option<u32>) {
 }
 
 #[tauri::command]
+pub fn get_memory_info(state: tauri::State<'_, Arc<AppState>>) -> jona_types::MemoryInfo {
+    let rss = crate::recording::get_rss_bytes();
+    let rss_mb = if rss > 0 {
+        Some((rss as f64 / (1024.0 * 1024.0) * 10.0).round() / 10.0)
+    } else {
+        None
+    };
+    jona_types::MemoryInfo {
+        rss_mb,
+        contexts: state.contexts.list_entries(),
+    }
+}
+
+#[tauri::command]
 pub async fn check_for_update(app: AppHandle) -> Result<Option<serde_json::Value>, String> {
     let updater = app.updater().map_err(|e| e.to_string())?;
     match updater.check().await {

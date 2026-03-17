@@ -45,6 +45,7 @@ pub fn get_settings(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Value
         "disfluency_removal_enabled": s.disfluency_removal_enabled,
         "itn_enabled": s.itn_enabled,
         "spellcheck_enabled": s.spellcheck_enabled,
+        "auto_release_memory": s.auto_release_memory,
         "theme": s.theme,
         "log_level": s.log_level,
         "log_retention": s.log_retention,
@@ -93,6 +94,7 @@ pub fn set_setting(
             "disfluency_removal_enabled" => s.disfluency_removal_enabled = value == "true",
             "itn_enabled" => s.itn_enabled = value == "true",
             "spellcheck_enabled" => s.spellcheck_enabled = value == "true",
+            "auto_release_memory" => s.auto_release_memory = value == "true",
             "theme" => s.theme = value.clone(),
             "log_level" => {
                 s.log_level = value.clone();

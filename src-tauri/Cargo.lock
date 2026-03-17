@@ -3989,6 +3989,7 @@ dependencies = [
  "jona-provider-speechmatics",
  "jona-types",
  "keyring",
+ "libc",
  "llama-cpp-2",
  "log",
  "ndarray",

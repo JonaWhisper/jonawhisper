@@ -245,6 +245,15 @@
   "dictionary.toggleKind": "Basculer entre mot et correspondance",
   "dictionary.kind.word": "Mot prot\u00e9g\u00e9",
   "dictionary.kind.mapping": "R\u00e8gle de remplacement",
+  "panel.diagnostic": "Diagnostic",
+  "diagnostic.memory": "M\u00e9moire",
+  "diagnostic.rss": "M\u00e9moire utilis\u00e9e (RSS)",
+  "diagnostic.loadedContexts": "Mod\u00e8les charg\u00e9s",
+  "diagnostic.noContexts": "Aucun mod\u00e8le charg\u00e9",
+  "diagnostic.autoRelease": "Lib\u00e9ration m\u00e9moire automatique",
+  "diagnostic.autoReleaseHint": "Lib\u00e8re la m\u00e9moire des mod\u00e8les apr\u00e8s les longues dict\u00e9es",
+  "diagnostic.loading": "Chargement\u2026",
+  "diagnostic.na": "N/D",
   "menu.panel": "R\u00e9glages\u2026",
   "window.panel": "JonaWhisper"
 }
