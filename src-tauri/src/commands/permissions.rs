@@ -27,6 +27,15 @@ pub fn start_monitoring(
         enabled.store(true, Ordering::Relaxed);
         log::info!("Monitoring enabled");
     }
+    // Mark setup as completed so it won't show again on next launch
+    {
+        let mut s = state.settings.lock().unwrap();
+        if !s.setup_completed {
+            s.setup_completed = true;
+            log::info!("Setup wizard completed");
+        }
+    }
+    state.save_preferences();
     if let Some(win) = app.get_webview_window("setup") {
         let _ = win.destroy();
     }
