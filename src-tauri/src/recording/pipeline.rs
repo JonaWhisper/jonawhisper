@@ -150,10 +150,12 @@ async fn run_transcription(
     // where the spawn_blocking task may still be running and using the context.
     let maybe_auto_release = |state: &AppState, elapsed: Duration| {
         const ORT_RELEASE_THRESHOLD: f64 = 30.0;
-        let auto_release = state.settings.lock().unwrap().auto_release_memory;
+        let (auto_release, model_id) = {
+            let s = state.settings.lock().unwrap();
+            (s.auto_release_memory, s.selected_model_id.clone())
+        };
         if auto_release && elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
             let rss_before = get_rss_bytes();
-            let model_id = state.settings.lock().unwrap().selected_model_id.clone();
             if let Some(model) = EngineCatalog::global().model_by_id(&model_id) {
                 state.contexts.invalidate(&model.engine_id);
                 let rss_after = get_rss_bytes();
@@ -676,10 +678,12 @@ pub fn get_rss_bytes() -> u64 {
 #[cfg(target_os = "linux")]
 pub fn get_rss_bytes() -> u64 {
     // /proc/self/statm: fields are in pages, RSS is the second field
+    let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+    let page_size = if page_size > 0 { page_size as u64 } else { 4096 };
     std::fs::read_to_string("/proc/self/statm")
         .ok()
         .and_then(|s| s.split_whitespace().nth(1)?.parse::<u64>().ok())
-        .map(|pages| pages * 4096)
+        .map(|pages| pages * page_size)
         .unwrap_or(0)
 }
 

@@ -165,6 +165,16 @@ impl ContextMap {
     }
 }
 
+// -- Memory diagnostics --
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MemoryInfo {
+    /// RSS in MB, or None if unavailable on this platform.
+    pub rss_mb: Option<f64>,
+    /// Loaded engine contexts: (engine_id, context_key).
+    pub contexts: Vec<(String, String)>,
+}
+
 // -- History --
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
