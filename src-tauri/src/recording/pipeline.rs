@@ -168,7 +168,7 @@ async fn run_transcription(
 
     match result {
         Ok(Ok(Ok(tr))) => {
-            maybe_auto_release(&state, elapsed);
+            maybe_auto_release(state, elapsed);
             if state.runtime.lock().unwrap().transcription_cancelled {
                 log::info!("Transcription result discarded (cancelled)");
                 return false;
@@ -177,7 +177,7 @@ async fn run_transcription(
             false
         }
         Ok(Ok(Err(e))) => {
-            maybe_auto_release(&state, elapsed);
+            maybe_auto_release(state, elapsed);
             log::error!("Transcription error: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
@@ -187,7 +187,7 @@ async fn run_transcription(
             true
         }
         Ok(Err(e)) => {
-            maybe_auto_release(&state, elapsed);
+            maybe_auto_release(state, elapsed);
             log::error!("Transcription task panicked: {}", e);
             platform::play_sound("Basso");
             let _ = app.emit(
