@@ -86,7 +86,7 @@ All `#[tauri::command]` handlers (33 total), split by domain. Each sub-module is
 | `commands/providers.rs` | `add_provider`, `remove_provider`, `update_provider`, `get_providers`, `fetch_provider_models` |
 | `commands/settings.rs` | `get_settings`, `set_setting`, `get_system_locale`, `get_launch_at_login_status`, `set_launch_at_login` |
 | `commands/permissions.rs` | `get_permissions`, `request_permission`, `start_monitoring`, `enable_monitoring` |
-| `commands/app.rs` | `get_app_state`, `start_shortcut_capture`, `stop_shortcut_capture`, `simulate_pill_test` |
+| `commands/app.rs` | `get_app_state`, `get_memory_info`, `start_shortcut_capture`, `stop_shortcut_capture`, `simulate_pill_test`, `check_for_update`, `install_update` |
 
 ### Cleanup (`cleanup/`)
 
@@ -202,6 +202,7 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 | `ProvidersSection.vue` | Cloud provider management (22 presets + custom) |
 | `DictionarySection.vue` | User dictionary for protected words and replacement mappings |
 | `PermissionsSection.vue` | Permission status (microphone, accessibility, input monitoring) with grant buttons |
+| `DiagnosticSection.vue` | Real-time process memory (RSS), loaded engine contexts in ContextMap, auto-release toggle (`auto_release_memory`) |
 | `GeneralSection.vue` | Appearance (theme), interface language, About card (version, GPL-3.0 license) |
 
 ### Key components
@@ -301,7 +302,9 @@ Main thread (Tauri + Tokio runtime)
 
 Preferences are stored as JSON in `~/Library/Application Support/JonaWhisper/preferences.json` with a `_version` field tracking the schema version. History lives in `history.db` (SQLite, WAL mode) in the same directory. All model files are stored under `models/` with subdirectories per engine (`whisper/`, `canary/`, `parakeet/`, `qwen-asr/`, `voxtral/`, `llm/`, `bert/`, `pcs/`, `correction/`).
 
-On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON and the typed `Preferences` struct. To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`.
+On startup, `migrations.rs` checks `_version` and runs any pending migrations sequentially. Each migration receives both the raw JSON and the typed `Preferences` struct. To add a migration: append to the `MIGRATIONS` array and bump `CURRENT_VERSION`. When no preferences file exists (first launch), the app deserializes an empty JSON `{}` so that all `#[serde(default = "default_true")]` fields get their correct defaults.
+
+The `setup_completed` flag (default `false`) tracks whether the setup wizard has been completed. The app shows the setup wizard on launch if this flag is false or if any permission is missing. When all permissions are already granted, the wizard skips directly to step 2 (language, model, shortcut). The flag is set to `true` when the user clicks "Start" at the end of step 2.
 
 Shortcut values are stored as JSON objects (`{"key_codes":[54],"modifiers":1048576,"kind":"ModifierOnly"}`). Multi-key shortcuts store multiple key codes (up to 4). Legacy formats are automatically parsed for backward compatibility: old JSON (`key_code` singular) and legacy strings (`"right_command"`).
 
