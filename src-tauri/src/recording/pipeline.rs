@@ -138,6 +138,10 @@ async fn run_transcription(
     let path = audio_path.to_path_buf();
     let t0 = std::time::Instant::now();
 
+    // Capture model_id before spawning — if user changes model during transcription,
+    // we still invalidate the engine that was actually used.
+    let transcription_model_id = state.settings.lock().unwrap().selected_model_id.clone();
+
     // Timeout: if transcription + cleanup takes more than 120s, abort
     let task = tokio::task::spawn_blocking(move || {
         transcribe(&state_clone, &path)
@@ -150,18 +154,15 @@ async fn run_transcription(
     // where the spawn_blocking task may still be running and using the context.
     let maybe_auto_release = |state: &AppState, elapsed: Duration| {
         const ORT_RELEASE_THRESHOLD: f64 = 30.0;
-        let (auto_release, model_id) = {
-            let s = state.settings.lock().unwrap();
-            (s.auto_release_memory, s.selected_model_id.clone())
-        };
+        let auto_release = state.settings.lock().unwrap().auto_release_memory;
         if auto_release && elapsed.as_secs_f64() > ORT_RELEASE_THRESHOLD {
             let rss_before = get_rss_bytes();
-            if let Some(model) = EngineCatalog::global().model_by_id(&model_id) {
+            if let Some(model) = EngineCatalog::global().model_by_id(&transcription_model_id) {
                 state.contexts.invalidate(&model.engine_id);
                 let rss_after = get_rss_bytes();
                 let freed_mb = rss_before.saturating_sub(rss_after) as f64 / (1024.0 * 1024.0);
                 log::info!(
-                    "ORT memory released for engine={} after {:.1}s transcription (freed ~{:.0} MB, RSS: {})",
+                    "Context released for engine={} after {:.1}s transcription (freed ~{:.0} MB, RSS: {})",
                     model.engine_id, elapsed.as_secs_f64(), freed_mb, format_rss()
                 );
             }
