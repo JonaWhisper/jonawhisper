@@ -253,6 +253,7 @@
   "diagnostic.autoRelease": "Automatic memory release",
   "diagnostic.autoReleaseHint": "Frees model memory after long dictations",
   "diagnostic.loading": "Loading\u2026",
+  "diagnostic.na": "N/A",
   "menu.panel": "Settings\u2026",
   "window.panel": "JonaWhisper"
 }

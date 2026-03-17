@@ -35,7 +35,7 @@ onUnmounted(() => {
 })
 
 function formatRss(mb: number | null): string {
-  if (mb == null || mb <= 0) return 'N/A'
+  if (mb == null || mb <= 0) return t('diagnostic.na')
   if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
   return `${Math.round(mb)} MB`
 }
