@@ -142,7 +142,7 @@ onMounted(async () => {
         <Transition name="fade" mode="out-in">
           <RecentsSection v-if="activeSection === 'recents'" key="recents" />
           <ModelsSection v-else-if="activeSection === 'models'" key="models" />
-          <TranscriptionSection v-else-if="activeSection === 'transcription'" key="transcription" />
+          <TranscriptionSection v-else-if="activeSection === 'transcription'" key="transcription" @navigate="activeSection = $event" />
           <ProcessingSection v-else-if="activeSection === 'processing'" key="processing" @navigate="activeSection = $event" />
           <DictionarySection v-else-if="activeSection === 'dictionary'" key="dictionary" />
           <ShortcutsSection v-else-if="activeSection === 'shortcuts'" key="shortcuts" />

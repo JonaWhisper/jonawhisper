@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useEnginesStore } from '@/stores/engines'
 import { useDownloadStore } from '@/stores/downloads'
+import { useSettingsStore } from '@/stores/settings'
 import type { ASRModel } from '@/stores/types'
 import ModelCell from '@/components/ModelCell.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -12,6 +13,7 @@ import { AudioLines, Type, SpellCheck, MessageSquare, BookA, BookText } from 'lu
 const { t } = useI18n()
 const engines = useEnginesStore()
 const downloads = useDownloadStore()
+const settings = useSettingsStore()
 
 type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm' | 'spellcheck' | 'languagemodel'
 const activeFilter = ref<FilterKey>('all')
@@ -47,6 +49,21 @@ const filteredModels = computed(() => {
 
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
+
+const isDeleteTargetActive = computed(() => {
+  if (!deleteTarget.value) return false
+  return deleteTarget.value.id === settings.selectedModelId
+    || deleteTarget.value.id === settings.punctuationModelId
+    || deleteTarget.value.id === settings.cleanupModelId
+})
+
+const deleteConfirmDescription = computed(() => {
+  const base = t('modelManager.deleteConfirmDesc', [deleteTarget.value?.label || ''])
+  if (isDeleteTargetActive.value) {
+    return `${base}\n\n⚠ ${t('modelManager.deleteActiveWarning')}`
+  }
+  return base
+})
 
 async function handleDownload(model: ASRModel) {
   await downloads.downloadModel(model.id)
@@ -132,7 +149,7 @@ const virtualizer = useVirtualizer(computed(() => ({
     <ConfirmDialog
       v-model:open="showDeleteConfirm"
       :title="t('modelManager.deleteConfirm')"
-      :description="t('modelManager.deleteConfirmDesc', [deleteTarget?.label || ''])"
+      :description="deleteConfirmDescription"
       :confirm-label="t('modelManager.delete')"
       @confirm="confirmDelete"
     />
