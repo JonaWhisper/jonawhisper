@@ -82,8 +82,17 @@ onMounted(() => {
         <div>
           <div class="text-[13px] text-foreground">{{ t('settings.transcription.model') }}</div>
         </div>
+        <!-- Single model: display inline, no dropdown -->
+        <div v-if="engines.asrModels.length === 1 && selectedAsrModel" class="flex h-8 items-center px-3 text-xs">
+          <ModelOption
+            :label="selectedAsrModel.label"
+            :location="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'"
+            compact
+          />
+        </div>
+        <!-- Multiple models: full dropdown -->
         <Select
-          v-if="engines.asrModels.length > 0"
+          v-else-if="engines.asrModels.length > 1"
           :model-value="settings.selectedModelId"
           @update:model-value="onAsrModelChange"
         >
@@ -106,6 +115,7 @@ onMounted(() => {
             </SelectItem>
           </SelectContent>
         </Select>
+        <!-- No models: warning -->
         <div v-else class="flex h-8 items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-xs text-amber-600 dark:text-amber-400 min-w-[180px] gap-1.5">
           <TriangleAlert class="w-3.5 h-3.5 flex-shrink-0" />
           {{ t('settings.transcription.noModels') }}
