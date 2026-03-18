@@ -104,7 +104,7 @@ export const useEnginesStore = defineStore('engines', () => {
   /** Reset selected model IDs if they point to models that no longer exist or are disabled. */
   function validateSelections() {
     const asrIds = new Set(asrModels.value.map(m => m.id))
-    if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
+    if (!settingsStore.selectedModelId || !asrIds.has(settingsStore.selectedModelId)) {
       const first = asrModels.value[0]
       settingsStore.setSetting('selected_model_id', first?.id ?? '')
     }
