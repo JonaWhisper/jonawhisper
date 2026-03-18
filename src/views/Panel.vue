@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getVersion } from '@tauri-apps/api/app'
 import { useAppStore } from '@/stores/app'
+import { useEnginesStore } from '@/stores/engines'
 import { Clock, Package, AudioLines, Sparkles, Keyboard, Mic, Cloud, Shield, Settings2, BookOpen, Activity, Download, RefreshCw, AlertTriangle } from 'lucide-vue-next'
 
 // Lazy-load sections — only the active one is loaded
@@ -21,6 +22,13 @@ const DiagnosticSection = defineAsyncComponent(() => import('@/sections/Diagnost
 
 const { t } = useI18n()
 const store = useAppStore()
+const engines = useEnginesStore()
+
+const sectionWarnings = computed<Set<string>>(() => {
+  const warnings = new Set<string>()
+  if (engines.asrModels.length === 0) warnings.add('transcription')
+  return warnings
+})
 
 const activeSection = ref('recents')
 
@@ -81,6 +89,7 @@ onMounted(async () => {
           <div class="flex items-center gap-2">
             <component :is="section.icon" class="w-[18px] h-[18px] flex-shrink-0" :class="activeSection === section.id ? 'opacity-100 text-panel-accent' : 'opacity-70'" />
             <span class="text-[13px] truncate">{{ t(section.label) }}</span>
+            <span v-if="sectionWarnings.has(section.id)" class="ml-auto w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
           </div>
         </button>
       </nav>
