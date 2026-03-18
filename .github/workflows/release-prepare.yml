@@ -1,0 +1,66 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump type
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    name: Prepare Release PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          output=$(bash .github/scripts/bump-version.sh ${{ inputs.bump }})
+          echo "$output"
+          version=$(echo "$output" | grep '^version=' | cut -d= -f2)
+          tag=$(echo "$output" | grep '^tag=' | cut -d= -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --tag ${{ steps.bump.outputs.tag }}
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="release/${{ steps.bump.outputs.tag }}"
+          git checkout -b "$BRANCH"
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml CHANGELOG.md
+          git commit -m "release: ${{ steps.bump.outputs.tag }}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "release: ${{ steps.bump.outputs.tag }}" \
+            --body "Bump version to ${{ steps.bump.outputs.version }} and update changelog." \
+            --base main \
+            --head "$BRANCH"
