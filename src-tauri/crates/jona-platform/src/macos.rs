@@ -207,13 +207,19 @@ fn open_privacy_settings(anchor: &str) {
         "x-apple.systempreferences:com.apple.preference.security?{}",
         anchor
     );
-    let _ = std::process::Command::new("open").arg(url).spawn();
+    if let Ok(mut child) = std::process::Command::new("open").arg(url).spawn() {
+        std::thread::spawn(move || { let _ = child.wait(); });
+    }
 }
 
 pub fn play_sound(name: &str) {
-    let _ = std::process::Command::new("/usr/bin/afplay")
-        .arg(format!("/System/Library/Sounds/{}.aiff", name))
-        .spawn();
+    use objc2_app_kit::NSSound;
+    use objc2_foundation::NSString;
+
+    let ns_name = NSString::from_str(name);
+    if let Some(sound) = NSSound::soundNamed(&ns_name) {
+        sound.play();
+    }
 }
 
 // -- Launch at Login (SMAppService) --
