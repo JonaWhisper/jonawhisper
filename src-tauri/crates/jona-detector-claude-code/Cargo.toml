@@ -11,6 +11,6 @@ log = "0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
-whoami = "1"
+whoami = "2"
 core-foundation = "0.10"
 security-framework-sys = "2"

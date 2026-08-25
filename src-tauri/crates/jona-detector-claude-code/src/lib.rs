@@ -53,7 +53,7 @@ mod keychain {
         use core_foundation::dictionary::CFDictionary;
         use core_foundation::string::CFString;
 
-        let username = whoami::username();
+        let Ok(username) = whoami::username() else { return false };
 
         let keys = [
             unsafe { CFString::wrap_under_get_rule(security_framework_sys::item::kSecClass) },
@@ -141,7 +141,10 @@ mod keychain {
             }
         }
 
-        let username = whoami::username();
+        let Ok(username) = whoami::username() else {
+            log::debug!("claude-code detector: cannot resolve username");
+            return vec![];
+        };
         let entry = match keyring::Entry::new(KEYCHAIN_SERVICE, &username) {
             Ok(e) => e,
             Err(e) => {

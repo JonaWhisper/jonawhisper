@@ -96,7 +96,7 @@ shellexpand = "3"
 thiserror.workspace = true
 crossbeam-channel = "0.5.15"
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled", "fallible_uint"] }
 rust-i18n = "3"
 sys-locale = "0.3"
 ort.workspace = true
@@ -114,7 +114,7 @@ libc = "0.2"
 llama-cpp-2 = { version = "0.1", features = ["metal"] }
 jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
 
-core-graphics = "0.24"
+core-graphics = "0.25"
 core-foundation = "0.10"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
