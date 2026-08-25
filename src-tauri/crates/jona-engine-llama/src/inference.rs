@@ -76,7 +76,7 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
 
     let mut batch = LlamaBatch::new(512, 1);
     let last_index = tokens.len() as i32 - 1;
-    for (i, token) in (0_i32..).zip(tokens.into_iter()) {
+    for (i, token) in (0_i32..).zip(tokens) {
         batch.add(token, i, &[0], i == last_index)
             .map_err(|e| LlmError::Inference(format!("Batch add failed: {}", e)))?;
     }
