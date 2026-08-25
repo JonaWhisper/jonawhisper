@@ -787,3 +787,20 @@ mod tests {
         assert!(result.is_none());
     }
 }
+
+#[cfg(test)]
+mod i18n_tests {
+    // The locale files are flat, with literal dotted keys ("menu.quit"), not nested
+    // objects — rust-i18n returns the key itself when a lookup misses, so a silent
+    // regression here would be invisible without asserting on the resolved value.
+    #[test]
+    fn dotted_keys_resolve_in_both_locales() {
+        rust_i18n::set_locale("en");
+        assert_eq!(rust_i18n::t!("menu.quit"), "Quit");
+        assert_eq!(rust_i18n::t!("window.setup"), "Setup");
+
+        rust_i18n::set_locale("fr");
+        assert_eq!(rust_i18n::t!("menu.quit"), "Quitter");
+        assert_eq!(rust_i18n::t!("window.setup"), "Configuration");
+    }
+}
