@@ -1,5 +1,5 @@
 use super::{
-    AudioCmd, AudioReply, RecordingState, PILL_CLOSE_GENERATION,
+    RecordingState, PILL_CLOSE_GENERATION,
     SHORT_TAP_MS, DOUBLE_TAP_MS, show_error_then_close,
 };
 use crate::events;
@@ -20,7 +20,11 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         if rt.mic_testing {
             rt.mic_testing = false;
             state.audio_flags.set_mic_testing(false);
-            let _ = rec.audio_tx.send(AudioCmd::StopMicTest);
+            if let Ok(mut r) = rec.recorder.lock() {
+                if let Some(path) = r.stop_recording() {
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
             let _ = app.emit(events::MIC_TEST_STOPPED, ());
         }
         rt.is_recording = true;
@@ -38,8 +42,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         let s = state.settings.lock().unwrap();
         (s.selected_input_device_uid.clone(), s.audio_ducking_enabled, s.audio_ducking_level)
     };
-    let _ = rec.audio_tx.send(AudioCmd::StartRecording { device_uid });
-    let _ = rec.audio_rx.recv();
+    rec.recorder.lock().unwrap().start_recording(device_uid.as_deref());
     log::debug!("Audio stream created, waiting for first samples");
 
     // Duck AFTER stream started: BT profile switch (A2DP→HFP) has already happened,
@@ -103,11 +106,7 @@ pub fn stop_recording_and_enqueue(
     // so we restore volume in the same audio profile state as when we ducked.
     // Stopping the stream triggers HFP→A2DP switch which would swallow the restore.
     platform::audio_ducking::restore_volume();
-    let _ = rec.audio_tx.send(AudioCmd::StopRecording);
-    let audio_path = match rec.audio_rx.recv() {
-        Ok(AudioReply::Stopped { path }) => path,
-        _ => None,
-    };
+    let audio_path = rec.recorder.lock().unwrap().stop_recording();
 
     let held_duration = rec.key_down_time.map(|t| t.elapsed());
     rec.key_down_time = None;
@@ -198,8 +197,7 @@ pub(super) fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut
 
     // Restore BEFORE stopping stream (same rationale as stop_recording_and_enqueue)
     platform::audio_ducking::restore_volume();
-    let _ = rec.audio_tx.send(AudioCmd::StopRecording);
-    if let Ok(AudioReply::Stopped { path: Some(path) }) = rec.audio_rx.recv() {
+    if let Some(path) = rec.recorder.lock().unwrap().stop_recording() {
         let _ = std::fs::remove_file(&path);
     }
     rec.key_down_time = None;

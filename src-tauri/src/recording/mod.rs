@@ -19,41 +19,54 @@ const ORPHAN_CLEANUP_SECS: u64 = 300;
 
 // -- Audio commands for the dedicated audio thread --
 
-pub enum AudioCmd {
-    StartRecording { device_uid: Option<String> },
-    StopRecording,
-    StartMicTest { device_uid: Option<String> },
-    StopMicTest,
-}
-
-pub enum AudioReply {
-    Started,
-    Stopped { path: Option<std::path::PathBuf> },
-}
-
-// -- Recording state (Send-safe, does not hold AudioRecorder) --
+// -- Recording state --
 
 pub struct RecordingState {
     key_down_time: Option<Instant>,
     last_short_tap_time: Option<Instant>,
-    audio_tx: crossbeam_channel::Sender<AudioCmd>,
-    audio_rx: crossbeam_channel::Receiver<AudioReply>,
+    pub(crate) recorder: SharedRecorder,
     pub(crate) samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
-/// Wrapper around audio command sender for mic test (managed by Tauri).
-pub struct MicTestSender(pub crossbeam_channel::Sender<AudioCmd>);
+/// The recorder, shared with the spectrum monitor and the mic-test commands.
+/// cpal 0.18 makes `Stream` `Send` on CoreAudio, so it no longer needs an owner thread.
+pub type SharedRecorder = std::sync::Arc<std::sync::Mutex<crate::audio::AudioRecorder>>;
+
+/// Everything the rest of the app needs to reach the recorder.
+pub struct AudioHandles {
+    pub recorder: SharedRecorder,
+    /// Live spectrum data — lock-free atomic array shared with the cpal callback.
+    pub spectrum_data: std::sync::Arc<crate::audio::AtomicSpectrum>,
+    pub stream_error: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+pub fn create_recorder() -> AudioHandles {
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    let stream_error = Arc::new(AtomicBool::new(false));
+    let samples_received = Arc::new(AtomicBool::new(false));
+    let recorder =
+        crate::audio::AudioRecorder::new(Arc::clone(&stream_error), Arc::clone(&samples_received));
+    let spectrum_data = recorder.spectrum_handle();
+
+    AudioHandles {
+        recorder: Arc::new(std::sync::Mutex::new(recorder)),
+        spectrum_data,
+        stream_error,
+        samples_received,
+    }
+}
 
 pub fn new_recording_state(
-    cmd_tx: crossbeam_channel::Sender<AudioCmd>,
-    reply_rx: crossbeam_channel::Receiver<AudioReply>,
+    recorder: SharedRecorder,
     samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> RecordingState {
     RecordingState {
         key_down_time: None,
         last_short_tap_time: None,
-        audio_tx: cmd_tx,
-        audio_rx: reply_rx,
+        recorder,
         samples_received,
     }
 }
@@ -72,7 +85,7 @@ fn show_error_then_close(app: &tauri::AppHandle) {
 }
 
 pub use pipeline::get_rss_bytes;
-pub use threads::{spawn_audio_thread, spawn_hotkey_handler, spawn_spectrum_emitter, AudioThreadHandles};
+pub use threads::{spawn_hotkey_handler, spawn_spectrum_emitter};
 
 pub fn cleanup_orphan_audio_files() {
     let tmp_dir = std::env::temp_dir();
