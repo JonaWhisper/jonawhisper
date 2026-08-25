@@ -53,7 +53,11 @@ pub fn list_usable_devices() -> Vec<crate::platform::audio_devices::AudioDevice>
     let host = cpal::default_host();
     let cpal_names: Vec<String> = host
         .input_devices()
-        .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+        .map(|devices| {
+            devices
+                .filter_map(|d| d.description().ok().map(|desc| desc.name().to_string()))
+                .collect()
+        })
         .unwrap_or_default();
 
     crate::platform::audio_devices::list_input_devices()
@@ -98,7 +102,7 @@ impl AudioRecorder {
             if let Some(name) = device_name {
                 host.input_devices()
                     .ok()
-                    .and_then(|mut devices| devices.find(|d| d.name().ok().as_deref() == Some(&name)))
+                    .and_then(|mut devices| devices.find(|d| d.description().is_ok_and(|desc| desc.name() == name)))
                     .or_else(|| {
                         log::warn!("CoreAudio device '{}' not found in cpal, using default", name);
                         host.default_input_device()
@@ -122,7 +126,7 @@ impl AudioRecorder {
         // Try 16kHz mono first, fall back to device default config
         let preferred = cpal::StreamConfig {
             channels: 1,
-            sample_rate: cpal::SampleRate(SAMPLE_RATE),
+            sample_rate: SAMPLE_RATE,
             buffer_size: cpal::BufferSize::Default,
         };
 
@@ -133,8 +137,8 @@ impl AudioRecorder {
             .map(|configs| {
                 configs.into_iter().any(|c| {
                     c.channels() >= 1
-                        && c.min_sample_rate().0 <= SAMPLE_RATE
-                        && c.max_sample_rate().0 >= SAMPLE_RATE
+                        && c.min_sample_rate() <= SAMPLE_RATE
+                        && c.max_sample_rate() >= SAMPLE_RATE
                 })
             })
             .unwrap_or(false)
@@ -148,10 +152,10 @@ impl AudioRecorder {
             };
             log::info!(
                 "Using device native config: {}Hz {}ch (will resample to 16kHz mono)",
-                cfg.sample_rate().0,
+                cfg.sample_rate(),
                 cfg.channels()
             );
-            (sc, cfg.channels(), cfg.sample_rate().0)
+            (sc, cfg.channels(), cfg.sample_rate())
         } else {
             log::error!("No supported input configuration found");
             return false;
@@ -206,7 +210,7 @@ impl AudioRecorder {
                 let error_flag = Arc::clone(&self.stream_error);
                 let received_flag = Arc::clone(&self.samples_received);
                 device.build_input_stream(
-                    &config,
+                    config,
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         received_flag.store(true, Ordering::Relaxed);
                         let mono = mix_to_mono(data, channels);
@@ -227,7 +231,7 @@ impl AudioRecorder {
                 let error_flag = Arc::clone(&self.stream_error);
                 let received_flag = Arc::clone(&self.samples_received);
                 device.build_input_stream(
-                    &config,
+                    config,
                     move |data: &[i16], _: &cpal::InputCallbackInfo| {
                         received_flag.store(true, Ordering::Relaxed);
                         let float_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
