@@ -8,9 +8,12 @@ license = "GPL-3.0-or-later"
 jona-types = { path = "../jona-types" }
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-credential-types = { version = "1", features = ["hardcoded-credentials"] }
-aws-sdk-transcribe = "1"
-aws-sdk-transcribestreaming = "1"
-aws-sdk-s3 = "1"
+# `rustls` is in each SDK's default set but only wires the legacy hyper-0.14
+# connector, pinning rustls 0.21 / rustls-webpki 0.101.7 (GHSA, unpatched on that
+# branch). We only ever use the default client, so drop it and keep the modern stack.
+aws-sdk-transcribe = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-transcribestreaming = { version = "1", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1", default-features = false, features = ["sigv4a", "http-1x", "default-https-client", "rt-tokio"] }
 reqwest = { version = "0.12", features = ["json"] }
 hound = "3.5"
 serde.workspace = true
