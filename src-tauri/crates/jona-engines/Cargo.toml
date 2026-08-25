@@ -9,7 +9,7 @@ inventory.workspace = true
 jona-types = { path = "../jona-types" }
 serde.workspace = true
 serde_json.workspace = true
-reqwest = { version = "0.12", features = ["stream", "json", "blocking"] }
+reqwest = { version = "0.13", features = ["stream", "json", "blocking"] }
 hound = "3.5"
 futures-util = "0.3"
 tokio = { version = "1", features = ["full"] }
