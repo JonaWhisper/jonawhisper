@@ -83,7 +83,7 @@ tauri-plugin-process = "2"
 
 serde.workspace = true
 serde_json.workspace = true
-cpal = "0.15"
+cpal = "0.18"
 hound = "3.5"
 reqwest = { version = "0.13", features = ["stream", "multipart", "json", "blocking"] }
 regex = "1"
@@ -97,7 +97,7 @@ thiserror.workspace = true
 crossbeam-channel = "0.5.15"
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
 rusqlite = { version = "0.40", features = ["bundled", "fallible_uint"] }
-rust-i18n = "3"
+rust-i18n = "4"
 sys-locale = "0.3"
 ort.workspace = true
 ndarray = "0.17"
