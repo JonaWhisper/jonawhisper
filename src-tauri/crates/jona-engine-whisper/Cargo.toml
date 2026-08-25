@@ -11,7 +11,7 @@ jona-engines = { path = "../jona-engines" }
 log.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-whisper-rs = { version = "0.15", features = ["metal"] }
+whisper-rs = { version = "0.16", features = ["metal"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-whisper-rs = "0.15"
+whisper-rs = "0.16"

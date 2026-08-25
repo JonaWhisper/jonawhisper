@@ -27,10 +27,7 @@ pub fn load(model_path: &Path, gpu_mode: GpuMode) -> Result<WhisperCtx, EngineEr
     let mut ctx_params = WhisperContextParameters::default();
     ctx_params.use_gpu(use_gpu);
     ctx_params.flash_attn(true);
-    let wctx = WhisperContext::new_with_params(
-        &model_path.to_string_lossy(),
-        ctx_params,
-    ).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
+    let wctx = WhisperContext::new_with_params(model_path, ctx_params).map_err(|e| EngineError::LaunchFailed(format!("Failed to load whisper model: {}", e)))?;
     log::info!("Whisper model loaded: {} (gpu={})", model_path.display(), use_gpu);
     Ok(WhisperCtx {
         context: wctx,
