@@ -23,7 +23,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "diff": "^9.0.0",
-    "lucide-vue-next": "^0.575.0",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3",
     "reka-ui": "^2.8.2",
     "tailwind-merge": "^3.5.0",
