@@ -47,6 +47,7 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 | **Canary-1B v2** | ~1B | 25 langues | ONNX int8 | 1.03 GB | 1.45 GB | FastConformer enc-dec | Non | ort (encodeur CoreML, décodeur CPU) | **Intégré** (`canary:1b-v2-int8`) |
 | **Parakeet-TDT 0.6B v3** | 600M | 25 langues | ONNX int8 | 703 MB | 750 MB | FastConformer + TDT transducer | Non | ort (CoreML) | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
 | **Qwen3-ASR 0.6B** | 600M | 30 langues | Safetensors | 1.88 GB | 2 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:0.6b`) |
+| **Qwen3-ASR 1.7B** | 1.7B | 30 langues | Safetensors (2 shards) | 4.70 GB | 5 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:1.7b`) |
 | **Voxtral Realtime 4B** | 4.4B | 13 langues | Safetensors BF16 | 8.9 GB | ~10 GB | Mimi encoder + LLM decoder | Oui (voxtral.c) | voxtral.c vendoré (Metal) | **Intégré** (`voxtral:mini-4b-realtime`) |
 
 #### Voxtral — Benchmarks (WER moyen FLEURS + MCV + MLS)
@@ -70,9 +71,7 @@ Modèles avec un chemin d'intégration réaliste (ONNX disponible, safetensors, 
 
 | Modèle | Params | FR | Format | Taille | Runtime Rust | Langues | WER | Intérêt | Statut |
 |---|---|---|---|---|---|---|---|---|---|
-| **Qwen3-ASR 1.7B** | 1.7B | Oui | Safetensors | 4.7 GB | `qwen-asr` (Rust pur, AMX) | 30 + dialectes | 1.63% LS | Meilleur WER open-source, streaming, FR natif | **Candidat #1** |
-| **Canary-1B v2** | 978M | Oui | ONNX (community) | ~2 GB | ort (CoreML) | 25 EU | 7.27-8.85% | 25 langues EU, traduction bidirectionnelle | **Candidat #2** |
-| **SenseVoice Small** | 234M | 50+ (focus zh/en) | ONNX int8 | 228 MB | `sensevoice-rs` (Candle) | 50+ | Excellent zh/en | Ultra-rapide (15x Whisper), ONNX + Rust crate | **Candidat #3** |
+| **SenseVoice Small** | 234M | 50+ (focus zh/en) | ONNX int8 | 228 MB | `sensevoice-rs` (Candle) | 50+ | Excellent zh/en | Ultra-rapide (15x Whisper), ONNX + Rust crate | **Candidat #1** |
 | **Moonshine v2 Medium** | 250M | EN seul | ONNX (.ort) | ~500 MB | ort | EN | ~6.65% | 100x Whisper Large, streaming natif | Écarté — EN seul |
 | **Moonshine Tiny** | 27M | EN seul | ONNX (.ort) | 108 MB | ort | EN | ~12.7% | Ultra-compact, <108 MB | Écarté — EN seul |
 | ~~Voxtral Mini 4B~~ | 4B | Oui | Safetensors BF16 | 8.87 GB | voxtral.c (C, Metal) | 13 langues | — | **✓ Intégré** via voxtral.c vendoré | **Intégré** (`voxtral:mini-4b-realtime`) |
@@ -111,7 +110,7 @@ Résumé des top modèles du leaderboard HuggingFace (60+ modèles, 18 organisat
 | — | NVIDIA Parakeet CTC 1.1B | 6.68% | **2794** | 1.1B | Non (EN seul) | SOTA vitesse |
 | — | OpenAI Whisper Large V3 | 6.43% | 69 | 1.55B | **Oui** (intégré) | Référence multilingue |
 | — | Moonshine Medium v2 | 6.65% | ~1200 | 250M | Non (EN seul) | 100x Whisper |
-| — | Qwen3-ASR 1.7B | ~4.5% estimé | — | 1.7B | **Oui** (candidat) | 1.63% LS clean |
+| — | Qwen3-ASR 1.7B | ~4.5% estimé | — | 1.7B | **Oui** (intégré) | 1.63% LS clean |
 
 **Note** : les meilleurs modèles du leaderboard (Canary-Qwen, Granite) sont trop lourds pour du natif. Les modèles intégrables offrent un bon compromis qualité/taille.
 
@@ -133,11 +132,9 @@ Résumé des top modèles du leaderboard HuggingFace (60+ modèles, 18 organisat
 
 | Priorité | Action | Effort | Impact |
 |---|---|---|---|
-| **1 — Immédiat** | Intégrer Qwen3-ASR 1.7B (via `qwen-asr` existant) | Très faible | Meilleur WER, 30 langues, streaming |
-| **2 — Court terme** | Évaluer Canary-1B v2 (ONNX community) | Modéré | 25 langues EU, traduction intégrée |
-| **3 — Court terme** | Évaluer SenseVoice Small (`sensevoice-rs`) | Faible | Ultra-rapide, 228 MB, crate Rust |
-| **4 — Optionnel** | Moonshine Tiny pour mode ultra-léger EN | Faible | 108 MB, streaming, EN seul |
-| **5 — Optionnel** | Adapter cloud providers (Deepgram, AssemblyAI streaming FR) | Modéré | Alternatives cloud premium |
+| **1 — Court terme** | Évaluer SenseVoice Small (`sensevoice-rs`) | Faible | Ultra-rapide, 228 MB, crate Rust |
+| **2 — Optionnel** | Moonshine Tiny pour mode ultra-léger EN | Faible | 108 MB, streaming, EN seul |
+| **3 — Optionnel** | Adapter cloud providers (Deepgram, AssemblyAI streaming FR) | Modéré | Alternatives cloud premium |
 
 ---
 

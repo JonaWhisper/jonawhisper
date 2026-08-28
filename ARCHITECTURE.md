@@ -147,7 +147,7 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-whisper` | Whisper (tiny → large-v3-turbo) | whisper-rs (Metal GPU) |
 | `jona-engine-canary` | NVIDIA Canary 182M / 1B v2 | ort + CoreML |
 | `jona-engine-parakeet` | NVIDIA Parakeet-TDT 0.6B | ort + CoreML, vendored TDT decoder |
-| `jona-engine-qwen` | Alibaba Qwen3-ASR 0.6B | qwen-asr crate (Accelerate/AMX) |
+| `jona-engine-qwen` | Alibaba Qwen3-ASR 0.6B / 1.7B | qwen-asr crate (Accelerate/AMX) |
 | `jona-engine-voxtral` | Mistral Voxtral 4B | vendored voxtral.c (Metal GPU) |
 | `jona-engine-bert` | BERT punctuation | ort (ONNX + CoreML) or Candle (safetensors + Metal GPU) |
 | `jona-engine-pcs` | PCS punctuation (47 lang) | ort (ONNX + CoreML), SentencePiece tokenizer |
