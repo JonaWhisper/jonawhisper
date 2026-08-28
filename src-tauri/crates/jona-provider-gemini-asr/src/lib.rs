@@ -160,9 +160,9 @@ impl CloudProvider for GeminiAsrBackend {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
             Ok(vec![
-                "gemini-2.0-flash".into(),
-                "gemini-2.5-flash".into(),
-                "gemini-2.5-pro".into(),
+                "gemini-3.5-transcribe".into(),
+                "gemini-3.7-flash".into(),
+                "gemini-3.5-flash".into(),
             ])
         })
     }
@@ -178,7 +178,7 @@ inventory::submit! { ProviderPreset {
     base_url: "https://generativelanguage.googleapis.com/v1beta", backend_id: "gemini-asr",
     supports_asr: true, supports_llm: false,
     gradient: "linear-gradient(135deg, #4285f4, #1a73e8)",
-    default_asr_models: &["gemini-2.0-flash", "gemini-2.5-flash"],
+    default_asr_models: &["gemini-3.5-transcribe", "gemini-3.7-flash"],
     default_llm_models: &[],
     extra_fields: &[
         PresetField {

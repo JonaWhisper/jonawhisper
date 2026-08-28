@@ -13,10 +13,10 @@ tauri = { version = "2" }
 tauri-plugin-clipboard-manager = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-graphics = "0.24"
+core-graphics = "0.25"
 core-foundation = "0.10"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
-objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSSound", "NSApplication", "NSRunningApplication"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSApplication", "NSRunningApplication"] }
 block2 = "0.6"
 smappservice-rs = "0.1"

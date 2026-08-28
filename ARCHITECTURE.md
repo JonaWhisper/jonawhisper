@@ -58,7 +58,7 @@ The main Tauri crate (`src-tauri/src/`) is a **thin orchestrator**. It contains 
 | `lib.rs` | App setup: registers commands, spawns threads, manages the `monitor_enabled` flag. 10 modules: audio, cleanup, commands, errors, events, migrations, platform, recording, state, ui. |
 | `state.rs` | `AppState` with fine-grained mutexes via `context_group!` macro: runtime state, download state, preferences, history DB (SQLite WAL), tray menu state, cached contexts. History queries use cursor-based pagination (`WHERE timestamp < ?cursor … LIMIT`) with optional `LIKE` search. `ProviderKind::base_url()` resolves canonical API URLs at runtime. Keyring helpers (`keyring_store`, `keyring_load`, `keyring_delete`) manage API keys in the OS keychain. `Provider::validate_url()` enforces HTTPS on Custom providers (unless `allow_insecure`). |
 | `migrations.rs` | Versioned preference migrations (numbered functions, raw JSON + typed `Preferences`). Runs on startup if `_version` < current. Can also perform filesystem operations (e.g. relocating model files). Current version: 7 (v4 migrates API keys to OS keychain, v6 separates punctuation from cleanup model, v7 cleans up old Candle/safetensors correction models). |
-| `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Owns the cpal stream (not Send), so it lives on a dedicated thread. Also provides `read_wav_f32()` shared WAV reader. |
+| `audio.rs` | `AudioRecorder` — cpal input stream, WAV output via hound, 12-band FFT spectrum. Shared as `SharedRecorder` (`Arc<Mutex<_>>`) and called directly: cpal 0.18 makes `Stream` `Send` and runs its own dedicated thread internally. Also provides `read_wav_f32()` shared WAV reader. |
 | `events.rs` | Centralised event name constants to avoid string typos |
 | `errors.rs` | App error types (`AppError` enum with `thiserror` derivations) |
 
@@ -68,10 +68,10 @@ Recording lifecycle and transcription pipeline, split into focused sub-modules.
 
 | File | Role |
 |------|------|
-| `recording/mod.rs` | Public types (`AudioCmd`, `AudioReply`, `RecordingState`, `MicTestSender`), timing constants, shared helpers (`show_error_then_close`, `cleanup_orphan_audio_files`). |
+| `recording/mod.rs` | Public types (`RecordingState`, `SharedRecorder`, `AudioHandles`), `create_recorder()`, timing constants, shared helpers (`show_error_then_close`, `cleanup_orphan_audio_files`). |
 | `recording/lifecycle.rs` | `start_recording`, `stop_recording_and_enqueue`, `handle_short_tap`, `cancel_recording`, `cancel_transcription`. Everything that touches the record button. |
 | `recording/pipeline.rs` | `process_next_in_queue` → VAD pre-check → ASR dispatch (cloud or local via `ASREngine` trait) → hallucination filter → dictation commands → disfluency removal → punctuation → spell-check → correction/LLM → finalize → ITN → paste. Each step records its result in `pipeline_steps` (changed / `:nochange` / `:error`). All engine interactions go through `jona_engines::EngineCatalog`. |
-| `recording/threads.rs` | Three long-lived threads: audio (cpal), hotkey handler, spectrum emitter (30fps). |
+| `recording/threads.rs` | Two long-lived threads: hotkey handler and spectrum emitter (30fps). |
 
 ### Commands (`commands/`)
 
@@ -145,9 +145,9 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | Crate | Engine | Inference |
 |-------|--------|-----------|
 | `jona-engine-whisper` | Whisper (tiny → large-v3-turbo) | whisper-rs (Metal GPU) |
-| `jona-engine-canary` | NVIDIA Canary 182M | ort + CoreML |
+| `jona-engine-canary` | NVIDIA Canary 182M / 1B v2 | ort + CoreML |
 | `jona-engine-parakeet` | NVIDIA Parakeet-TDT 0.6B | ort + CoreML, vendored TDT decoder |
-| `jona-engine-qwen` | Alibaba Qwen3-ASR 0.6B | qwen-asr crate (Accelerate/AMX) |
+| `jona-engine-qwen` | Alibaba Qwen3-ASR 0.6B / 1.7B | qwen-asr crate (Accelerate/AMX) |
 | `jona-engine-voxtral` | Mistral Voxtral 4B | vendored voxtral.c (Metal GPU) |
 | `jona-engine-bert` | BERT punctuation | ort (ONNX + CoreML) or Candle (safetensors + Metal GPU) |
 | `jona-engine-pcs` | PCS punctuation (47 lang) | ort (ONNX + CoreML), SentencePiece tokenizer |
@@ -266,12 +266,10 @@ Main thread (Tauri + Tokio runtime)
   │     Reads HotkeyEvent from the channel, drives recording start/stop,
   │     forwards capture events to the frontend.
   │
-  ├── Audio thread (recording/threads.rs → audio.rs)
-  │     Owns the cpal::Stream. Receives AudioCmd, replies with AudioReply.
-  │
   ├── Spectrum emitter thread (recording/threads.rs)
-  │     30fps loop. Polls spectrum data from the audio thread,
-  │     feeds pill directly. Also detects audio stream errors.
+  │     30fps loop. Reads the recorder's lock-free spectrum buffer,
+  │     feeds pill directly. Also detects audio stream errors and stops
+  │     the recorder itself on a device disconnect.
   │
   ├── Pill animation thread (ui/pill.rs)
   │     ~30fps loop while pill is open. Smooths spectrum, advances dot phase,
@@ -285,7 +283,7 @@ Main thread (Tauri + Tokio runtime)
 
 1. **Hotkey press** → CGEvent callback detects the configured shortcut → sends `HotkeyEvent::KeyDown`
 2. **Hotkey handler** receives the event → calls `start_recording()`
-3. **Recording starts** → if audio ducking enabled, saves and reduces system volume → sends `AudioCmd::StartRecording` to the audio thread → cpal stream begins capturing
+3. **Recording starts** → if audio ducking enabled, saves and reduces system volume → calls `start_recording()` on the shared recorder → cpal stream begins capturing
 4. **Pill opens** — native NSWindow with first frame pre-rendered (no flash), shows recording mode (spectrum bars)
 5. **Hotkey release** → `HotkeyEvent::KeyUp` → `stop_recording_and_enqueue()`
 6. **Audio stops** → system volume restored → WAV file path returned → enqueued in `RuntimeState.queue`

@@ -203,7 +203,7 @@ fn animation_loop(app: AppHandle) {
                     // Only warn after ~3s of sustained flat, then every ~3s
                     if count >= 90 && count.is_multiple_of(90) {
                         log::warn!("Pill render flat ({:.1}s): spec_max={:.4}, smooth_max={:.4}, spectrum={:.3?}",
-                            count as f32 / 30.0, spec_max, smooth_max, &p.spectrum);
+                            count as f32 / 30.0, spec_max, smooth_max, p.spectrum);
                     }
                 } else {
                     let prev = ff.swap(0, Ordering::Relaxed);

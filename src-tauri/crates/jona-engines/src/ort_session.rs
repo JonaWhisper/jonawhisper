@@ -37,6 +37,17 @@ pub fn build_session(n_threads: usize) -> Result<SessionBuilder, String> {
     Ok(builder)
 }
 
+/// Build an ort SessionBuilder pinned to CPU.
+///
+/// The CoreML EP rejects any input tensor with zero elements, which rules it out
+/// for autoregressive decoders whose KV-cache input starts empty.
+pub fn build_cpu_session(n_threads: usize) -> Result<SessionBuilder, String> {
+    Session::builder()
+        .map_err(|e| format!("ort session builder: {e}"))?
+        .with_intra_threads(n_threads)
+        .map_err(|e| format!("ort threads: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

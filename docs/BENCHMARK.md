@@ -44,8 +44,10 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 |---|---|---|---|---|---|---|---|---|---|
 | **Whisper Large V3 French** | 1.5B | Natif FR | GGML | 538 MB | 900 MB | Encoder-decoder attention | Non | whisper-rs (Metal) | **Intégré** (`whisper:large-v3-french-distil`) |
 | **Canary-180M-Flash** | 182M | 4 langues | ONNX int8 | 213 MB | 300 MB | FastConformer enc-dec | Non | ort (CoreML) | **Intégré** (`canary:180m-flash-int8`) |
+| **Canary-1B v2** | ~1B | 25 langues | ONNX int8 | 1.03 GB | 1.45 GB | FastConformer enc-dec | Non | ort (encodeur CoreML, décodeur CPU) | **Intégré** (`canary:1b-v2-int8`) |
 | **Parakeet-TDT 0.6B v3** | 600M | 25 langues | ONNX int8 | 703 MB | 750 MB | FastConformer + TDT transducer | Non | ort (CoreML) | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
 | **Qwen3-ASR 0.6B** | 600M | 30 langues | Safetensors | 1.88 GB | 2 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:0.6b`) |
+| **Qwen3-ASR 1.7B** | 1.7B | 30 langues | Safetensors (2 shards) | 4.70 GB | 5 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:1.7b`) |
 | **Voxtral Realtime 4B** | 4.4B | 13 langues | Safetensors BF16 | 8.9 GB | ~10 GB | Mimi encoder + LLM decoder | Oui (voxtral.c) | voxtral.c vendoré (Metal) | **Intégré** (`voxtral:mini-4b-realtime`) |
 
 #### Voxtral — Benchmarks (WER moyen FLEURS + MCV + MLS)
@@ -69,13 +71,11 @@ Modèles avec un chemin d'intégration réaliste (ONNX disponible, safetensors, 
 
 | Modèle | Params | FR | Format | Taille | Runtime Rust | Langues | WER | Intérêt | Statut |
 |---|---|---|---|---|---|---|---|---|---|
-| **Qwen3-ASR 1.7B** | 1.7B | Oui | Safetensors | 4.7 GB | `qwen-asr` (Rust pur, AMX) | 30 + dialectes | 1.63% LS | Meilleur WER open-source, streaming, FR natif | **Candidat #1** |
-| **Canary-1B v2** | 978M | Oui | ONNX (community) | ~2 GB | ort (CoreML) | 25 EU | 7.27-8.85% | 25 langues EU, traduction bidirectionnelle | **Candidat #2** |
-| **SenseVoice Small** | 234M | 50+ (focus zh/en) | ONNX int8 | 228 MB | `sensevoice-rs` (Candle) | 50+ | Excellent zh/en | Ultra-rapide (15x Whisper), ONNX + Rust crate | **Candidat #3** |
+| **SenseVoice Small** | 234M | 50+ (focus zh/en) | ONNX int8 | 228 MB | `sensevoice-rs` (Candle) | 50+ | Excellent zh/en | Ultra-rapide (15x Whisper), ONNX + Rust crate | **Candidat #1** |
 | **Moonshine v2 Medium** | 250M | EN seul | ONNX (.ort) | ~500 MB | ort | EN | ~6.65% | 100x Whisper Large, streaming natif | Écarté — EN seul |
 | **Moonshine Tiny** | 27M | EN seul | ONNX (.ort) | 108 MB | ort | EN | ~12.7% | Ultra-compact, <108 MB | Écarté — EN seul |
 | ~~Voxtral Mini 4B~~ | 4B | Oui | Safetensors BF16 | 8.87 GB | voxtral.c (C, Metal) | 13 langues | — | **✓ Intégré** via voxtral.c vendoré | **Intégré** (`voxtral:mini-4b-realtime`) |
-| **Canary-1B-Flash** | ~1B | 4 langues | .nemo | ~2 GB | Conversion ONNX nécessaire | FR/EN/DE/ES | — | >1000 RTFx, streaming | Non intégré — conversion .nemo→ONNX non triviale |
+| **Canary-1B-Flash** | ~1B | 4 langues | .nemo | ~2 GB | Conversion ONNX nécessaire | FR/EN/DE/ES | — | >1000 RTFx, streaming | Remplacé par Canary-1B v2, intégré via l'export ONNX d'istupakov |
 | **OWSM-CTC v4 1B** | ~1B | Multi | PyTorch | ~2 GB | Conversion ONNX nécessaire | Multi | — | Encoder-only CTC, ultra-rapide | Non intégré — ESPnet/PyTorch, pas d'ONNX |
 | **IBM Granite Speech 3.3 8B** | 8B | Oui | Safetensors | ~16 GB | Candle (théorique) | Multi | 5.85% | Top leaderboard, Apache 2.0 | Écarté — 16 GB, LLM backbone trop lourd |
 | **Parakeet-TDT 1.1B** | 1.1B | EN seul | .nemo | ~2.2 GB | Pas d'ONNX officiel | EN | 1.39% LS | Meilleur WER EN, RTFx >2000 | Écarté — EN seul, pas d'ONNX |
@@ -110,7 +110,7 @@ Résumé des top modèles du leaderboard HuggingFace (60+ modèles, 18 organisat
 | — | NVIDIA Parakeet CTC 1.1B | 6.68% | **2794** | 1.1B | Non (EN seul) | SOTA vitesse |
 | — | OpenAI Whisper Large V3 | 6.43% | 69 | 1.55B | **Oui** (intégré) | Référence multilingue |
 | — | Moonshine Medium v2 | 6.65% | ~1200 | 250M | Non (EN seul) | 100x Whisper |
-| — | Qwen3-ASR 1.7B | ~4.5% estimé | — | 1.7B | **Oui** (candidat) | 1.63% LS clean |
+| — | Qwen3-ASR 1.7B | ~4.5% estimé | — | 1.7B | **Oui** (intégré) | 1.63% LS clean |
 
 **Note** : les meilleurs modèles du leaderboard (Canary-Qwen, Granite) sont trop lourds pour du natif. Les modèles intégrables offrent un bon compromis qualité/taille.
 
@@ -132,11 +132,9 @@ Résumé des top modèles du leaderboard HuggingFace (60+ modèles, 18 organisat
 
 | Priorité | Action | Effort | Impact |
 |---|---|---|---|
-| **1 — Immédiat** | Intégrer Qwen3-ASR 1.7B (via `qwen-asr` existant) | Très faible | Meilleur WER, 30 langues, streaming |
-| **2 — Court terme** | Évaluer Canary-1B v2 (ONNX community) | Modéré | 25 langues EU, traduction intégrée |
-| **3 — Court terme** | Évaluer SenseVoice Small (`sensevoice-rs`) | Faible | Ultra-rapide, 228 MB, crate Rust |
-| **4 — Optionnel** | Moonshine Tiny pour mode ultra-léger EN | Faible | 108 MB, streaming, EN seul |
-| **5 — Optionnel** | Adapter cloud providers (Deepgram, AssemblyAI streaming FR) | Modéré | Alternatives cloud premium |
+| **1 — Court terme** | Évaluer SenseVoice Small (`sensevoice-rs`) | Faible | Ultra-rapide, 228 MB, crate Rust |
+| **2 — Optionnel** | Moonshine Tiny pour mode ultra-léger EN | Faible | 108 MB, streaming, EN seul |
+| **3 — Optionnel** | Adapter cloud providers (Deepgram, AssemblyAI streaming FR) | Modéré | Alternatives cloud premium |
 
 ---
 
@@ -153,6 +151,9 @@ Modèles GGUF téléchargeables depuis le Model Manager, exécutés en local via
 | **Qwen3 1.7B** | `llama:qwen3-1.7b` | 1.28 GB | 1.7B | 1.5 GB | Oui | **Recommandé** | **Intégré** |
 | Qwen3 4B | `llama:qwen3-4b` | 2.5 GB | 4B | 3 GB | Oui | | **Intégré** |
 | Qwen3 0.6B | `llama:qwen3-0.6b` | ~400 MB | 0.6B | 600 MB | Oui | | **Intégré** |
+| Qwen3.5 0.8B | `llama:qwen3.5-0.8b` | 580 MB | 0.8B | 700 MB | Oui | | **Intégré** |
+| Qwen3.5 2B | `llama:qwen3.5-2b` | 1.40 GB | 2B | 1.7 GB | Oui | | **Intégré** |
+| Qwen3.5 4B | `llama:qwen3.5-4b` | 3.01 GB | 4B | 3.6 GB | Oui | | **Intégré** |
 | Gemma 3 1B | `llama:gemma3-1b` | 806 MB | 1B | 1 GB | Oui | | **Intégré** |
 | Gemma 3 4B | `llama:gemma3-4b` | ~2.5 GB | 4B | 3 GB | Oui | | **Intégré** |
 | SmolLM2 1.7B | `llama:smollm2-1.7b` | 1.06 GB | 1.7B | 1.3 GB | EN seul | | **Intégré** |

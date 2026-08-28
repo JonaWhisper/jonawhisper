@@ -44,6 +44,12 @@ fn lang_code_to_name(code: &str) -> Option<&'static str> {
     }
 }
 
+const QWEN_LANG_CODES: &[&str] = &[
+    "en", "fr", "zh", "ja", "ko", "de", "es", "pt", "it", "ru",
+    "ar", "tr", "hi", "th", "vi", "id", "ms", "nl", "sv", "da",
+    "fi", "pl", "cs", "ro", "hu", "el", "fa", "fil", "mk",
+];
+
 // -- Context (cached model state) --
 
 /// Cached Qwen3-ASR inference context.
@@ -105,6 +111,48 @@ impl ASREngine for QwenEngine {
     fn models(&self) -> Vec<ASRModel> {
         vec![
             ASRModel {
+                id: "qwen-asr:1.7b".into(),
+                engine_id: "qwen-asr".into(),
+                label: "Qwen3 ASR".into(),
+                filename: "1.7b".into(),
+                url: String::new(),
+                size: 4_220_320_824 + 478_200_688 + 2_776_833 + 1_671_853,
+                storage_dir: jona_types::engine_storage_dir("qwen-asr"),
+                download_type: DownloadType::MultiFile {
+                    files: vec![
+                        DownloadFile {
+                            filename: "model-00001-of-00002.safetensors".into(),
+                            url: "https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/main/model-00001-of-00002.safetensors".into(),
+                            size: 4_220_320_824,
+                        },
+                        DownloadFile {
+                            filename: "model-00002-of-00002.safetensors".into(),
+                            url: "https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/main/model-00002-of-00002.safetensors".into(),
+                            size: 478_200_688,
+                        },
+                        DownloadFile {
+                            filename: "vocab.json".into(),
+                            url: "https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/main/vocab.json".into(),
+                            size: 2_776_833,
+                        },
+                        DownloadFile {
+                            filename: "merges.txt".into(),
+                            url: "https://huggingface.co/Qwen/Qwen3-ASR-1.7B/resolve/main/merges.txt".into(),
+                            size: 1_671_853,
+                        },
+                    ],
+                },
+                download_marker: Some(".complete".into()),
+                wer: Some(1.63),
+                rtf: Some(1.0),
+                recommended_for: None,
+                params: Some(1.7),
+                ram: Some(5_000_000_000),
+                lang_codes: Some(QWEN_LANG_CODES.iter().map(|c| (*c).into()).collect()),
+                runtime: Some("accelerate".into()),
+                quantization: Some("BF16".into()),
+            },
+            ASRModel {
                 id: "qwen-asr:0.6b".into(),
                 engine_id: "qwen-asr".into(),
                 label: "Qwen3 ASR".into(),
@@ -133,18 +181,11 @@ impl ASREngine for QwenEngine {
                 },
                 download_marker: Some(".complete".into()),
                 wer: Some(2.0),
-                rtf: Some(0.15),
+                rtf: Some(0.10),
                 recommended_for: None,
                 params: Some(0.6),
                 ram: Some(2_000_000_000),
-                lang_codes: Some(vec![
-                    "en".into(), "fr".into(), "zh".into(), "ja".into(), "ko".into(),
-                    "de".into(), "es".into(), "pt".into(), "it".into(), "ru".into(),
-                    "ar".into(), "tr".into(), "hi".into(), "th".into(), "vi".into(),
-                    "id".into(), "ms".into(), "nl".into(), "sv".into(), "da".into(),
-                    "fi".into(), "pl".into(), "cs".into(), "ro".into(), "hu".into(),
-                    "el".into(), "fa".into(), "fil".into(), "mk".into(),
-                ]),
+                lang_codes: Some(QWEN_LANG_CODES.iter().map(|c| (*c).into()).collect()),
                 runtime: Some("accelerate".into()),
                 quantization: Some("BF16".into()),
             },
@@ -267,5 +308,28 @@ mod tests {
         let engine = QwenEngine;
         let langs = engine.supported_languages();
         assert!(langs.len() >= 20, "Qwen should support at least 20 languages, got {}", langs.len());
+    }
+}
+
+#[cfg(test)]
+mod smoke {
+    use std::path::Path;
+
+    #[test]
+    #[ignore]
+    fn transcribe_real_model() {
+        let dir = std::env::var("QWEN_MODEL_DIR").expect("QWEN_MODEL_DIR");
+        let wav = std::env::var("QWEN_TEST_WAV").expect("QWEN_TEST_WAV");
+        let lang = std::env::var("QWEN_LANG").unwrap_or_else(|_| "fr".into());
+
+        let t_load = std::time::Instant::now();
+        let mut ctx = super::load(Path::new(&dir)).expect("load failed");
+        eprintln!("LOAD_SECS={:.2}", t_load.elapsed().as_secs_f64());
+
+        let t0 = std::time::Instant::now();
+        let text = super::transcribe(&mut ctx, Path::new(&wav), &lang).expect("transcribe failed");
+        eprintln!("INFER_SECS={:.3}", t0.elapsed().as_secs_f64());
+        eprintln!("TEXT={text}");
+        assert!(!text.trim().is_empty());
     }
 }

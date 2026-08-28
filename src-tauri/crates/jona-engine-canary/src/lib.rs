@@ -11,7 +11,20 @@ use std::path::Path;
 // -- Constants --
 
 const MAX_DECODE_TOKENS: usize = 512;
-const DEFAULT_NUM_LAYERS: usize = 4;
+
+/// The 25 European languages of Canary-1B-v2; the 180m flash model covers the first four.
+const CANARY_V2_LANGS: &[(&str, &str)] = &[
+    ("fr", "Fran\u{00e7}ais"), ("en", "English"), ("de", "Deutsch"), ("es", "Espa\u{00f1}ol"),
+    ("it", "Italiano"), ("pt", "Portugu\u{00ea}s"), ("nl", "Nederlands"), ("pl", "Polski"),
+    ("ru", "\u{0420}\u{0443}\u{0441}\u{0441}\u{043a}\u{0438}\u{0439}"),
+    ("uk", "\u{0423}\u{043a}\u{0440}\u{0430}\u{0457}\u{043d}\u{0441}\u{044c}\u{043a}\u{0430}"),
+    ("sv", "Svenska"), ("da", "Dansk"), ("fi", "Suomi"), ("ro", "Rom\u{00e2}n\u{0103}"),
+    ("hu", "Magyar"), ("cs", "\u{010c}e\u{0161}tina"), ("sk", "Sloven\u{010d}ina"),
+    ("bg", "\u{0411}\u{044a}\u{043b}\u{0433}\u{0430}\u{0440}\u{0441}\u{043a}\u{0438}"),
+    ("hr", "Hrvatski"), ("sl", "Sloven\u{0161}\u{010d}ina"),
+    ("el", "\u{0395}\u{03bb}\u{03bb}\u{03b7}\u{03bd}\u{03b9}\u{03ba}\u{03ac}"),
+    ("lt", "Lietuvi\u{0173}"), ("lv", "Latvie\u{0161}u"), ("et", "Eesti"), ("mt", "Malti"),
+];
 
 // -- Context (cached model state) --
 
@@ -22,6 +35,10 @@ pub struct CanaryContext {
     vocab: Vec<String>,
     token_to_id: HashMap<String, i64>,
     is_sentencepiece: bool,
+    /// `decoder_mems` layout, read from the decoder graph: 6 layers on
+    /// canary-180m-flash, 10 on canary-1b-v2.
+    mems_layers: usize,
+    mems_hidden: usize,
 }
 
 impl CanaryContext {
@@ -39,18 +56,6 @@ impl CanaryContext {
         self.token_id("<|endoftext|>")
             .or_else(|| self.token_id("</s>"))
             .unwrap_or(1)
-    }
-
-    fn lang_token_id(&self, lang: &str) -> Option<i64> {
-        self.token_id(&format!("<|{lang}|>"))
-    }
-
-    fn pnc_token_id(&self, use_pnc: bool) -> Option<i64> {
-        if use_pnc {
-            self.token_id("<|pnc|>")
-        } else {
-            self.token_id("<|nopnc|>")
-        }
     }
 }
 
@@ -81,7 +86,7 @@ pub fn load(model_dir: &Path) -> Result<CanaryContext, EngineError> {
         .map_err(|e| EngineError::LaunchFailed(format!("Failed to load encoder: {e}")))?;
 
     log::info!("Loading Canary decoder: {}", decoder_path.display());
-    let decoder = jona_engines::ort_session::build_session(n_threads)
+    let decoder = jona_engines::ort_session::build_cpu_session(n_threads)
         .map_err(EngineError::LaunchFailed)?
         .commit_from_file(&decoder_path)
         .map_err(|e| EngineError::LaunchFailed(format!("Failed to load decoder: {e}")))?;
@@ -91,11 +96,14 @@ pub fn load(model_dir: &Path) -> Result<CanaryContext, EngineError> {
     let (vocab, token_to_id) = parse_vocab(&vocab_text)
         .map_err(EngineError::LaunchFailed)?;
 
+    let (mems_layers, mems_hidden) = decoder_mems_dims(&decoder)
+        .ok_or_else(|| EngineError::LaunchFailed("Decoder has no static decoder_mems shape".into()))?;
+
     let is_sentencepiece = vocab.iter().any(|t| t.contains('\u{2581}'));
 
     log::info!(
-        "Canary loaded: {} vocab tokens, sentencepiece={}",
-        vocab.len(), is_sentencepiece
+        "Canary loaded: {} vocab tokens, sentencepiece={}, decoder_mems={}x{}",
+        vocab.len(), is_sentencepiece, mems_layers, mems_hidden
     );
 
     Ok(CanaryContext {
@@ -104,7 +112,19 @@ pub fn load(model_dir: &Path) -> Result<CanaryContext, EngineError> {
         vocab,
         token_to_id,
         is_sentencepiece,
+        mems_layers,
+        mems_hidden,
     })
+}
+
+fn decoder_mems_dims(decoder: &Session) -> Option<(usize, usize)> {
+    let outlet = decoder.inputs().iter().find(|i| i.name() == "decoder_mems")?;
+    let ort::value::ValueType::Tensor { shape, .. } = outlet.dtype() else {
+        return None;
+    };
+    let layers = *shape.first()?;
+    let hidden = *shape.get(3)?;
+    (layers > 0 && hidden > 0).then_some((layers as usize, hidden as usize))
 }
 
 // -- Inference --
@@ -122,18 +142,7 @@ pub fn transcribe(ctx: &mut CanaryContext, audio_path: &Path, language: &str) ->
     // Resolve language for prompt
     let lang = if language == "auto" { "en" } else { language };
 
-    // Build prompt tokens: [BOS, target_lang, source_lang, pnc_token]
-    let mut prompt_tokens: Vec<i64> = Vec::with_capacity(4);
-    prompt_tokens.push(ctx.bos_id());
-    if let Some(id) = ctx.lang_token_id(lang) {
-        prompt_tokens.push(id);
-    }
-    if let Some(id) = ctx.lang_token_id(lang) {
-        prompt_tokens.push(id);
-    }
-    if let Some(id) = ctx.pnc_token_id(true) {
-        prompt_tokens.push(id);
-    }
+    let prompt_tokens = build_prompt(ctx, lang);
 
     let output_tokens = run_decoder(ctx, &prompt_tokens, &enc_result)?;
     let text = decode_tokens_with_probs(ctx, &output_tokens);
@@ -144,6 +153,33 @@ pub fn transcribe(ctx: &mut CanaryContext, audio_path: &Path, language: &str) ->
     })
 }
 
+/// NeMo's canonical AED prompt. A short prompt still decodes on canary-180m-flash
+/// but makes canary-1b-v2 drop its first word.
+fn build_prompt(ctx: &CanaryContext, lang: &str) -> Vec<i64> {
+    let mut tokens: Vec<i64> = Vec::with_capacity(10);
+    let mut push = |token: &str| {
+        if let Some(id) = ctx.token_id(token) {
+            tokens.push(id);
+        }
+    };
+    push("\u{2581}");
+    push("<|startofcontext|>");
+    push("<|startoftranscript|>");
+    push("<|emo:undefined|>");
+    let lang_token = format!("<|{lang}|>");
+    push(&lang_token);
+    push(&lang_token);
+    push("<|pnc|>");
+    push("<|noitn|>");
+    push("<|notimestamp|>");
+    push("<|nodiarize|>");
+
+    if tokens.is_empty() {
+        tokens.push(ctx.bos_id());
+    }
+    tokens
+}
+
 // -- Encoder --
 
 struct EncoderResult {
@@ -151,7 +187,6 @@ struct EncoderResult {
     emb_shape: [usize; 3],
     mask: Vec<i64>,
     mask_len: usize,
-    hidden_dim: usize,
 }
 
 fn run_encoder(
@@ -194,7 +229,6 @@ fn run_encoder(
         emb_shape,
         mask: mask_data,
         mask_len: enc_seq_len,
-        hidden_dim,
     })
 }
 
@@ -217,9 +251,8 @@ fn run_decoder(
     let eos_id = ctx.eos_id();
     let mut output_tokens: Vec<TokenWithProb> = Vec::new();
 
-    let num_layers = DEFAULT_NUM_LAYERS;
     let mut cache_data: Vec<f32> = Vec::new();
-    let mut cache_shape: [usize; 4] = [num_layers, 1, 0, enc.hidden_dim];
+    let mut cache_shape: [usize; 4] = [ctx.mems_layers, 1, 0, ctx.mems_hidden];
 
     let mut input_ids = prompt_tokens.to_vec();
 
@@ -384,6 +417,43 @@ impl ASREngine for CanaryEngine {
     fn models(&self) -> Vec<ASRModel> {
         vec![
             ASRModel {
+                id: "canary:1b-v2-int8".into(),
+                engine_id: "canary".into(),
+                label: "Canary 1B V2".into(),
+                quantization: Some("INT8".into()),
+                filename: "1b-v2-int8".into(),
+                url: String::new(),
+                size: 859_078_138 + 170_040_374 + 208_022,
+                storage_dir: jona_types::engine_storage_dir("canary"),
+                download_type: DownloadType::MultiFile {
+                    files: vec![
+                        DownloadFile {
+                            filename: "encoder-model.int8.onnx".into(),
+                            url: "https://huggingface.co/istupakov/canary-1b-v2-onnx/resolve/main/encoder-model.int8.onnx".into(),
+                            size: 859_078_138,
+                        },
+                        DownloadFile {
+                            filename: "decoder-model.int8.onnx".into(),
+                            url: "https://huggingface.co/istupakov/canary-1b-v2-onnx/resolve/main/decoder-model.int8.onnx".into(),
+                            size: 170_040_374,
+                        },
+                        DownloadFile {
+                            filename: "vocab.txt".into(),
+                            url: "https://huggingface.co/istupakov/canary-1b-v2-onnx/resolve/main/vocab.txt".into(),
+                            size: 208_022,
+                        },
+                    ],
+                },
+                download_marker: Some(".complete".into()),
+                wer: Some(2.18),
+                rtf: Some(0.22),
+                recommended_for: None,
+                params: Some(0.978),
+                ram: Some(1_450_000_000),
+                lang_codes: Some(CANARY_V2_LANGS.iter().map(|(c, _)| (*c).into()).collect()),
+                runtime: Some("ort".into()),
+            },
+            ASRModel {
                 id: "canary:180m-flash-int8".into(),
                 engine_id: "canary".into(),
                 label: "Canary Flash".into(),
@@ -424,16 +494,14 @@ impl ASREngine for CanaryEngine {
     }
 
     fn supported_languages(&self) -> Vec<Language> {
-        vec![
-            Language { code: "fr".into(), label: "Fran\u{00e7}ais".into() },
-            Language { code: "en".into(), label: "English".into() },
-            Language { code: "de".into(), label: "Deutsch".into() },
-            Language { code: "es".into(), label: "Espa\u{00f1}ol".into() },
-        ]
+        CANARY_V2_LANGS
+            .iter()
+            .map(|(code, label)| Language { code: (*code).into(), label: (*label).into() })
+            .collect()
     }
 
     fn description(&self) -> &str {
-        "NVIDIA Canary encoder-decoder ASR. Ultra-light (182M params), beats Whisper Medium quality."
+        "NVIDIA Canary encoder-decoder ASR. 180m flash for FR/EN/DE/ES, 1B v2 for 25 European languages."
     }
 
     fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
@@ -514,5 +582,28 @@ mod tests {
         let engine = CanaryEngine;
         let langs = engine.supported_languages();
         assert!(langs.len() > 1, "Canary should support multiple languages for user selection");
+    }
+}
+
+#[cfg(test)]
+mod smoke {
+    use std::path::Path;
+
+    #[test]
+    #[ignore]
+    fn transcribe_real_model() {
+        let dir = std::env::var("CANARY_MODEL_DIR").expect("CANARY_MODEL_DIR");
+        let wav = std::env::var("CANARY_TEST_WAV").expect("CANARY_TEST_WAV");
+        let lang = std::env::var("CANARY_LANG").unwrap_or_else(|_| "fr".into());
+
+        let t_load = std::time::Instant::now();
+        let mut ctx = super::load(Path::new(&dir)).expect("load failed");
+        eprintln!("LOAD_SECS={:.2}", t_load.elapsed().as_secs_f64());
+
+        let t0 = std::time::Instant::now();
+        let r = super::transcribe(&mut ctx, Path::new(&wav), &lang).expect("transcribe failed");
+        eprintln!("INFER_SECS={:.3}", t0.elapsed().as_secs_f64());
+        eprintln!("TEXT={}", r.text);
+        assert!(!r.text.trim().is_empty());
     }
 }

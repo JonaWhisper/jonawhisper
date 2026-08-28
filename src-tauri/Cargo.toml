@@ -23,7 +23,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
 inventory = "0.3"
-ort = { version = "2.0.0-rc.11", features = ["coreml"] }
+ort = { version = "2.0.0-rc.13", features = ["coreml"] }
 tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
 thiserror = "2"
 
@@ -83,9 +83,9 @@ tauri-plugin-process = "2"
 
 serde.workspace = true
 serde_json.workspace = true
-cpal = "0.15"
+cpal = "0.18"
 hound = "3.5"
-reqwest = { version = "0.12", features = ["stream", "multipart", "json", "blocking"] }
+reqwest = { version = "0.13", features = ["stream", "multipart", "json", "blocking"] }
 regex = "1"
 tokio = { version = "1", features = ["time", "rt"] }
 dirs = "6"
@@ -96,8 +96,8 @@ shellexpand = "3"
 thiserror.workspace = true
 crossbeam-channel = "0.5.15"
 keyring = { version = "3", features = ["apple-native", "windows-native"] }
-rusqlite = { version = "0.32", features = ["bundled"] }
-rust-i18n = "3"
+rusqlite = { version = "0.40", features = ["bundled", "fallible_uint"] }
+rust-i18n = "4"
 sys-locale = "0.3"
 ort.workspace = true
 ndarray = "0.17"
@@ -114,11 +114,11 @@ libc = "0.2"
 llama-cpp-2 = { version = "0.1", features = ["metal"] }
 jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
 
-core-graphics = "0.24"
+core-graphics = "0.25"
 core-foundation = "0.10"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSThread"] }
-objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSSound", "NSApplication", "NSRunningApplication"] }
+objc2-app-kit = { version = "0.3", features = ["NSPasteboard", "NSApplication", "NSRunningApplication"] }
 block2 = "0.6"
 
 [profile.release]

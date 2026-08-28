@@ -259,8 +259,8 @@ inventory::submit! { ProviderPreset {
     base_url: "https://api.openai.com/v1", backend_id: "openai",
     supports_asr: true, supports_llm: true,
     gradient: "linear-gradient(135deg, #10a37f, #0d8c6d)",
-    default_asr_models: &["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"],
-    default_llm_models: &["gpt-4o-mini", "gpt-4o"],
+    default_asr_models: &["gpt-transcribe", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"],
+    default_llm_models: &["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
     extra_fields: &[PresetField {
         id: "api_key", label: "API Key", field_type: FieldType::Password,
         required: true, placeholder: "sk-...", default_value: "",
@@ -288,7 +288,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #3b82f6, #2563eb)",
     default_asr_models: &[],
-    default_llm_models: &["llama3.1-8b"],
+    default_llm_models: &["gpt-oss-120b", "gemma-4-31b"],
     extra_fields: &[PresetField {
         id: "api_key", label: "API Key", field_type: FieldType::Password,
         required: true, placeholder: "", default_value: "",
@@ -302,7 +302,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #0ea5e9, #0284c7)",
     default_asr_models: &[],
-    default_llm_models: &["gemini-2.5-flash-lite"],
+    default_llm_models: &["gemini-3.5-flash-lite"],
     extra_fields: &[PresetField {
         id: "api_key", label: "API Key", field_type: FieldType::Password,
         required: true, placeholder: "AIza...", default_value: "",
@@ -358,7 +358,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #06b6d4, #0891b2)",
     default_asr_models: &[],
-    default_llm_models: &["deepseek-v3.2"],
+    default_llm_models: &["deepseek-v4-flash", "deepseek-v4-pro"],
     extra_fields: &[PresetField {
         id: "api_key", label: "API Key", field_type: FieldType::Password,
         required: true, placeholder: "sk-...", default_value: "",
@@ -372,7 +372,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
     default_asr_models: &[],
-    default_llm_models: &["openai/gpt-4o", "anthropic/claude-sonnet-4", "google/gemini-2.0-flash-001"],
+    default_llm_models: &["openai/gpt-5.6-sol", "anthropic/claude-opus-5", "google/gemini-3.7-flash"],
     extra_fields: &[PresetField {
         id: "api_key", label: "API Key", field_type: FieldType::Password,
         required: true, placeholder: "sk-or-...", default_value: "",
@@ -386,7 +386,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #1d1d1f, #3a3a3c)",
     default_asr_models: &[],
-    default_llm_models: &["grok-2"],
+    default_llm_models: &["grok-4.6"],
     extra_fields: &[PresetField {
         id: "api_key", label: "API Key", field_type: FieldType::Password,
         required: true, placeholder: "xai-...", default_value: "",

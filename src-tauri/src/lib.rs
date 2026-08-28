@@ -295,21 +295,18 @@ pub fn run() {
 
             ui::tray::setup_tray(app.handle())?;
 
-            // Audio thread (cpal::Stream is not Send)
-            let recording::AudioThreadHandles {
-                cmd_tx, spectrum_data, reply_rx, stream_error, samples_received,
-            } = recording::spawn_audio_thread();
+            let recording::AudioHandles {
+                recorder, spectrum_data, stream_error, samples_received,
+            } = recording::create_recorder();
 
-            // Mic test sender (clone before cmd_tx is moved)
-            app.manage(recording::MicTestSender(cmd_tx.clone()));
+            app.manage(recording::SharedRecorder::clone(&recorder));
 
             // Clone before moving into RecordingState — spectrum emitter needs it too
             let samples_received_for_spectrum = samples_received.clone();
+            let recorder_for_spectrum = recording::SharedRecorder::clone(&recorder);
 
-            // Recording state (Send-safe: only channels, no cpal::Stream)
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
-                cmd_tx.clone(),
-                reply_rx,
+                recorder,
                 samples_received,
             )));
 
@@ -362,7 +359,7 @@ pub fn run() {
             recording::spawn_spectrum_emitter(
                 app.handle().clone(),
                 app_state,
-                cmd_tx,
+                recorder_for_spectrum,
                 spectrum_data,
                 stream_error,
                 samples_received_for_spectrum,
@@ -785,5 +782,22 @@ mod tests {
         ensure_catalog();
         let result = jona_provider::refresh_credential("nonexistent-detector", "anthropic");
         assert!(result.is_none());
+    }
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    // The locale files are flat, with literal dotted keys ("menu.quit"), not nested
+    // objects — rust-i18n returns the key itself when a lookup misses, so a silent
+    // regression here would be invisible without asserting on the resolved value.
+    #[test]
+    fn dotted_keys_resolve_in_both_locales() {
+        rust_i18n::set_locale("en");
+        assert_eq!(rust_i18n::t!("menu.quit"), "Quit");
+        assert_eq!(rust_i18n::t!("window.setup"), "Setup");
+
+        rust_i18n::set_locale("fr");
+        assert_eq!(rust_i18n::t!("menu.quit"), "Quitter");
+        assert_eq!(rust_i18n::t!("window.setup"), "Configuration");
     }
 }

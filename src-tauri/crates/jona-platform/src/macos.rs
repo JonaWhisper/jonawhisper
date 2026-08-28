@@ -1,5 +1,9 @@
 use super::{PermissionReport, PermissionStatus};
+use core_foundation::base::TCFType;
+use core_foundation::url::{CFURL, CFURLRef};
+use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::{LazyLock, Mutex};
 
 pub fn check_permissions() -> PermissionReport {
     PermissionReport {
@@ -207,13 +211,80 @@ fn open_privacy_settings(anchor: &str) {
         "x-apple.systempreferences:com.apple.preference.security?{}",
         anchor
     );
-    let _ = std::process::Command::new("open").arg(url).spawn();
+    if let Ok(mut child) = std::process::Command::new("open").arg(url).spawn() {
+        std::thread::spawn(move || { let _ = child.wait(); });
+    }
+}
+
+// -- System sounds (AudioToolbox) --
+//
+// The cues fire from the recording, spectrum and transcription threads, which have no
+// autorelease pool and never drain one — an ObjC path (NSSound) would strand every
+// autoreleased temporary for the life of the thread. AudioServices allocates none.
+
+#[link(name = "AudioToolbox", kind = "framework")]
+extern "C" {
+    fn AudioServicesCreateSystemSoundID(url: CFURLRef, out_id: *mut u32) -> i32;
+    fn AudioServicesPlaySystemSoundWithCompletion(id: u32, completion: *const c_void);
+    fn AudioServicesSetProperty(
+        property_id: u32,
+        specifier_size: u32,
+        specifier: *const c_void,
+        data_size: u32,
+        data: *const c_void,
+    ) -> i32;
+}
+
+/// `kAudioServicesPropertyIsUISound`.
+const K_IS_UI_SOUND: u32 = u32::from_be_bytes(*b"isui");
+
+static SYSTEM_SOUNDS: LazyLock<Mutex<HashMap<String, u32>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn register_system_sound(name: &str) -> Option<u32> {
+    let url = CFURL::from_path(format!("/System/Library/Sounds/{}.aiff", name), false)?;
+
+    let mut id: u32 = 0;
+    let status = unsafe { AudioServicesCreateSystemSoundID(url.as_concrete_TypeRef(), &mut id) };
+    if status != 0 {
+        log::warn!("Sound '{}' unavailable (OSStatus {})", name, status);
+        return None;
+    }
+
+    // Defaults to 1, which would mute the cues whenever "Play user interface sound
+    // effects" is off in System Settings. afplay never honoured that checkbox and the
+    // app exposes no sound toggle of its own, so opting out keeps the shipped behaviour.
+    let off: u32 = 0;
+    unsafe {
+        AudioServicesSetProperty(
+            K_IS_UI_SOUND,
+            std::mem::size_of::<u32>() as u32,
+            &id as *const u32 as *const c_void,
+            std::mem::size_of::<u32>() as u32,
+            &off as *const u32 as *const c_void,
+        );
+    }
+
+    Some(id)
 }
 
 pub fn play_sound(name: &str) {
-    let _ = std::process::Command::new("/usr/bin/afplay")
-        .arg(format!("/System/Library/Sounds/{}.aiff", name))
-        .spawn();
+    // IDs are cached rather than disposed after playback: playback is asynchronous, so
+    // disposing on return would cut the cue short, and re-registering per call leaks a
+    // server-side resource — the very failure mode this replaced.
+    let Ok(mut cache) = SYSTEM_SOUNDS.lock() else { return };
+
+    let id = match cache.get(name) {
+        Some(id) => *id,
+        None => {
+            let Some(id) = register_system_sound(name) else { return };
+            cache.insert(name.to_string(), id);
+            id
+        }
+    };
+    drop(cache);
+
+    unsafe { AudioServicesPlaySystemSoundWithCompletion(id, std::ptr::null()) };
 }
 
 // -- Launch at Login (SMAppService) --
@@ -278,4 +349,32 @@ pub fn set_launch_at_login(enabled: bool) -> Result<&'static str, String> {
         log::info!("SMAppService: unregistered main app login item");
     }
     Ok(get_launch_at_login_status())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registers_a_system_sound_off_the_main_thread() {
+        let id = std::thread::spawn(|| register_system_sound("Tink"))
+            .join()
+            .unwrap();
+
+        assert!(matches!(id, Some(id) if id != 0));
+    }
+
+    #[test]
+    fn unknown_sound_registers_nothing() {
+        assert_eq!(register_system_sound("NoSuchSystemSound"), None);
+    }
+
+    #[test]
+    fn repeated_playback_reuses_the_cached_id() {
+        play_sound("Pop");
+        let first = SYSTEM_SOUNDS.lock().unwrap()["Pop"];
+
+        play_sound("Pop");
+        assert_eq!(SYSTEM_SOUNDS.lock().unwrap()["Pop"], first);
+    }
 }

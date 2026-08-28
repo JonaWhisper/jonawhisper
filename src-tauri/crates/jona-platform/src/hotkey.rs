@@ -554,6 +554,8 @@ impl TapState {
 }
 
 #[cfg(target_os = "macos")]
+// Only the second arm of each symmetric Combo/Key pair is flagged; a guard there splits the pair.
+#[allow(clippy::collapsible_match)]
 fn run_event_tap(
     initial_record: Shortcut,
     initial_cancel: Shortcut,

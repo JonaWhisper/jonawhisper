@@ -184,7 +184,9 @@ pub fn save_user_dict(entries: Vec<UserDictEntry>) -> Result<(), String> {
 pub fn open_logs_folder() {
     let log_dir = jona_types::config_dir().join("logs");
     let _ = std::fs::create_dir_all(&log_dir);
-    let _ = std::process::Command::new("open").arg(&log_dir).spawn();
+    if let Ok(mut child) = std::process::Command::new("open").arg(&log_dir).spawn() {
+        std::thread::spawn(move || { let _ = child.wait(); });
+    }
 }
 
 #[tauri::command]

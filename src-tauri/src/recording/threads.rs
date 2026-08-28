@@ -1,4 +1,4 @@
-use super::{AudioCmd, AudioReply, RecordingState, show_error_then_close, SPECTRUM_INTERVAL_MS};
+use super::{RecordingState, show_error_then_close, SPECTRUM_INTERVAL_MS};
 use crate::audio;
 use crate::events;
 use crate::platform;
@@ -8,65 +8,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
-
-/// Named return type for `spawn_audio_thread`.
-pub struct AudioThreadHandles {
-    pub cmd_tx: crossbeam_channel::Sender<AudioCmd>,
-    /// Live spectrum data — lock-free atomic array shared with the cpal callback.
-    pub spectrum_data: Arc<audio::AtomicSpectrum>,
-    pub reply_rx: crossbeam_channel::Receiver<AudioReply>,
-    pub stream_error: Arc<AtomicBool>,
-    pub samples_received: Arc<AtomicBool>,
-}
-
-/// Spawns the dedicated audio thread (cpal::Stream is not Send).
-pub fn spawn_audio_thread() -> AudioThreadHandles {
-    let (cmd_tx, cmd_rx) = crossbeam_channel::unbounded::<AudioCmd>();
-    let (reply_tx, reply_rx) = crossbeam_channel::unbounded::<AudioReply>();
-
-    let stream_error = Arc::new(AtomicBool::new(false));
-    let stream_error_clone = Arc::clone(&stream_error);
-
-    let samples_received = Arc::new(AtomicBool::new(false));
-    let samples_received_clone = Arc::clone(&samples_received);
-
-    // Channel to send back the recorder's live spectrum handle once created.
-    let (spectrum_tx, spectrum_rx) = crossbeam_channel::bounded::<Arc<audio::AtomicSpectrum>>(1);
-
-    std::thread::spawn(move || {
-        let mut recorder = audio::AudioRecorder::new(stream_error_clone, samples_received_clone);
-        // Send the recorder's spectrum handle back to the main thread.
-        let _ = spectrum_tx.send(recorder.spectrum_handle());
-
-        loop {
-            match cmd_rx.recv() {
-                Ok(AudioCmd::StartRecording { device_uid }) => {
-                    recorder.start_recording(device_uid.as_deref());
-                    let _ = reply_tx.send(AudioReply::Started);
-                }
-                Ok(AudioCmd::StopRecording) => {
-                    let path = recorder.stop_recording();
-                    let _ = reply_tx.send(AudioReply::Stopped { path });
-                }
-                Ok(AudioCmd::StartMicTest { device_uid }) => {
-                    recorder.start_recording(device_uid.as_deref());
-                    // No reply — fire-and-forget for mic test
-                }
-                Ok(AudioCmd::StopMicTest) => {
-                    if let Some(path) = recorder.stop_recording() {
-                        let _ = std::fs::remove_file(&path);
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    // Receive the live spectrum handle from the audio thread.
-    let spectrum_data = spectrum_rx.recv().expect("audio thread failed to send spectrum handle");
-
-    AudioThreadHandles { cmd_tx, spectrum_data, reply_rx, stream_error, samples_received }
-}
 
 pub fn spawn_hotkey_handler(
     hotkey_rx: crossbeam_channel::Receiver<hotkey::HotkeyEvent>,
@@ -132,7 +73,7 @@ pub fn spawn_hotkey_handler(
 pub fn spawn_spectrum_emitter(
     app: AppHandle,
     state: Arc<AppState>,
-    cmd_tx: crossbeam_channel::Sender<AudioCmd>,
+    recorder: super::SharedRecorder,
     spectrum_data: Arc<audio::AtomicSpectrum>,
     stream_error: Arc<AtomicBool>,
     samples_received: Arc<AtomicBool>,
@@ -183,7 +124,11 @@ pub fn spawn_spectrum_emitter(
                 stream_error.store(false, Ordering::Relaxed);
 
                 // Actually stop the cpal stream — without this the mic stays active
-                let _ = cmd_tx.send(AudioCmd::StopRecording);
+                // Swallow a poisoned lock rather than unwrap: this monitor runs for the
+                // life of the app, and killing it would freeze the pill for good.
+                if let Ok(mut r) = recorder.lock() {
+                    let _ = r.stop_recording();
+                }
 
                 platform::play_sound("Basso");
                 let _ = app.emit(events::RECORDING_STOPPED, ());
@@ -251,4 +196,15 @@ pub fn spawn_spectrum_emitter(
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn cpal_stream_is_send() {
+        fn assert_send<T: Send>() {}
+        // Precondition for the recorder living behind a Mutex instead of an owner
+        // thread: if a cpal upgrade takes it away, it fails here, not at every call site.
+        assert_send::<cpal::Stream>();
+    }
 }

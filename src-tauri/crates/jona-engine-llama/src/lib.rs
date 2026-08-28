@@ -30,6 +30,18 @@ impl ASREngine for LlamaEngine {
                 ..Default::default()
             },
             ASRModel {
+                id: "llama:qwen3.5-0.8b".into(), engine_id: "llama".into(),
+                label: "Qwen3.5".into(),
+                filename: "Qwen_Qwen3.5-0.8B-Q4_K_M.gguf".into(),
+                url: "https://huggingface.co/bartowski/Qwen_Qwen3.5-0.8B-GGUF/resolve/main/Qwen_Qwen3.5-0.8B-Q4_K_M.gguf".into(),
+                size: 579_615_840, storage_dir: jona_types::engine_storage_dir("llm"),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(0.8), ram: Some(700_000_000),
+                lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
+                quantization: Some("Q4".into()),
+                ..Default::default()
+            },
+            ASRModel {
                 id: "llama:gemma3-1b".into(), engine_id: "llama".into(),
                 label: "Gemma 3".into(),
                 filename: "google_gemma-3-1b-it-Q4_K_M.gguf".into(),
@@ -74,6 +86,18 @@ impl ASREngine for LlamaEngine {
                 download_type: DownloadType::SingleFile, download_marker: None,
                 recommended_for: Some(vec![]),
                 params: Some(1.7), ram: Some(1_500_000_000),
+                lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
+                quantization: Some("Q4".into()),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "llama:qwen3.5-2b".into(), engine_id: "llama".into(),
+                label: "Qwen3.5".into(),
+                filename: "Qwen_Qwen3.5-2B-Q4_K_M.gguf".into(),
+                url: "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf".into(),
+                size: 1_396_198_496, storage_dir: jona_types::engine_storage_dir("llm"),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(2.0), ram: Some(1_700_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
@@ -146,6 +170,18 @@ impl ASREngine for LlamaEngine {
                 size: 2_497_280_960, storage_dir: jona_types::engine_storage_dir("llm"),
                 download_type: DownloadType::SingleFile, download_marker: None,
                 params: Some(4.0), ram: Some(3_000_000_000),
+                lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
+                quantization: Some("Q4".into()),
+                ..Default::default()
+            },
+            ASRModel {
+                id: "llama:qwen3.5-4b".into(), engine_id: "llama".into(),
+                label: "Qwen3.5".into(),
+                filename: "Qwen_Qwen3.5-4B-Q4_K_M.gguf".into(),
+                url: "https://huggingface.co/bartowski/Qwen_Qwen3.5-4B-GGUF/resolve/main/Qwen_Qwen3.5-4B-Q4_K_M.gguf".into(),
+                size: 3_013_027_808, storage_dir: jona_types::engine_storage_dir("llm"),
+                download_type: DownloadType::SingleFile, download_marker: None,
+                params: Some(4.0), ram: Some(3_600_000_000),
                 lang_codes: Some(vec!["fr".into(), "en".into(), "es".into(), "de".into()]),
                 quantization: Some("Q4".into()),
                 ..Default::default()
