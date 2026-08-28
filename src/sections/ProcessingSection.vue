@@ -78,7 +78,7 @@ function onToggle(v: boolean, key: string) {
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.processing') }}</div>
 
     <!-- Pre-processing card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.postProcessing.vad') }}</div>
       <SettingToggle
         setting-key="vad_enabled"
@@ -90,7 +90,7 @@ function onToggle(v: boolean, key: string) {
     </div>
 
     <!-- Post-processing card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.postProcessing.textCleanup') }}</div>
 
       <!-- Hallucination filter -->
@@ -216,7 +216,7 @@ function onToggle(v: boolean, key: string) {
 
     <!-- Cloud LLM sub-settings -->
     <template v-if="settings.textCleanupEnabled && engines.isCloudLlm && llmSelectedProvider">
-      <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
         <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.llm.model') }}</div>
         <div class="flex items-center justify-between py-2 gap-3">
           <div>
@@ -236,7 +236,7 @@ function onToggle(v: boolean, key: string) {
 
     <!-- Local LLM sub-settings (token cap only) -->
     <template v-if="settings.textCleanupEnabled && engines.isLocalLlm">
-      <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
         <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.llm.maxTokens') }}</div>
         <MaxTokensSlider />
       </div>

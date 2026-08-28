@@ -134,7 +134,7 @@ onUnmounted(() => {
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.microphone') }}</div>
 
     <!-- Input device card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.microphone') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div class="min-w-0 flex-1">
@@ -169,7 +169,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Mic test card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.microphone.test') }}</div>
       <div class="flex flex-col items-center gap-2.5">
         <div class="w-full flex justify-center">
@@ -197,7 +197,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Audio ducking card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.microphone.ducking') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>

@@ -55,7 +55,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
 
 <template>
   <div
-    class="group flex items-center gap-3 px-3.5 py-3 rounded-[10px] transition-shadow bg-panel-card-bg border-[0.5px] border-panel-card-border backdrop-blur hover:shadow-panel-card"
+    class="group flex items-center gap-3 px-3.5 py-3 rounded-[10px] transition-shadow bg-panel-card-bg border-[0.5px] border-panel-card-border backdrop-blur-sm hover:shadow-panel-card"
   >
     <!-- Model info -->
     <div class="flex-1 min-w-0">
@@ -68,7 +68,7 @@ const showCustomDownloaded = computed(() => isDownloaded.value && !isDownloading
     </div>
 
     <!-- Status / Actions -->
-    <div class="relative flex-shrink-0">
+    <div class="relative shrink-0">
       <!-- Deleting — greyed trash with indeterminate bar, centered over badge -->
       <template v-if="isDeleting">
         <Badge

@@ -70,7 +70,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     <!-- Launch at Login card (hidden when not signed with Developer ID) -->
     <div
       v-if="launchAtLoginStatus !== 'unavailable'"
-      class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5"
+      class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5"
     >
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.launchAtLogin') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
@@ -84,7 +84,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- Appearance card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.appearance') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>
@@ -103,7 +103,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- Interface language card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.interfaceLanguage') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>
@@ -127,7 +127,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- Log level card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.logging') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>
@@ -181,7 +181,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- Update card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.update.title') }}</div>
 
       <!-- Update available -->
@@ -232,7 +232,7 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
     </div>
 
     <!-- About card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-5 mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-5 mb-2.5">
       <div class="text-center">
         <img src="@/assets/icon.png" alt="JonaWhisper" class="w-12 h-12 mx-auto mb-2 rounded-xl" />
         <div class="text-base font-bold">JonaWhisper</div>

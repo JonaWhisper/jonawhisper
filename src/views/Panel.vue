@@ -69,7 +69,7 @@ onMounted(async () => {
 <template>
   <div class="flex h-full min-w-0 select-none">
     <!-- Sidebar -->
-    <div class="backdrop-blur-[20px] backdrop-saturate-[1.8] bg-[hsl(var(--background)/0.72)] dark:bg-[hsl(var(--background)/0.65)] border-r-[0.5px] border-[hsl(var(--border)/0.5)] w-44 min-w-[10rem] flex flex-col flex-shrink-0">
+    <div class="backdrop-blur-[20px] backdrop-saturate-[1.8] bg-[hsl(var(--background)/0.72)] dark:bg-[hsl(var(--background)/0.65)] border-r-[0.5px] border-[hsl(var(--border)/0.5)] w-44 min-w-40 flex flex-col shrink-0">
       <!-- Drag region -->
       <div class="h-9 shrink-0 flex items-center px-2" data-tauri-drag-region />
 
@@ -87,9 +87,9 @@ onMounted(async () => {
           :class="activeSection === section.id ? 'bg-sidebar-active-bg border-sidebar-active-border font-medium' : ''"
         >
           <div class="flex items-center gap-2">
-            <component :is="section.icon" class="w-[18px] h-[18px] flex-shrink-0" :class="activeSection === section.id ? 'opacity-100 text-panel-accent' : 'opacity-70'" />
+            <component :is="section.icon" class="w-[18px] h-[18px] shrink-0" :class="activeSection === section.id ? 'opacity-100 text-panel-accent' : 'opacity-70'" />
             <span class="text-[13px] truncate">{{ t(section.label) }}</span>
-            <span v-if="sectionWarnings.has(section.id)" class="ml-auto w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+            <span v-if="sectionWarnings.has(section.id)" class="ml-auto w-2 h-2 rounded-full bg-amber-500 shrink-0" />
           </div>
         </button>
       </nav>

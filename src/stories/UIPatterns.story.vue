@@ -11,7 +11,7 @@ import {
     <!-- Card -->
     <Variant title="Card" id="card">
       <div class="p-6 bg-[linear-gradient(160deg,var(--panel-bg-start),var(--panel-bg-end))] min-h-[200px]">
-        <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+        <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
           <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">
             TRANSCRIPTION
           </div>
@@ -37,7 +37,7 @@ import {
     <!-- Form Rows -->
     <Variant title="Form Rows" id="form-rows">
       <div class="p-6 bg-[linear-gradient(160deg,var(--panel-bg-start),var(--panel-bg-end))]">
-        <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px]">
+        <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px]">
           <div class="flex items-center justify-between py-2 gap-3">
             <div>
               <div class="text-[13px] text-foreground">Voice Activity Detection</div>
@@ -155,9 +155,9 @@ import {
     <!-- Provider Row -->
     <Variant title="Provider Row" id="provider-row">
       <div class="p-6 bg-[linear-gradient(160deg,var(--panel-bg-start),var(--panel-bg-end))]">
-        <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px]">
+        <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px]">
           <div class="flex items-center gap-3 py-2.5">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
+            <div class="w-8 h-8 rounded-lg bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white text-sm font-bold">
               W
             </div>
             <div class="flex-1 min-w-0">
@@ -169,7 +169,7 @@ import {
             </Badge>
           </div>
           <div class="flex items-center gap-3 py-2.5 border-t-[0.5px] border-panel-divider">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+            <div class="w-8 h-8 rounded-lg bg-linear-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
               C
             </div>
             <div class="flex-1 min-w-0">
@@ -187,7 +187,7 @@ import {
     <!-- About Icon -->
     <Variant title="About Icon" id="about-icon">
       <div class="p-6 bg-[linear-gradient(160deg,var(--panel-bg-start),var(--panel-bg-end))] text-center">
-        <div class="w-12 h-12 mx-auto mb-2 bg-gradient-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">
+        <div class="w-12 h-12 mx-auto mb-2 bg-linear-to-br from-panel-accent to-[#5856d6] rounded-xl flex items-center justify-center text-[22px] font-bold text-white">
           J
         </div>
         <div class="text-sm font-semibold text-foreground">JonaWhisper</div>
