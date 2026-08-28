@@ -137,11 +137,26 @@ Every dependency has a reason. This document explains **what** each one does and
 |---------|------|--------------|
 | [`@tauri-apps/cli`](https://github.com/tauri-apps/tauri) | Tauri CLI | `tauri dev`, `tauri build`. Manages Rust + frontend builds |
 | [`vite`](https://github.com/vitejs/vite) / [`@vitejs/plugin-vue`](https://github.com/vitejs/vite-plugin-vue) | Bundler | Sub-second HMR, native ESM. Standard for Vue 3 + Tauri |
-| [`typescript`](https://github.com/microsoft/TypeScript) / [`vue-tsc`](https://github.com/vuejs/language-tools) | Type checking | Full type safety. `vue-tsc` for single-file component checking |
+| [`typescript`](https://github.com/microsoft/TypeScript) / [`vue-tsc`](https://github.com/vuejs/language-tools) | Type checking | Full type safety. `vue-tsc` for single-file component checking. **Held at 5.9** — see Version ceilings |
 | [`histoire`](https://github.com/histoire-dev/histoire) / [`@histoire/plugin-vue`](https://github.com/histoire-dev/histoire) | Component stories | Visual catalog of UI patterns (cards, form rows, nav pills, etc.). Stories in `src/stories/`, screenshots generated via Playwright |
 | [`playwright`](https://github.com/microsoft/playwright) | Browser automation | Automated screenshot capture of Histoire stories (light + dark mode) for `docs/UI_GUIDELINES.md` |
 | [`tsx`](https://github.com/privatenumber/tsx) | TypeScript execution | Runs the `src/stories/capture.ts` screenshot script directly |
 
 ---
 
-*Last updated: March 2026*
+## Version ceilings
+
+Two frontend dependencies are deliberately held back. Both are blocked upstream, not by preference — retry when the upstream moves.
+
+| Held at | Blocked by | Symptom if bumped |
+|---------|------------|-------------------|
+| `typescript` 5.9 | Vue tooling does not support TypeScript 7 | `vue-tsc` dies with `ERR_PACKAGE_PATH_NOT_EXPORTED: './lib/tsc'` — TS 7 is the native compiler and no longer ships that subpath. Separately, `vite build` fails inside `@vue/compiler-sfc` with *Failed to resolve extends base type* on every `interface Props extends PrimitiveProps` in the shadcn-vue components. `vue-tsc`'s peer range (`typescript >=5.0.0`) does not protect against either |
+| `vite` 7 | `histoire` 1.0.0-beta.1 peers on `vite ^7.3.0` | `npm install` refuses the tree with `ERESOLVE`; `npm ci` still succeeds, which is why the `peers` CI job resolves without the lockfile |
+
+`vitest` passes under TypeScript 7 — it transpiles without type-checking, so a green test run says nothing here.
+
+Checked 2026-08-29 against `typescript` 7.0.2, `vue-tsc` 3.3.11, `histoire` 1.0.0-beta.1.
+
+---
+
+*Last updated: August 2026*
