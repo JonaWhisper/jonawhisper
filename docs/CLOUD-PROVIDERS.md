@@ -45,7 +45,8 @@ L'app supporte `POST /v1/audio/transcriptions` avec multipart form. Ces provider
 | **Fireworks** | whisper-v3-turbo | $0.0009 | <300ms | ~2% LS | 99 | `https://api.fireworks.ai/inference/v1` | `Bearer fw_...` |
 | **Fireworks** | whisper-v3 | $0.0015 | <300ms | ~2% LS | 99 | idem | idem |
 | **Together** | whisper-large-v3 | $0.0015 | Sub-sec | ~3% EN | 50+ | `https://api.together.xyz/v1` | `Bearer ...` |
-| **OpenAI** | gpt-4o-mini-transcribe | $0.003 | ~320ms | ~2.5% | 99+ | `https://api.openai.com/v1` | `Bearer sk-...` |
+| **OpenAI** | gpt-transcribe | $0.0045 | — | — | 99+ | `https://api.openai.com/v1` | `Bearer sk-...` |
+| **OpenAI** | gpt-4o-mini-transcribe | $0.003 | ~320ms | ~2.5% | 99+ | idem | idem |
 | **OpenAI** | gpt-4o-transcribe | $0.006 | ~320ms | 2.46% | 99+ | idem | idem |
 | **OpenAI** | whisper-1 | $0.006 | ~500ms | ~4% | 99 | idem | idem |
 | **Mistral** | pixtral (multimodal audio) | — | — | — | Multi | `https://api.mistral.ai/v1` | `Bearer ...` |
@@ -128,16 +129,16 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | Provider | Modèle | Input $/1M | Output $/1M | Vitesse | Free tier | Base URL | Auth |
 |----------|--------|-----------|------------|---------|-----------|----------|------|
 | **Groq** | llama-3.1-8b-instant | $0.05 | $0.08 | 1200 tok/s | Non | `https://api.groq.com/openai/v1` | `Bearer gsk_...` |
-| **Cerebras** | llama3.1-8b | $0.10 | $0.10 | 1800 tok/s | Oui (30 req/min) | `https://api.cerebras.ai/v1` | `Bearer csk-...` |
+| **Cerebras** | gpt-oss-120b | — | — | 1800 tok/s | Oui ($5 de crédits) | `https://api.cerebras.ai/v1` | `Bearer csk-...` |
 | **Mistral** | ministral-3b-latest | $0.10 | $0.10 | Rapide | Non | `https://api.mistral.ai/v1` | `Bearer ...` |
 | **OpenAI** | gpt-4.1-nano | $0.10 | $0.15 | Rapide | Non | `https://api.openai.com/v1` | `Bearer sk-...` |
 | **OpenAI** | gpt-5-nano | $0.05 | $0.40 | Rapide | Non | idem | idem |
-| **Google** | gemini-2.5-flash-lite | $0.10 | $0.40 | Rapide | Oui (15 req/min) | `.../v1beta/openai` | `Bearer AIza...` |
+| **Google** | gemini-3.5-flash-lite | $0.30 | $2.50 | Rapide | Oui | `.../v1beta/openai` | `Bearer AIza...` |
 | **Together** | Llama-3.2-3B | $0.06 | $0.06 | Modéré | Non | `https://api.together.xyz/v1` | `Bearer ...` |
-| **DeepSeek** | deepseek-v3.2 | $0.03 (hit) | $0.42 | Lent TTFT (7.5s) | Non | `https://api.deepseek.com/v1` | `Bearer sk-...` |
+| **DeepSeek** | deepseek-v4-flash | $0.22–0.44 | $0.66–1.32 | — | Non | `https://api.deepseek.com/v1` | `Bearer sk-...` |
 | **Fireworks** | llama-v3p1-405b | $3.00 | $3.00 | Modéré | Non | `https://api.fireworks.ai/inference/v1` | `Bearer fw_...` |
 | **OpenRouter** | 200+ modèles | Variable | Variable | Variable | Non | `https://openrouter.ai/api/v1` | `Bearer sk-or-...` |
-| **xAI** | grok-2 | $2.00 | $10.00 | Rapide | Non | `https://api.x.ai/v1` | `Bearer xai-...` |
+| **xAI** | grok-4.6 | $2.00 | $6.00 | Rapide | Non | `https://api.x.ai/v1` | `Bearer xai-...` |
 | **SambaNova** | Meta-Llama-3.1-8B-Instant | — | — | Très rapide | Oui (rate-limited) | `https://api.sambanova.ai/v1` | `Bearer ...` |
 | **Nebius AI** | meta-llama/Meta-Llama-3.1-8B-Instruct | — | — | Rapide | Non | `https://api.studio.nebius.com/v1` | `Bearer ...` |
 
@@ -154,8 +155,8 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **Endpoint** | `https://api.anthropic.com/v1/messages` |
 | **Auth** | `x-api-key: sk-ant-api03-...` |
 | **Format** | Propriétaire (`messages` API avec `role`/`content` blocks) |
-| **Modèles** | claude-haiku-4-5 ($1/$5), claude-sonnet-4-5 ($3/$15), claude-opus-4 ($15/$75) |
-| **Particularités** | Versioning via header `anthropic-version`, streaming SSE, pas de `/v1/models` standard |
+| **Modèles** | claude-haiku-4-5 ($1/$5), claude-sonnet-5 ($2/$10), claude-opus-5 ($5/$25) |
+| **Particularités** | Versioning via header `anthropic-version`, streaming SSE, `GET /v1/models` pour le catalogue |
 
 ### Google Gemini ASR (implémenté : `jona-provider-gemini-asr`)
 
@@ -164,7 +165,7 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 | **Endpoint** | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
 | **Auth** | `?key=AIza...` (query param) |
 | **ASR** | Audio en base64 dans `inline_data` (mime `audio/wav`) — API multimodale |
-| **Modèles** | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro |
+| **Modèles** | gemini-3.5-transcribe (STT dédié), gemini-3.7-flash, gemini-3.5-flash |
 | **Note** | LLM séparé via le preset `gemini` (layer OpenAI-compat). Ce crate gère uniquement l'ASR natif. |
 
 ### Cohere (implémenté : `jona-provider-cohere`)
@@ -173,7 +174,7 @@ L'app supporte `POST /v1/chat/completions` (format OpenAI) pour le cleanup texte
 |--|--------|
 | **Endpoint** | `https://api.cohere.com/v2/chat` |
 | **Auth** | `Authorization: Bearer ...` |
-| **Modèles** | command-r-plus ($2.50/$10), command-r ($0.15/$0.60), command-a-03-2025 |
+| **Modèles** | command-a-plus-05-2026, command-a-03-2025, command-r7b-12-2024 |
 | **Particularités** | v2 API : réponse dans `message.content[0].text` (pas `choices[0]`). Spécialisé RAG/search. |
 
 ### GitHub Copilot (implémenté : `jona-provider-copilot`)
@@ -239,26 +240,26 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 
 | Provider | `id` | ASR | LLM | Base URL |
 |----------|------|-----|-----|----------|
-| **OpenAI** | `openai` | whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe | gpt-4o-mini, gpt-4o | `api.openai.com` |
+| **OpenAI** | `openai` | gpt-transcribe, gpt-4o-transcribe, gpt-4o-mini-transcribe | gpt-5.6-luna, gpt-5.6-terra, gpt-5.6-sol | `api.openai.com` |
 | **Groq** | `groq` | whisper-large-v3-turbo, whisper-large-v3 | llama-3.1-8b-instant | `api.groq.com` |
-| **Cerebras** | `cerebras` | — | llama3.1-8b | `api.cerebras.ai` |
-| **Google Gemini** | `gemini` | — | gemini-2.5-flash-lite | `generativelanguage.googleapis.com` |
+| **Cerebras** | `cerebras` | — | gpt-oss-120b, gemma-4-31b | `api.cerebras.ai` |
+| **Google Gemini** | `gemini` | — | gemini-3.5-flash-lite | `generativelanguage.googleapis.com` |
 | **Mistral** | `mistral` | — | ministral-3b-latest | `api.mistral.ai` |
 | **Fireworks** | `fireworks` | whisper-v3-turbo, whisper-v3 | — | `api.fireworks.ai` |
 | **Together** | `together` | openai/whisper-large-v3 | Llama-3.2-3B | `api.together.xyz` |
-| **DeepSeek** | `deepseek` | — | deepseek-v3.2 | `api.deepseek.com` |
+| **DeepSeek** | `deepseek` | — | deepseek-v4-flash, deepseek-v4-pro | `api.deepseek.com` |
 | **OpenRouter** | `openrouter` | — | (200+ modèles) | `openrouter.ai` |
-| **xAI** | `xai` | — | grok-2 | `api.x.ai` |
+| **xAI** | `xai` | — | grok-4.6 | `api.x.ai` |
 | **SambaNova** | `sambanova` | whisper-large-v3 | Meta-Llama-3.1-8B-Instant | `api.sambanova.ai` |
 | **Nebius AI** | `nebius` | — | meta-llama/Meta-Llama-3.1-8B-Instruct | `api.studio.nebius.com` |
-| **Anthropic** | `anthropic` | — | claude-haiku-4-5, claude-sonnet-4-5, claude-opus-4-6 | `api.anthropic.com` |
+| **Anthropic** | `anthropic` | — | claude-haiku-4-5, claude-sonnet-5, claude-opus-5 | `api.anthropic.com` |
 | **Deepgram** | `deepgram` | nova-3, nova-2 | — | `api.deepgram.com` |
 | **GitHub Copilot** | `copilot` | — | gpt-4o, gpt-4o-mini | `api.githubcopilot.com` |
-| **Gemini ASR** | `gemini-asr` | gemini-2.0-flash, gemini-2.5-flash | — | `generativelanguage.googleapis.com` |
+| **Gemini ASR** | `gemini-asr` | gemini-3.5-transcribe, gemini-3.7-flash | — | `generativelanguage.googleapis.com` |
 | **Rev.ai** | `revai` | reverb-english, reverb-foreign | — | `api.rev.ai` |
 | **AssemblyAI** | `assemblyai` | best, nano | — | `api.assemblyai.com` |
 | **ElevenLabs** | `elevenlabs` | scribe_v2, scribe_v1 | — | `api.elevenlabs.io` |
-| **Cohere** | `cohere` | — | command-r-plus, command-r | `api.cohere.com` |
+| **Cohere** | `cohere` | — | command-a-03-2025, command-a-plus-05-2026 | `api.cohere.com` |
 | **Gladia** | `gladia` | Whisper-Zero | — | `api.gladia.io` |
 | **Speechmatics** | `speechmatics` | — (batch ASR) | — | `asr.api.speechmatics.com` |
 | **Azure Speech** | `azure-speech` | multi-lang ASR | — | `cognitiveservices.azure.com` |

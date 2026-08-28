@@ -173,7 +173,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #d97706, #b45309)",
     default_asr_models: &[],
-    default_llm_models: &["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250514", "claude-opus-4-6-20250626"],
+    default_llm_models: &["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"],
     extra_fields: &[
         PresetField {
             id: "api_key",
