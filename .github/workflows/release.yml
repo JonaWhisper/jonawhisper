@@ -58,9 +58,12 @@ jobs:
     outputs:
       has-macos-signing: ${{ steps.check.outputs.has-macos-signing }}
       has-windows-signing: ${{ steps.check.outputs.has-windows-signing }}
+      has-updater-signing: ${{ steps.check.outputs.has-updater-signing }}
     steps:
       - name: Detect available secrets
         id: check
+        env:
+          UPDATER_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           if [ -n "${{ secrets.APPLE_CERTIFICATE }}" ] && \
              [ -n "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" ] && \
@@ -73,6 +76,13 @@ jobs:
             echo "has-macos-signing=false" >> "$GITHUB_OUTPUT"
           fi
           echo "has-windows-signing=false" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$UPDATER_SIGNING_KEY" ]; then
+            echo "has-updater-signing=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-updater-signing=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set — updater artifacts will be unsigned and no update entry will be published."
+          fi
 
   # ───────────────────────────────────────────────
   # Job 3: Build macOS (Apple Silicon)
@@ -319,6 +329,8 @@ jobs:
           echo "|----------|-------|--------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| macOS (aarch64) | ${{ needs.build-macos.result }} | ${{ needs.check-secrets.outputs.has-macos-signing }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Windows (x64) | ${{ needs.build-windows.result }} | ${{ needs.check-secrets.outputs.has-windows-signing }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Updater signing key: ${{ needs.check-secrets.outputs.has-updater-signing }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
