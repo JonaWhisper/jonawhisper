@@ -36,6 +36,17 @@ struct TranscriptResponse {
     error: Option<String>,
 }
 
+fn transcript_body(upload_url: &str, model: &str, language: &str) -> serde_json::Value {
+    let mut body = serde_json::json!({ "audio_url": upload_url });
+    if !model.is_empty() {
+        body["speech_models"] = serde_json::json!([model]);
+    }
+    if language != "auto" {
+        body["language_code"] = serde_json::Value::String(language.to_string());
+    }
+    body
+}
+
 impl CloudProvider for AssemblyAiBackend {
     fn transcribe(
         &self,
@@ -81,15 +92,7 @@ impl CloudProvider for AssemblyAiBackend {
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?;
 
         // Step 2: Create transcript
-        let mut body = serde_json::json!({
-            "audio_url": upload.upload_url,
-        });
-        if !model.is_empty() && model != "best" {
-            body["speech_model"] = serde_json::Value::String(model.to_string());
-        }
-        if language != "auto" {
-            body["language_code"] = serde_json::Value::String(language.to_string());
-        }
+        let body = transcript_body(&upload.upload_url, model, language);
 
         let create_resp = BLOCKING_CLIENT
             .post(format!("{}/v2/transcript", base))
@@ -208,9 +211,8 @@ impl CloudProvider for AssemblyAiBackend {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
             Ok(vec![
-                "best".into(),
-                "nano".into(),
-                "conformer-2".into(),
+                "universal-3-5-pro".into(),
+                "universal-2".into(),
             ])
         })
     }
@@ -226,7 +228,7 @@ inventory::submit! { ProviderPreset {
     base_url: "https://api.assemblyai.com", backend_id: "assemblyai",
     supports_asr: true, supports_llm: false,
     gradient: "linear-gradient(135deg, #6366f1, #4f46e5)",
-    default_asr_models: &["best", "nano"],
+    default_asr_models: &["universal-3-5-pro", "universal-2"],
     default_llm_models: &[],
     extra_fields: &[
         PresetField {
@@ -242,3 +244,22 @@ inventory::submit! { ProviderPreset {
     ],
     hidden_fields: &[],
 }}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transcript_body_wraps_model_in_array() {
+        let body = transcript_body("https://cdn.example/a.wav", "universal-2", "auto");
+        assert_eq!(body["speech_models"], serde_json::json!(["universal-2"]));
+        assert!(body.get("language_code").is_none());
+    }
+
+    #[test]
+    fn transcript_body_omits_model_when_empty() {
+        let body = transcript_body("https://cdn.example/a.wav", "", "fr");
+        assert!(body.get("speech_models").is_none());
+        assert_eq!(body["language_code"], "fr");
+    }
+}
