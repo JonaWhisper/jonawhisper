@@ -12,6 +12,20 @@ use std::path::Path;
 
 const MAX_DECODE_TOKENS: usize = 512;
 
+/// The 25 European languages of Canary-1B-v2; the 180m flash model covers the first four.
+const CANARY_V2_LANGS: &[(&str, &str)] = &[
+    ("fr", "Fran\u{00e7}ais"), ("en", "English"), ("de", "Deutsch"), ("es", "Espa\u{00f1}ol"),
+    ("it", "Italiano"), ("pt", "Portugu\u{00ea}s"), ("nl", "Nederlands"), ("pl", "Polski"),
+    ("ru", "\u{0420}\u{0443}\u{0441}\u{0441}\u{043a}\u{0438}\u{0439}"),
+    ("uk", "\u{0423}\u{043a}\u{0440}\u{0430}\u{0457}\u{043d}\u{0441}\u{044c}\u{043a}\u{0430}"),
+    ("sv", "Svenska"), ("da", "Dansk"), ("fi", "Suomi"), ("ro", "Rom\u{00e2}n\u{0103}"),
+    ("hu", "Magyar"), ("cs", "\u{010c}e\u{0161}tina"), ("sk", "Sloven\u{010d}ina"),
+    ("bg", "\u{0411}\u{044a}\u{043b}\u{0433}\u{0430}\u{0440}\u{0441}\u{043a}\u{0438}"),
+    ("hr", "Hrvatski"), ("sl", "Sloven\u{0161}\u{010d}ina"),
+    ("el", "\u{0395}\u{03bb}\u{03bb}\u{03b7}\u{03bd}\u{03b9}\u{03ba}\u{03ac}"),
+    ("lt", "Lietuvi\u{0173}"), ("lv", "Latvie\u{0161}u"), ("et", "Eesti"), ("mt", "Malti"),
+];
+
 // -- Context (cached model state) --
 
 /// Cached Canary inference context: encoder + decoder ONNX sessions + vocabulary.
@@ -403,6 +417,43 @@ impl ASREngine for CanaryEngine {
     fn models(&self) -> Vec<ASRModel> {
         vec![
             ASRModel {
+                id: "canary:1b-v2-int8".into(),
+                engine_id: "canary".into(),
+                label: "Canary 1B V2".into(),
+                quantization: Some("INT8".into()),
+                filename: "1b-v2-int8".into(),
+                url: String::new(),
+                size: 859_078_138 + 170_040_374 + 208_022,
+                storage_dir: jona_types::engine_storage_dir("canary"),
+                download_type: DownloadType::MultiFile {
+                    files: vec![
+                        DownloadFile {
+                            filename: "encoder-model.int8.onnx".into(),
+                            url: "https://huggingface.co/istupakov/canary-1b-v2-onnx/resolve/main/encoder-model.int8.onnx".into(),
+                            size: 859_078_138,
+                        },
+                        DownloadFile {
+                            filename: "decoder-model.int8.onnx".into(),
+                            url: "https://huggingface.co/istupakov/canary-1b-v2-onnx/resolve/main/decoder-model.int8.onnx".into(),
+                            size: 170_040_374,
+                        },
+                        DownloadFile {
+                            filename: "vocab.txt".into(),
+                            url: "https://huggingface.co/istupakov/canary-1b-v2-onnx/resolve/main/vocab.txt".into(),
+                            size: 208_022,
+                        },
+                    ],
+                },
+                download_marker: Some(".complete".into()),
+                wer: Some(2.18),
+                rtf: Some(0.22),
+                recommended_for: None,
+                params: Some(0.978),
+                ram: Some(1_450_000_000),
+                lang_codes: Some(CANARY_V2_LANGS.iter().map(|(c, _)| (*c).into()).collect()),
+                runtime: Some("ort".into()),
+            },
+            ASRModel {
                 id: "canary:180m-flash-int8".into(),
                 engine_id: "canary".into(),
                 label: "Canary Flash".into(),
@@ -443,16 +494,14 @@ impl ASREngine for CanaryEngine {
     }
 
     fn supported_languages(&self) -> Vec<Language> {
-        vec![
-            Language { code: "fr".into(), label: "Fran\u{00e7}ais".into() },
-            Language { code: "en".into(), label: "English".into() },
-            Language { code: "de".into(), label: "Deutsch".into() },
-            Language { code: "es".into(), label: "Espa\u{00f1}ol".into() },
-        ]
+        CANARY_V2_LANGS
+            .iter()
+            .map(|(code, label)| Language { code: (*code).into(), label: (*label).into() })
+            .collect()
     }
 
     fn description(&self) -> &str {
-        "NVIDIA Canary encoder-decoder ASR. Ultra-light (182M params), beats Whisper Medium quality."
+        "NVIDIA Canary encoder-decoder ASR. 180m flash for FR/EN/DE/ES, 1B v2 for 25 European languages."
     }
 
     fn create_context(&self, model: &ASRModel, _gpu_mode: GpuMode)
