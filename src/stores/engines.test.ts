@@ -307,6 +307,40 @@ describe('engines store actions', () => {
     expect(settings.selectedModelId).toBe('whisper:tiny')
   })
 
+  it('validateSelections never auto-selects a cloud provider', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    settings.selectedModelId = ''
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = []
+    store.providers = [makeProvider({ id: 'openai', supports_asr: true, enabled: true })]
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    expect(settings.selectedModelId).toBe('')
+  })
+
+  it('validateSelections keeps an explicit cloud selection', async () => {
+    const store = useEnginesStore()
+    const settings = useSettingsStore()
+    settings.selectedModelId = 'cloud:openai'
+    store.engines = [makeEngine({ id: 'whisper', category: 'asr' })]
+    store.models = [makeModel({ id: 'whisper:tiny', engine_id: 'whisper', is_downloaded: true })]
+    store.providers = [makeProvider({ id: 'openai', supports_asr: true, enabled: true })]
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === 'get_models') return store.models
+      return undefined
+    })
+
+    await store.fetchModels()
+
+    expect(settings.selectedModelId).toBe('cloud:openai')
+  })
+
   it('validateSelections resets when cloud provider is disabled (cleanup)', async () => {
     const store = useEnginesStore()
     const settings = useSettingsStore()
