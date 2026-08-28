@@ -26,7 +26,9 @@ function isUtilityModel(id: string): boolean {
 /** Get ASR models for a provider (cached > preset fallback) */
 export function getAsrModels(provider: Provider, presets: ProviderPresetInfo[]): string[] {
   if (provider.cached_models.length > 0) {
-    return provider.cached_models.filter(isAsrModel)
+    // Only OpenAI-compatible providers return a mixed catalogue worth filtering;
+    // a dedicated ASR API lists nothing but ASR models (nova-3, universal-2...).
+    return provider.supports_llm ? provider.cached_models.filter(isAsrModel) : provider.cached_models
   }
   const preset = presets.find(p => p.id === provider.kind)
   return preset?.default_asr_models ?? []
@@ -35,7 +37,9 @@ export function getAsrModels(provider: Provider, presets: ProviderPresetInfo[]):
 /** Get LLM models for a provider (cached > preset fallback) */
 export function getLlmModels(provider: Provider, presets: ProviderPresetInfo[]): string[] {
   if (provider.cached_models.length > 0) {
-    return provider.cached_models.filter(id => !isAsrModel(id) && !isUtilityModel(id))
+    return provider.supports_asr
+      ? provider.cached_models.filter(id => !isAsrModel(id) && !isUtilityModel(id))
+      : provider.cached_models.filter(id => !isUtilityModel(id))
   }
   const preset = presets.find(p => p.id === provider.kind)
   return preset?.default_llm_models ?? []
