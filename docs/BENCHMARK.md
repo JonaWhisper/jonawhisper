@@ -154,6 +154,9 @@ Modèles GGUF téléchargeables depuis le Model Manager, exécutés en local via
 | **Qwen3 1.7B** | `llama:qwen3-1.7b` | 1.28 GB | 1.7B | 1.5 GB | Oui | **Recommandé** | **Intégré** |
 | Qwen3 4B | `llama:qwen3-4b` | 2.5 GB | 4B | 3 GB | Oui | | **Intégré** |
 | Qwen3 0.6B | `llama:qwen3-0.6b` | ~400 MB | 0.6B | 600 MB | Oui | | **Intégré** |
+| Qwen3.5 0.8B | `llama:qwen3.5-0.8b` | 580 MB | 0.8B | 700 MB | Oui | | **Intégré** |
+| Qwen3.5 2B | `llama:qwen3.5-2b` | 1.40 GB | 2B | 1.7 GB | Oui | | **Intégré** |
+| Qwen3.5 4B | `llama:qwen3.5-4b` | 3.01 GB | 4B | 3.6 GB | Oui | | **Intégré** |
 | Gemma 3 1B | `llama:gemma3-1b` | 806 MB | 1B | 1 GB | Oui | | **Intégré** |
 | Gemma 3 4B | `llama:gemma3-4b` | ~2.5 GB | 4B | 3 GB | Oui | | **Intégré** |
 | SmolLM2 1.7B | `llama:smollm2-1.7b` | 1.06 GB | 1.7B | 1.3 GB | EN seul | | **Intégré** |
