@@ -122,7 +122,7 @@ fn decoder_mems_dims(decoder: &Session) -> Option<(usize, usize)> {
     let ort::value::ValueType::Tensor { shape, .. } = outlet.dtype() else {
         return None;
     };
-    let layers = *shape.get(0)?;
+    let layers = *shape.first()?;
     let hidden = *shape.get(3)?;
     (layers > 0 && hidden > 0).then_some((layers as usize, hidden as usize))
 }
