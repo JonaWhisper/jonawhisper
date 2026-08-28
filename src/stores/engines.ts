@@ -104,8 +104,10 @@ export const useEnginesStore = defineStore('engines', () => {
   /** Reset selected model IDs if they point to models that no longer exist or are disabled. */
   function validateSelections() {
     const asrIds = new Set(asrModels.value.map(m => m.id))
-    if (settingsStore.selectedModelId && !asrIds.has(settingsStore.selectedModelId)) {
-      const first = asrModels.value[0]
+    if (!settingsStore.selectedModelId || !asrIds.has(settingsStore.selectedModelId)) {
+      // Only ever auto-pick a local model: selecting a cloud provider would start
+      // sending audio off the machine without the user asking for it.
+      const first = asrModels.value.find(m => m.group === 'local')
       settingsStore.setSetting('selected_model_id', first?.id ?? '')
     }
     const punctIds = new Set(punctuationModels.value.map(m => m.id))

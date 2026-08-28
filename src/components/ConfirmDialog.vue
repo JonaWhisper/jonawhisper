@@ -34,7 +34,7 @@ const emit = defineEmits<{
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ title }}</AlertDialogTitle>
-        <AlertDialogDescription v-if="description">{{ description }}</AlertDialogDescription>
+        <AlertDialogDescription v-if="description" class="whitespace-pre-line">{{ description }}</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel @click="emit('update:open', false)">

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useEnginesStore } from '@/stores/engines'
 import { useDownloadStore } from '@/stores/downloads'
+import { useSettingsStore } from '@/stores/settings'
 import type { ASRModel } from '@/stores/types'
 import ModelCell from '@/components/ModelCell.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -12,6 +13,7 @@ import { AudioLines, Type, SpellCheck, MessageSquare, BookA, BookText } from 'lu
 const { t } = useI18n()
 const engines = useEnginesStore()
 const downloads = useDownloadStore()
+const settings = useSettingsStore()
 
 type FilterKey = 'all' | 'asr' | 'punctuation' | 'correction' | 'llm' | 'spellcheck' | 'languagemodel'
 const activeFilter = ref<FilterKey>('all')
@@ -47,6 +49,21 @@ const filteredModels = computed(() => {
 
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
+
+const deleteTargetUsage = computed(() => {
+  const id = deleteTarget.value?.id
+  if (!id) return null
+  if (id === settings.selectedModelId) return 'modelManager.deleteActiveTranscription'
+  if (id === settings.punctuationModelId) return 'modelManager.deleteActivePunctuation'
+  if (id === settings.cleanupModelId) return 'modelManager.deleteActiveCleanup'
+  return null
+})
+
+const deleteConfirmDescription = computed(() => {
+  const base = t('modelManager.deleteConfirmDesc', [deleteTarget.value?.label || ''])
+  const usage = deleteTargetUsage.value
+  return usage ? `${base}\n\n${t(usage)}` : base
+})
 
 async function handleDownload(model: ASRModel) {
   await downloads.downloadModel(model.id)
@@ -132,7 +149,7 @@ const virtualizer = useVirtualizer(computed(() => ({
     <ConfirmDialog
       v-model:open="showDeleteConfirm"
       :title="t('modelManager.deleteConfirm')"
-      :description="t('modelManager.deleteConfirmDesc', [deleteTarget?.label || ''])"
+      :description="deleteConfirmDescription"
       :confirm-label="t('modelManager.delete')"
       @confirm="confirmDelete"
     />

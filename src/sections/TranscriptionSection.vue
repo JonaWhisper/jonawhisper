@@ -11,10 +11,15 @@ import {
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
 import ModelOption from '@/components/ModelOption.vue'
+import { TriangleAlert, Cloud } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
 const engines = useEnginesStore()
+
+const emit = defineEmits<{
+  'navigate': [section: string]
+}>()
 
 async function onAsrModelChange(value: string | number | bigint | Record<string, unknown> | null) {
   if (typeof value !== 'string') return
@@ -41,6 +46,9 @@ async function onAsrCloudModelChange(value: string) {
   await settings.setSetting('asr_cloud_model', value)
 }
 
+const hasLocalAsr = computed(() => engines.asrModels.some(m => m.group === 'local'))
+const cloudOnly = computed(() => !hasLocalAsr.value && engines.asrModels.length > 0)
+
 const selectedAsrModel = computed(() =>
   engines.asrModels.find(m => m.id === settings.selectedModelId) ?? null
 )
@@ -57,6 +65,28 @@ onMounted(() => {
   <div>
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.transcription') }}</div>
 
+    <!-- Nothing available at all: transcription cannot run -->
+    <div v-if="engines.asrModels.length === 0" class="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 mb-2.5">
+      <TriangleAlert class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+      <div class="flex-1 min-w-0">
+        <p class="text-xs text-amber-700 dark:text-amber-300">{{ t('settings.transcription.noModelWarning') }}</p>
+        <button class="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline mt-1 cursor-pointer" @click="emit('navigate', 'models')">
+          {{ t('settings.transcription.goToModels') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Cloud is available but nothing local: a choice to make, not a failure -->
+    <div v-else-if="cloudOnly" class="flex items-start gap-2.5 rounded-xl border border-panel-card-border bg-panel-card-bg p-3 mb-2.5">
+      <Cloud class="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <div class="flex-1 min-w-0">
+        <p class="text-xs text-muted-foreground">{{ t('settings.transcription.cloudOnlyNotice') }}</p>
+        <button class="text-xs font-medium text-panel-accent hover:underline mt-1 cursor-pointer" @click="emit('navigate', 'models')">
+          {{ t('settings.transcription.goToModels') }}
+        </button>
+      </div>
+    </div>
+
     <!-- Speech recognition card -->
     <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.transcription.model') }}</div>
@@ -66,8 +96,17 @@ onMounted(() => {
         <div>
           <div class="text-[13px] text-foreground">{{ t('settings.transcription.model') }}</div>
         </div>
+        <!-- Single model: display inline, no dropdown -->
+        <div v-if="engines.asrModels.length === 1 && selectedAsrModel" class="flex h-8 items-center px-3 text-xs">
+          <ModelOption
+            :label="selectedAsrModel.label"
+            :location="selectedAsrModel.group === 'cloud' ? 'cloud' : 'local'"
+            compact
+          />
+        </div>
+        <!-- Multiple models: full dropdown -->
         <Select
-          v-if="engines.asrModels.length > 0"
+          v-else-if="engines.asrModels.length > 0"
           :model-value="settings.selectedModelId"
           @update:model-value="onAsrModelChange"
         >
@@ -90,7 +129,9 @@ onMounted(() => {
             </SelectItem>
           </SelectContent>
         </Select>
-        <div v-else class="flex h-8 items-center rounded-md border border-input px-3 text-xs text-muted-foreground opacity-60 min-w-[180px]">
+        <!-- No models: warning -->
+        <div v-else class="flex h-8 items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-xs text-amber-600 dark:text-amber-400 min-w-[180px] gap-1.5">
+          <TriangleAlert class="w-3.5 h-3.5 flex-shrink-0" />
           {{ t('settings.transcription.noModels') }}
         </div>
       </div>
