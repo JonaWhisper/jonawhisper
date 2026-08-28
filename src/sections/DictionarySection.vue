@@ -72,7 +72,7 @@ onMounted(load)
     <div class="text-[12px] text-muted-foreground mb-4">{{ t('dictionary.description') }}</div>
 
     <!-- Add entry card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('dictionary.add') }}</div>
 
       <!-- Word input -->
@@ -80,7 +80,7 @@ onMounted(load)
         <input
           v-model="newWord"
           :placeholder="t('dictionary.placeholder.word')"
-          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-ring"
           @keydown.enter="addEntry"
         />
         <TooltipProvider>
@@ -112,13 +112,13 @@ onMounted(load)
         <input
           v-model="newPattern"
           :placeholder="t('dictionary.placeholder.pattern')"
-          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-ring"
         />
         <ArrowRight class="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         <input
           v-model="newReplacement"
           :placeholder="t('dictionary.placeholder.replacement')"
-          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          class="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-ring"
           @keydown.enter="addEntry"
         />
         <TooltipProvider>
@@ -152,7 +152,7 @@ onMounted(load)
     </div>
 
     <!-- Entries list card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px]">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px]">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">
         {{ t('dictionary.entries') }}
         <span v-if="entries.length" class="ml-1 opacity-60">({{ entries.length }})</span>

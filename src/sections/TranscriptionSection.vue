@@ -67,7 +67,7 @@ onMounted(() => {
 
     <!-- Nothing available at all: transcription cannot run -->
     <div v-if="engines.asrModels.length === 0" class="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 mb-2.5">
-      <TriangleAlert class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+      <TriangleAlert class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
       <div class="flex-1 min-w-0">
         <p class="text-xs text-amber-700 dark:text-amber-300">{{ t('settings.transcription.noModelWarning') }}</p>
         <button class="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline mt-1 cursor-pointer" @click="emit('navigate', 'models')">
@@ -78,7 +78,7 @@ onMounted(() => {
 
     <!-- Cloud is available but nothing local: a choice to make, not a failure -->
     <div v-else-if="cloudOnly" class="flex items-start gap-2.5 rounded-xl border border-panel-card-border bg-panel-card-bg p-3 mb-2.5">
-      <Cloud class="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <Cloud class="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
       <div class="flex-1 min-w-0">
         <p class="text-xs text-muted-foreground">{{ t('settings.transcription.cloudOnlyNotice') }}</p>
         <button class="text-xs font-medium text-panel-accent hover:underline mt-1 cursor-pointer" @click="emit('navigate', 'models')">
@@ -88,7 +88,7 @@ onMounted(() => {
     </div>
 
     <!-- Speech recognition card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.transcription.model') }}</div>
 
       <!-- Model selector row -->
@@ -131,7 +131,7 @@ onMounted(() => {
         </Select>
         <!-- No models: warning -->
         <div v-else class="flex h-8 items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-3 text-xs text-amber-600 dark:text-amber-400 min-w-[180px] gap-1.5">
-          <TriangleAlert class="w-3.5 h-3.5 flex-shrink-0" />
+          <TriangleAlert class="w-3.5 h-3.5 shrink-0" />
           {{ t('settings.transcription.noModels') }}
         </div>
       </div>
@@ -171,7 +171,7 @@ onMounted(() => {
     </div>
 
     <!-- GPU Acceleration card (grayed when cloud ASR) -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5" :class="{ 'opacity-35 pointer-events-none': engines.isCloudAsr }">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5" :class="{ 'opacity-35 pointer-events-none': engines.isCloudAsr }">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.transcription.gpuMode') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>

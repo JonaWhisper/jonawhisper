@@ -95,7 +95,7 @@ function onInput(event: Event) {
               ref="searchInput"
               v-model="search"
               type="text"
-              class="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+              class="flex-1 bg-transparent text-xs outline-hidden placeholder:text-muted-foreground/60"
               :placeholder="t('provider.searchPreset')"
               @keydown="onSearchKeydown"
             />

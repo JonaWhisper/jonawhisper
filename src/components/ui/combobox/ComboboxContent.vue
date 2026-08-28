@@ -37,7 +37,7 @@ const forwardedProps = useForwardProps(delegatedProps)
         props.class,
       )"
     >
-      <ComboboxViewport :class="cn('p-1', position === 'popper' && 'w-full min-w-[--reka-combobox-trigger-width]')">
+      <ComboboxViewport :class="cn('p-1', position === 'popper' && 'w-full min-w-(--reka-combobox-trigger-width)')">
         <slot />
       </ComboboxViewport>
     </ComboboxContent>

@@ -55,7 +55,7 @@ onUnmounted(() => {
   <div>
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.permissions') }}</div>
 
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="flex flex-col gap-2">
         <div
           v-for="item in items"

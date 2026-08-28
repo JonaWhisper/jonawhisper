@@ -207,7 +207,7 @@ const canStart = computed(() => {
                   @click="handleSelectModel(model)"
                 >
                   <div
-                    class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                    class="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0"
                     :class="model.id === settings.selectedModelId
                       ? 'border-primary bg-primary'
                       : isModelDownloaded(model)
@@ -223,7 +223,7 @@ const canStart = computed(() => {
                     </div>
                     <BenchmarkBadges v-if="model.wer != null || model.rtf != null || model.params != null || model.ram != null || (model.lang_codes && model.lang_codes.length > 0)" :wer="model.wer" :rtf="model.rtf" :params="model.params" :ram="model.ram" :lang-codes="model.lang_codes" compact class="mt-0.5" />
                   </div>
-                  <div class="flex items-center gap-1.5 flex-shrink-0" @click.stop>
+                  <div class="flex items-center gap-1.5 shrink-0" @click.stop>
                     <DownloadActions :model="model" compact @download="handleDownload" />
                   </div>
                 </div>

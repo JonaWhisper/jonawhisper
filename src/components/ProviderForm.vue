@@ -262,7 +262,7 @@ function save() {
                 ref="kindSearchInput"
                 v-model="kindSearch"
                 type="text"
-                class="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/60"
+                class="flex-1 bg-transparent text-xs outline-hidden placeholder:text-muted-foreground/60"
                 :placeholder="t('provider.searchPreset')"
                 @keydown="onKindSearchKeydown"
               />

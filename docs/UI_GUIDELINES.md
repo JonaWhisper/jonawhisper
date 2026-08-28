@@ -4,7 +4,7 @@ Conventions for building and maintaining the JonaWhisper interface. Follow these
 
 ## Design system
 
-The app uses a **glassmorphism** design language inspired by native macOS panels: translucent card backgrounds, subtle blurs, thin borders, and soft shadows. Components come from **shadcn-vue** (reka-ui primitives), styled exclusively with **Tailwind CSS** utilities. Panel design tokens are CSS custom properties (defined in `main.css`) registered as Tailwind theme extensions in `tailwind.config.ts`.
+The app uses a **glassmorphism** design language inspired by native macOS panels: translucent card backgrounds, subtle blurs, thin borders, and soft shadows. Components come from **shadcn-vue** (reka-ui primitives), styled exclusively with **Tailwind CSS** utilities. Panel design tokens are CSS custom properties defined in `main.css` and exposed to Tailwind through its `@theme` block — Tailwind 4 has no JavaScript config file.
 
 Colors are CSS custom properties defined in `src/assets/main.css`. Dark mode is automatic (`prefers-color-scheme`) with full variable overrides.
 
@@ -42,7 +42,7 @@ Exception: the native pill overlay (`ui/pill.rs`) renders via RGBA buffer where 
 
 ## Tailwind utility patterns
 
-All panel-specific styling uses **inline Tailwind utilities** referencing panel tokens from `tailwind.config.ts`. No custom CSS classes — keep everything in templates.
+All panel-specific styling uses **inline Tailwind utilities** referencing panel tokens from the `@theme` block in `main.css`. No custom CSS classes — keep everything in templates.
 
 ### Card container
 
@@ -196,7 +196,7 @@ Every section starts with:
   }" />
 ```
 
-`animate-status-pulse` is registered in `tailwind.config.ts` (1.2s ease-in-out infinite).
+`animate-status-pulse` is declared as `--animate-status-pulse` in the `@theme` block of `main.css` (1.2s ease-in-out infinite).
 
 ### Header + scrollable content
 

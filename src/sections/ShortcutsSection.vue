@@ -25,7 +25,7 @@ async function onCancelShortcutChange(value: string) {
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.shortcuts') }}</div>
 
     <!-- Recording mode card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.shortcut.mode') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>
@@ -43,7 +43,7 @@ async function onCancelShortcutChange(value: string) {
     </div>
 
     <!-- Keyboard shortcuts card -->
-    <div class="bg-panel-card-bg backdrop-blur border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('settings.shortcut.record') }}</div>
       <div class="flex items-center justify-between py-2 gap-3">
         <div>
