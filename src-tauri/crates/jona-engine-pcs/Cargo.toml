@@ -10,5 +10,5 @@ jona-types = { path = "../jona-types" }
 jona-engines = { path = "../jona-engines" }
 ort.workspace = true
 tokenizers.workspace = true
-prost = "0.13"
+prost = "0.14"
 log.workspace = true
