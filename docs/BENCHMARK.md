@@ -44,6 +44,7 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 |---|---|---|---|---|---|---|---|---|---|
 | **Whisper Large V3 French** | 1.5B | Natif FR | GGML | 538 MB | 900 MB | Encoder-decoder attention | Non | whisper-rs (Metal) | **Intégré** (`whisper:large-v3-french-distil`) |
 | **Canary-180M-Flash** | 182M | 4 langues | ONNX int8 | 213 MB | 300 MB | FastConformer enc-dec | Non | ort (CoreML) | **Intégré** (`canary:180m-flash-int8`) |
+| **Canary-1B v2** | ~1B | 25 langues | ONNX int8 | 1.03 GB | 1.45 GB | FastConformer enc-dec | Non | ort (encodeur CoreML, décodeur CPU) | **Intégré** (`canary:1b-v2-int8`) |
 | **Parakeet-TDT 0.6B v3** | 600M | 25 langues | ONNX int8 | 703 MB | 750 MB | FastConformer + TDT transducer | Non | ort (CoreML) | **Intégré** (`parakeet:tdt-0.6b-v3-int8`) |
 | **Qwen3-ASR 0.6B** | 600M | 30 langues | Safetensors | 1.88 GB | 2 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:0.6b`) |
 | **Voxtral Realtime 4B** | 4.4B | 13 langues | Safetensors BF16 | 8.9 GB | ~10 GB | Mimi encoder + LLM decoder | Oui (voxtral.c) | voxtral.c vendoré (Metal) | **Intégré** (`voxtral:mini-4b-realtime`) |
@@ -75,7 +76,7 @@ Modèles avec un chemin d'intégration réaliste (ONNX disponible, safetensors, 
 | **Moonshine v2 Medium** | 250M | EN seul | ONNX (.ort) | ~500 MB | ort | EN | ~6.65% | 100x Whisper Large, streaming natif | Écarté — EN seul |
 | **Moonshine Tiny** | 27M | EN seul | ONNX (.ort) | 108 MB | ort | EN | ~12.7% | Ultra-compact, <108 MB | Écarté — EN seul |
 | ~~Voxtral Mini 4B~~ | 4B | Oui | Safetensors BF16 | 8.87 GB | voxtral.c (C, Metal) | 13 langues | — | **✓ Intégré** via voxtral.c vendoré | **Intégré** (`voxtral:mini-4b-realtime`) |
-| **Canary-1B-Flash** | ~1B | 4 langues | .nemo | ~2 GB | Conversion ONNX nécessaire | FR/EN/DE/ES | — | >1000 RTFx, streaming | Non intégré — conversion .nemo→ONNX non triviale |
+| **Canary-1B-Flash** | ~1B | 4 langues | .nemo | ~2 GB | Conversion ONNX nécessaire | FR/EN/DE/ES | — | >1000 RTFx, streaming | Remplacé par Canary-1B v2, intégré via l'export ONNX d'istupakov |
 | **OWSM-CTC v4 1B** | ~1B | Multi | PyTorch | ~2 GB | Conversion ONNX nécessaire | Multi | — | Encoder-only CTC, ultra-rapide | Non intégré — ESPnet/PyTorch, pas d'ONNX |
 | **IBM Granite Speech 3.3 8B** | 8B | Oui | Safetensors | ~16 GB | Candle (théorique) | Multi | 5.85% | Top leaderboard, Apache 2.0 | Écarté — 16 GB, LLM backbone trop lourd |
 | **Parakeet-TDT 1.1B** | 1.1B | EN seul | .nemo | ~2.2 GB | Pas d'ONNX officiel | EN | 1.39% LS | Meilleur WER EN, RTFx >2000 | Écarté — EN seul, pas d'ONNX |

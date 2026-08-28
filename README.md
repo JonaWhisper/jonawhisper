@@ -25,7 +25,7 @@ All processing happens on your machine — no data leaves your computer unless y
 | Engine | Params | Size | Languages | GPU | Best WER | RTF |
 |--------|--------|------|-----------|-----|----------|-----|
 | [Whisper](https://github.com/tazz4843/whisper-rs) | 39M–1.55B | 75 MB–3.1 GB | 99 | Metal | 1.5% | 0.05–0.50 |
-| [Canary](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/canary-180m-flash) | 182M | 213 MB | 4 (FR/EN/DE/ES) | CoreML | 1.87% | 0.15 |
+| [Canary](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/canary-180m-flash) | 182M–1B | 213 MB–1.03 GB | 4 (FR/EN/DE/ES) or 25 European | CoreML | 1.87% | 0.15–0.22 |
 | [Parakeet-TDT](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/parakeet-tdt-0.6b-v2) | 600M | 703 MB | 25 European | CoreML | 1.5% | 0.10 |
 | [Qwen3-ASR](https://github.com/huanglizhuo/QwenASR) | 600M | 1.88 GB | 30 | Accelerate/AMX | 2.0% | 0.15 |
 | [Voxtral](https://github.com/antirez/voxtral.c) | 4.4B | 8.9 GB | 13 | Metal | 8.7% | 0.40 |
