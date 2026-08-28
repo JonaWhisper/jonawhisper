@@ -57,10 +57,22 @@ describe('hasAsrSupport / hasLlmSupport', () => {
 describe('getAsrModels', () => {
   it('returns filtered cached models when available', () => {
     const provider = makeProvider({
+      supports_asr: true,
+      supports_llm: true,
       cached_models: ['whisper-1', 'gpt-4o', 'gpt-4o-transcribe', 'text-embedding-ada'],
     })
     const result = getAsrModels(provider, TEST_PRESETS)
     expect(result).toEqual(['whisper-1', 'gpt-4o-transcribe'])
+  })
+
+  it('keeps every cached model for an ASR-only provider', () => {
+    const provider = makeProvider({
+      kind: 'assemblyai',
+      supports_asr: true,
+      supports_llm: false,
+      cached_models: ['universal-3-5-pro', 'universal-2'],
+    })
+    expect(getAsrModels(provider, TEST_PRESETS)).toEqual(['universal-3-5-pro', 'universal-2'])
   })
 
   it('falls back to preset ASR models when no cached models', () => {
@@ -78,10 +90,22 @@ describe('getAsrModels', () => {
 describe('getLlmModels', () => {
   it('returns non-ASR non-utility cached models', () => {
     const provider = makeProvider({
+      supports_asr: true,
+      supports_llm: true,
       cached_models: ['gpt-4o', 'whisper-1', 'text-embedding-ada', 'dall-e-3'],
     })
     const result = getLlmModels(provider, TEST_PRESETS)
     expect(result).toEqual(['gpt-4o'])
+  })
+
+  it('keeps ASR-named cached models for an LLM-only provider', () => {
+    const provider = makeProvider({
+      kind: 'anthropic',
+      supports_asr: false,
+      supports_llm: true,
+      cached_models: ['claude-opus-5', 'whisper-tuned-internal', 'text-embedding-ada'],
+    })
+    expect(getLlmModels(provider, TEST_PRESETS)).toEqual(['claude-opus-5', 'whisper-tuned-internal'])
   })
 
   it('falls back to preset LLM models when no cached models', () => {
@@ -92,6 +116,8 @@ describe('getLlmModels', () => {
 
   it('filters out tts and moderation models', () => {
     const provider = makeProvider({
+      supports_asr: true,
+      supports_llm: true,
       cached_models: ['gpt-4o', 'tts-1', 'text-moderation-latest'],
     })
     expect(getLlmModels(provider, TEST_PRESETS)).toEqual(['gpt-4o'])
