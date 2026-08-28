@@ -50,19 +50,19 @@ const filteredModels = computed(() => {
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<ASRModel | null>(null)
 
-const isDeleteTargetActive = computed(() => {
-  if (!deleteTarget.value) return false
-  return deleteTarget.value.id === settings.selectedModelId
-    || deleteTarget.value.id === settings.punctuationModelId
-    || deleteTarget.value.id === settings.cleanupModelId
+const deleteTargetUsage = computed(() => {
+  const id = deleteTarget.value?.id
+  if (!id) return null
+  if (id === settings.selectedModelId) return 'modelManager.deleteActiveTranscription'
+  if (id === settings.punctuationModelId) return 'modelManager.deleteActivePunctuation'
+  if (id === settings.cleanupModelId) return 'modelManager.deleteActiveCleanup'
+  return null
 })
 
 const deleteConfirmDescription = computed(() => {
   const base = t('modelManager.deleteConfirmDesc', [deleteTarget.value?.label || ''])
-  if (isDeleteTargetActive.value) {
-    return `${base}\n\n⚠ ${t('modelManager.deleteActiveWarning')}`
-  }
-  return base
+  const usage = deleteTargetUsage.value
+  return usage ? `${base}\n\n${t(usage)}` : base
 })
 
 async function handleDownload(model: ASRModel) {
