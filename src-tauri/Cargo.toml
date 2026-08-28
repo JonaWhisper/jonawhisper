@@ -102,8 +102,8 @@ sys-locale = "0.3"
 ort.workspace = true
 ndarray = "0.17"
 tokenizers.workspace = true
-prost = "0.13"
-symspell = "0.4.5"
+prost = "0.14"
+symspell = "0.5.2"
 rphonetic = { version = "3.0", features = ["embedded_bm"] }
 jona-detector-env = { path = "crates/jona-detector-env" }
 

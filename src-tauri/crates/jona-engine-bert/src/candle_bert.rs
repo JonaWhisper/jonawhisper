@@ -189,3 +189,24 @@ fn infer_chunk(ctx: &CandlePunctContext, words: &[String]) -> Result<Vec<usize>,
 
     Ok(labels)
 }
+
+#[cfg(test)]
+mod smoke {
+    use std::path::Path;
+
+    const SAMPLES: &[&str] = &[
+        "bonjour ceci est un test de ponctuation automatique en français",
+        "hello world this is a punctuation test",
+    ];
+
+    #[test]
+    #[ignore]
+    fn punctuation_output_snapshot() {
+        let model = std::env::var("BERT_MODEL").expect("BERT_MODEL");
+        let ctx = super::CandlePunctContext::load(Path::new(&model)).expect("load failed");
+        for s in SAMPLES {
+            let out = super::restore_punctuation(&ctx, s).expect("inference failed");
+            println!("OUT|{out}");
+        }
+    }
+}

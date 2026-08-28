@@ -1306,3 +1306,21 @@ mod tests {
         assert!(is_phonetically_plausible("smith", "smyth"));
     }
 }
+
+#[cfg(test)]
+mod smoke {
+    const SAMPLES: &[(&str, &str)] = &[
+        ("fr", "je voudrai un caffe sil vous plait"),
+        ("fr", "le chein cours dans le jardim"),
+        ("en", "i wnat to tset the speling corection"),
+    ];
+
+    #[test]
+    #[ignore]
+    fn spellcheck_output_snapshot() {
+        for (lang, text) in SAMPLES {
+            let (out, _) = super::auto_correct(text, lang, &[]);
+            println!("OUT|{lang}|{out}");
+        }
+    }
+}
