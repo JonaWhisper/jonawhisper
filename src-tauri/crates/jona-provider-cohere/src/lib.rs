@@ -111,9 +111,9 @@ impl CloudProvider for CohereBackend {
     ) -> Pin<Box<dyn Future<Output = Result<Vec<String>, ProviderError>> + Send + 'a>> {
         Box::pin(async move {
             Ok(vec![
-                "command-r-plus".into(),
-                "command-r".into(),
+                "command-a-plus-05-2026".into(),
                 "command-a-03-2025".into(),
+                "command-r7b-12-2024".into(),
             ])
         })
     }
@@ -159,7 +159,7 @@ inventory::submit! { ProviderPreset {
     supports_asr: false, supports_llm: true,
     gradient: "linear-gradient(135deg, #39d353, #2ea043)",
     default_asr_models: &[],
-    default_llm_models: &["command-r-plus", "command-r"],
+    default_llm_models: &["command-a-03-2025", "command-a-plus-05-2026"],
     extra_fields: &[
         PresetField {
             id: "api_key",
