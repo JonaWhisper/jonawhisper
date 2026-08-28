@@ -306,14 +306,38 @@ fn build_tokenizer_from_spe(model_dir: &Path) -> Result<Tokenizer, String> {
 
     use tokenizers::NormalizerWrapper;
     use tokenizers::normalizers::{Lowercase, Sequence, unicode::NFC};
-    tokenizer.with_normalizer(Some(Sequence::new(vec![
-        NormalizerWrapper::NFC(NFC),
-        NormalizerWrapper::Lowercase(Lowercase),
-    ])));
+    tokenizer
+        .with_normalizer(Some(Sequence::new(vec![
+            NormalizerWrapper::NFC(NFC),
+            NormalizerWrapper::Lowercase(Lowercase),
+        ])))
+        .map_err(|e| format!("Failed to set PCS normalizer: {e}"))?;
 
     use tokenizers::decoders::metaspace::Metaspace;
     tokenizer.with_pre_tokenizer(Some(Metaspace::default()));
 
     log::info!("PCS tokenizer built from SentencePiece model");
     Ok(tokenizer)
+}
+
+#[cfg(test)]
+mod smoke {
+    use std::path::Path;
+
+    const SAMPLES: &[&str] = &[
+        "bonjour ceci est un test de ponctuation automatique en français",
+        "hello world this is a punctuation test",
+        "le chat dort sur le canapé et le chien joue dans le jardin",
+    ];
+
+    #[test]
+    #[ignore]
+    fn punctuation_output_snapshot() {
+        let model = std::env::var("PCS_MODEL").expect("PCS_MODEL");
+        let mut ctx = super::PcsContext::load(Path::new(&model)).expect("load failed");
+        for s in SAMPLES {
+            let out = super::restore_punctuation_and_case(&mut ctx, s).expect("inference failed");
+            println!("OUT|{out}");
+        }
+    }
 }

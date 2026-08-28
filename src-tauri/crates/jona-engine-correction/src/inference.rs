@@ -361,3 +361,24 @@ fn calc_banned_ngram_tokens(generated: &[i64], ngram_size: usize) -> Vec<i64> {
     }
     banned
 }
+
+#[cfg(test)]
+mod smoke {
+    use std::path::Path;
+
+    const SAMPLES: &[&str] = &[
+        "je voudrai un caffé sil vous plait",
+        "le chien cours dans le jardin",
+    ];
+
+    #[test]
+    #[ignore]
+    fn correction_output_snapshot() {
+        let dir = std::env::var("T5_DIR").expect("T5_DIR");
+        let mut ctx = super::T5Context::load(Path::new(&dir)).expect("load failed");
+        for s in SAMPLES {
+            let out = super::correct(&mut ctx, s).expect("correct failed");
+            println!("OUT|{out}");
+        }
+    }
+}
