@@ -11,7 +11,7 @@ import {
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
 import ModelOption from '@/components/ModelOption.vue'
-import { TriangleAlert } from 'lucide-vue-next'
+import { TriangleAlert, Cloud } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -46,6 +46,9 @@ async function onAsrCloudModelChange(value: string) {
   await settings.setSetting('asr_cloud_model', value)
 }
 
+const hasLocalAsr = computed(() => engines.asrModels.some(m => m.group === 'local'))
+const cloudOnly = computed(() => !hasLocalAsr.value && engines.asrModels.length > 0)
+
 const selectedAsrModel = computed(() =>
   engines.asrModels.find(m => m.id === settings.selectedModelId) ?? null
 )
@@ -62,12 +65,23 @@ onMounted(() => {
   <div>
     <div class="text-[20px] font-bold tracking-[-0.02em] mb-4">{{ t('panel.transcription') }}</div>
 
-    <!-- No model warning banner -->
+    <!-- Nothing available at all: transcription cannot run -->
     <div v-if="engines.asrModels.length === 0" class="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/8 p-3 mb-2.5">
       <TriangleAlert class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
       <div class="flex-1 min-w-0">
         <p class="text-xs text-amber-700 dark:text-amber-300">{{ t('settings.transcription.noModelWarning') }}</p>
         <button class="text-xs font-medium text-amber-600 dark:text-amber-400 hover:underline mt-1 cursor-pointer" @click="emit('navigate', 'models')">
+          {{ t('settings.transcription.goToModels') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Cloud is available but nothing local: a choice to make, not a failure -->
+    <div v-else-if="cloudOnly" class="flex items-start gap-2.5 rounded-xl border border-panel-card-border bg-panel-card-bg p-3 mb-2.5">
+      <Cloud class="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+      <div class="flex-1 min-w-0">
+        <p class="text-xs text-muted-foreground">{{ t('settings.transcription.cloudOnlyNotice') }}</p>
+        <button class="text-xs font-medium text-panel-accent hover:underline mt-1 cursor-pointer" @click="emit('navigate', 'models')">
           {{ t('settings.transcription.goToModels') }}
         </button>
       </div>
@@ -92,7 +106,7 @@ onMounted(() => {
         </div>
         <!-- Multiple models: full dropdown -->
         <Select
-          v-else-if="engines.asrModels.length > 1"
+          v-else-if="engines.asrModels.length > 0"
           :model-value="settings.selectedModelId"
           @update:model-value="onAsrModelChange"
         >

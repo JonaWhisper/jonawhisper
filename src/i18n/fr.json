@@ -114,6 +114,7 @@
   "settings.transcription.noModels": "Aucun mod\u00e8le",
   "settings.transcription.noModelWarning": "Aucun mod\u00e8le de transcription install\u00e9. T\u00e9l\u00e9chargez-en un dans Mod\u00e8les pour commencer \u00e0 transcrire.",
   "settings.transcription.goToModels": "Aller aux Mod\u00e8les",
+  "settings.transcription.cloudOnlyNotice": "Aucun mod\u00e8le local install\u00e9. Choisissez un service cloud ci-dessous \u2014 votre audio y sera envoy\u00e9 \u2014 ou installez un mod\u00e8le local.",
   "settings.cloudAsr.model": "Modèle",
   "settings.cloudAsr.custom": "Modèle personnalisé\u2026",
   "settings.cloudAsr.customPlaceholder": "Nom du modèle",
