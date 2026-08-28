@@ -59,12 +59,15 @@ All run via ONNX Runtime with CoreML, autoregressive decoding with repeat penalt
 | Model | Params | Size | Languages |
 |-------|--------|------|-----------|
 | Qwen3 0.6B | 0.6B | 484 MB | FR/EN/ES/DE |
+| Qwen3.5 0.8B | 0.8B | 580 MB | FR/EN/ES/DE |
 | Gemma 3 1B | 1.0B | 806 MB | FR/EN/ES/DE |
 | **Qwen3 1.7B** | 1.7B | 1.28 GB | FR/EN/ES/DE |
+| Qwen3.5 2B | 2.0B | 1.40 GB | FR/EN/ES/DE |
 | Ministral 3B | 3.0B | 2.15 GB | FR/EN/ES/DE |
 | Qwen3 4B | 4.0B | 2.50 GB | FR/EN/ES/DE |
+| Qwen3.5 4B | 4.0B | 3.01 GB | FR/EN/ES/DE |
 
-All GGUF Q4 quantized, run via llama.cpp with Metal GPU. 11 models available total.
+All GGUF Q4 quantized, run via llama.cpp with Metal GPU. 14 models available total.
 
 ## Processing pipelines
 

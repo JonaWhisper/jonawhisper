@@ -120,3 +120,24 @@ pub fn cleanup_text(ctx: &LlmContext, text: &str, language: &str, max_tokens: us
 
     jona_engines::llm_prompt::sanitize_output(&output, text.len())
 }
+
+#[cfg(test)]
+mod smoke {
+    use std::path::Path;
+
+    #[test]
+    #[ignore]
+    fn cleanup_with_real_model() {
+        let path = std::env::var("LLM_GGUF").expect("LLM_GGUF");
+        let t0 = std::time::Instant::now();
+        let ctx = super::LlmContext::load(Path::new(&path)).expect("load failed");
+        eprintln!("LOAD_SECS={:.2}", t0.elapsed().as_secs_f64());
+
+        let t1 = std::time::Instant::now();
+        let out = super::cleanup_text(&ctx, "bonjour euh ceci est un test de euh transcription", "fr", 128)
+            .expect("cleanup failed");
+        eprintln!("INFER_SECS={:.2}", t1.elapsed().as_secs_f64());
+        eprintln!("OUT={out}");
+        assert!(!out.trim().is_empty());
+    }
+}
