@@ -33,6 +33,27 @@ jobs:
       - name: Tests
         run: npx vitest run
 
+  # ── Dependency resolution (peer conflicts) ────────────
+  peers:
+    name: Peer resolution
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      # npm ci follows the lockfile and never resolves peer ranges, so a
+      # conflict stays invisible until someone runs npm install — which
+      # build.sh does. Resolving without the lockfile is what surfaces it.
+      - name: Resolve without the lockfile
+        run: |
+          rm -f package-lock.json
+          npm install --dry-run
+
   # ── Rust (clippy + tests) ──────────────────────────────
   rust:
     name: Rust
