@@ -63,7 +63,7 @@ APIs ASR avec protocole dédié (non OpenAI-compatible), chacune dans son propre
 |----------|--------|----------|---------|-----|-----|-----------|-------|--------|
 | **Deepgram** | Nova-3 | $0.0043 | <300ms | 5.26% | Oui (codeswitching) | Oui | `jona-provider-deepgram` | ✅ |
 | **Rev.ai** | Reverb Foreign | $0.005 | <1s | — | Oui | Oui | `jona-provider-revai` | ✅ |
-| **AssemblyAI** | Universal-2 | $0.0025 | Secondes/stream | ~14.5% | Oui | Oui (6 langues) | `jona-provider-assemblyai` | ✅ |
+| **AssemblyAI** | Universal-3.5 Pro | $0.0035 | Secondes/stream | — | Oui | Oui (6 langues) | `jona-provider-assemblyai` | ✅ |
 | **ElevenLabs** | Scribe v2 | $0.01 | <150ms stream | ~93.5% FLEURS | Oui | Oui | `jona-provider-elevenlabs` | ✅ |
 | **Gladia** | Whisper-Zero | $0.010 | Temps réel | — | Oui | Oui | `jona-provider-gladia` | ✅ |
 | **Speechmatics** | Flow API | Sur devis | ~150ms | — | Oui (55+ lang) | Oui | `jona-provider-speechmatics` | ✅ |
@@ -93,7 +93,7 @@ APIs ASR avec protocole dédié (non OpenAI-compatible), chacune dans son propre
 | **Endpoint** | `POST https://api.assemblyai.com/v2/transcript` |
 | **Auth** | `authorization: ...` |
 | **Format** | **Asynchrone** 3 étapes : upload audio → create transcript → poll status |
-| **Modèles** | best, nano (léger), conformer-2 |
+| **Modèles** | universal-3-5-pro, universal-2 (moins cher) |
 | **Langues** | 99+ langues |
 | **Features** | Speaker diarization, sentiment analysis, résumés. Mode real-time streaming aussi disponible. |
 | **Crate** | `jona-provider-assemblyai` (workflow async : upload → create → poll) |
@@ -256,7 +256,7 @@ Tous exposent `/v1/chat/completions` compatible OpenAI.
 | **GitHub Copilot** | `copilot` | — | gpt-4o, gpt-4o-mini | `api.githubcopilot.com` |
 | **Gemini ASR** | `gemini-asr` | gemini-2.0-flash, gemini-2.5-flash | — | `generativelanguage.googleapis.com` |
 | **Rev.ai** | `revai` | reverb-english, reverb-foreign | — | `api.rev.ai` |
-| **AssemblyAI** | `assemblyai` | best, nano | — | `api.assemblyai.com` |
+| **AssemblyAI** | `assemblyai` | universal-3-5-pro, universal-2 | — | `api.assemblyai.com` |
 | **ElevenLabs** | `elevenlabs` | scribe_v2, scribe_v1 | — | `api.elevenlabs.io` |
 | **Cohere** | `cohere` | — | command-r-plus, command-r | `api.cohere.com` |
 | **Gladia** | `gladia` | Whisper-Zero | — | `api.gladia.io` |
