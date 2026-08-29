@@ -23,7 +23,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
 inventory = "0.3"
-ort = { version = "2.0.0-rc.13", features = ["coreml"] }
+ort = { version = "2.0.0-rc.13" }
 tokenizers = { version = "0.23", default-features = false, features = ["onig"] }
 thiserror = "2"
 
@@ -66,7 +66,6 @@ jona-engine-whisper = { path = "crates/jona-engine-whisper" }
 jona-engine-qwen = { path = "crates/jona-engine-qwen" }
 jona-engine-canary = { path = "crates/jona-engine-canary" }
 jona-engine-parakeet = { path = "crates/jona-engine-parakeet" }
-jona-engine-voxtral = { path = "crates/jona-engine-voxtral" }
 jona-engine-llama = { path = "crates/jona-engine-llama" }
 jona-engine-bert = { path = "crates/jona-engine-bert" }
 jona-engine-pcs = { path = "crates/jona-engine-pcs" }
@@ -113,6 +112,9 @@ libc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }
 jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
+# voxtral.c is vendored C + Metal shaders; its build script is macOS-only, so the
+# extern "C" symbols would be missing at link time anywhere else.
+jona-engine-voxtral = { path = "crates/jona-engine-voxtral" }
 
 core-graphics = "0.25"
 core-foundation = "0.10"

@@ -54,6 +54,28 @@ jobs:
           rm -f package-lock.json
           npm install --dry-run
 
+  # ── Rust cross-compile check (Windows) ────────────────
+  rust-windows:
+    name: Rust (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: windows-x64
+          cache-on-failure: true
+
+      # Apple-only features (metal, coreml, accelerate) and the vendored
+      # voxtral.c are gated per target; this job is what proves the gates hold.
+      - name: Check
+        working-directory: src-tauri
+        run: cargo check --workspace
+
   # ── Rust (clippy + tests) ──────────────────────────────
   rust:
     name: Rust

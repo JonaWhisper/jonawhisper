@@ -83,10 +83,13 @@ impl CandlePunctContext {
             .map_err(|e| format!("Failed to parse config.json: {e}"))?;
 
         // Select device: Metal GPU with CPU fallback
+        #[cfg(target_os = "macos")]
         let device = Device::new_metal(0).unwrap_or_else(|e| {
             log::info!("Metal unavailable ({e}), falling back to CPU");
             Device::Cpu
         });
+        #[cfg(not(target_os = "macos"))]
+        let device = Device::Cpu;
         log::info!(
             "Candle device: {}",
             if matches!(device, Device::Cpu) {
