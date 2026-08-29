@@ -292,6 +292,34 @@ impl AppState {
         }
     }
 
+    /// Store the text the user says should have come out. It lands as a final
+    /// `manual` pipeline step, so the history renders it like every other stage,
+    /// and becomes the entry's text — the corrected version is the right one.
+    pub fn set_history_correction(&self, timestamp: u64, corrected: &str) -> Result<(), rusqlite::Error> {
+        let db = self.history_db.lock().unwrap();
+        let (text, raw): (String, String) = db.query_row(
+            "SELECT text, raw_text FROM history WHERE timestamp = ?1",
+            rusqlite::params![timestamp],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+
+        let mut steps: Vec<(String, String)> =
+            serde_json::from_str(&raw).unwrap_or_default();
+        // Entries recorded before pipeline tracking have no steps to diff against.
+        if steps.is_empty() {
+            steps.push(("asr".to_string(), text));
+        }
+        steps.retain(|(name, _)| name != "manual");
+        steps.push(("manual".to_string(), corrected.to_string()));
+
+        let updated = serde_json::to_string(&steps).unwrap_or(raw);
+        db.execute(
+            "UPDATE history SET text = ?1, raw_text = ?2 WHERE timestamp = ?3",
+            rusqlite::params![corrected, updated, timestamp],
+        )?;
+        Ok(())
+    }
+
     /// Record the user's verdict on one dictation: 1 good, -1 bad, 0 clears it.
     pub fn set_history_rating(&self, timestamp: u64, rating: i8) -> Result<(), rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
@@ -444,6 +472,35 @@ mod tests {
         assert_eq!(results[0].text, "Bonjour le monde");
         assert_eq!(results[0].model_id, "whisper:large-v3");
         assert_eq!(results[0].language, "fr");
+    }
+
+    #[test]
+    fn manual_correction_lands_as_final_step_and_becomes_the_text() {
+        let state = AppState::test_instance();
+        state.add_history_at(1000, entry("Bonjour le mode", "whisper:large-v3", "fr"));
+
+        state.set_history_correction(1000, "Bonjour le monde").unwrap();
+
+        let entries = state.get_history("", 10, None).unwrap();
+        assert_eq!(entries[0].text, "Bonjour le monde");
+        let steps: Vec<(String, String)> = serde_json::from_str(&entries[0].raw_text).unwrap();
+        assert_eq!(steps[0].0, "asr", "l'original reste diffable");
+        assert_eq!(steps[0].1, "Bonjour le mode");
+        assert_eq!(steps.last().unwrap().0, "manual");
+    }
+
+    #[test]
+    fn correcting_twice_replaces_the_step() {
+        let state = AppState::test_instance();
+        state.add_history_at(1000, entry("Bonjour le mode", "whisper:large-v3", "fr"));
+
+        state.set_history_correction(1000, "premier essai").unwrap();
+        state.set_history_correction(1000, "Bonjour le monde").unwrap();
+
+        let entries = state.get_history("", 10, None).unwrap();
+        let steps: Vec<(String, String)> = serde_json::from_str(&entries[0].raw_text).unwrap();
+        assert_eq!(steps.iter().filter(|(n, _)| n == "manual").count(), 1);
+        assert_eq!(entries[0].text, "Bonjour le monde");
     }
 
     #[test]

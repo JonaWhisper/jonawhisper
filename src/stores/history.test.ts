@@ -137,6 +137,33 @@ describe('history store', () => {
     })
   })
 
+  describe('setCorrection', () => {
+    it('replaces the text and appends a manual step', async () => {
+      const store = useHistoryStore()
+      store.history = [makeEntry({ timestamp: 100, text: 'bonjour le mode', raw_text: '[["asr","bonjour le mode"]]' })]
+      mockInvoke.mockResolvedValueOnce(undefined)
+
+      await store.setCorrection(100, 'bonjour le monde')
+
+      expect(store.history[0]!.text).toBe('bonjour le monde')
+      const steps = JSON.parse(store.history[0]!.raw_text) as [string, string][]
+      expect(steps[0]).toEqual(['asr', 'bonjour le mode'])
+      expect(steps[steps.length - 1]).toEqual(['manual', 'bonjour le monde'])
+    })
+
+    it('keeps a single manual step when corrected twice', async () => {
+      const store = useHistoryStore()
+      store.history = [makeEntry({ timestamp: 100, raw_text: '[["asr","a"],["manual","b"]]' })]
+      mockInvoke.mockResolvedValueOnce(undefined)
+
+      await store.setCorrection(100, 'c')
+
+      const steps = JSON.parse(store.history[0]!.raw_text) as [string, string][]
+      expect(steps.filter(([n]) => n === 'manual')).toHaveLength(1)
+      expect(steps[steps.length - 1]).toEqual(['manual', 'c'])
+    })
+  })
+
   describe('deleteHistoryDay', () => {
     it('filters entries of the day and adjusts total', async () => {
       const store = useHistoryStore()

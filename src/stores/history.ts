@@ -70,6 +70,19 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  async function setCorrection(timestamp: number, corrected: string) {
+    try {
+      await invoke('set_history_correction', { timestamp: Math.floor(timestamp), corrected })
+      const entry = history.value.find(e => e.timestamp === timestamp)
+      if (entry) {
+        const steps: [string, string][] = entry.raw_text ? JSON.parse(entry.raw_text) : []
+        if (!steps.length) steps.push(['asr', entry.text])
+        entry.raw_text = JSON.stringify([...steps.filter(([n]) => n !== 'manual'), ['manual', corrected]])
+        entry.text = corrected
+      }
+    } catch (e) { console.error('setCorrection failed:', e) }
+  }
+
   async function deleteHistoryDay(dayTimestamp: number) {
     try {
       await invoke('delete_history_day', { dayTimestamp: Math.floor(dayTimestamp) })
@@ -91,6 +104,6 @@ export const useHistoryStore = defineStore('history', () => {
   return {
     history, total, hasMore,
     fetchHistory, loadMore, clearHistoryAction,
-    deleteHistoryEntry, deleteHistoryDay, addEntry, setRating,
+    deleteHistoryEntry, deleteHistoryDay, addEntry, setRating, setCorrection,
   }
 })
