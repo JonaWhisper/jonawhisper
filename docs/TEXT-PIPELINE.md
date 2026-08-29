@@ -478,6 +478,7 @@ BERT reste disponible comme alternative (certains utilisateurs le préfèrent po
 | **Passe unique LLM** | Un LLM local remplaçant spell+punct+GEC | Élevé | Haut |
 | **Correction sélective** | Ne corriger que les segments à faible confiance ASR | Modéré | Moyen |
 | **Ponctuation domain-adapted** | Fine-tuner sur corpus ASR oral | Élevé | Moyen |
+| **Auto-corrections orales** | Détecter les reprises du locuteur (« je veux dire X », « pardon, X ») | Modéré | Moyen |
 
 ---
 
@@ -497,8 +498,12 @@ BERT reste disponible comme alternative (certains utilisateurs le préfèrent po
 9. **Filtrage hallucinations par log-probabilité** — Token log-probs + compression ratio pour détecter les hallucinations de manière plus robuste que les listes statiques. Papers : "Whispering LLaMA" (2023), "Hallucination detection in neural ASR" (2024). Haut impact, effort modéré.
 10. ~~**Dictionnaire utilisateur / biasing contextuel**~~ — ✅ Implémenté. Panneau "Dictionnaire" avec mots protégés + mappings ITN (`pattern=replacement`).
 11. **Filtrage phonétique SymSpell** — Score Soundex/Metaphone pour filtrer les faux positifs SymSpell. Les erreurs ASR sont phonétiquement proches → SymSpell ne le sait pas. Effort modéré.
-12. **Passe unique LLM** — Un seul appel LLM local (Qwen3 4B) remplaçant spell+punct+GEC. Cohérence globale, moins de passes. Risque : latence, hallucinations LLM. Évaluer sur benchmark avant migration.
+12. **Passe unique LLM** — Un seul appel LLM local (Qwen3 4B) remplaçant spell+punct+GEC. Cohérence globale, moins de passes. Risque : latence, hallucinations LLM. Évaluer sur benchmark avant migration, en mesurant la **reproductibilité** (deux dictées proches doivent donner la même sortie) et la **latence selon la longueur** — pas seulement le WER. Rambler (CHI 2024) relève une latence GPT-4 linéaire en longueur de sortie (7 s pour 60 mots) et une sortie sans cohérence lexicale dès que l'entrée change à peine ; leurs opérations LLM aux résultats imprévisibles ont été délaissées par les participants.
 13. **Correction sélective par confiance** — Ne corriger que les segments à faible confiance ASR (Parakeet/Canary exposent des scores, Whisper non). Effort modéré.
+
+14. **Auto-corrections orales** — Détecter les reprises du locuteur en cours de dictée (« envoie ça à Marc, non, à Julien », « je veux dire X », « pardon, X ») et ne garder que la version retenue. Aujourd'hui `dictation.rs` ne traite que les commandes de ponctuation dictées, et aucune étape du pipeline ne couvre les reprises. Piste dérivée du *respeak* de Rambler (CHI 2024), transposée en one-shot : l'utilisateur ne peut pas ré-enregistrer, la reprise est déjà dans le texte.
+
+    **Réserve** : nid à faux positifs — « non, plutôt bien » n'est pas une correction. Supprimer du texte légitime coûte bien plus cher que laisser passer une reprise. À traiter en règles étroites et ancrées, jamais en heuristique large.
 
 ### Évaluations terminées — items écartés
 
@@ -512,4 +517,4 @@ BERT reste disponible comme alternative (certains utilisateurs le préfèrent po
 
 *Voir aussi : [BENCHMARK.md](BENCHMARK.md) pour les données de benchmark détaillées (WER, RTF, latences par modèle).*
 
-*Dernière mise à jour : mars 2026*
+*Dernière mise à jour : août 2026*
