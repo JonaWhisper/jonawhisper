@@ -114,6 +114,28 @@ fn activate_app() {
 #[cfg(not(target_os = "macos"))]
 fn activate_app() {}
 
+/// Types out a sentence word by word, the way the preview will once wired to
+/// the recorder, so the strip can be judged without a microphone.
+#[cfg(debug_assertions)]
+async fn simulate_subtitle(app: AppHandle) {
+    const WORDS: &[&str] = &[
+        "Alors,", "ce", "que", "je", "voudrais", "faire,", "c'est", "afficher",
+        "le", "texte", "pendant", "que", "je", "parle.",
+    ];
+    super::subtitle::open(&app);
+    let mut line = String::new();
+    for word in WORDS {
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(word);
+        super::subtitle::set_text(&app, &line);
+        tokio::time::sleep(std::time::Duration::from_millis(220)).await;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+    super::subtitle::close(&app);
+}
+
 #[cfg(debug_assertions)]
 pub fn open_pill_window(app: &AppHandle) {
     super::pill::open(app, super::pill::PillMode::Recording);
@@ -122,6 +144,7 @@ pub fn open_pill_window(app: &AppHandle) {
 pub fn close_pill_window(app: &AppHandle) {
     set_tray_state(app, "idle");
     super::pill::close(app);
+    super::subtitle::close(app);
 }
 
 // -- Tray menu --
@@ -143,6 +166,8 @@ fn build_initial_menu(app: &AppHandle) -> Result<TrayMenuState, Box<dyn std::err
             &PredefinedMenuItem::separator(app)?,
             #[cfg(debug_assertions)]
             &MenuItem::with_id(app, "test_pill", "Test Pill States", true, None::<&str>)?,
+            #[cfg(debug_assertions)]
+            &MenuItem::with_id(app, "test_subtitle", "Test Live Preview", true, None::<&str>)?,
             #[cfg(debug_assertions)]
             &MenuItem::with_id(app, "open_setup", "Setup Wizard", true, None::<&str>)?,
             #[cfg(debug_assertions)]
@@ -415,6 +440,13 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     let app_clone = app.clone();
                     tauri::async_runtime::spawn(async move {
                         crate::commands::app::simulate_pill_test(app_clone, Some(3)).await;
+                    });
+                }
+                #[cfg(debug_assertions)]
+                "test_subtitle" => {
+                    let app_clone = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        simulate_subtitle(app_clone).await;
                     });
                 }
                 "open_setup" => {
