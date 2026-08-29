@@ -3,6 +3,7 @@ use jona_types::{
     GpuMode, Language, TranscriptionResult,
 };
 use std::any::Any;
+use std::marker::PhantomData;
 use std::ffi::{c_char, c_int, c_void, CStr};
 use std::path::Path;
 
@@ -13,11 +14,23 @@ pub struct VoxCtx {
     _opaque: [u8; 0],
 }
 
+#[repr(C)]
+pub struct VoxStream {
+    _opaque: [u8; 0],
+}
+
 extern "C" {
     fn vox_load(model_dir: *const c_char) -> *mut VoxCtx;
     fn vox_free(ctx: *mut VoxCtx);
     fn vox_transcribe_audio(ctx: *mut VoxCtx, samples: *const f32, n_samples: c_int) -> *mut c_char;
     fn free(ptr: *mut c_void);
+
+    fn vox_stream_init(ctx: *mut VoxCtx) -> *mut VoxStream;
+    fn vox_stream_feed(s: *mut VoxStream, samples: *const f32, n_samples: c_int) -> c_int;
+    fn vox_stream_finish(s: *mut VoxStream) -> c_int;
+    fn vox_stream_get(s: *mut VoxStream, out_tokens: *mut *const c_char, max: c_int) -> c_int;
+    fn vox_stream_free(s: *mut VoxStream);
+    fn vox_set_processing_interval(s: *mut VoxStream, seconds: f32);
 }
 
 // Defined in voxtral_metal.m, which only builds on macOS.
@@ -76,6 +89,92 @@ pub fn load(model_dir: &Path) -> Result<VoxtralContext, EngineError> {
     Ok(VoxtralContext {
         ctx,
     })
+}
+
+// -- Streaming --
+
+/// How many token pointers `vox_stream_get` fills per call.
+const DRAIN_BATCH: usize = 32;
+
+/// Incremental transcription over one recording: feed audio as it arrives, read
+/// text back before the user stops speaking.
+///
+/// Borrows the context because the C stream holds a pointer into it — the
+/// borrow is what stops the model being freed while a stream is still live.
+pub struct VoxtralStream<'a> {
+    stream: *mut VoxStream,
+    ctx: PhantomData<&'a mut VoxtralContext>,
+}
+
+// Same reasoning as VoxtralContext: reachable only through the ContextMap mutex.
+unsafe impl Send for VoxtralStream<'_> {}
+
+impl<'a> VoxtralStream<'a> {
+    pub fn new(ctx: &'a mut VoxtralContext) -> Result<Self, EngineError> {
+        let stream = unsafe { vox_stream_init(ctx.ctx) };
+        if stream.is_null() {
+            return Err(EngineError::LaunchFailed("vox_stream_init returned null".into()));
+        }
+        Ok(Self { stream, ctx: PhantomData })
+    }
+
+    /// Minimum seconds of audio between encoder runs. Lower is more responsive
+    /// and costs more GPU; the C default is 2.0, and the first chunk always
+    /// waits for ~3s because the decoder prompt needs 312 mel frames.
+    pub fn set_interval(&mut self, seconds: f32) {
+        unsafe { vox_set_processing_interval(self.stream, seconds) };
+    }
+
+    /// Push mono f32 samples at 16 kHz. Runs the encoder and decoder on whatever
+    /// is available, queueing any text produced.
+    pub fn feed(&mut self, samples: &[f32]) -> Result<(), EngineError> {
+        if samples.is_empty() {
+            return Ok(());
+        }
+        let rc = unsafe {
+            vox_stream_feed(self.stream, samples.as_ptr(), samples.len() as c_int)
+        };
+        if rc != 0 {
+            return Err(EngineError::LaunchFailed("vox_stream_feed failed".into()));
+        }
+        Ok(())
+    }
+
+    /// Text decoded since the last call, empty when nothing new is ready.
+    pub fn drain(&mut self) -> String {
+        let mut out = String::new();
+        loop {
+            let mut slots: [*const c_char; DRAIN_BATCH] = [std::ptr::null(); DRAIN_BATCH];
+            let n = unsafe {
+                vox_stream_get(self.stream, slots.as_mut_ptr(), DRAIN_BATCH as c_int)
+            };
+            if n <= 0 {
+                return out;
+            }
+            for slot in slots.iter().take(n as usize) {
+                if slot.is_null() {
+                    continue;
+                }
+                // Owned by the stream and valid until vox_stream_free: copy, never free.
+                out.push_str(&unsafe { CStr::from_ptr(*slot) }.to_string_lossy());
+            }
+        }
+    }
+
+    /// Flush the trailing audio and return everything still queued.
+    pub fn finish(&mut self) -> Result<String, EngineError> {
+        let rc = unsafe { vox_stream_finish(self.stream) };
+        if rc != 0 {
+            return Err(EngineError::LaunchFailed("vox_stream_finish failed".into()));
+        }
+        Ok(self.drain())
+    }
+}
+
+impl Drop for VoxtralStream<'_> {
+    fn drop(&mut self) {
+        unsafe { vox_stream_free(self.stream) };
+    }
 }
 
 // -- Inference --
@@ -204,6 +303,32 @@ inventory::submit! {
 mod tests {
     use super::*;
     use jona_types::{ASREngine, DownloadType};
+
+    /// Exercises the streaming FFI end to end. Ignored by default: it needs the
+    /// 8.9 GB model on disk, so CI can never run it. Run with
+    /// `cargo test -p jona-engine-voxtral -- --ignored --nocapture` once the
+    /// model is installed.
+    #[test]
+    #[ignore]
+    fn stream_transcribes_a_silent_buffer() {
+        let model = VoxtralEngine.models().remove(0);
+        let dir = model.local_path();
+        if !dir.join("consolidated.safetensors").exists() {
+            eprintln!("SKIPPED: Voxtral model not installed at {}", dir.display());
+            return;
+        }
+
+        let mut ctx = load(&dir).expect("model should load");
+        let mut stream = VoxtralStream::new(&mut ctx).expect("stream should start");
+        stream.set_interval(0.5);
+
+        // 2 s of silence at 16 kHz: enough to drive a full feed/finish cycle.
+        let silence = vec![0.0f32; 32_000];
+        stream.feed(&silence).expect("feed should succeed");
+        let _partial = stream.drain();
+        let text = stream.finish().expect("finish should succeed");
+        println!("STREAM OUT|{text}");
+    }
 
     #[test]
     fn engine_registers_as_asr() {
