@@ -219,7 +219,10 @@ onMounted(load)
         {{ t('dictionary.suggestions.empty') }}
       </div>
 
-      <div v-else-if="suggestions.length" class="divide-y divide-panel-divider max-h-[260px] overflow-y-auto">
+      <div
+        v-else-if="suggestions.length"
+        class="divide-y divide-panel-divider max-h-[260px] overflow-y-auto pr-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-panel-scrollbar [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-track]:bg-transparent"
+      >
         <div v-for="s in suggestions" :key="s.word" class="flex items-center justify-between py-2 gap-3">
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-[13px] truncate">{{ s.word }}</span>
