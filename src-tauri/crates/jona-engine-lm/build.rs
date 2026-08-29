@@ -40,13 +40,16 @@ fn main() {
         .opt_level_str("3")
         .std("c++17")
         .define("KENLM_MAX_ORDER", "6")
-        // KenLM uses std::binary_function, removed in C++17 libc++
+        // KenLM uses std::binary_function, removed in C++17; each standard
+        // library re-enables it with its own macro.
         .define("_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION", None)
         // Include root so headers like "lm/model.hh" and "util/file.hh" resolve
         .include(kenlm_dir);
 
     if msvc {
         build.flag("/fp:fast");
+        // MSVC's equivalent: brings back auto_ptr, unary_function, binary_function...
+        build.define("_HAS_AUTO_PTR_ETC", "1");
     } else {
         build.flag("-ffast-math");
         // zlib/bzip2/lzma ship with the macOS SDK; MSVC has none of them, and
