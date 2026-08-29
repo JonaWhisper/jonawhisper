@@ -9,9 +9,17 @@ inventory.workspace = true
 jona-types = { path = "../jona-types" }
 jona-engines = { path = "../jona-engines" }
 ort.workspace = true
-candle-core = { version = "0.11", features = ["metal", "accelerate"] }
-candle-nn = { version = "0.11", features = ["metal", "accelerate"] }
-candle-transformers = { version = "0.11", features = ["metal", "accelerate"] }
 tokenizers.workspace = true
 serde_json.workspace = true
 log.workspace = true
+
+# metal/accelerate pull objc2, which refuses to build off Apple platforms.
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { version = "0.11", features = ["metal", "accelerate"] }
+candle-nn = { version = "0.11", features = ["metal", "accelerate"] }
+candle-transformers = { version = "0.11", features = ["metal", "accelerate"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+candle-core = "0.11"
+candle-nn = "0.11"
+candle-transformers = "0.11"
