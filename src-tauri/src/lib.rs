@@ -258,6 +258,7 @@ pub fn run() {
             commands::settings::get_system_locale,
             commands::settings::get_user_dict,
             commands::settings::save_user_dict,
+            commands::settings::suggest_user_dict_words,
             commands::settings::get_launch_at_login_status,
             commands::settings::set_launch_at_login,
             commands::settings::open_logs_folder,

@@ -180,6 +180,69 @@ pub fn save_user_dict(entries: Vec<UserDictEntry>) -> Result<(), String> {
     Ok(())
 }
 
+/// A word the user dictates repeatedly that no dictionary knows.
+#[derive(serde::Serialize)]
+pub struct DictSuggestion {
+    pub word: String,
+    pub count: u32,
+}
+
+/// Words worth protecting are the ones the user actually says and no dictionary
+/// covers — spell-check rewrites exactly those. Suggestions only: a recurring ASR
+/// mistake looks identical here, and freezing one into the dictionary is worse
+/// than the rewrite it would prevent.
+#[tauri::command]
+pub fn suggest_user_dict_words(
+    language: String,
+    min_count: u32,
+    state: tauri::State<'_, std::sync::Arc<crate::state::AppState>>,
+) -> Result<Vec<DictSuggestion>, String> {
+    use crate::cleanup::symspell_correct::{is_known_word, word_boundaries, MIN_CORRECTION_LEN};
+    use std::collections::HashMap;
+
+    let (texts, language) = {
+        let db = state.history_db.lock().unwrap_or_else(|e| e.into_inner());
+        // "auto" never reaches the history rows, which store the resolved language.
+        let language = if language.is_empty() || language == "auto" {
+            db.query_row(
+                "SELECT language FROM history WHERE language <> '' \
+                 GROUP BY language ORDER BY COUNT(*) DESC LIMIT 1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(|_| "no dictation history yet".to_string())?
+        } else {
+            language
+        };
+        let mut stmt = db
+            .prepare("SELECT text FROM history WHERE language = ?1")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([&language], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        (rows.filter_map(Result::ok).collect::<Vec<String>>(), language)
+    };
+
+    let mut counts: HashMap<String, u32> = HashMap::new();
+    for text in &texts {
+        for (_, word) in word_boundaries(text) {
+            if word.chars().count() >= MIN_CORRECTION_LEN && word.chars().any(|c| c.is_alphabetic())
+            {
+                *counts.entry(word.to_lowercase()).or_default() += 1;
+            }
+        }
+    }
+
+    let mut out: Vec<DictSuggestion> = counts
+        .into_iter()
+        .filter(|(word, count)| *count >= min_count && !is_known_word(word, &language))
+        .map(|(word, count)| DictSuggestion { word, count })
+        .collect();
+    out.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.word.cmp(&b.word)));
+    log::info!("User dict: {} suggestions from {} dictations", out.len(), texts.len());
+    Ok(out)
+}
+
 #[tauri::command]
 pub fn open_logs_folder() {
     let log_dir = jona_types::config_dir().join("logs");

@@ -94,6 +94,57 @@ fn is_user_word(word: &str) -> bool {
     guard.as_ref().is_some_and(|ud| ud.words.contains(&word.to_lowercase()))
 }
 
+/// The lookups a word passes before spell-check will consider rewriting it: exact
+/// match, French plural ("clous" from "clou"), French elision ("j'avais" from
+/// "avais"). Shared so the dictionary suggestions can't drift from the corrector
+/// and offer words it would never have touched.
+fn known_in_dict(ss: &SymSpell<UnicodeStringStrategy>, lower: &str) -> bool {
+    if !ss.lookup(lower, Verbosity::Top, 0).is_empty() {
+        return true;
+    }
+    if lower.ends_with('s')
+        && lower.len() > 3
+        && !ss
+            .lookup(&lower[..lower.len() - 1], Verbosity::Top, 0)
+            .is_empty()
+    {
+        return true;
+    }
+    // split_once, not find + slice: a typographic apostrophe is 3 bytes, so
+    // indexing past it lands mid-character and panics.
+    let after = lower
+        .split_once('\'')
+        .or_else(|| lower.split_once('\u{2019}'))
+        .map(|(_, a)| a);
+    matches!(after, Some(a) if a.len() >= 2 && !ss.lookup(a, Verbosity::Top, 0).is_empty())
+}
+
+/// True when a word is already covered by a dictionary — the language's own, the
+/// cross-language one, or the user's list. Used to surface the words a user says
+/// that no dictionary knows, which are the ones spell-check would rewrite.
+pub fn is_known_word(word: &str, language: &str) -> bool {
+    let lower = word.to_lowercase();
+    refresh_user_dict();
+    if is_user_word(&lower) {
+        return true;
+    }
+    // get_ss takes the cache lock itself, so both calls must land before ours.
+    if !get_ss(language) {
+        return false;
+    }
+    let cross = cross_language_code(language).filter(|cl| get_ss(cl));
+    let guard = SS_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(cache) = guard.as_ref() else {
+        return false;
+    };
+    let known = |code: &str| {
+        cache
+            .get(code)
+            .is_some_and(|ss| known_in_dict(ss, &lower))
+    };
+    known(&lang_to_code(language)) || cross.is_some_and(|cl| known(&lang_to_code(cl)))
+}
+
 /// Global cache of loaded KenLM instances keyed by language code.
 static LM_CACHE: Mutex<Option<HashMap<String, KenLMModel>>> = Mutex::new(None);
 
@@ -377,7 +428,7 @@ const CONFIDENCE_SKIP_THRESHOLD: f32 = 0.85;
 
 /// Minimum word length for correction (skip very short words that are often valid).
 /// Bumped from 3→4 to avoid false positives on common short words ("vois"→"vous", etc.)
-const MIN_CORRECTION_LEN: usize = 4;
+pub(crate) const MIN_CORRECTION_LEN: usize = 4;
 
 pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::WordConfidence]) -> (String, Vec<ProtectedWord>) {
     refresh_user_dict();
@@ -460,31 +511,9 @@ pub fn auto_correct(text: &str, language: &str, word_confidences: &[jona_types::
                 }
             }
 
-            // Check if word exists in dictionary (distance 0)
-            let exact = ss.lookup(&lower, Verbosity::Top, 0);
-            if !exact.is_empty() {
-                // Word is known — keep as-is
+            if known_in_dict(ss, &lower) {
                 result.push_str(word);
                 continue;
-            }
-
-            // French plural guard: if word ends in 's' and the stem is known, it's a valid plural
-            if lower.ends_with('s') && lower.len() > 3 {
-                let stem = &lower[..lower.len() - 1];
-                if !ss.lookup(stem, Verbosity::Top, 0).is_empty() {
-                    result.push_str(word);
-                    continue;
-                }
-            }
-
-            // French elision guard: split on apostrophe and check the main part
-            // e.g. "j'avais" → check "avais", "l'homme" → check "homme"
-            if let Some(apos_pos) = lower.find('\'').or_else(|| lower.find('\u{2019}')) {
-                let after = &lower[apos_pos + 1..];
-                if after.len() >= 2 && !ss.lookup(after, Verbosity::Top, 0).is_empty() {
-                    result.push_str(word);
-                    continue;
-                }
             }
 
             // Cross-language guard: check EN dict for anglicisms (same lock, no deadlock)
@@ -711,7 +740,7 @@ pub fn correct_compound(text: &str, language: &str) -> String {
 
 // --- Shared helpers (same as spellcheck.rs) ---
 
-fn word_boundaries(text: &str) -> Vec<(usize, &str)> {
+pub(crate) fn word_boundaries(text: &str) -> Vec<(usize, &str)> {
     let mut words = Vec::new();
     let mut start = None;
 
@@ -1352,6 +1381,24 @@ mod tests {
     fn accent_slips_are_still_corrected() {
         require_dicts!();
         assert_eq!(ac("zero", "fr"), "zéro");
+    }
+
+    /// Sans ces gardes, l'analyse de 10 925 dictées réelles remontait 393 mots
+    /// dont c'est, qu'on, t'as — des élisions que le correcteur ne touche pas.
+    #[test]
+    fn known_word_covers_elisions_and_plurals() {
+        require_dicts!();
+        assert!(is_known_word("bonjour", "fr"));
+        assert!(is_known_word("c'est", "fr"), "élision connue");
+        assert!(is_known_word("qu'on", "fr"), "élision connue");
+        assert!(!is_known_word("voxtral", "fr"), "jargon: à proposer");
+        assert!(!is_known_word("tmdb", "fr"), "jargon: à proposer");
+    }
+
+    #[test]
+    fn known_word_handles_typographic_apostrophe() {
+        require_dicts!();
+        assert!(is_known_word("c\u{2019}est", "fr"));
     }
 }
 
