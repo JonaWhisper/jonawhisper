@@ -32,6 +32,8 @@ function makePayload(overrides: Partial<SettingsPayload> = {}): SettingsPayload 
     audio_ducking_enabled: false,
     audio_ducking_level: 0.2,
     vad_enabled: true,
+    live_preview_enabled: false,
+    live_preview_model_id: '',
     punctuation_model_id: '',
     disfluency_removal_enabled: true,
     itn_enabled: true,
@@ -115,6 +117,23 @@ describe('settings store', () => {
     it('returns empty string for unknown key', () => {
       const store = useSettingsStore()
       expect(store.getSettingValue('nonexistent_key')).toBe('')
+    })
+  })
+
+  describe('live preview', () => {
+    it('defaults to off with no dedicated model', async () => {
+      const store = useSettingsStore()
+      mockInvoke.mockResolvedValueOnce(makePayload())
+      await store.fetchSettings()
+      expect(store.livePreviewEnabled).toBe(false)
+      expect(store.livePreviewModelId).toBe('')
+    })
+
+    it('persists the chosen preview model', async () => {
+      const store = useSettingsStore()
+      mockInvoke.mockResolvedValueOnce(undefined)
+      await store.setSetting('live_preview_model_id', 'parakeet:tdt-0.6b-v3-int8')
+      expect(store.livePreviewModelId).toBe('parakeet:tdt-0.6b-v3-int8')
     })
   })
 

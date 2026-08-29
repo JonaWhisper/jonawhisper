@@ -205,6 +205,8 @@ export interface SettingsPayload {
   audio_ducking_enabled: boolean
   audio_ducking_level: number
   vad_enabled: boolean
+  live_preview_enabled: boolean
+  live_preview_model_id: string
   punctuation_model_id: string
   disfluency_removal_enabled: boolean
   itn_enabled: boolean

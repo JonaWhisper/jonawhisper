@@ -581,6 +581,13 @@ pub struct Preferences {
     pub itn_enabled: bool,
     #[serde(default)]
     pub spellcheck_enabled: bool,
+    /// Show transcribed text while the user is still speaking.
+    #[serde(default)]
+    pub live_preview_enabled: bool,
+    /// Engine used for that preview. Empty means reuse the transcription model:
+    /// the preview is discarded on release, so it can afford a lighter engine.
+    #[serde(default)]
+    pub live_preview_model_id: String,
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default = "default_true")]
