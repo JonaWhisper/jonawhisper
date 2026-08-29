@@ -18,6 +18,12 @@ pub fn get_history(query: String, limit: u32, cursor: Option<u64>, state: tauri:
 }
 
 #[tauri::command]
+pub fn set_history_correction(timestamp: u64, corrected: String, state: tauri::State<'_, Arc<AppState>>) -> Result<(), AppError> {
+    state.set_history_correction(timestamp, &corrected)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn set_history_rating(timestamp: u64, rating: i8, state: tauri::State<'_, Arc<AppState>>) -> Result<(), AppError> {
     state.set_history_rating(timestamp, rating)?;
     Ok(())

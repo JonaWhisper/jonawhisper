@@ -220,6 +220,7 @@ function headerAt(index: number) {
                 :copied-timestamp="copiedTimestamp"
                 @copy="copyEntry"
                 @rate="(e, r) => historyStore.setRating(e.timestamp, r)"
+                @correct="(e, c) => historyStore.setCorrection(e.timestamp, c)"
                 @delete="deleteEntry"
               />
             </template>

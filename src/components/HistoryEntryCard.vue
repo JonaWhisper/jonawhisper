@@ -6,7 +6,7 @@ import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, Slash, ThumbsUp, ThumbsDown,
+  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, Slash, ThumbsUp, ThumbsDown, Pencil, X,
 } from 'lucide-vue-next'
 import { diffWords } from 'diff'
 
@@ -22,7 +22,27 @@ const emit = defineEmits<{
   copy: [entry: HistoryEntry]
   delete: [entry: HistoryEntry]
   rate: [entry: HistoryEntry, rating: number]
+  correct: [entry: HistoryEntry, corrected: string]
 }>()
+
+const editing = ref(false)
+const draft = ref('')
+
+function startEditing() {
+  draft.value = props.entry.text
+  editing.value = true
+}
+
+function commitEditing() {
+  const value = draft.value.trim()
+  if (value && value !== props.entry.text) emit('correct', props.entry, value)
+  editing.value = false
+}
+
+/** True once the user has supplied what the transcription should have been. */
+const hasManualCorrection = computed(() =>
+  pipelineSteps.value.some(s => s.step === 'manual'),
+)
 
 /** Clicking the active thumb clears the verdict rather than repeating it. */
 function toggleRating(value: number) {
@@ -85,7 +105,7 @@ const pipelineSteps = computed<PipelineStep[]>(() => {
 })
 
 // Substantive steps: ASR + steps that actually changed text
-const substantiveStepNames = new Set(['preprocess', 'punctuation', 'spellcheck', 'correction', 'itn'])
+const substantiveStepNames = new Set(['preprocess', 'punctuation', 'spellcheck', 'correction', 'itn', 'manual'])
 
 const substantiveSteps = computed(() => {
   const all = pipelineSteps.value
@@ -283,6 +303,18 @@ const pipelineIcons = computed<PipelineIcon[]>(() => {
     color: 'text-cyan-500',
   })
 
+  // 9. Manual correction
+  icons.push({
+    id: 'manual',
+    icon: Pencil,
+    active: hasManualCorrection.value,
+    hasDiff: stepsWithDiff.value.has('manual'),
+    noChange: false,
+    hasError: false,
+    tooltip: t('history.badge.manual'),
+    color: 'text-emerald-500',
+  })
+
   return icons
 })
 
@@ -396,6 +428,33 @@ watch(() => props.entry.timestamp, () => {
           </span>
         </div>
       </div>
+      <!-- Manual correction: what the transcription should have been -->
+      <div v-else-if="editing" class="mb-1">
+        <textarea
+          v-model="draft"
+          rows="3"
+          class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-[13px] leading-snug focus:outline-hidden focus:ring-1 focus:ring-ring"
+          @keydown.esc="editing = false"
+          @keydown.enter.meta="commitEditing"
+        />
+        <div class="flex items-center gap-2 mt-1">
+          <button
+            class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground h-6 px-2 text-[11px] hover:bg-primary/90 disabled:opacity-40"
+            :disabled="!draft.trim()"
+            @click="commitEditing"
+          >
+            <Check class="h-3 w-3" />
+            {{ t('history.correctSave') }}
+          </button>
+          <button
+            class="inline-flex items-center gap-1 rounded-md border border-input h-6 px-2 text-[11px] hover:bg-accent"
+            @click="editing = false"
+          >
+            <X class="h-3 w-3" />
+            {{ t('history.correctCancel') }}
+          </button>
+        </div>
+      </div>
       <!-- Main text: always show the final corrected version -->
       <p v-else class="text-[13px] leading-snug mb-1">{{ entry.text }}</p>
     </div>
@@ -441,6 +500,19 @@ watch(() => props.entry.timestamp, () => {
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" :side-offset="4">{{ t('history.copy') }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              :aria-label="t('aria.correct')"
+              class="w-6 h-6 flex items-center justify-center rounded hover:bg-muted/50"
+              :class="hasManualCorrection ? 'text-emerald-600' : 'text-muted-foreground hover:text-foreground'"
+              @click="startEditing"
+            >
+              <Pencil class="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('history.correct') }}</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
