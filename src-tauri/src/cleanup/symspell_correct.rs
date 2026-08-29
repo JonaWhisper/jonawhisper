@@ -1385,14 +1385,16 @@ mod tests {
 
     /// Sans ces gardes, l'analyse de 10 925 dictées réelles remontait 393 mots
     /// dont c'est, qu'on, t'as — des élisions que le correcteur ne touche pas.
+    ///
+    /// Le mot inconnu est synthétique : "voxtral" et "tmdb" ont fait échouer ce
+    /// test dès que l'utilisateur les a ajoutés à son dictionnaire personnel.
     #[test]
     fn known_word_covers_elisions_and_plurals() {
         require_dicts!();
         assert!(is_known_word("bonjour", "fr"));
         assert!(is_known_word("c'est", "fr"), "élision connue");
         assert!(is_known_word("qu'on", "fr"), "élision connue");
-        assert!(!is_known_word("voxtral", "fr"), "jargon: à proposer");
-        assert!(!is_known_word("tmdb", "fr"), "jargon: à proposer");
+        assert!(!is_known_word("qzwxvbtk", "fr"), "inconnu des dictionnaires: à proposer");
     }
 
     #[test]
