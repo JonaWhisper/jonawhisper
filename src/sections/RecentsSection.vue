@@ -189,7 +189,12 @@ function headerAt(index: number) {
       </div>
 
       <!-- Virtual-scrolled timeline -->
-      <div v-else ref="scrollEl" class="h-full overflow-auto" @scroll="onScroll">
+      <div
+        v-else
+        ref="scrollEl"
+        class="h-full overflow-auto pr-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-panel-scrollbar [&::-webkit-scrollbar-thumb]:rounded-[3px] [&::-webkit-scrollbar-track]:bg-transparent"
+        @scroll="onScroll"
+      >
         <div :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }">
           <div
             v-for="vItem in virtualizer.getVirtualItems()"
