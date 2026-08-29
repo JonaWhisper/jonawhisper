@@ -65,6 +65,7 @@ jona-provider-aws-transcribe = { path = "crates/jona-provider-aws-transcribe" }
 jona-engine-whisper = { path = "crates/jona-engine-whisper" }
 jona-engine-canary = { path = "crates/jona-engine-canary" }
 jona-engine-parakeet = { path = "crates/jona-engine-parakeet" }
+jona-engine-voxtral = { path = "crates/jona-engine-voxtral" }
 jona-engine-llama = { path = "crates/jona-engine-llama" }
 jona-engine-bert = { path = "crates/jona-engine-bert" }
 jona-engine-pcs = { path = "crates/jona-engine-pcs" }
@@ -111,10 +112,6 @@ libc = "0.2"
 [target.'cfg(target_os = "macos")'.dependencies]
 llama-cpp-2 = { version = "0.1", features = ["metal"] }
 jona-detector-claude-code = { path = "crates/jona-detector-claude-code" }
-# voxtral.c is vendored C + Metal shaders; its build script is macOS-only, so the
-# extern "C" symbols would be missing at link time anywhere else.
-jona-engine-voxtral = { path = "crates/jona-engine-voxtral" }
-
 # qwen-asr calls mmap/munmap without a platform guard, so it does not compile
 # off Unix. Revisit when the crate gains Windows support.
 jona-engine-qwen = { path = "crates/jona-engine-qwen" }
