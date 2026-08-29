@@ -29,7 +29,7 @@ thiserror = "2"
 
 [package]
 name = "jona-whisper"
-version = "0.2.0"
+version = "0.3.0"
 description = "JonaWhisper - Voice-to-text dictation"
 authors = ["Jonathan"]
 license = "GPL-3.0-or-later"

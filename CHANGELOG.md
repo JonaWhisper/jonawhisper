@@ -1,6 +1,78 @@
 # Changelog
 
 All notable changes to JonaWhisper will be documented in this file.
+## [0.3.0] - 2026-08-28
+
+### Added
+
+- **asr**: add Qwen3-ASR 1.7B, bump qwen-asr to 0.11
+- **cleanup**: add Qwen3.5 0.8B, 2B and 4B to the local LLM catalog
+- **asr**: add Canary 1B V2 with 25 European languages
+- **ui**: tell the user when only cloud transcription is available
+
+### Chore
+
+- **deps**: migrate to Tailwind 4 **BREAKING**
+- **deps**: bump typescript to 6.0 and drop deprecated baseUrl
+- **deps**: bump vite to 8.2
+- **deps**: bump pinia to 4.0
+- **deps**: bump vue-router to 5.3
+- **deps**: bump lucide-vue-next to 1.0
+- **deps**: bump @vue/tsconfig, diff and @types/node
+- **deps**: npm update within existing ranges
+- **deps**: bump prost, symspell and candle, refresh the lock
+- **deps**: bump tokenizers to 0.23, the only bump that earns its place
+- **providers**: refresh cloud model lists against current APIs
+- **deps**: bump whisper-rs to 0.16
+- **deps**: bump cpal to 0.18
+- **deps**: bump rust-i18n to 4
+- **deps**: bump reqwest to 0.13
+- **deps**: bump rusqlite to 0.40
+- **deps**: bump whoami to 2
+- **deps**: bump core-graphics to 0.25
+- **deps**: drop the legacy rustls feature from the AWS SDK crates
+- **deps**: update Rust dependencies within semver ranges
+- **deps**: update npm dependencies within semver ranges
+- **platform**: drop unused objc2-app-kit NSSound feature
+- fix clippy errors breaking CI on main
+
+### Documentation
+
+- **deps**: record why typescript and vite are held back
+- **architecture**: catch up with the audio thread removal
+- **build**: record why arm-ggml-fix.cmake must stay
+
+### Fixed
+
+- **deps**: revert vite to 7, which npm install requires
+- **asr**: use first() instead of get(0) to satisfy clippy
+- **asr**: correct Qwen3-ASR RTF figures from measurement
+- **asr**: repair Canary decoding, broken for every model
+- **ui**: keep every cached model for single-capability providers
+- **providers**: send AssemblyAI speech_models with universal model IDs
+- **deps**: clear the quinn-proto advisories
+- **platform**: play system sounds via AudioToolbox instead of NSSound
+- **platform**: eliminate zombie processes from sound playback and open commands
+- **ui**: never auto-select a cloud provider for transcription
+- **ui**: name the model's actual usage in the delete warning
+- auto-select first model when selectedModelId is empty
+- show single model inline instead of dropdown in transcription
+- add amber warning dot on Transcription nav item when no model
+- show warning when no transcription model is installed
+
+### Other
+
+- catch peer dependency conflicts npm ci cannot see
+- surface a missing updater signing key in the release summary
+
+### Refactored
+
+- **audio**: drop the audio owner thread, fix the reply desync
+
+### Style
+
+- **i18n**: escape non-ASCII in the strings this branch adds
+
 ## [0.2.0] - 2026-03-18
 
 ### Added

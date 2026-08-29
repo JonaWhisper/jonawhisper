@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/tauri.conf.json",
   "productName": "JonaWhisper",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.local.jona-whisper",
   "build": {
     "frontendDist": "../dist",
