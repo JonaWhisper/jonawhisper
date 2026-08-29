@@ -58,8 +58,18 @@ MANIFEST_URL="https://github.com/JonaWhisper/jonawhisper-spellcheck-dicts/releas
 MANIFEST_DEST="$SCRIPT_DIR/src-tauri/crates/jona-engine-spellcheck/manifest.json"
 echo "  Fetching spellcheck manifest..."
 if curl -sL --max-time 10 -o "$MANIFEST_DEST.tmp" "$MANIFEST_URL" 2>/dev/null; then
-    mv "$MANIFEST_DEST.tmp" "$MANIFEST_DEST"
-    echo "  Manifest cached: $(wc -c < "$MANIFEST_DEST" | tr -d ' ') bytes"
+    # generated_at moves on every upstream regeneration, dictionaries or not.
+    # This file is tracked and embedded via include_str!, so rewriting it on
+    # that alone left a modified file behind after every single build — enough
+    # to block a git pull. Compare everything except that timestamp.
+    strip_ts() { sed 's/"generated_at"[[:space:]]*:[[:space:]]*"[^"]*"/"generated_at":""/' "$1"; }
+    if [ -f "$MANIFEST_DEST" ] && strip_ts "$MANIFEST_DEST" | cmp -s - <(strip_ts "$MANIFEST_DEST.tmp"); then
+        rm -f "$MANIFEST_DEST.tmp"
+        echo "  Manifest unchanged"
+    else
+        mv "$MANIFEST_DEST.tmp" "$MANIFEST_DEST"
+        echo "  Manifest updated: $(wc -c < "$MANIFEST_DEST" | tr -d ' ') bytes"
+    fi
 else
     rm -f "$MANIFEST_DEST.tmp"
     echo "  Manifest fetch failed (will use embedded fallback)"
