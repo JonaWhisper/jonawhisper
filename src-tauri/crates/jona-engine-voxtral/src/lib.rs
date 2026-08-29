@@ -17,8 +17,13 @@ extern "C" {
     fn vox_load(model_dir: *const c_char) -> *mut VoxCtx;
     fn vox_free(ctx: *mut VoxCtx);
     fn vox_transcribe_audio(ctx: *mut VoxCtx, samples: *const f32, n_samples: c_int) -> *mut c_char;
-    fn vox_metal_init() -> c_int;
     fn free(ptr: *mut c_void);
+}
+
+// Defined in voxtral_metal.m, which only builds on macOS.
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn vox_metal_init() -> c_int;
 }
 
 // -- Context (cached model state) --
@@ -45,12 +50,16 @@ pub fn load(model_dir: &Path) -> Result<VoxtralContext, EngineError> {
     log::info!("Loading Voxtral model from: {}", model_dir.display());
 
     // Initialize Metal GPU acceleration
-    let metal_ok = unsafe { vox_metal_init() };
-    if metal_ok == 1 {
-        log::info!("Voxtral: Metal GPU initialized");
-    } else {
-        log::warn!("Voxtral: Metal unavailable, falling back to CPU");
+    #[cfg(target_os = "macos")]
+    {
+        if unsafe { vox_metal_init() } == 1 {
+            log::info!("Voxtral: Metal GPU initialized");
+        } else {
+            log::warn!("Voxtral: Metal unavailable, falling back to CPU");
+        }
     }
+    #[cfg(not(target_os = "macos"))]
+    log::info!("Voxtral: CPU inference (Metal is macOS-only)");
 
     let dir_cstr = std::ffi::CString::new(model_dir.to_string_lossy().as_bytes())
         .map_err(|e| EngineError::LaunchFailed(format!("Invalid path: {}", e)))?;

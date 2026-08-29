@@ -7,10 +7,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#endif
+
+/* Read-only file mapping. Windows keeps the view valid once the mapping handle
+   is closed, so unmapping there needs only the pointer. */
+static void *vox_map_readonly(const char *path, size_t *out_size) {
+#ifdef _WIN32
+    HANDLE fh = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (fh == INVALID_HANDLE_VALUE) return NULL;
+    LARGE_INTEGER sz;
+    if (!GetFileSizeEx(fh, &sz)) { CloseHandle(fh); return NULL; }
+    HANDLE mh = CreateFileMappingA(fh, NULL, PAGE_READONLY, 0, 0, NULL);
+    CloseHandle(fh);
+    if (!mh) return NULL;
+    void *p = MapViewOfFile(mh, FILE_MAP_READ, 0, 0, 0);
+    CloseHandle(mh);
+    if (!p) return NULL;
+    *out_size = (size_t)sz.QuadPart;
+    return p;
+#else
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return NULL;
+    struct stat st;
+    if (fstat(fd, &st) < 0) { close(fd); return NULL; }
+    void *p = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (p == MAP_FAILED) return NULL;
+    *out_size = (size_t)st.st_size;
+    return p;
+#endif
+}
+
+static void vox_unmap(void *p, size_t size) {
+#ifdef _WIN32
+    (void)size;
+    UnmapViewOfFile(p);
+#else
+    munmap(p, size);
+#endif
+}
 
 /* Minimal JSON parser for safetensors header */
 
@@ -202,31 +245,16 @@ static int parse_header(safetensors_file_t *sf) {
 }
 
 safetensors_file_t *safetensors_open(const char *path) {
-    int fd = open(path, O_RDONLY);
-    if (fd < 0) {
-        perror("safetensors_open: open failed");
+    size_t file_size = 0;
+    void *data = vox_map_readonly(path, &file_size);
+    if (!data) {
+        fprintf(stderr, "safetensors_open: cannot map %s\n", path);
         return NULL;
     }
 
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
-        perror("safetensors_open: fstat failed");
-        close(fd);
-        return NULL;
-    }
-
-    size_t file_size = (size_t)st.st_size;
     if (file_size < 8) {
         fprintf(stderr, "safetensors_open: file too small\n");
-        close(fd);
-        return NULL;
-    }
-
-    void *data = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    close(fd);
-
-    if (data == MAP_FAILED) {
-        perror("safetensors_open: mmap failed");
+        vox_unmap(data, file_size);
         return NULL;
     }
 
@@ -236,13 +264,13 @@ safetensors_file_t *safetensors_open(const char *path) {
 
     if (header_size > file_size - 8) {
         fprintf(stderr, "safetensors_open: invalid header size\n");
-        munmap(data, file_size);
+        vox_unmap(data, file_size);
         return NULL;
     }
 
     safetensors_file_t *sf = calloc(1, sizeof(safetensors_file_t));
     if (!sf) {
-        munmap(data, file_size);
+        vox_unmap(data, file_size);
         return NULL;
     }
 
@@ -285,7 +313,7 @@ safetensors_file_t *safetensors_open(const char *path) {
 
 void safetensors_close(safetensors_file_t *sf) {
     if (!sf) return;
-    if (sf->data) munmap(sf->data, sf->file_size);
+    if (sf->data) vox_unmap(sf->data, sf->file_size);
     free(sf->path);
     free(sf->header_json);
     free(sf);
