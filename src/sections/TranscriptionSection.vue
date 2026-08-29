@@ -11,6 +11,7 @@ import {
 import SegmentedToggle from '@/components/SegmentedToggle.vue'
 import CloudModelPicker from '@/components/CloudModelPicker.vue'
 import ModelOption from '@/components/ModelOption.vue'
+import SettingToggle from '@/components/SettingToggle.vue'
 import { TriangleAlert, Cloud } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -34,6 +35,22 @@ async function onLanguageChange(value: string | number | bigint | Record<string,
 async function onGpuModeChange(mode: string) {
   await settings.setSetting('gpu_mode', mode)
 }
+
+function onToggle(v: boolean, key: string) {
+  settings.setSetting(key, String(v))
+}
+
+/** Empty means "reuse the transcription model" — the preview is thrown away anyway. */
+async function onPreviewModelChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await settings.setSetting('live_preview_model_id', value === SAME_AS_ASR ? '' : value)
+}
+
+const SAME_AS_ASR = '__same__'
+
+const previewModelValue = computed(() => settings.livePreviewModelId || SAME_AS_ASR)
+
+const localAsrModels = computed(() => engines.asrModels.filter(m => m.group === 'local'))
 
 const {
   selectedProvider: asrSelectedProvider,
@@ -186,6 +203,39 @@ onMounted(() => {
           ]"
           @update:model-value="onGpuModeChange"
         />
+      </div>
+    </div>
+
+    <!-- Live preview -->
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">
+        {{ t('settings.transcription.livePreview') }}
+      </div>
+
+      <SettingToggle
+        setting-key="live_preview_enabled"
+        :model-value="settings.livePreviewEnabled"
+        :label="t('settings.transcription.livePreviewLabel')"
+        :border-top="false"
+        @update:model-value="onToggle"
+      />
+
+      <div v-if="settings.livePreviewEnabled" class="flex items-center justify-between gap-3 pt-2.5 mt-2.5 border-t border-panel-divider">
+        <div class="min-w-0">
+          <div class="text-[13px]">{{ t('settings.transcription.livePreviewModel') }}</div>
+          <div class="text-[11px] text-muted-foreground">{{ t('settings.transcription.livePreviewHint') }}</div>
+        </div>
+        <Select :model-value="previewModelValue" @update:model-value="onPreviewModelChange">
+          <SelectTrigger class="w-auto min-w-[180px] h-8 text-xs shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem :value="SAME_AS_ASR">{{ t('settings.transcription.livePreviewSame') }}</SelectItem>
+            <SelectItem v-for="m in localAsrModels" :key="m.id" :value="m.id">
+              <ModelOption :label="m.label" location="local" />
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   </div>
