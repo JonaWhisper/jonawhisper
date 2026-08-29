@@ -94,7 +94,7 @@ cp -R "$APP_PATH" "$DIST_DIR/"
 echo "  .app → $DIST_DIR/${APP_NAME}.app"
 
 # Copy DMG if it exists
-DMG_FILE=$(find "$BUNDLE_DIR/dmg/" -name "*.dmg" -type f 2>/dev/null | head -1)
+DMG_FILE=$(find "$BUNDLE_DIR/dmg/" -name "*.dmg" -type f 2>/dev/null | head -1 || true)
 if [ -n "$DMG_FILE" ]; then
     cp "$DMG_FILE" "$DIST_DIR/${APP_NAME}.dmg"
     echo "  .dmg → $DIST_DIR/${APP_NAME}.dmg"
