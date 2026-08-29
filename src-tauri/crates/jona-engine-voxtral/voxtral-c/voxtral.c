@@ -19,13 +19,10 @@
 #include <ctype.h>
 #include <math.h>
 #ifdef _WIN32
+/* struct timeval comes from winsock, not from windows.h. Including winsock2.h
+   first is what stops windows.h from pulling in the conflicting winsock.h. */
+#include <winsock2.h>
 #include <windows.h>
-/* windows.h pulls in winsock.h, which already defines struct timeval behind
-   this guard; define it only when some SDK layout did not. */
-#ifndef _TIMEVAL_DEFINED
-#define _TIMEVAL_DEFINED
-struct timeval { long tv_sec; long tv_usec; };
-#endif
 static int gettimeofday(struct timeval *tv, void *tz) {
     (void)tz;
     FILETIME ft;

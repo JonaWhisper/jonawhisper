@@ -26,9 +26,10 @@ closed, so unmapping needs only the pointer.
 ### `voxtral.c` — `gettimeofday`
 
 There is no `gettimeofday` on Windows, so under `_WIN32` the file supplies one
-backed by `GetSystemTimeAsFileTime`. `struct timeval` itself comes from
-`winsock.h`, which `windows.h` pulls in; we define it only behind
-`_TIMEVAL_DEFINED`, the guard that header uses. Timing only — it feeds the
+backed by `GetSystemTimeAsFileTime`. `struct timeval` is not ours to declare:
+SDK 10.0.26100 declares it in `winsock.h:108` behind no reusable guard, so the
+file includes `winsock2.h` before `windows.h` — that order is what makes
+`windows.h` skip the conflicting `winsock.h`. Timing only — it feeds the
 `encoder_ms` counters.
 
 ### `voxtral_kernels.c` — the fourth `cblas_sgemm`
