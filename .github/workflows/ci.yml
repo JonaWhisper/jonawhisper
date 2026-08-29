@@ -70,11 +70,12 @@ jobs:
           shared-key: windows-x64
           cache-on-failure: true
 
-      # Apple-only features (metal, coreml, accelerate) and the vendored
-      # voxtral.c are gated per target; this job is what proves the gates hold.
+      # -p jona-whisper, not --workspace: engine crates that cannot build off
+      # macOS (voxtral, qwen) stay workspace members but are gated out of the
+      # binary's dependencies, and --workspace would compile them anyway.
       - name: Check
         working-directory: src-tauri
-        run: cargo check --workspace
+        run: cargo check -p jona-whisper
 
   # ── Rust (clippy + tests) ──────────────────────────────
   rust:
