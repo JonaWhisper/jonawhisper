@@ -42,7 +42,14 @@ fn main() {
         }
     }
 
-    tauri_build::build()
+    // Windows resolves char* paths through the process ANSI code page, while
+    // Rust hands the C engines UTF-8: without this manifest an accented
+    // Windows account name makes model loading fail. Needs Windows 10 1903+.
+    println!("cargo:rerun-if-changed=windows-app-manifest.xml");
+    let windows = tauri_build::WindowsAttributes::new()
+        .app_manifest(include_str!("windows-app-manifest.xml"));
+    tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
+        .expect("failed to run tauri-build")
 }
 
 /// Scan Cargo.toml for `jona-engine-*`, `jona-provider-*` and `jona-detector-*`
