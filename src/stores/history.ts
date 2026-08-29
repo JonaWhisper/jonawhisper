@@ -58,6 +58,18 @@ export const useHistoryStore = defineStore('history', () => {
     } catch (e) { console.error('deleteHistoryEntry failed:', e) }
   }
 
+  async function setRating(timestamp: number, rating: number) {
+    const entry = history.value.find(e => e.timestamp === timestamp)
+    const previous = entry?.rating ?? 0
+    if (entry) entry.rating = rating
+    try {
+      await invoke('set_history_rating', { timestamp: Math.floor(timestamp), rating })
+    } catch (e) {
+      if (entry) entry.rating = previous
+      console.error('setRating failed:', e)
+    }
+  }
+
   async function deleteHistoryDay(dayTimestamp: number) {
     try {
       await invoke('delete_history_day', { dayTimestamp: Math.floor(dayTimestamp) })
@@ -79,6 +91,6 @@ export const useHistoryStore = defineStore('history', () => {
   return {
     history, total, hasMore,
     fetchHistory, loadMore, clearHistoryAction,
-    deleteHistoryEntry, deleteHistoryDay, addEntry,
+    deleteHistoryEntry, deleteHistoryDay, addEntry, setRating,
   }
 })

@@ -27,6 +27,7 @@ function makeEntry(overrides: Partial<HistoryEntry> = {}): HistoryEntry {
     itn: false,
     raw_text: '',
     word_scores: '',
+    rating: 0,
     ...overrides,
   }
 }
@@ -110,6 +111,29 @@ describe('history store', () => {
       expect(store.history).toHaveLength(1)
       expect(store.history[0]!.timestamp).toBe(200)
       expect(store.total).toBe(4)
+    })
+  })
+
+  describe('setRating', () => {
+    it('stores the verdict and persists it', async () => {
+      const store = useHistoryStore()
+      store.history = [makeEntry({ timestamp: 100 })]
+      mockInvoke.mockResolvedValueOnce(undefined)
+
+      await store.setRating(100, -1)
+
+      expect(store.history[0]!.rating).toBe(-1)
+      expect(mockInvoke).toHaveBeenCalledWith('set_history_rating', { timestamp: 100, rating: -1 })
+    })
+
+    it('rolls back when the backend rejects', async () => {
+      const store = useHistoryStore()
+      store.history = [makeEntry({ timestamp: 100, rating: 1 })]
+      mockInvoke.mockRejectedValueOnce(new Error('nope'))
+
+      await store.setRating(100, -1)
+
+      expect(store.history[0]!.rating).toBe(1)
     })
   })
 

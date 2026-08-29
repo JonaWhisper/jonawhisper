@@ -205,6 +205,9 @@ pub struct HistoryEntry {
     /// Per-word confidence scores as JSON (e.g. [["word", 0.95], ["hello", 0.8]]).
     #[serde(default)]
     pub word_scores: String,
+    /// User verdict on this dictation: 1 good, -1 bad, 0 not rated.
+    #[serde(default)]
+    pub rating: i8,
 }
 
 // -- Typed settings enums --

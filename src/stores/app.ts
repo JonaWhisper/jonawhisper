@@ -94,6 +94,7 @@ export const useAppStore = defineStore('app', () => {
           itn: event.payload.itn ?? false,
           raw_text: event.payload.raw_text ?? '',
           word_scores: event.payload.word_scores ?? '',
+          rating: 0,
         })
       }
     }).then(fn => unlistenFns.push(fn))

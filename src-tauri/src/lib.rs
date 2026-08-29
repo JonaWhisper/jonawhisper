@@ -241,6 +241,7 @@ pub fn run() {
             commands::engines::cancel_download,
             commands::engines::get_languages,
             commands::history::get_history,
+            commands::history::set_history_rating,
             commands::history::delete_history_entry,
             commands::history::delete_history_day,
             commands::history::clear_history,

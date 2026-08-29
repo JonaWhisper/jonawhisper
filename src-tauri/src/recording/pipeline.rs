@@ -496,6 +496,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         itn: itn_enabled,
         raw_text: raw_text.clone(),
         word_scores: word_scores_json.clone(),
+        rating: 0,
     });
     platform::play_sound("Glass");
 

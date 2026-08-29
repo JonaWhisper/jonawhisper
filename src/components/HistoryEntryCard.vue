@@ -6,7 +6,7 @@ import { parseCloudId } from '@/stores/types'
 import type { HistoryEntry } from '@/stores/types'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
-  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, Slash,
+  Copy, Check, Trash2, Mic, Scissors, ShieldCheck, Eraser, Type, BookA, SpellCheck, MessageSquare, Cloud, Hash, ChevronRight, Slash, ThumbsUp, ThumbsDown,
 } from 'lucide-vue-next'
 import { diffWords } from 'diff'
 
@@ -21,7 +21,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   copy: [entry: HistoryEntry]
   delete: [entry: HistoryEntry]
+  rate: [entry: HistoryEntry, rating: number]
 }>()
+
+/** Clicking the active thumb clears the verdict rather than repeating it. */
+function toggleRating(value: number) {
+  emit('rate', props.entry, props.entry.rating === value ? 0 : value)
+}
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp * 1000)
@@ -393,8 +399,34 @@ watch(() => props.entry.timestamp, () => {
       <!-- Main text: always show the final corrected version -->
       <p v-else class="text-[13px] leading-snug mb-1">{{ entry.text }}</p>
     </div>
-    <div class="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pt-0.5">
+    <div class="flex gap-1 shrink-0 transition-opacity pt-0.5" :class="entry.rating ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
       <TooltipProvider :delay-duration="300">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              :aria-label="t('aria.rateGood')"
+              class="w-6 h-6 flex items-center justify-center rounded hover:bg-muted/50"
+              :class="entry.rating === 1 ? 'text-green-600' : 'text-muted-foreground hover:text-green-600'"
+              @click="toggleRating(1)"
+            >
+              <ThumbsUp class="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('history.rateGood') }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              :aria-label="t('aria.rateBad')"
+              class="w-6 h-6 flex items-center justify-center rounded hover:bg-muted/50"
+              :class="entry.rating === -1 ? 'text-destructive' : 'text-muted-foreground hover:text-destructive'"
+              @click="toggleRating(-1)"
+            >
+              <ThumbsDown class="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" :side-offset="4">{{ t('history.rateBad') }}</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
             <button :aria-label="t('aria.copy')" class="relative w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50" @click="emit('copy', entry)">

@@ -219,6 +219,7 @@ function headerAt(index: number) {
                 :entry="entryAt(vItem.index)"
                 :copied-timestamp="copiedTimestamp"
                 @copy="copyEntry"
+                @rate="(e, r) => historyStore.setRating(e.timestamp, r)"
                 @delete="deleteEntry"
               />
             </template>

@@ -26,34 +26,46 @@ pub struct AppState {
     pub detected_providers: Mutex<Vec<Provider>>,
 }
 
+/// Shared by production and tests: a test table built by hand drifts from this one,
+/// and every reader indexes columns positionally.
+fn init_history_schema(conn: &Connection) {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS history (
+             timestamp INTEGER NOT NULL,
+             text TEXT NOT NULL,
+             model_id TEXT NOT NULL DEFAULT '',
+             language TEXT NOT NULL DEFAULT ''
+         );
+         CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);",
+    )
+    .expect("Failed to initialize history schema");
+
+    // Additive migrations: each is a no-op once the column exists.
+    for stmt in [
+        "ALTER TABLE history ADD COLUMN cleanup_model_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE history ADD COLUMN hallucination_filter INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE history ADD COLUMN vad_trimmed INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE history ADD COLUMN punctuation_model_id TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE history ADD COLUMN spellcheck INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE history ADD COLUMN disfluency_removal INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE history ADD COLUMN itn INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE history ADD COLUMN raw_text TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE history ADD COLUMN word_scores TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE history ADD COLUMN rating INTEGER NOT NULL DEFAULT 0",
+    ] {
+        let _ = conn.execute(stmt, []);
+    }
+}
+
 fn open_history_db() -> Connection {
     let dir = config_dir();
     let _ = std::fs::create_dir_all(&dir);
     let db_path = dir.join(HISTORY_DB);
     let conn = Connection::open(&db_path).expect("Failed to open history database");
 
-    conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA synchronous = NORMAL;
-         CREATE TABLE IF NOT EXISTS history (
-             timestamp INTEGER NOT NULL,
-             text TEXT NOT NULL,
-             model_id TEXT NOT NULL DEFAULT '',
-             language TEXT NOT NULL DEFAULT ''
-         );
-         CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);"
-    ).expect("Failed to initialize history schema");
-
-    // Additive migrations
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN cleanup_model_id TEXT NOT NULL DEFAULT ''", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN hallucination_filter INTEGER NOT NULL DEFAULT 0", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN vad_trimmed INTEGER NOT NULL DEFAULT 0", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN punctuation_model_id TEXT NOT NULL DEFAULT ''", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN spellcheck INTEGER NOT NULL DEFAULT 0", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN disfluency_removal INTEGER NOT NULL DEFAULT 0", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN itn INTEGER NOT NULL DEFAULT 0", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN raw_text TEXT NOT NULL DEFAULT ''", []);
-    let _ = conn.execute("ALTER TABLE history ADD COLUMN word_scores TEXT NOT NULL DEFAULT ''", []);
+    conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")
+        .expect("Failed to set history pragmas");
+    init_history_schema(&conn);
 
     // Migrate legacy history.json if it exists
     let json_path = dir.join(HISTORY_JSON_LEGACY);
@@ -280,9 +292,19 @@ impl AppState {
         }
     }
 
+    /// Record the user's verdict on one dictation: 1 good, -1 bad, 0 clears it.
+    pub fn set_history_rating(&self, timestamp: u64, rating: i8) -> Result<(), rusqlite::Error> {
+        let db = self.history_db.lock().unwrap();
+        db.execute(
+            "UPDATE history SET rating = ?1 WHERE timestamp = ?2",
+            rusqlite::params![rating, timestamp],
+        )?;
+        Ok(())
+    }
+
     pub fn get_history(&self, query: &str, limit: u32, cursor: Option<u64>) -> Result<Vec<HistoryEntry>, rusqlite::Error> {
         let db = self.history_db.lock().unwrap();
-        const COLS: &str = "timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn, raw_text, word_scores";
+        const COLS: &str = "timestamp, text, model_id, language, cleanup_model_id, hallucination_filter, vad_trimmed, punctuation_model_id, spellcheck, disfluency_removal, itn, raw_text, word_scores, rating";
         let (sql, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match (query.is_empty(), cursor) {
             (true, None) => (
                 format!("SELECT {COLS} FROM history ORDER BY timestamp DESC LIMIT ?1"),
@@ -326,6 +348,7 @@ impl AppState {
                 itn: row.get(10)?,
                 raw_text: row.get(11)?,
                 word_scores: row.get(12)?,
+                rating: row.get(13)?,
             })
         })?.filter_map(|r| r.ok()).collect();
         Ok(entries)
@@ -370,24 +393,7 @@ impl AppState {
     /// Create an AppState with in-memory SQLite for testing.
     pub(crate) fn test_instance() -> Self {
         let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS history (
-                 timestamp INTEGER NOT NULL,
-                 text TEXT NOT NULL,
-                 model_id TEXT NOT NULL DEFAULT '',
-                 language TEXT NOT NULL DEFAULT '',
-                 cleanup_model_id TEXT NOT NULL DEFAULT '',
-                 hallucination_filter INTEGER NOT NULL DEFAULT 0,
-                 vad_trimmed INTEGER NOT NULL DEFAULT 0,
-                 punctuation_model_id TEXT NOT NULL DEFAULT '',
-                 spellcheck INTEGER NOT NULL DEFAULT 0,
-                 disfluency_removal INTEGER NOT NULL DEFAULT 0,
-                 itn INTEGER NOT NULL DEFAULT 0,
-                 raw_text TEXT NOT NULL DEFAULT '',
-                 word_scores TEXT NOT NULL DEFAULT ''
-             );
-             CREATE INDEX IF NOT EXISTS idx_history_timestamp ON history(timestamp DESC);"
-        ).unwrap();
+        init_history_schema(&conn);
         Self {
             runtime: Mutex::new(RuntimeState::default()),
             download: Arc::new(Mutex::new(DownloadState::default())),
@@ -438,6 +444,19 @@ mod tests {
         assert_eq!(results[0].text, "Bonjour le monde");
         assert_eq!(results[0].model_id, "whisper:large-v3");
         assert_eq!(results[0].language, "fr");
+    }
+
+    #[test]
+    fn rating_defaults_to_zero_and_round_trips() {
+        let state = AppState::test_instance();
+        state.add_history_at(1000, entry("Bonjour", "whisper:large-v3", "fr"));
+        assert_eq!(state.get_history("", 10, None).unwrap()[0].rating, 0);
+
+        state.set_history_rating(1000, -1).unwrap();
+        assert_eq!(state.get_history("", 10, None).unwrap()[0].rating, -1);
+
+        state.set_history_rating(1000, 0).unwrap();
+        assert_eq!(state.get_history("", 10, None).unwrap()[0].rating, 0);
     }
 
     #[test]
