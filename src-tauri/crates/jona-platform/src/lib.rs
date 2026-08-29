@@ -44,8 +44,20 @@ pub use macos::*;
 pub mod audio_devices {
     use serde::{Deserialize, Serialize};
 
+    // Same variants as the macOS enum: shared code (menu_icons) matches on all
+    // of them, and USB/Bluetooth/HDMI are not macOS concepts.
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-    pub enum AudioTransportType { Unknown }
+    #[allow(clippy::upper_case_acronyms)]
+    pub enum AudioTransportType {
+        BuiltIn,
+        USB,
+        Bluetooth,
+        Virtual,
+        Aggregate,
+        Thunderbolt,
+        HDMI,
+        Unknown,
+    }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct AudioDevice {

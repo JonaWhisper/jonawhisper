@@ -54,10 +54,10 @@ fn main() {
         build.flag("-ffast-math");
         // zlib/bzip2/lzma ship with the macOS SDK; MSVC has none of them, and
         // KenLM only needs them to read compressed ARPA text, not .binary models.
+        // KenLM tests HAVE_XZLIB, never HAVE_LZMA — the latter was a no-op.
         build
             .define("HAVE_ZLIB", None)
-            .define("HAVE_BZLIB", None)
-            .define("HAVE_LZMA", None);
+            .define("HAVE_BZLIB", None);
     }
 
     for src in &sources {
@@ -70,7 +70,6 @@ fn main() {
         // Compression libraries (available in the macOS SDK)
         println!("cargo:rustc-link-lib=z");
         println!("cargo:rustc-link-lib=bz2");
-        println!("cargo:rustc-link-lib=lzma");
         // C++ standard library; MSVC links its own automatically
         println!("cargo:rustc-link-lib=c++");
     }
