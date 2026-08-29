@@ -56,6 +56,8 @@ export interface HistoryEntry {
   raw_text: string
   /** Per-word confidence scores as JSON array of [word, score] tuples */
   word_scores: string
+  /** User verdict: 1 good, -1 bad, 0 not rated */
+  rating: number
 }
 
 export type ProviderKind = string
