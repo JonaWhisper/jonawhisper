@@ -89,7 +89,8 @@ The bundled face is **Inter Regular** (`src-tauri/fonts/`), under the SIL Open F
 
 | Crate | Role | Why this one |
 |-------|------|--------------|
-| [`windows-sys`](https://github.com/microsoft/windows-rs) | Win32 FFI | Low-level hotkey hook (`WH_KEYBOARD_LL`), paste simulation (`SendInput`), and the pill's layered overlay window (`UpdateLayeredWindow`). Raw C-style bindings rather than the `windows` crate: no COM wrappers or RAII types needed here, and it compiles far faster |
+| [`windows-sys`](https://github.com/microsoft/windows-rs) | Win32 FFI | Low-level hotkey hook (`WH_KEYBOARD_LL`), paste simulation (`SendInput`), the layered overlay windows (`UpdateLayeredWindow`), registry access (launch at login, microphone consent) and system cues (`PlaySoundW`). Raw C-style bindings, which is all these need |
+| [`windows`](https://github.com/microsoft/windows-rs) | COM interfaces | Audio ducking only: `IMMDeviceEnumerator` and `IAudioEndpointVolume` are COM, and `windows-sys` carries only the C-style API. Kept to three features so the rest of the metadata is never compiled |
 
 ### macOS Platform (behind `cfg(target_os = "macos")`)
 
