@@ -108,27 +108,35 @@ pub fn toggle_key_down(rec: &mut RecordingState) {
     rec.toggle_press_time = Some(std::time::Instant::now());
 }
 
-/// Toggle mode, key released while recording: a brief press stops and
-/// transcribes, a longer one pauses or resumes.
+/// Toggle mode, key released while recording. A brief press does the obvious
+/// thing for the current state — stop while speaking, resume while paused — and
+/// a long press does the other one. Resuming is a tap because that is the
+/// reflex; pausing needs the deliberate gesture because it is the rarer intent.
 pub fn toggle_key_up(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
     let held = rec.toggle_press_time.take().map(|t| t.elapsed());
     let is_short = held
         .map(|d| d < Duration::from_millis(SHORT_TAP_MS))
         .unwrap_or(true);
+    let is_paused = rec.paused.load(Ordering::Relaxed);
 
-    if is_short {
-        stop_recording_and_enqueue(app, state, rec);
-        return;
+    match (is_paused, is_short) {
+        // Speaking: tap stops, hold pauses.
+        (false, true) => stop_recording_and_enqueue(app, state, rec),
+        (false, false) => set_paused(rec, true),
+        // Paused: tap resumes, hold stops.
+        (true, true) => set_paused(rec, false),
+        (true, false) => stop_recording_and_enqueue(app, state, rec),
     }
+}
 
-    let now_paused = !rec.paused.load(Ordering::Relaxed);
-    rec.paused.store(now_paused, Ordering::Relaxed);
-    crate::ui::pill::set_mode(if now_paused {
+fn set_paused(rec: &mut RecordingState, paused: bool) {
+    rec.paused.store(paused, Ordering::Relaxed);
+    crate::ui::pill::set_mode(if paused {
         crate::ui::pill::PillMode::Paused
     } else {
         crate::ui::pill::PillMode::Recording
     });
-    log::info!("Recording {}", if now_paused { "paused" } else { "resumed" });
+    log::info!("Recording {}", if paused { "paused" } else { "resumed" });
 }
 
 pub fn stop_recording_and_enqueue(
