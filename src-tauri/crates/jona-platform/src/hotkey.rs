@@ -468,20 +468,100 @@ pub fn start_monitor(
 
 // -- TapState: shared between CGEvent callback and hotkey thread --
 
+/// One shortcut, stored as atomics so the CGEvent callback can read it without
+/// locking. Every shortcut the tap watches uses this — duplicating the four
+/// fields per shortcut is what made adding a third one expensive.
+#[cfg(target_os = "macos")]
+struct ShortcutSlot {
+    keys_packed: AtomicU64,
+    key_count: AtomicU8,
+    modifiers: AtomicU64,
+    kind: AtomicU8, // 0=ModifierOnly, 1=Combo, 2=Key
+}
+
+#[cfg(target_os = "macos")]
+impl ShortcutSlot {
+    fn new(s: &Shortcut) -> Self {
+        let (packed, count) = pack_keys(&s.key_codes);
+        Self {
+            keys_packed: AtomicU64::new(packed),
+            key_count: AtomicU8::new(count),
+            modifiers: AtomicU64::new(s.modifiers),
+            kind: AtomicU8::new(kind_to_u8(s.kind)),
+        }
+    }
+
+    fn load(&self) -> Shortcut {
+        Shortcut {
+            key_codes: unpack_keys(
+                self.keys_packed.load(Ordering::SeqCst),
+                self.key_count.load(Ordering::SeqCst),
+            ),
+            modifiers: self.modifiers.load(Ordering::SeqCst),
+            kind: u8_to_kind(self.kind.load(Ordering::SeqCst)),
+        }
+    }
+
+    fn store(&self, s: &Shortcut) {
+        let (packed, count) = pack_keys(&s.key_codes);
+        self.keys_packed.store(packed, Ordering::SeqCst);
+        self.key_count.store(count, Ordering::SeqCst);
+        self.modifiers.store(s.modifiers, Ordering::SeqCst);
+        self.kind.store(kind_to_u8(s.kind), Ordering::SeqCst);
+    }
+}
+
+/// Does this shortcut fire for the keys currently down? Combo also requires its
+/// modifiers; a plain Key requires none, so it cannot swallow Cmd+key.
+#[cfg(target_os = "macos")]
+fn shortcut_matches(shortcut: &Shortcut, pressed_p: u64, pressed_c: u8, mod_flags: u64) -> bool {
+    if shortcut.is_disabled() {
+        return false;
+    }
+    let (want_p, want_c) = pack_keys(&shortcut.key_codes);
+    if !packed_contains_all(pressed_p, pressed_c, want_p, want_c) {
+        return false;
+    }
+    match shortcut.kind {
+        ShortcutKind::Combo => (mod_flags & shortcut.modifiers) == shortcut.modifiers,
+        ShortcutKind::Key => mod_flags == 0,
+        ShortcutKind::ModifierOnly => false,
+    }
+}
+
+/// ModifierOnly shortcuts match against the modifier keys held, not the regular ones.
+#[cfg(target_os = "macos")]
+fn modifier_shortcut_matches(shortcut: &Shortcut, pressed_p: u64, pressed_c: u8) -> bool {
+    if shortcut.is_disabled() || shortcut.kind != ShortcutKind::ModifierOnly {
+        return false;
+    }
+    let (want_p, want_c) = pack_keys(&shortcut.key_codes);
+    packed_contains_all(pressed_p, pressed_c, want_p, want_c)
+}
+
+#[cfg(target_os = "macos")]
+fn kind_to_u8(kind: ShortcutKind) -> u8 {
+    match kind {
+        ShortcutKind::ModifierOnly => 0,
+        ShortcutKind::Combo => 1,
+        ShortcutKind::Key => 2,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn u8_to_kind(v: u8) -> ShortcutKind {
+    match v {
+        0 => ShortcutKind::ModifierOnly,
+        1 => ShortcutKind::Combo,
+        _ => ShortcutKind::Key,
+    }
+}
+
 #[cfg(target_os = "macos")]
 struct TapState {
-    // Record shortcut (atomics for lock-free callback access)
-    rec_keys_packed: AtomicU64,
-    rec_key_count: AtomicU8,
-    rec_modifiers: AtomicU64,
-    rec_kind: AtomicU8, // 0=ModifierOnly, 1=Combo, 2=Key
+    record: ShortcutSlot,
     rec_held: AtomicBool,
-
-    // Cancel shortcut
-    cancel_keys_packed: AtomicU64,
-    cancel_key_count: AtomicU8,
-    cancel_modifiers: AtomicU64,
-    cancel_kind: AtomicU8,
+    cancel: ShortcutSlot,
 
     // Currently pressed keys (for multi-key matching in normal mode)
     pressed_keys_packed: AtomicU64,
@@ -497,59 +577,11 @@ struct TapState {
 
 #[cfg(target_os = "macos")]
 impl TapState {
-    fn kind_to_u8(kind: ShortcutKind) -> u8 {
-        match kind {
-            ShortcutKind::ModifierOnly => 0,
-            ShortcutKind::Combo => 1,
-            ShortcutKind::Key => 2,
-        }
-    }
-
-    fn u8_to_kind(v: u8) -> ShortcutKind {
-        match v {
-            0 => ShortcutKind::ModifierOnly,
-            1 => ShortcutKind::Combo,
-            _ => ShortcutKind::Key,
-        }
-    }
-
-    fn load_rec_shortcut(&self) -> Shortcut {
-        let packed = self.rec_keys_packed.load(Ordering::SeqCst);
-        let count = self.rec_key_count.load(Ordering::SeqCst);
-        Shortcut {
-            key_codes: unpack_keys(packed, count),
-            modifiers: self.rec_modifiers.load(Ordering::SeqCst),
-            kind: Self::u8_to_kind(self.rec_kind.load(Ordering::SeqCst)),
-        }
-    }
-
-    fn store_rec_shortcut(&self, s: &Shortcut) {
-        let (packed, count) = pack_keys(&s.key_codes);
-        self.rec_keys_packed.store(packed, Ordering::SeqCst);
-        self.rec_key_count.store(count, Ordering::SeqCst);
-        self.rec_modifiers.store(s.modifiers, Ordering::SeqCst);
-        self.rec_kind
-            .store(Self::kind_to_u8(s.kind), Ordering::SeqCst);
+    /// Storing a record shortcut also clears the held flag: the old shortcut's
+    /// key-up will never arrive.
+    fn store_record(&self, s: &Shortcut) {
+        self.record.store(s);
         self.rec_held.store(false, Ordering::SeqCst);
-    }
-
-    fn load_cancel_shortcut(&self) -> Shortcut {
-        let packed = self.cancel_keys_packed.load(Ordering::SeqCst);
-        let count = self.cancel_key_count.load(Ordering::SeqCst);
-        Shortcut {
-            key_codes: unpack_keys(packed, count),
-            modifiers: self.cancel_modifiers.load(Ordering::SeqCst),
-            kind: Self::u8_to_kind(self.cancel_kind.load(Ordering::SeqCst)),
-        }
-    }
-
-    fn store_cancel_shortcut(&self, s: &Shortcut) {
-        let (packed, count) = pack_keys(&s.key_codes);
-        self.cancel_keys_packed.store(packed, Ordering::SeqCst);
-        self.cancel_key_count.store(count, Ordering::SeqCst);
-        self.cancel_modifiers.store(s.modifiers, Ordering::SeqCst);
-        self.cancel_kind
-            .store(Self::kind_to_u8(s.kind), Ordering::SeqCst);
     }
 }
 
@@ -565,20 +597,10 @@ fn run_event_tap(
 ) {
     use std::os::raw::c_void;
 
-    let (rec_packed, rec_count) = pack_keys(&initial_record.key_codes);
-    let (cancel_packed, cancel_count) = pack_keys(&initial_cancel.key_codes);
-
     let state = Box::new(TapState {
-        rec_keys_packed: AtomicU64::new(rec_packed),
-        rec_key_count: AtomicU8::new(rec_count),
-        rec_modifiers: AtomicU64::new(initial_record.modifiers),
-        rec_kind: AtomicU8::new(TapState::kind_to_u8(initial_record.kind)),
+        record: ShortcutSlot::new(&initial_record),
         rec_held: AtomicBool::new(false),
-
-        cancel_keys_packed: AtomicU64::new(cancel_packed),
-        cancel_key_count: AtomicU8::new(cancel_count),
-        cancel_modifiers: AtomicU64::new(initial_cancel.modifiers),
-        cancel_kind: AtomicU8::new(TapState::kind_to_u8(initial_cancel.kind)),
+        cancel: ShortcutSlot::new(&initial_cancel),
 
         pressed_keys_packed: AtomicU64::new(0),
         pressed_key_count: AtomicU8::new(0),
@@ -771,8 +793,8 @@ fn run_event_tap(
         const KEY_UP: u32 = 11;
         const FLAGS_CHANGED: u32 = 12;
 
-        let rec = state.load_rec_shortcut();
-        let cancel = state.load_cancel_shortcut();
+        let rec = state.record.load();
+        let cancel = state.cancel.load();
 
         match event_type {
             KEY_DOWN => {
@@ -790,29 +812,9 @@ fn run_event_tap(
                 let pressed_c = state.pressed_key_count.load(Ordering::SeqCst);
 
                 // Check cancel shortcut (Combo/Key)
-                if !cancel.is_disabled() {
-                    let (cancel_p, cancel_c) = pack_keys(&cancel.key_codes);
-                    match cancel.kind {
-                        ShortcutKind::Combo => {
-                            if packed_contains_all(pressed_p, pressed_c, cancel_p, cancel_c)
-                                && (mod_flags & cancel.modifiers) == cancel.modifiers
-                            {
-                                let _ =
-                                    state.event_tx.send(HotkeyEvent::CancelPressed);
-                                return;
-                            }
-                        }
-                        ShortcutKind::Key => {
-                            if packed_contains_all(pressed_p, pressed_c, cancel_p, cancel_c)
-                                && mod_flags == 0
-                            {
-                                let _ =
-                                    state.event_tx.send(HotkeyEvent::CancelPressed);
-                                return;
-                            }
-                        }
-                        _ => {}
-                    }
+                if shortcut_matches(&cancel, pressed_p, pressed_c, mod_flags) {
+                    let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
+                    return;
                 }
 
                 // Check record shortcut (Combo/Key)
@@ -953,18 +955,8 @@ fn run_event_tap(
                 }
 
                 // -- Cancel shortcut (ModifierOnly) --
-                if !cancel.is_disabled()
-                    && cancel.kind == ShortcutKind::ModifierOnly
-                {
-                    let (cancel_p, cancel_c) = pack_keys(&cancel.key_codes);
-                    if packed_contains_all(
-                        pressed_mod_p,
-                        pressed_mod_c,
-                        cancel_p,
-                        cancel_c,
-                    ) {
-                        let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
-                    }
+                if modifier_shortcut_matches(&cancel, pressed_mod_p, pressed_mod_c) {
+                    let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
                 }
             }
             _ => {}
@@ -1016,7 +1008,7 @@ fn run_event_tap(
             // If rec_held is true but the modifier/key is no longer physically pressed,
             // we missed a KeyUp (tap disabled, Secure Input, etc.). Send safety KeyUp.
             if state.rec_held.load(Ordering::SeqCst) {
-                let rec = state.load_rec_shortcut();
+                let rec = state.record.load();
                 let current_flags =
                     ffi::CGEventSourceFlagsState(1) & CG_MASK_ALL_MODIFIERS;
                 let key_still_held = match rec.kind {
@@ -1052,14 +1044,14 @@ fn run_event_tap(
                             "Record shortcut changed to {}",
                             s.display_string()
                         );
-                        state.store_rec_shortcut(&s);
+                        state.store_record(&s);
                     }
                     HotkeyUpdate::SetCancelShortcut(s) => {
                         log::info!(
                             "Cancel shortcut changed to {}",
                             s.display_string()
                         );
-                        state.store_cancel_shortcut(&s);
+                        state.cancel.store(&s);
                     }
                 }
             }
@@ -1081,4 +1073,92 @@ pub fn start_monitor(
     let (update_tx, _update_rx) = crossbeam_channel::unbounded();
     log::warn!("Hotkey monitoring not implemented on this platform");
     (event_rx, update_tx)
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod slot_tests {
+    use super::*;
+
+    fn combo(keys: &[u16], modifiers: u64) -> Shortcut {
+        Shortcut { key_codes: keys.to_vec(), modifiers, kind: ShortcutKind::Combo }
+    }
+
+    fn plain_key(keys: &[u16]) -> Shortcut {
+        Shortcut { key_codes: keys.to_vec(), modifiers: 0, kind: ShortcutKind::Key }
+    }
+
+    fn modifier_only(keys: &[u16]) -> Shortcut {
+        Shortcut { key_codes: keys.to_vec(), modifiers: 0, kind: ShortcutKind::ModifierOnly }
+    }
+
+    fn pressed(keys: &[u16]) -> (u64, u8) {
+        pack_keys(keys)
+    }
+
+    const CMD: u64 = 1 << 20;
+    const SHIFT: u64 = 1 << 17;
+
+    #[test]
+    fn combo_needs_both_its_keys_and_its_modifiers() {
+        let s = combo(&[9], CMD);
+        let (p, c) = pressed(&[9]);
+        assert!(shortcut_matches(&s, p, c, CMD));
+        assert!(!shortcut_matches(&s, p, c, 0), "sans le modificateur");
+        let (p2, c2) = pressed(&[10]);
+        assert!(!shortcut_matches(&s, p2, c2, CMD), "mauvaise touche");
+    }
+
+    #[test]
+    fn combo_tolerates_extra_modifiers() {
+        let s = combo(&[9], CMD);
+        let (p, c) = pressed(&[9]);
+        assert!(shortcut_matches(&s, p, c, CMD | SHIFT));
+    }
+
+    /// A bare key must not fire as part of a chord, or Escape alone would also
+    /// trigger on Cmd+Escape.
+    #[test]
+    fn plain_key_refuses_any_modifier() {
+        let s = plain_key(&[53]);
+        let (p, c) = pressed(&[53]);
+        assert!(shortcut_matches(&s, p, c, 0));
+        assert!(!shortcut_matches(&s, p, c, CMD));
+    }
+
+    #[test]
+    fn modifier_only_never_matches_the_regular_key_path() {
+        let s = modifier_only(&[54]);
+        let (p, c) = pressed(&[54]);
+        assert!(!shortcut_matches(&s, p, c, CMD));
+        assert!(modifier_shortcut_matches(&s, p, c));
+    }
+
+    #[test]
+    fn a_disabled_shortcut_matches_nothing() {
+        let s = Shortcut::disabled();
+        let (p, c) = pressed(&[9]);
+        assert!(!shortcut_matches(&s, p, c, CMD));
+        assert!(!modifier_shortcut_matches(&s, p, c));
+    }
+
+    #[test]
+    fn slot_round_trips_every_kind() {
+        for original in [combo(&[9, 10], CMD), plain_key(&[53]), modifier_only(&[54])] {
+            let slot = ShortcutSlot::new(&original);
+            let back = slot.load();
+            assert_eq!(back.key_codes, original.key_codes);
+            assert_eq!(back.modifiers, original.modifiers);
+            assert_eq!(back.kind, original.kind);
+        }
+    }
+
+    #[test]
+    fn storing_over_a_slot_replaces_it() {
+        let slot = ShortcutSlot::new(&plain_key(&[53]));
+        slot.store(&combo(&[9], CMD));
+        let back = slot.load();
+        assert_eq!(back.key_codes, vec![9]);
+        assert_eq!(back.modifiers, CMD);
+        assert_eq!(back.kind, ShortcutKind::Combo);
+    }
 }
