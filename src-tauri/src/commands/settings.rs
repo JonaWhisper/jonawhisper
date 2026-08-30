@@ -206,28 +206,19 @@ pub fn suggest_user_dict_words(
     use crate::cleanup::symspell_correct::{is_known_word, word_boundaries, MIN_CORRECTION_LEN};
     use std::collections::HashMap;
 
-    let (texts, language) = {
-        let db = state.history_db.lock().unwrap_or_else(|e| e.into_inner());
-        // "auto" never reaches the history rows, which store the resolved language.
-        let language = if language.is_empty() || language == "auto" {
-            db.query_row(
-                "SELECT language FROM history WHERE language <> '' \
-                 GROUP BY language ORDER BY COUNT(*) DESC LIMIT 1",
-                [],
-                |row| row.get::<_, String>(0),
-            )
+    // "auto" never reaches the history rows, which store the resolved language.
+    let language = if language.is_empty() || language == "auto" {
+        state
+            .history
+            .dominant_language()
             .map_err(|_| "no dictation history yet".to_string())?
-        } else {
-            language
-        };
-        let mut stmt = db
-            .prepare("SELECT text FROM history WHERE language = ?1")
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([&language], |row| row.get::<_, String>(0))
-            .map_err(|e| e.to_string())?;
-        (rows.filter_map(Result::ok).collect::<Vec<String>>(), language)
+    } else {
+        language
     };
+    let texts = state
+        .history
+        .texts_for_language(&language)
+        .map_err(|e| e.to_string())?;
 
     let mut counts: HashMap<String, u32> = HashMap::new();
     for text in &texts {

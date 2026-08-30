@@ -482,9 +482,9 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     })
     .await;
     state.runtime.lock().unwrap().last_paste_had_content = true;
-    state.add_history(HistoryEntry {
+    state.history.add(HistoryEntry {
         text: processed.clone(),
-        timestamp: 0, // filled by add_history
+        timestamp: 0, // filled by history.add
         model_id: model_id.clone(),
         language: lang.clone(),
         cleanup_model_id: effective_cleanup_model_id.clone(),
