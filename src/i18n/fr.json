@@ -38,6 +38,7 @@
   "window.setup": "Configuration",
   "modelManager.download": "Télécharger",
   "modelManager.downloaded": "Téléchargé",
+  "modelManager.verifying": "V\u00e9rification\u2026",
   "modelManager.delete": "Supprimer",
   "modelManager.deleteConfirm": "Voulez-vous vraiment supprimer ce modèle ?",
   "modelManager.deleteConfirmDesc": "Le modèle « {0} » sera supprimé du disque. Vous pourrez le re-télécharger plus tard.",
