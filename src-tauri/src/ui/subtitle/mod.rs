@@ -30,6 +30,13 @@ fn line_cap() -> u8 {
     MAX_LINES.load(Ordering::Relaxed).max(1)
 }
 
+/// The strip stays hidden until the first words land: it opens with the
+/// recording, and an empty band hanging under the pill while the user has not
+/// spoken yet reads as a stuck overlay.
+fn worth_showing(text: &str) -> bool {
+    !text.trim().is_empty()
+}
+
 #[cfg(target_os = "macos")]
 #[path = "macos.rs"]
 mod backend;
@@ -90,3 +97,24 @@ pub fn close(app: &AppHandle) {
     backend::close(app);
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_strip_holds_back_until_there_are_words() {
+        assert!(!worth_showing(""), "l'ouverture n'affiche rien");
+        assert!(!worth_showing("   "), "ni des espaces");
+        assert!(!worth_showing("\n\t "), "ni des blancs");
+        assert!(worth_showing("Bonjour"));
+        assert!(worth_showing("  Bonjour  "));
+    }
+
+    #[test]
+    fn the_old_placeholder_would_now_be_shown() {
+        // Le "…" que reset() posait comptait comme du contenu : c'est pour cela
+        // qu'il faut l'avoir retiré, pas seulement cacher les chaines vides.
+        assert!(worth_showing("…"));
+    }
+}

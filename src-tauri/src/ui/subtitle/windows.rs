@@ -2,7 +2,7 @@
 //! the window lives on its own thread, which is the only one allowed to destroy
 //! it, and reaching it from the setter would mean a channel for no gain.
 
-use super::{STRIP, TOP_OFFSET, line_cap, render_strip};
+use super::{STRIP, TOP_OFFSET, line_cap, render_strip, worth_showing};
 use crate::ui::layered::{Overlay, cursor_display};
 use std::time::Duration;
 use windows_sys::core::w;
@@ -37,7 +37,8 @@ unsafe fn run(generation: u32) {
     let mut overlay = None;
     loop {
         let Some((text, revision)) = current(generation) else { break };
-        if drawn != Some(revision) {
+        // Nothing to read yet: no window, so no empty band under the pill.
+        if drawn != Some(revision) && (shown || worth_showing(&text)) {
             drawn = Some(revision);
             let strip = render_strip(&text, scale, line_cap());
             let (width, height) = (strip.width as i32, strip.height as i32);

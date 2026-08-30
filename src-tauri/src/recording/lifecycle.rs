@@ -45,8 +45,6 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     };
     if preview_on {
         crate::ui::subtitle::open(app, max_lines);
-        // Placeholder until the first pass lands: an empty strip reads as a bug.
-        super::preview::reset(app);
         let buffer = rec.recorder.lock().unwrap().preview_buffer();
         super::preview::spawn(app.clone(), Arc::clone(state), buffer);
     }
