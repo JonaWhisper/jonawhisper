@@ -26,6 +26,13 @@ mod keys {
     pub const RIGHT_CONTROL: u16 = 0x3E;
     pub const RIGHT_SHIFT: u16 = 0x3C;
     pub const ESCAPE: u16 = 0x35;
+
+    pub const LEFT_COMMAND: u16 = 0x37;
+    pub const LEFT_OPTION: u16 = 0x3A;
+    pub const LEFT_CONTROL: u16 = 0x3B;
+    pub const LEFT_SHIFT: u16 = 0x38;
+    /// Caps Lock counts as a modifier on macOS.
+    pub const EXTRA_MODIFIER: u16 = 0x3F;
 }
 
 /// Windows virtual-key codes. Right Command maps to the right Windows key: it
@@ -37,6 +44,14 @@ mod keys {
     pub const RIGHT_CONTROL: u16 = 0xA3; // VK_RCONTROL
     pub const RIGHT_SHIFT: u16 = 0xA1; // VK_RSHIFT
     pub const ESCAPE: u16 = 0x1B; // VK_ESCAPE
+
+    pub const LEFT_COMMAND: u16 = 0x5B; // VK_LWIN
+    pub const LEFT_OPTION: u16 = 0xA4; // VK_LMENU
+    pub const LEFT_CONTROL: u16 = 0xA2; // VK_LCONTROL
+    pub const LEFT_SHIFT: u16 = 0xA0; // VK_LSHIFT
+    /// No Caps Lock equivalent to treat as a held modifier; VK_APPS is inert
+    /// here and keeps the table the same shape on both platforms.
+    pub const EXTRA_MODIFIER: u16 = 0x5D; // VK_APPS
 }
 
 const CG_MASK_COMMAND: u64 = 1 << 20;
@@ -252,19 +267,16 @@ fn key_code_label(key_code: u16) -> &'static str {
 
 /// Check if a key_code is a modifier key (not a regular key).
 fn is_modifier_key_code(key_code: u16) -> bool {
-    matches!(
-        key_code,
-        0x36 | 0x37 | 0x3A | 0x3B | 0x3C | 0x3D | 0x3E | 0x38 | 0x3F
-    )
+    modifier_flag_for_key_code(key_code) != 0 || key_code == keys::EXTRA_MODIFIER
 }
 
 /// Get the modifier flag for a specific modifier key code.
 fn modifier_flag_for_key_code(key_code: u16) -> u64 {
     match key_code {
-        0x36 | 0x37 => CG_MASK_COMMAND,
-        0x3A | 0x3D => CG_MASK_ALTERNATE,
-        0x3B | 0x3E => CG_MASK_CONTROL,
-        0x38 | 0x3C => CG_MASK_SHIFT,
+        keys::RIGHT_COMMAND | keys::LEFT_COMMAND => MASK_COMMAND,
+        keys::RIGHT_OPTION | keys::LEFT_OPTION => MASK_ALTERNATE,
+        keys::RIGHT_CONTROL | keys::LEFT_CONTROL => MASK_CONTROL,
+        keys::RIGHT_SHIFT | keys::LEFT_SHIFT => MASK_SHIFT,
         _ => 0,
     }
 }
@@ -489,7 +501,6 @@ pub fn start_monitor(
 /// One shortcut, stored as atomics so the CGEvent callback can read it without
 /// locking. Every shortcut the tap watches uses this — duplicating the four
 /// fields per shortcut is what made adding a third one expensive.
-#[cfg(target_os = "macos")]
 struct ShortcutSlot {
     keys_packed: AtomicU64,
     key_count: AtomicU8,
@@ -497,7 +508,6 @@ struct ShortcutSlot {
     kind: AtomicU8, // 0=ModifierOnly, 1=Combo, 2=Key
 }
 
-#[cfg(target_os = "macos")]
 impl ShortcutSlot {
     fn new(s: &Shortcut) -> Self {
         let (packed, count) = pack_keys(&s.key_codes);
@@ -531,7 +541,6 @@ impl ShortcutSlot {
 
 /// Does this shortcut fire for the keys currently down? Combo also requires its
 /// modifiers; a plain Key requires none, so it cannot swallow Cmd+key.
-#[cfg(target_os = "macos")]
 fn shortcut_matches(shortcut: &Shortcut, pressed_p: u64, pressed_c: u8, mod_flags: u64) -> bool {
     if shortcut.is_disabled() {
         return false;
@@ -548,7 +557,6 @@ fn shortcut_matches(shortcut: &Shortcut, pressed_p: u64, pressed_c: u8, mod_flag
 }
 
 /// ModifierOnly shortcuts match against the modifier keys held, not the regular ones.
-#[cfg(target_os = "macos")]
 fn modifier_shortcut_matches(shortcut: &Shortcut, pressed_p: u64, pressed_c: u8) -> bool {
     if shortcut.is_disabled() || shortcut.kind != ShortcutKind::ModifierOnly {
         return false;
@@ -557,7 +565,6 @@ fn modifier_shortcut_matches(shortcut: &Shortcut, pressed_p: u64, pressed_c: u8)
     packed_contains_all(pressed_p, pressed_c, want_p, want_c)
 }
 
-#[cfg(target_os = "macos")]
 fn kind_to_u8(kind: ShortcutKind) -> u8 {
     match kind {
         ShortcutKind::ModifierOnly => 0,
@@ -566,7 +573,6 @@ fn kind_to_u8(kind: ShortcutKind) -> u8 {
     }
 }
 
-#[cfg(target_os = "macos")]
 fn u8_to_kind(v: u8) -> ShortcutKind {
     match v {
         0 => ShortcutKind::ModifierOnly,
@@ -1077,7 +1083,250 @@ fn run_event_tap(
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+mod win {
+    use super::*;
+    use std::sync::OnceLock;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, KBDLLHOOKSTRUCT, MSG, PM_REMOVE, PeekMessageW,
+        SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_KEYDOWN,
+        WM_SYSKEYDOWN,
+    };
+
+    /// The low-level keyboard hook receives no user pointer, so its state has to
+    /// be reachable from a plain function.
+    struct HookState {
+        record: ShortcutSlot,
+        rec_held: AtomicBool,
+        cancel: ShortcutSlot,
+        pressed_packed: AtomicU64,
+        pressed_count: AtomicU8,
+        capture: Arc<CaptureControl>,
+        event_tx: crossbeam_channel::Sender<HotkeyEvent>,
+    }
+
+    static STATE: OnceLock<HookState> = OnceLock::new();
+
+    /// Windows delivers modifiers as ordinary virtual-key codes, so one pressed
+    /// set covers both and the flags are derived from it.
+    fn modifier_flags(packed: u64, count: u8) -> u64 {
+        unpack_keys(packed, count)
+            .iter()
+            .fold(0, |acc, &k| acc | modifier_flag_for_key_code(k))
+    }
+
+    fn on_key(state: &HookState, vk: u16, down: bool) {
+        if down {
+            packed_add(&state.pressed_packed, &state.pressed_count, vk);
+        } else {
+            packed_remove(&state.pressed_packed, &state.pressed_count, vk);
+        }
+
+        let pressed_p = state.pressed_packed.load(Ordering::SeqCst);
+        let pressed_c = state.pressed_count.load(Ordering::SeqCst);
+
+        if state.capture.mode.load(Ordering::SeqCst) {
+            if down {
+                capture_key(&state.capture, vk);
+                let _ = state.event_tx.send(HotkeyEvent::CaptureUpdate {
+                    modifiers: state.capture.peak_modifiers.load(Ordering::SeqCst),
+                    key_codes: capture_key_codes(&state.capture),
+                });
+            } else {
+                finish_capture(state);
+            }
+            return;
+        }
+
+        let mod_flags = modifier_flags(pressed_p, pressed_c);
+
+        let cancel = state.cancel.load();
+        if down
+            && (shortcut_matches(&cancel, pressed_p, pressed_c, mod_flags)
+                || modifier_shortcut_matches(&cancel, pressed_p, pressed_c))
+        {
+            let _ = state.event_tx.send(HotkeyEvent::CancelPressed);
+            return;
+        }
+
+        let rec = state.record.load();
+        let matched = shortcut_matches(&rec, pressed_p, pressed_c, mod_flags)
+            || modifier_shortcut_matches(&rec, pressed_p, pressed_c);
+
+        if matched && !state.rec_held.load(Ordering::SeqCst) {
+            state.rec_held.store(true, Ordering::SeqCst);
+            let _ = state.event_tx.send(HotkeyEvent::KeyDown);
+        } else if !matched && state.rec_held.load(Ordering::SeqCst) {
+            state.rec_held.store(false, Ordering::SeqCst);
+            let _ = state.event_tx.send(HotkeyEvent::KeyUp);
+        }
+    }
+
+    fn capture_key(capture: &CaptureControl, vk: u16) {
+        capture.active.store(true, Ordering::SeqCst);
+        if is_modifier_key_code(vk) {
+            capture.peak_modifiers.fetch_or(
+                modifier_flag_for_key_code(vk),
+                Ordering::SeqCst,
+            );
+            packed_add(&capture.mod_keys_packed, &capture.mod_key_count, vk);
+        } else {
+            packed_add(&capture.keys_packed, &capture.key_count, vk);
+        }
+    }
+
+    fn capture_key_codes(capture: &CaptureControl) -> Vec<u16> {
+        let mut codes = unpack_keys(
+            capture.mod_keys_packed.load(Ordering::SeqCst),
+            capture.mod_key_count.load(Ordering::SeqCst),
+        );
+        codes.extend(unpack_keys(
+            capture.keys_packed.load(Ordering::SeqCst),
+            capture.key_count.load(Ordering::SeqCst),
+        ));
+        codes
+    }
+
+    /// First key release ends capture, matching the macOS backend.
+    fn finish_capture(state: &HookState) {
+        let capture = &state.capture;
+        if !capture.active.load(Ordering::SeqCst) {
+            return;
+        }
+        let key_codes = capture_key_codes(capture);
+        let modifiers = capture.peak_modifiers.load(Ordering::SeqCst);
+        let regular = capture.key_count.load(Ordering::SeqCst) > 0;
+
+        let kind = if !regular {
+            ShortcutKind::ModifierOnly
+        } else if modifiers != 0 {
+            ShortcutKind::Combo
+        } else {
+            ShortcutKind::Key
+        };
+
+        capture.active.store(false, Ordering::SeqCst);
+        capture.mode.store(false, Ordering::SeqCst);
+        let _ = state.event_tx.send(HotkeyEvent::CaptureComplete(Shortcut {
+            key_codes,
+            modifiers,
+            kind,
+        }));
+    }
+
+    unsafe extern "system" fn keyboard_hook(code: i32, wparam: usize, lparam: isize) -> isize {
+        if code >= 0 {
+            if let Some(state) = STATE.get() {
+                // SAFETY: for HC_ACTION the hook contract says lparam points at a
+                // KBDLLHOOKSTRUCT owned by the caller for the duration of the call.
+                let kb = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
+                let msg = wparam as u32;
+                let down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+                on_key(state, kb.vkCode as u16, down);
+            }
+        }
+        // Listen only: never swallow the keystroke.
+        unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+    }
+
+    pub fn run(
+        initial_record: Shortcut,
+        initial_cancel: Shortcut,
+        event_tx: crossbeam_channel::Sender<HotkeyEvent>,
+        update_rx: crossbeam_channel::Receiver<HotkeyUpdate>,
+        capture: Arc<CaptureControl>,
+    ) {
+        let state = HookState {
+            record: ShortcutSlot::new(&initial_record),
+            rec_held: AtomicBool::new(false),
+            cancel: ShortcutSlot::new(&initial_cancel),
+            pressed_packed: AtomicU64::new(0),
+            pressed_count: AtomicU8::new(0),
+            capture,
+            event_tx,
+        };
+        if STATE.set(state).is_err() {
+            log::error!("Hotkey monitor already running");
+            return;
+        }
+
+        // SAFETY: the hook procedure is a plain function and stays valid for the
+        // lifetime of the process.
+        let hook = unsafe {
+            SetWindowsHookExW(
+                WH_KEYBOARD_LL,
+                Some(keyboard_hook),
+                std::ptr::null_mut(),
+                0,
+            )
+        };
+        if hook.is_null() {
+            log::error!("SetWindowsHookEx failed; the hotkey will not respond");
+            return;
+        }
+        log::info!(
+            "Hotkey monitor started (record={}, cancel={})",
+            initial_record.display_string(),
+            initial_cancel.display_string()
+        );
+
+        // A low-level hook is only delivered while its thread pumps messages, so
+        // the loop drains the queue rather than blocking in GetMessage — that
+        // leaves room to apply shortcut updates between passes.
+        let state = STATE.get().expect("state was just set");
+        loop {
+            let mut msg = MSG::default();
+            // SAFETY: msg is a valid, writable MSG for the duration of each call.
+            while unsafe { PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
+                unsafe {
+                    TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+            }
+            while let Ok(update) = update_rx.try_recv() {
+                match update {
+                    HotkeyUpdate::SetRecordShortcut(s) => {
+                        state.record.store(&s);
+                        state.rec_held.store(false, Ordering::SeqCst);
+                    }
+                    HotkeyUpdate::SetCancelShortcut(s) => state.cancel.store(&s),
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        // Unreachable today; kept so the hook has an owner if the loop ever ends.
+        #[allow(unreachable_code)]
+        {
+            unsafe { UnhookWindowsHookEx(hook) };
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn start_monitor(
+    initial_record: Shortcut,
+    initial_cancel: Shortcut,
+    enabled: Arc<AtomicBool>,
+    capture: Arc<CaptureControl>,
+) -> (
+    crossbeam_channel::Receiver<HotkeyEvent>,
+    crossbeam_channel::Sender<HotkeyUpdate>,
+) {
+    let (event_tx, event_rx) = crossbeam_channel::unbounded::<HotkeyEvent>();
+    let (update_tx, update_rx) = crossbeam_channel::unbounded::<HotkeyUpdate>();
+
+    std::thread::spawn(move || {
+        while !enabled.load(Ordering::SeqCst) {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        log::info!("Hotkey monitoring enabled, installing keyboard hook");
+        win::run(initial_record, initial_cancel, event_tx, update_rx, capture);
+    });
+
+    (event_rx, update_tx)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn start_monitor(
     _initial_record: Shortcut,
     _initial_cancel: Shortcut,
@@ -1141,7 +1390,7 @@ mod key_name_tests {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod slot_tests {
     use super::*;
 
