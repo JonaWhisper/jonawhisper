@@ -1,27 +1,8 @@
+//! CoreAudio device enumeration and change notifications.
+
+use super::{AudioDevice, AudioTransportType};
 use std::ffi::c_void;
 use std::sync::Mutex;
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[allow(clippy::upper_case_acronyms)]
-pub enum AudioTransportType {
-    BuiltIn,
-    USB,
-    Bluetooth,
-    Virtual,
-    Aggregate,
-    Thunderbolt,
-    HDMI,
-    Unknown,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AudioDevice {
-    pub id: u32,
-    pub name: String,
-    pub uid: String,
-    pub transport_type: AudioTransportType,
-    pub is_default: bool,
-}
 
 // CoreAudio FFI — matches Apple C headers, hence non-snake_case
 #[allow(non_upper_case_globals, non_snake_case, dead_code)]
