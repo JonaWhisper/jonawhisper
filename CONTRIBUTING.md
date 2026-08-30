@@ -48,14 +48,17 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Too
 set CMAKE_GENERATOR=Ninja
 set CC=clang-cl
 set CXX=clang-cl
-cargo check -p jona-platform
+set CXXFLAGS=/EHsc
+cargo check -p jona-whisper
 ```
 
-**Known limit:** `jona-platform` and its tests build on Windows ARM, verified.
-The full binary does not yet: `llama-cpp-sys-2` fails on `cannot use 'try' with
-exceptions disabled`, and `whisper-rs-sys` fails during its CMake build. Neither
-is a project issue — CI builds both on x64 — but neither has been worked around
-here either. Releases are x64.
+`CXXFLAGS=/EHsc` is the last of them: with `CXX` forced to clang-cl, cc-rs no
+longer recognises the compiler as MSVC and stops passing the flag itself, so
+`llama-cpp-sys-2` fails on `cannot use 'try' with exceptions disabled`.
+
+With all five in place the whole binary builds on Windows ARM — verified, 4m26
+from a cold cache. Releases are still x64: this path is for checking a change
+before pushing it, not for shipping.
 
 ## Development setup
 
