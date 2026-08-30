@@ -122,7 +122,7 @@ async fn simulate_subtitle(app: AppHandle) {
         "Alors,", "ce", "que", "je", "voudrais", "faire,", "c'est", "afficher",
         "le", "texte", "pendant", "que", "je", "parle.",
     ];
-    super::subtitle::open(&app);
+    super::subtitle::open(&app, 5);
     let mut line = String::new();
     for word in WORDS {
         if !line.is_empty() {

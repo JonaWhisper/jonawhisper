@@ -23,6 +23,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const vadEnabled = ref(true)
   const livePreviewEnabled = ref(false)
   const livePreviewModelId = ref('')
+  const livePreviewMaxLines = ref(5)
   const disfluencyRemovalEnabled = ref(true)
   const itnEnabled = ref(true)
   const spellcheckEnabled = ref(false)
@@ -56,6 +57,7 @@ export const useSettingsStore = defineStore('settings', () => {
       vadEnabled.value = s.vad_enabled ?? true
       livePreviewEnabled.value = s.live_preview_enabled ?? false
       livePreviewModelId.value = s.live_preview_model_id ?? ''
+      livePreviewMaxLines.value = s.live_preview_max_lines ?? 5
       disfluencyRemovalEnabled.value = s.disfluency_removal_enabled ?? true
       itnEnabled.value = s.itn_enabled ?? true
       spellcheckEnabled.value = s.spellcheck_enabled ?? false
@@ -88,6 +90,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'vad_enabled': return String(vadEnabled.value)
       case 'live_preview_enabled': return String(livePreviewEnabled.value)
       case 'live_preview_model_id': return livePreviewModelId.value
+      case 'live_preview_max_lines': return String(livePreviewMaxLines.value)
       case 'disfluency_removal_enabled': return String(disfluencyRemovalEnabled.value)
       case 'itn_enabled': return String(itnEnabled.value)
       case 'spellcheck_enabled': return String(spellcheckEnabled.value)
@@ -121,6 +124,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
       case 'live_preview_enabled': livePreviewEnabled.value = value === 'true'; break
       case 'live_preview_model_id': livePreviewModelId.value = value; break
+      case 'live_preview_max_lines': livePreviewMaxLines.value = Number(value) || 5; break
       case 'disfluency_removal_enabled': disfluencyRemovalEnabled.value = value === 'true'; break
       case 'itn_enabled': itnEnabled.value = value === 'true'; break
       case 'spellcheck_enabled': spellcheckEnabled.value = value === 'true'; break
@@ -155,7 +159,7 @@ export const useSettingsStore = defineStore('settings', () => {
     hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
     autoReleaseMemory,
-    livePreviewEnabled, livePreviewModelId,
+    livePreviewEnabled, livePreviewModelId, livePreviewMaxLines,
     hotkey, cancelShortcut, recordingMode, appLocale, theme, logLevel, logRetention,
     fetchSettings, setSetting, applySettingLocally, getSettingValue,
     selectModel, selectLanguageAction,

@@ -112,6 +112,8 @@
   "settings.transcription.livePreviewLabel": "Show text while dictating",
   "settings.transcription.livePreviewModel": "Preview model",
   "settings.transcription.livePreviewHint": "The preview is discarded on release: only the transcription model produces the pasted text.",
+  "settings.transcription.livePreviewMaxLines": "Maximum lines",
+  "settings.transcription.livePreviewMaxLinesHint": "How tall the strip may get; beyond that, the oldest text scrolls out of view.",
   "settings.transcription.livePreviewSame": "Same as transcription",
   "settings.transcription.gpuMode.auto": "Auto",
   "settings.transcription.gpuMode.gpu": "GPU",

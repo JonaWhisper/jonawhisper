@@ -46,6 +46,13 @@ async function onPreviewModelChange(value: string | number | bigint | Record<str
   await settings.setSetting('live_preview_model_id', value === SAME_AS_ASR ? '' : value)
 }
 
+async function onPreviewMaxLinesChange(value: string | number | bigint | Record<string, unknown> | null) {
+  if (typeof value !== 'string') return
+  await settings.setSetting('live_preview_max_lines', value)
+}
+
+const LINE_CHOICES = ['1', '2', '3', '4', '5', '6', '8', '10']
+
 const SAME_AS_ASR = '__same__'
 
 const previewModelValue = computed(() => settings.livePreviewModelId || SAME_AS_ASR)
@@ -234,6 +241,21 @@ onMounted(() => {
             <SelectItem v-for="m in localAsrModels" :key="m.id" :value="m.id">
               <ModelOption :label="m.label" location="local" />
             </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div v-if="settings.livePreviewEnabled" class="flex items-center justify-between gap-3 pt-2.5 mt-2.5 border-t border-panel-divider">
+        <div class="min-w-0">
+          <div class="text-[13px]">{{ t('settings.transcription.livePreviewMaxLines') }}</div>
+          <div class="text-[11px] text-muted-foreground">{{ t('settings.transcription.livePreviewMaxLinesHint') }}</div>
+        </div>
+        <Select :model-value="String(settings.livePreviewMaxLines)" @update:model-value="onPreviewMaxLinesChange">
+          <SelectTrigger class="w-auto min-w-[90px] h-8 text-xs shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="n in LINE_CHOICES" :key="n" :value="n">{{ n }}</SelectItem>
           </SelectContent>
         </Select>
       </div>

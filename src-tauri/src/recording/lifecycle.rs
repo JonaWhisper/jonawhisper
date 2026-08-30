@@ -36,8 +36,12 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
 
     // Show pill immediately in Preparing mode (before stream starts)
     crate::ui::pill::open(app, crate::ui::pill::PillMode::Preparing);
-    if state.settings.lock().unwrap().live_preview_enabled {
-        crate::ui::subtitle::open(app);
+    let (preview_on, max_lines) = {
+        let s = state.settings.lock().unwrap();
+        (s.live_preview_enabled, s.live_preview_max_lines)
+    };
+    if preview_on {
+        crate::ui::subtitle::open(app, max_lines);
         // Placeholder until the first pass lands: an empty strip reads as a bug.
         super::preview::reset(app);
         let buffer = rec.recorder.lock().unwrap().preview_buffer();

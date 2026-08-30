@@ -207,6 +207,7 @@ export interface SettingsPayload {
   vad_enabled: boolean
   live_preview_enabled: boolean
   live_preview_model_id: string
+  live_preview_max_lines: number
   punctuation_model_id: string
   disfluency_removal_enabled: boolean
   itn_enabled: boolean

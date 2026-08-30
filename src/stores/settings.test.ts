@@ -34,6 +34,7 @@ function makePayload(overrides: Partial<SettingsPayload> = {}): SettingsPayload 
     vad_enabled: true,
     live_preview_enabled: false,
     live_preview_model_id: '',
+    live_preview_max_lines: 5,
     punctuation_model_id: '',
     disfluency_removal_enabled: true,
     itn_enabled: true,

@@ -588,6 +588,9 @@ pub struct Preferences {
     /// the preview is discarded on release, so it can afford a lighter engine.
     #[serde(default)]
     pub live_preview_model_id: String,
+    /// Most lines the preview strip may occupy before it stops growing.
+    #[serde(default = "default_preview_max_lines")]
+    pub live_preview_max_lines: u8,
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default = "default_true")]
@@ -609,6 +612,10 @@ pub struct Preferences {
 }
 
 pub fn default_model_id() -> String { "whisper:large-v3-turbo-q8".to_string() }
+fn default_preview_max_lines() -> u8 {
+    5
+}
+
 fn default_language() -> String { "auto".to_string() }
 fn default_true() -> bool { true }
 fn default_hotkey() -> String { "right_command".to_string() }
