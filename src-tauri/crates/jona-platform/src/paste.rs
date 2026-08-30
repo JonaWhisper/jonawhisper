@@ -46,8 +46,53 @@ fn simulate_paste() -> Result<(), String> {
 /// Simulate Ctrl+V on Windows.
 #[cfg(target_os = "windows")]
 fn simulate_paste() -> Result<(), String> {
-    // TODO: implement with SendInput
-    log::warn!("Paste simulation not yet implemented for Windows");
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput, VK_CONTROL, VK_V,
+        VIRTUAL_KEY,
+    };
+
+    fn key(vk: VIRTUAL_KEY, released: bool) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: if released { KEYEVENTF_KEYUP } else { 0 },
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }
+    }
+
+    // Ctrl down, V down, V up, Ctrl up — sent as one batch so nothing can be
+    // injected between them and leave Ctrl stuck down.
+    let inputs = [
+        key(VK_CONTROL, false),
+        key(VK_V, false),
+        key(VK_V, true),
+        key(VK_CONTROL, true),
+    ];
+
+    // SAFETY: SendInput reads `inputs.len()` records of `size_of::<INPUT>()`
+    // bytes from the pointer, which is exactly what the array provides.
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        )
+    };
+
+    if sent as usize != inputs.len() {
+        // Blocked rather than broken, usually: UIPI drops injected input aimed
+        // at a window running with higher privileges than this process.
+        return Err(format!(
+            "SendInput delivered {sent} of {} events; the focused window may be elevated",
+            inputs.len()
+        ));
+    }
     Ok(())
 }
 
