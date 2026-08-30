@@ -3,7 +3,8 @@
 
 use super::super::appkit::{self, DPR, MainThreadPtr};
 use super::render::height_for_lines;
-use super::{STRIP, TOP_OFFSET, WIDTH, line_cap, render_strip};
+use super::{STRIP, TOP_OFFSET, WIDTH, line_cap, render_strip, worth_showing};
+use std::sync::atomic::{AtomicBool, Ordering};
 use objc2::msg_send;
 use objc2::runtime::AnyObject;
 use tauri::AppHandle;
@@ -15,10 +16,14 @@ struct SubtitleInner {
 
 static WINDOW: std::sync::Mutex<Option<SubtitleInner>> = std::sync::Mutex::new(None);
 
+/// Whether the window has been ordered front yet. Reset on every open.
+static REVEALED: AtomicBool = AtomicBool::new(false);
+
 pub(super) fn open(app: &AppHandle, _generation: u32) {
+    REVEALED.store(false, Ordering::Relaxed);
+    // Built, not shown: set_text orders it front once there is something to read.
     let _ = app.run_on_main_thread(move || unsafe {
         let (ns_win, iv) = create_window();
-        let _: () = msg_send![ns_win, orderFrontRegardless];
         *WINDOW.lock().unwrap() = Some(SubtitleInner {
             ns_window: MainThreadPtr(ns_win),
             image_view: MainThreadPtr(iv),
@@ -28,6 +33,10 @@ pub(super) fn open(app: &AppHandle, _generation: u32) {
 
 pub(super) fn set_text(app: &AppHandle) {
     let Some(text) = STRIP.read(|s| s.text.clone()) else { return };
+    if !REVEALED.load(Ordering::Relaxed) && !worth_showing(&text) {
+        return;
+    }
+    let reveal = !REVEALED.swap(true, Ordering::Relaxed);
     let handles = {
         let guard = WINDOW.lock().unwrap();
         match guard.as_ref() {
@@ -46,6 +55,9 @@ pub(super) fn set_text(app: &AppHandle) {
             strip.height,
             objc2_foundation::NSSize::new(WIDTH, strip.points),
         );
+        if reveal {
+            let _: () = msg_send![ns_win, orderFrontRegardless];
+        }
     });
 }
 

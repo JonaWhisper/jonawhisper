@@ -204,12 +204,6 @@ fn transcribe(
         .map(|tr| tr.text.trim().to_string())
 }
 
-/// Recording stopped: drop the strip's contents so a stale line never outlives
-/// the dictation that produced it.
-pub fn reset(app: &AppHandle) {
-    crate::ui::subtitle::set_text(app, "…");
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
