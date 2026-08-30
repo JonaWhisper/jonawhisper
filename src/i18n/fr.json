@@ -112,6 +112,8 @@
   "settings.transcription.livePreviewLabel": "Afficher le texte pendant la dict\u00e9e",
   "settings.transcription.livePreviewModel": "Mod\u00e8le de l'aper\u00e7u",
   "settings.transcription.livePreviewHint": "L'aper\u00e7u est jet\u00e9 au rel\u00e2chement : seul le mod\u00e8le de transcription produit le texte coll\u00e9.",
+  "settings.transcription.livePreviewMaxLines": "Lignes maximum",
+  "settings.transcription.livePreviewMaxLinesHint": "Hauteur maximale de la bande ; au-del\u00e0, le texte le plus ancien sort de l'affichage.",
   "settings.transcription.livePreviewSame": "Identique \u00e0 la transcription",
   "settings.transcription.gpuMode.auto": "Auto",
   "settings.transcription.gpuMode.gpu": "GPU",

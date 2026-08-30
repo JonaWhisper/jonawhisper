@@ -15,12 +15,16 @@ const WIDTH: f64 = 560.0;
 /// One line of 15pt system font, as laid out by the text cell.
 #[cfg(target_os = "macos")]
 const LINE_HEIGHT: f64 = 19.0;
+/// Set from preferences when the strip opens: how tall it may get before it
+/// stops growing, whatever the text.
 #[cfg(target_os = "macos")]
-const MAX_LINES: f64 = 5.0;
+static MAX_LINES: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(5);
+
 /// Height for a given number of lines, padding included.
 #[cfg(target_os = "macos")]
 fn height_for_lines(lines: f64) -> f64 {
-    lines.clamp(1.0, MAX_LINES) * LINE_HEIGHT + PADDING * 2.0
+    let cap = MAX_LINES.load(std::sync::atomic::Ordering::Relaxed).max(1) as f64;
+    lines.clamp(1.0, cap) * LINE_HEIGHT + PADDING * 2.0
 }
 /// Sits below the pill: pill top offset (40) + pill height (32) + a gap.
 #[cfg(target_os = "macos")]
@@ -51,9 +55,10 @@ static SUBTITLE: Mutex<Option<SubtitleInner>> = Mutex::new(None);
 
 // -- Public API --
 
-pub fn open(app: &AppHandle) {
+pub fn open(app: &AppHandle, max_lines: u8) {
     #[cfg(target_os = "macos")]
     {
+        MAX_LINES.store(max_lines.clamp(1, 10), std::sync::atomic::Ordering::Relaxed);
         if SUBTITLE.lock().unwrap().is_some() {
             return;
         }
@@ -69,7 +74,7 @@ pub fn open(app: &AppHandle) {
         });
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    let _ = (app, max_lines);
 }
 
 /// Replace the displayed text. No-op when the overlay is closed.
@@ -274,12 +279,24 @@ unsafe fn position_under_pill(ns_win: *mut AnyObject, height: f64) {
 mod tests {
     #[cfg(target_os = "macos")]
     #[test]
-    fn height_grows_from_one_line_to_five() {
+    fn height_honours_the_configured_cap() {
+        use std::sync::atomic::Ordering;
+        super::MAX_LINES.store(5, Ordering::Relaxed);
         let one = super::height_for_lines(1.0);
-        let five = super::height_for_lines(5.0);
-        assert!(five > one);
         assert_eq!(super::height_for_lines(0.0), one, "jamais moins d'une ligne");
-        assert_eq!(super::height_for_lines(99.0), five, "plafonne a cinq lignes");
+        assert_eq!(
+            super::height_for_lines(99.0),
+            super::height_for_lines(5.0),
+            "plafonne au reglage"
+        );
+
+        super::MAX_LINES.store(2, Ordering::Relaxed);
+        assert_eq!(super::height_for_lines(99.0), super::height_for_lines(2.0));
+        assert!(super::height_for_lines(99.0) < super::height_for_lines(5.0) + 1.0);
+
+        super::MAX_LINES.store(0, Ordering::Relaxed);
+        assert_eq!(super::height_for_lines(3.0), one, "0 ne fait pas disparaitre la bande");
+        super::MAX_LINES.store(5, Ordering::Relaxed);
     }
 
     #[cfg(target_os = "macos")]
