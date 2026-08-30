@@ -3,6 +3,7 @@ mod cleanup;
 mod commands;
 mod errors;
 mod events;
+mod history;
 mod migrations;
 mod platform;
 mod recording;
