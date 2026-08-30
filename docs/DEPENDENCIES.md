@@ -76,6 +76,21 @@ Every dependency has a reason. This document explains **what** each one does and
 | [`rust-i18n`](https://github.com/longbridge/rust-i18n) | Backend i18n | Tray menu labels, system messages in FR/EN. Compile-time YAML loading, `t!()` macro |
 | [`sys-locale`](https://github.com/1Password/sys-locale) | System locale detection | Auto-detect FR/EN at startup. Reads macOS `AppleLanguages` preference |
 
+### Text rendering
+
+| Crate | Role | Why this one |
+|-------|------|--------------|
+| [`fontdue`](https://github.com/mooman219/fontdue) | Font rasterizer + layout | The subtitle strip draws its own glyphs so macOS and Windows show identical text; a native control per OS would differ in hinting and antialiasing. Pure Rust, no system dependency, and its `Layout` handles word wrapping |
+| [`fontdb`](https://github.com/RazrFalcon/fontdb) | System font lookup | Fallback for what the bundled font lacks — seven engines transcribe Chinese, Japanese and Korean. Scans the OS font directories without any platform API. `fontconfig` feature off: it only serves Linux and drags in an XML parser |
+
+The bundled face is **Inter Regular** (`src-tauri/fonts/`), under the SIL Open Font License 1.1 — compatible with the project's GPL-3.0. Chosen for its closeness to the two system faces it stands in for, SF Pro and Segoe UI, neither of which exists on the other OS.
+
+### Windows Platform (behind `cfg(target_os = "windows")`)
+
+| Crate | Role | Why this one |
+|-------|------|--------------|
+| [`windows-sys`](https://github.com/microsoft/windows-rs) | Win32 FFI | Low-level hotkey hook (`WH_KEYBOARD_LL`), paste simulation (`SendInput`), and the pill's layered overlay window (`UpdateLayeredWindow`). Raw C-style bindings rather than the `windows` crate: no COM wrappers or RAII types needed here, and it compiles far faster |
+
 ### macOS Platform (behind `cfg(target_os = "macos")`)
 
 | Crate | Role | Why this one |
