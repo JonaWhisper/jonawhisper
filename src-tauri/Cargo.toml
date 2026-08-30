@@ -105,6 +105,9 @@ prost = "0.14"
 symspell = "0.5.2"
 rphonetic = { version = "3.0", features = ["embedded_bm"] }
 jona-detector-env = { path = "crates/jona-detector-env" }
+fontdue = "0.9"
+# fontconfig off: it only serves Linux and drags in an XML parser.
+fontdb = { version = "0.24", default-features = false, features = ["fs", "memmap"] }
 
 [target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
 libc = "0.2"

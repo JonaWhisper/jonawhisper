@@ -260,51 +260,14 @@ unsafe fn create_pill_window() -> (*mut AnyObject, *mut AnyObject) {
     use objc2_foundation::{NSPoint, NSRect, NSSize};
 
     let rect = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(PILL_WIDTH, PILL_HEIGHT));
-    let cls = AnyClass::get(c"NSWindow").unwrap();
-    let ns_win: *mut AnyObject = msg_send![cls, alloc];
-    let ns_win: *mut AnyObject = msg_send![ns_win,
-        initWithContentRect: rect,
-        styleMask: 0u64,
-        backing: 2u64,
-        defer: false
-    ];
+    let ns_win = super::appkit::overlay_window(rect);
 
-    let clear: *mut AnyObject =
-        msg_send![AnyClass::get(c"NSColor").unwrap(), clearColor];
-    let _: () = msg_send![ns_win, setOpaque: false];
-    let _: () = msg_send![ns_win, setBackgroundColor: clear];
-    let _: () = msg_send![ns_win, setHasShadow: true];
-    let _: () = msg_send![ns_win, setIgnoresMouseEvents: true];
-    let _: () = msg_send![ns_win, setLevel: 3i64]; // NSFloatingWindowLevel
-    let _: () = msg_send![ns_win, setCollectionBehavior: 17u64]; // canJoinAllSpaces|stationary
-
-    // Position top-center on the screen where the mouse cursor is.
-    // NSScreen.mainScreen is unreliable for Accessory apps (Apple bug FB11506568) —
-    // it returns the menu bar screen instead of the focused screen. Mouse location
-    // is a reliable proxy for "where the user is working."
-    let mouse_loc: NSPoint = msg_send![AnyClass::get(c"NSEvent").unwrap(), mouseLocation];
-    let screens: *mut AnyObject = msg_send![AnyClass::get(c"NSScreen").unwrap(), screens];
-    let count: usize = msg_send![screens, count];
-    let mut target_frame: Option<NSRect> = None;
-    for i in 0..count {
-        let scr: *mut AnyObject = msg_send![screens, objectAtIndex: i];
-        let frame: NSRect = msg_send![scr, frame];
-        if mouse_loc.x >= frame.origin.x
-            && mouse_loc.x < frame.origin.x + frame.size.width
-            && mouse_loc.y >= frame.origin.y
-            && mouse_loc.y < frame.origin.y + frame.size.height
-        {
-            target_frame = Some(frame);
-            break;
-        }
-    }
-    if let Some(frame) = target_frame {
+    if let Some(frame) = super::appkit::screen_under_cursor() {
         let x = frame.origin.x + (frame.size.width - PILL_WIDTH) / 2.0;
         let y = frame.origin.y + frame.size.height - PILL_HEIGHT - PILL_TOP_OFFSET;
         let _: () = msg_send![ns_win, setFrameOrigin: NSPoint::new(x, y)];
     }
 
-    // NSImageView as content
     let iv: *mut AnyObject = msg_send![AnyClass::get(c"NSImageView").unwrap(), alloc];
     let iv: *mut AnyObject = msg_send![iv, initWithFrame: rect];
     let _: () = msg_send![ns_win, setContentView: iv];
@@ -314,33 +277,13 @@ unsafe fn create_pill_window() -> (*mut AnyObject, *mut AnyObject) {
 
 #[cfg(target_os = "macos")]
 unsafe fn update_image_view(iv: *mut AnyObject, rgba: &[u8]) {
-    let null_planes: *const *mut u8 = std::ptr::null();
-    let cs = objc2_foundation::NSString::from_str("NSDeviceRGBColorSpace");
-
-    let rep: *mut AnyObject = msg_send![AnyClass::get(c"NSBitmapImageRep").unwrap(), alloc];
-    let rep: *mut AnyObject = msg_send![rep,
-        initWithBitmapDataPlanes: null_planes,
-        pixelsWide: PX_W as i64,
-        pixelsHigh: PX_H as i64,
-        bitsPerSample: 8i64,
-        samplesPerPixel: 4i64,
-        hasAlpha: true,
-        isPlanar: false,
-        colorSpaceName: &*cs,
-        bytesPerRow: (PX_W * 4) as i64,
-        bitsPerPixel: 32i64
-    ];
-
-    let bitmap_data: *mut u8 = msg_send![rep, bitmapData];
-    std::ptr::copy_nonoverlapping(rgba.as_ptr(), bitmap_data, rgba.len());
-
-    let size = objc2_foundation::NSSize::new(PILL_WIDTH, PILL_HEIGHT);
-    let img: *mut AnyObject = msg_send![AnyClass::get(c"NSImage").unwrap(), alloc];
-    let img: *mut AnyObject = msg_send![img, initWithSize: size];
-    let _: () = msg_send![img, addRepresentation: rep];
-    let _: () = msg_send![iv, setImage: img];
-    let _: () = msg_send![img, release];
-    let _: () = msg_send![rep, release];
+    super::appkit::set_view_image(
+        iv,
+        rgba,
+        PX_W,
+        PX_H,
+        objc2_foundation::NSSize::new(PILL_WIDTH, PILL_HEIGHT),
+    );
 }
 
 // -- Rendering --
