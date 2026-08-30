@@ -4,6 +4,22 @@ use objc2::msg_send;
 use objc2::runtime::{AnyClass, AnyObject};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 
+/// Backing-store scale of the screens these overlays live on. Windows reads
+/// its own from the monitor; macOS overlays are Retina.
+pub(crate) const DPR: f32 = 2.0;
+
+/// Wrapper for raw AppKit pointers that are created on the main thread and
+/// accessed exclusively through `run_on_main_thread`.
+///
+/// # Safety
+/// These pointers are only dereferenced inside closures dispatched to the main
+/// thread via `AppHandle::run_on_main_thread`, and a `Mutex` around whatever
+/// holds them keeps that access serial. Sending the wrapper across threads is
+/// safe because it is never dereferenced off the main thread.
+pub(crate) struct MainThreadPtr(pub(crate) *mut AnyObject);
+
+unsafe impl Send for MainThreadPtr {}
+
 /// Hand an RGBA buffer to an NSImageView. `points` is the size the bitmap is
 /// drawn at, so a Retina buffer of twice the pixels lands at the same size.
 ///

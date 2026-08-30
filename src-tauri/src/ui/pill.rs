@@ -4,10 +4,12 @@
 
 use super::menu_icons::{sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
 #[cfg(target_os = "macos")]
+use super::appkit::MainThreadPtr;
+#[cfg(target_os = "macos")]
 use objc2::msg_send;
 #[cfg(target_os = "macos")]
 use objc2::runtime::{AnyClass, AnyObject};
-use std::sync::Mutex;
+use super::overlay::Shared;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::AppHandle;
@@ -17,12 +19,8 @@ const PILL_HEIGHT: f64 = 32.0;
 const PILL_TOP_OFFSET: f64 = 40.0;
 /// Both backends animate at this rate.
 const FRAME_INTERVAL: Duration = Duration::from_millis(33);
-/// Backing-store scale. Fixed on macOS, where the overlay lives on a Retina
-/// screen; read from the monitor on Windows, where it follows the display
-/// setting. Everything downstream derives its minimum sizes from the frame
-/// height, so the drawing itself is resolution-independent.
 #[cfg(target_os = "macos")]
-const DPR: f32 = 2.0;
+use super::appkit::DPR;
 #[cfg(target_os = "macos")]
 const PX_W: usize = (PILL_WIDTH as f32 * DPR) as usize; // 160
 #[cfg(target_os = "macos")]
@@ -72,12 +70,7 @@ impl PillState {
     }
 }
 
-static PILL: Mutex<Option<PillState>> = Mutex::new(None);
-
-/// Bumped by every open(). A close/open pair inside one frame interval would
-/// otherwise leave the previous loop running against the new state, animating
-/// everything at twice the rate.
-static GENERATION: AtomicU32 = AtomicU32::new(0);
+static PILL: Shared<PillState> = Shared::new();
 
 /// Advance one animation step. `None` once the pill is closed or superseded,
 /// which is how both backends learn to tear their window down.
@@ -85,11 +78,7 @@ fn tick(generation: u32) -> Option<PillFrame> {
     static FRAMES: AtomicU32 = AtomicU32::new(0);
     static FLAT: AtomicU32 = AtomicU32::new(0);
 
-    if GENERATION.load(Ordering::Relaxed) != generation {
-        return None;
-    }
-    let mut guard = PILL.lock().unwrap();
-    let p = guard.as_mut()?;
+    PILL.update(generation, |p| {
     p.dot_phase += 0.05;
     for i in 0..12 {
         p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
@@ -113,28 +102,23 @@ fn tick(generation: u32) -> Option<PillFrame> {
             }
         }
     }
-    Some(p.frame())
+    p.frame()
+    })
 }
 
 // -- Public API --
 
 pub fn open(app: &AppHandle, initial_mode: PillMode) {
-    {
-        let mut guard = PILL.lock().unwrap();
-        if guard.is_some() {
-            log::debug!("Pill: open() called but already open, skipping");
-            return;
-        }
-        // Published before the window exists so a set_mode() racing right
-        // behind open() lands on the state instead of warning into the void.
-        *guard = Some(PillState::new(initial_mode));
-    }
+    let Some(generation) = PILL.open(PillState::new(initial_mode)) else {
+        log::debug!("Pill: open() called but already open, skipping");
+        return;
+    };
     log::debug!("Pill: opening with mode {:?}", initial_mode);
-    backend_open(app, GENERATION.fetch_add(1, Ordering::Relaxed) + 1);
+    backend_open(app, generation);
 }
 
 pub fn close(app: &AppHandle) {
-    if PILL.lock().unwrap().take().is_none() {
+    if !PILL.close() {
         return;
     }
     log::debug!("Pill: closing");
@@ -142,40 +126,38 @@ pub fn close(app: &AppHandle) {
 }
 
 pub fn set_mode(mode: PillMode) {
-    let mut guard = PILL.lock().unwrap();
-    let Some(ref mut p) = *guard else {
-        log::warn!("Pill: set_mode({:?}) called but pill is not open", mode);
-        return;
-    };
-    log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
+    let applied = PILL.write(|p| {
+        log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
     // Reset spectrum state when entering Recording to avoid stale smoothed values
     if mode == PillMode::Recording {
         let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
         if smooth_max > 0.001 {
             log::debug!("Pill: resetting smoothed (was max={:.4})", smooth_max);
         }
-        p.smoothed = [0.0; 12];
-        p.spectrum = [0.0; 12];
+            p.smoothed = [0.0; 12];
+            p.spectrum = [0.0; 12];
+        }
+        p.mode = mode;
+    });
+    if applied.is_none() {
+        log::warn!("Pill: set_mode({mode:?}) called but pill is not open");
     }
-    p.mode = mode;
 }
 
 pub fn set_spectrum(data: &[f32]) {
-    if let Some(ref mut p) = *PILL.lock().unwrap() {
+    PILL.write(|p| {
         let n = data.len().min(12);
         p.spectrum[..n].copy_from_slice(&data[..n]);
-    }
+    });
 }
 
 pub fn set_pending(count: u32) {
-    if let Some(ref mut p) = *PILL.lock().unwrap() {
-        p.pending_count = count;
-    }
+    PILL.write(|p| p.pending_count = count);
 }
 
 #[allow(dead_code)]
 pub fn is_open() -> bool {
-    PILL.lock().unwrap().is_some()
+    PILL.is_open()
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -194,22 +176,9 @@ fn backend_close(_app: &AppHandle) {}
 
 // -- macOS native implementation --
 
-/// Wrapper for raw AppKit pointers that are created on the main thread and
-/// accessed exclusively through `run_on_main_thread`.
-///
-/// # Safety
-/// These pointers are only dereferenced inside closures dispatched to the main
-/// thread via `AppHandle::run_on_main_thread`. The `Mutex<Option<..>>` ensures
-/// no concurrent access. Sending the wrapper across threads is safe because it
-/// is never dereferenced off the main thread.
 #[cfg(target_os = "macos")]
-struct MainThreadPtr(*mut AnyObject);
-
-#[cfg(target_os = "macos")]
-unsafe impl Send for MainThreadPtr {}
-
-#[cfg(target_os = "macos")]
-static MAC_WINDOW: Mutex<Option<(MainThreadPtr, MainThreadPtr)>> = Mutex::new(None);
+static MAC_WINDOW: std::sync::Mutex<Option<(MainThreadPtr, MainThreadPtr)>> =
+    std::sync::Mutex::new(None);
 
 #[cfg(target_os = "macos")]
 fn backend_open(app: &AppHandle, generation: u32) {
@@ -217,8 +186,7 @@ fn backend_open(app: &AppHandle, generation: u32) {
     let _ = app.run_on_main_thread(move || {
         let (ns_win, iv) = unsafe { create_pill_window() };
         // Render first frame, then show — no flash possible
-        if let Some(ref p) = *PILL.lock().unwrap() {
-            let rgba = render_frame(&p.frame(), DPR);
+        if let Some(rgba) = PILL.read(|p| render_frame(&p.frame(), DPR)) {
             unsafe { update_image_view(iv, &rgba) };
         }
         unsafe {
@@ -568,7 +536,7 @@ mod win {
         };
 
         // First frame before the window is shown — no flash possible.
-        let first = PILL.lock().unwrap().as_ref().map(|p| render_frame(&p.frame(), scale));
+        let first = PILL.read(|p| render_frame(&p.frame(), scale));
         if let Some(rgba) = first {
             overlay.present(&rgba, width, height, x, y);
         }
