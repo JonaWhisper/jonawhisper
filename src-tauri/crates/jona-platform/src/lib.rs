@@ -34,11 +34,17 @@ pub mod audio_devices;
 #[cfg(target_os = "macos")]
 pub mod audio_ducking;
 
+#[cfg(target_os = "windows")]
+pub mod windows;
+
 pub mod hotkey;
 pub mod paste;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;
+
+#[cfg(target_os = "windows")]
+pub use windows::*;
 
 #[cfg(not(target_os = "macos"))]
 pub mod audio_devices {
@@ -135,7 +141,7 @@ pub mod audio_ducking {
     pub fn restore_volume() {}
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub mod stub {
     use super::{PermissionReport, PermissionStatus};
 
@@ -168,5 +174,5 @@ pub mod stub {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub use stub::*;
