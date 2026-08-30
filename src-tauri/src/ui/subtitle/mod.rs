@@ -90,21 +90,3 @@ pub fn close(app: &AppHandle) {
     backend::close(app);
 }
 
-#[cfg(target_os = "windows")]
-fn backend_open(_app: &AppHandle, generation: u32) {
-    win::open(generation);
-}
-/// The Windows backend polls `current`, so a change needs nothing pushed to it,
-/// and the window tears itself down once that returns None.
-#[cfg(target_os = "windows")]
-fn backend_set_text(_app: &AppHandle) {}
-#[cfg(target_os = "windows")]
-fn backend_close(_app: &AppHandle) {}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_open(_app: &AppHandle, _generation: u32) {}
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_set_text(_app: &AppHandle) {}
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_close(_app: &AppHandle) {}
-
