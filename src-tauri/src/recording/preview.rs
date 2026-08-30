@@ -120,6 +120,15 @@ pub fn spawn(app: AppHandle, state: Arc<AppState>, buffer: Arc<PreviewBuffer>) {
                 break;
             }
 
+            // A sign that something is listening. Until the first pass returns
+            // words there is nothing to show, and an absent strip is
+            // indistinguishable from a broken one — which is exactly how it
+            // read. Shown here rather than at open() so it appears when there
+            // is audio to work on, not while the user has yet to speak.
+            if text.settled.is_empty() && text.tail.is_empty() {
+                crate::ui::subtitle::set_text(&app, "…");
+            }
+
             let started = std::time::Instant::now();
             match transcribe(&state, &engine, &scratch, &buffer.slice(tail_from, total)) {
                 Ok(tail) if !tail.is_empty() => {

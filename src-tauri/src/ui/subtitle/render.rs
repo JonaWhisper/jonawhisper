@@ -28,13 +28,10 @@ pub(super) fn render_strip(content: &str, scale: f32, cap: u8) -> Strip {
     let width = (WIDTH as f32 * scale).round() as usize;
     let text_width = (width as f32 - pad * 2.0).max(1.0) as usize;
 
-    let img = text::render(content, FONT_SIZE as f32 * scale, text_width, line_px);
-    let visible = img.lines.clamp(1, cap.max(1) as usize);
-    // Show the tail, not the head: on a live transcript the newest words are
-    // the ones the user is checking, and they are at the bottom.
-    let skipped = img.lines.saturating_sub(visible) as f32 * line_px;
+    let cap_lines = cap.max(1) as usize;
+    let img = text::render(content, FONT_SIZE as f32 * scale, text_width, line_px, cap_lines);
 
-    let points = height_for_lines(visible as f64, cap);
+    let points = height_for_lines(img.lines as f64, cap);
     let height = (points as f32 * scale).round() as usize;
     let mut rgba = vec![0u8; width * height * 4];
     let (cw, ch) = (width as f32, height as f32);
@@ -57,7 +54,7 @@ pub(super) fn render_strip(content: &str, scale: f32, cap: u8) -> Strip {
             let back_a = backdrop * BACKDROP_ALPHA;
 
             let tx = x as f32 - pad;
-            let ty = y as f32 - pad + skipped;
+            let ty = y as f32 - pad;
             let ink = if tx >= 0.0 && ty >= 0.0 {
                 let (tx, ty) = (tx as usize, ty as usize);
                 if tx < img.width && ty < img.height {
@@ -122,6 +119,50 @@ mod tests {
         assert_eq!(long.points, height_for_lines(2.0, 2), "puis plafonne");
     }
 
+    /// Truncated transcripts used to start at pixel 0: the strip dropped the
+    /// oldest lines by shifting the canvas a multiple of the line height, while
+    /// fontdue had placed them on its own metrics.
+    #[test]
+    fn a_truncated_transcript_keeps_its_top_margin() {
+        let long = "Alors, ce que je voudrais faire, c'est afficher le texte pendant que je \
+                    parle, avec beaucoup de mots pour depasser la limite de lignes.";
+        for cap in [1u8, 2, 3] {
+            let strip = render_strip(long, 2.0, cap);
+            let inked = |y: usize| {
+                (0..strip.width).any(|x| strip.rgba[(y * strip.width + x) * 4] > 120)
+            };
+            let first = (0..strip.height).find(|&y| inked(y)).expect("de l'encre");
+            assert!(
+                first >= (PADDING as usize),
+                "cap {cap}: le texte commence a {first}, sous la marge de {PADDING}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_text_keeps_its_margins_top_and_bottom() {
+        let strip = render_strip("Bonjour, ceci deborde jusqu'a la derniere ligne visible.", 2.0, 5);
+        let row_has_ink = |y: usize| {
+            (0..strip.width).any(|x| strip.rgba[(y * strip.width + x) * 4] > 120)
+        };
+        let pad = (PADDING * 2.0) as usize; // en pixels, scale 2
+        let first = (0..strip.height).find(|&y| row_has_ink(y)).expect("de l'encre");
+        let last = (0..strip.height).rev().find(|&y| row_has_ink(y)).expect("de l'encre");
+        assert!(first > 0, "une marge subsiste en haut");
+        assert!(
+            strip.height - 1 - last > 0,
+            "une marge subsiste en bas: encre jusqu'a {last} sur {}",
+            strip.height
+        );
+        // et les deux marges restent comparables — c'est l'asymetrie qui se voyait
+        let top = first;
+        let bottom = strip.height - 1 - last;
+        assert!(
+            top.abs_diff(bottom) <= pad / 2,
+            "marges deséquilibrées: {top} en haut, {bottom} en bas"
+        );
+    }
+
     #[test]
     fn text_is_lighter_than_the_backdrop() {
         let strip = render_strip("IIIIIIIIIIIIIIII", 2.0, 5);
@@ -129,4 +170,5 @@ mod tests {
         assert!(brightest > 100, "de l'encre blanche est visible: {brightest}");
     }
 }
+
 

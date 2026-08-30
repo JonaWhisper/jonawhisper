@@ -36,7 +36,6 @@ pub(super) fn set_text(app: &AppHandle) {
     if !REVEALED.load(Ordering::Relaxed) && !worth_showing(&text) {
         return;
     }
-    let reveal = !REVEALED.swap(true, Ordering::Relaxed);
     let handles = {
         let guard = WINDOW.lock().unwrap();
         match guard.as_ref() {
@@ -44,6 +43,11 @@ pub(super) fn set_text(app: &AppHandle) {
             None => return,
         }
     };
+    // Claimed only once the window exists to be ordered front. open() builds it
+    // on the main thread, so the first set_text usually arrives before it does:
+    // claiming any earlier spends the one reveal on a call that then returns,
+    // and the strip stays hidden for the rest of the dictation.
+    let reveal = !REVEALED.swap(true, Ordering::Relaxed);
     let strip = render_strip(&text, DPR, line_cap());
     let _ = app.run_on_main_thread(move || unsafe {
         let (ns_win, iv) = (handles.0 as *mut AnyObject, handles.1 as *mut AnyObject);
