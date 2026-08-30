@@ -8,7 +8,7 @@
 use super::menu_icons::{sdf_aa, sdf_rrect};
 use super::text;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
 use tauri::AppHandle;
 
 #[cfg(target_os = "macos")]
@@ -46,7 +46,9 @@ struct Strip {
     rgba: Vec<u8>,
     width: usize,
     height: usize,
-    /// What the buffer measures once drawn at `scale`.
+    /// What the buffer measures once drawn at `scale`. AppKit sizes its window
+    /// in points; the Windows overlay works in pixels from end to end.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     points: f64,
 }
 
@@ -112,69 +114,75 @@ fn render_strip(content: &str, scale: f32, cap: u8) -> Strip {
     Strip { rgba, width, height, points }
 }
 
+// -- Shared state --
+
+/// Carries no window handle: each backend keeps its own, so what the app sets
+/// is the same on every platform.
+struct StripState {
+    text: String,
+    /// Bumped on every change, so a backend that polls knows what it has drawn.
+    revision: u64,
+}
+
+static STRIP: Mutex<Option<StripState>> = Mutex::new(None);
+
+/// Bumped by every open(), retiring a backend left over from a close/open pair
+/// too quick for it to notice.
+static GENERATION: AtomicU32 = AtomicU32::new(0);
+
 // -- Public API --
 
 pub fn open(app: &AppHandle, max_lines: u8) {
     MAX_LINES.store(max_lines.clamp(1, 10), Ordering::Relaxed);
-    #[cfg(target_os = "macos")]
     {
-        if SUBTITLE.lock().unwrap().is_some() {
+        let mut guard = STRIP.lock().unwrap();
+        if guard.is_some() {
             return;
         }
-        let _ = app.run_on_main_thread(move || unsafe {
-            let (ns_win, iv) = create_window();
-            let _: () = msg_send![ns_win, orderFrontRegardless];
-            *SUBTITLE.lock().unwrap() =
-                Some(SubtitleInner { ns_window: MainThreadPtr(ns_win), image_view: MainThreadPtr(iv) });
-        });
+        *guard = Some(StripState { text: String::new(), revision: 0 });
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    backend_open(app, GENERATION.fetch_add(1, Ordering::Relaxed) + 1);
 }
 
 /// Replace the displayed text. No-op when the overlay is closed.
 pub fn set_text(app: &AppHandle, text: &str) {
-    #[cfg(target_os = "macos")]
     {
-        let handles = {
-            let guard = SUBTITLE.lock().unwrap();
-            match guard.as_ref() {
-                Some(s) => (s.ns_window.0 as usize, s.image_view.0 as usize),
-                None => return,
-            }
-        };
-        let strip = render_strip(text, DPR, line_cap());
-        let _ = app.run_on_main_thread(move || unsafe {
-            let (ns_win, iv) = (handles.0 as *mut AnyObject, handles.1 as *mut AnyObject);
-            resize_to(ns_win, iv, strip.points);
-            super::appkit::set_view_image(
-                iv,
-                &strip.rgba,
-                strip.width,
-                strip.height,
-                objc2_foundation::NSSize::new(WIDTH, strip.points),
-            );
-        });
+        let mut guard = STRIP.lock().unwrap();
+        let Some(state) = guard.as_mut() else { return };
+        if state.text == text {
+            return;
+        }
+        state.text.clear();
+        state.text.push_str(text);
+        state.revision += 1;
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = (app, text);
+    backend_set_text(app);
 }
 
 pub fn close(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        let addr = SUBTITLE.lock().unwrap().take().map(|s| s.ns_window.0 as usize);
-        if let Some(addr) = addr {
-            let _ = app.run_on_main_thread(move || unsafe {
-                let ns_win = addr as *mut AnyObject;
-                let _: () = msg_send![ns_win, orderOut: std::ptr::null::<AnyObject>()];
-                let _: () = msg_send![ns_win, close];
-            });
-        }
+    if STRIP.lock().unwrap().take().is_none() {
+        return;
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    backend_close(app);
 }
+
+#[cfg(target_os = "windows")]
+fn backend_open(_app: &AppHandle, generation: u32) {
+    win::open(generation);
+}
+/// The Windows backend polls `current`, so a change needs nothing pushed to it,
+/// and the window tears itself down once that returns None.
+#[cfg(target_os = "windows")]
+fn backend_set_text(_app: &AppHandle) {}
+#[cfg(target_os = "windows")]
+fn backend_close(_app: &AppHandle) {}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn backend_open(_app: &AppHandle, _generation: u32) {}
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn backend_set_text(_app: &AppHandle) {}
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn backend_close(_app: &AppHandle) {}
 
 // -- macOS native implementation --
 
@@ -191,7 +199,58 @@ struct SubtitleInner {
 }
 
 #[cfg(target_os = "macos")]
-static SUBTITLE: Mutex<Option<SubtitleInner>> = Mutex::new(None);
+static WINDOW: Mutex<Option<SubtitleInner>> = Mutex::new(None);
+
+#[cfg(target_os = "macos")]
+fn backend_open(app: &AppHandle, _generation: u32) {
+    let _ = app.run_on_main_thread(move || unsafe {
+        let (ns_win, iv) = create_window();
+        let _: () = msg_send![ns_win, orderFrontRegardless];
+        *WINDOW.lock().unwrap() = Some(SubtitleInner {
+            ns_window: MainThreadPtr(ns_win),
+            image_view: MainThreadPtr(iv),
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn backend_set_text(app: &AppHandle) {
+    let Some((text, _)) = STRIP.lock().unwrap().as_ref().map(|s| (s.text.clone(), s.revision))
+    else {
+        return;
+    };
+    let handles = {
+        let guard = WINDOW.lock().unwrap();
+        match guard.as_ref() {
+            Some(w) => (w.ns_window.0 as usize, w.image_view.0 as usize),
+            None => return,
+        }
+    };
+    let strip = render_strip(&text, DPR, line_cap());
+    let _ = app.run_on_main_thread(move || unsafe {
+        let (ns_win, iv) = (handles.0 as *mut AnyObject, handles.1 as *mut AnyObject);
+        resize_to(ns_win, iv, strip.points);
+        super::appkit::set_view_image(
+            iv,
+            &strip.rgba,
+            strip.width,
+            strip.height,
+            objc2_foundation::NSSize::new(WIDTH, strip.points),
+        );
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn backend_close(app: &AppHandle) {
+    let addr = WINDOW.lock().unwrap().take().map(|w| w.ns_window.0 as usize);
+    if let Some(addr) = addr {
+        let _ = app.run_on_main_thread(move || unsafe {
+            let ns_win = addr as *mut AnyObject;
+            let _: () = msg_send![ns_win, orderOut: std::ptr::null::<AnyObject>()];
+            let _: () = msg_send![ns_win, close];
+        });
+    }
+}
 
 #[cfg(target_os = "macos")]
 unsafe fn create_window() -> (*mut AnyObject, *mut AnyObject) {
@@ -237,6 +296,74 @@ unsafe fn position_under_pill(ns_win: *mut AnyObject, height: f64) {
     let x = frame.origin.x + (frame.size.width - WIDTH) / 2.0;
     let y = frame.origin.y + frame.size.height - height - TOP_OFFSET;
     let _: () = msg_send![ns_win, setFrameOrigin: NSPoint::new(x, y)];
+}
+
+// -- Windows native implementation --
+
+#[cfg(target_os = "windows")]
+mod win {
+    use super::{GENERATION, STRIP, TOP_OFFSET, line_cap, render_strip};
+    use crate::ui::layered::{Overlay, cursor_display};
+    use std::sync::atomic::Ordering;
+    use std::time::Duration;
+    use windows_sys::core::w;
+
+    /// The text changes at most once a second; 20 Hz is imperceptibly prompt
+    /// and leaves the CPU alone.
+    const POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+    pub fn open(generation: u32) {
+        std::thread::spawn(move || unsafe { run(generation) });
+    }
+
+    /// What to show. `None` once the strip is closed or superseded, which is
+    /// how the thread learns to tear its window down.
+    fn current(generation: u32) -> Option<(String, u64)> {
+        if GENERATION.load(Ordering::Relaxed) != generation {
+            return None;
+        }
+        let guard = STRIP.lock().unwrap();
+        let state = guard.as_ref()?;
+        Some((state.text.clone(), state.revision))
+    }
+
+    unsafe fn run(generation: u32) {
+        let (scale, screen) = cursor_display();
+        let top = screen.top + (TOP_OFFSET as f32 * scale).round() as i32;
+
+        let mut drawn = None;
+        let mut shown = false;
+        let mut overlay = None;
+        loop {
+            let Some((text, revision)) = current(generation) else { break };
+            if drawn != Some(revision) {
+                drawn = Some(revision);
+                let strip = render_strip(&text, scale, line_cap());
+                let (width, height) = (strip.width as i32, strip.height as i32);
+                let x = screen.left + (screen.right - screen.left - width) / 2;
+
+                if overlay.is_none() {
+                    let Some(window) =
+                        Overlay::new(w!("JonaWhisperSubtitle"), x, top, width, height)
+                    else {
+                        return;
+                    };
+                    overlay = Some(window);
+                }
+                let window = overlay.as_mut().expect("just created");
+                // Painted before the first show, so the strip never appears empty.
+                window.present(&strip.rgba, width, height, x, top);
+                if !shown {
+                    window.show();
+                    shown = true;
+                }
+            }
+            if let Some(window) = overlay.as_ref() {
+                window.pump();
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        }
+    }
 }
 
 #[cfg(test)]

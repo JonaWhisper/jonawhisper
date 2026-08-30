@@ -546,195 +546,39 @@ const DIGITS: [[u8; 15]; 10] = [
 
 // -- Windows native implementation --
 
-/// Layered window: the compositor blends our premultiplied buffer directly, so
-/// the pill keeps the rounded, translucent look it has on macOS with no HWND
-/// background to flash through. Everything runs on one thread because a window
-/// may only be destroyed by the thread that created it.
 #[cfg(target_os = "windows")]
 mod win {
-    use super::{
-        FRAME_INTERVAL, PILL, PILL_HEIGHT, PILL_TOP_OFFSET, PILL_WIDTH, render_frame, tick,
-    };
-    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
-    use windows_sys::Win32::Graphics::Gdi::{
-        AC_SRC_ALPHA, AC_SRC_OVER, BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BLENDFUNCTION,
-        CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC,
-        GetMonitorInfoW, HBITMAP, HDC, HGDIOBJ, MONITOR_DEFAULTTONEAREST, MONITORINFO,
-        MonitorFromPoint, ReleaseDC, SelectObject,
-    };
-    use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-    use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetCursorPos, MSG,
-        PM_REMOVE, PeekMessageW, RegisterClassW, SW_SHOWNOACTIVATE, ShowWindow, ULW_ALPHA,
-        UpdateLayeredWindow, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
-        WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
-    };
+    use super::{FRAME_INTERVAL, PILL, PILL_HEIGHT, PILL_TOP_OFFSET, PILL_WIDTH, render_frame, tick};
+    use crate::ui::layered::{Overlay, cursor_display};
     use windows_sys::core::w;
-
-    /// Windows reports DPI against this baseline; the ratio is our render scale.
-    const BASELINE_DPI: f32 = 96.0;
 
     pub fn open(generation: u32) {
         std::thread::spawn(move || unsafe { run(generation) });
     }
 
-    unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
-        DefWindowProcW(hwnd, msg, w, l)
-    }
-
-    /// Scale and physical top-centre placement on the display holding the
-    /// cursor — the same "where the user is working" rule as the macOS side.
-    unsafe fn placement() -> (f32, i32, i32, i32, i32) {
-        let mut cursor = POINT { x: 0, y: 0 };
-        GetCursorPos(&mut cursor);
-        let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
-
-        let mut dpi_x = BASELINE_DPI as u32;
-        let mut dpi_y = 0u32;
-        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
-        let scale = dpi_x as f32 / BASELINE_DPI;
-
-        let mut info: MONITORINFO = std::mem::zeroed();
-        info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-        GetMonitorInfoW(monitor, &mut info);
-
+    unsafe fn run(generation: u32) {
+        let (scale, screen) = cursor_display();
         let width = (PILL_WIDTH as f32 * scale).round() as i32;
         let height = (PILL_HEIGHT as f32 * scale).round() as i32;
-        let rc = info.rcMonitor;
-        let x = rc.left + (rc.right - rc.left - width) / 2;
-        let y = rc.top + (PILL_TOP_OFFSET as f32 * scale).round() as i32;
-        (scale, x, y, width, height)
-    }
+        let x = screen.left + (screen.right - screen.left - width) / 2;
+        let y = screen.top + (PILL_TOP_OFFSET as f32 * scale).round() as i32;
 
-    unsafe fn run(generation: u32) {
-        let hinstance = GetModuleHandleW(std::ptr::null());
-        let mut class: WNDCLASSW = std::mem::zeroed();
-        class.lpfnWndProc = Some(wnd_proc);
-        class.hInstance = hinstance;
-        class.lpszClassName = w!("JonaWhisperPill");
-        // A second open() re-registers the same class; the duplicate is refused
-        // and the original registration stays valid, which is all we need.
-        RegisterClassW(&class);
-
-        let (scale, x, y, width, height) = placement();
-        let hwnd = CreateWindowExW(
-            WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
-            class.lpszClassName,
-            w!("JonaWhisper"),
-            WS_POPUP,
-            x,
-            y,
-            width,
-            height,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            hinstance,
-            std::ptr::null(),
-        );
-        if hwnd.is_null() {
-            log::error!("Pill: CreateWindowExW failed, overlay unavailable");
-            return;
-        }
-
-        let Some(mut surface) = Surface::new(width, height) else {
-            log::error!("Pill: CreateDIBSection failed, overlay unavailable");
-            DestroyWindow(hwnd);
+        let Some(mut overlay) = Overlay::new(w!("JonaWhisperPill"), x, y, width, height) else {
             return;
         };
 
         // First frame before the window is shown — no flash possible.
         let first = PILL.lock().unwrap().as_ref().map(|p| render_frame(&p.frame(), scale));
         if let Some(rgba) = first {
-            surface.blit(hwnd, &rgba, width, height);
+            overlay.present(&rgba, width, height, x, y);
         }
-        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+        overlay.show();
 
         loop {
-            let mut msg: MSG = std::mem::zeroed();
-            while PeekMessageW(&mut msg, hwnd, 0, 0, PM_REMOVE) != 0 {
-                DispatchMessageW(&msg);
-            }
+            overlay.pump();
             std::thread::sleep(FRAME_INTERVAL);
             let Some(frame) = tick(generation) else { break };
-            surface.blit(hwnd, &render_frame(&frame, scale), width, height);
-        }
-
-        DestroyWindow(hwnd);
-    }
-
-    /// The DIB the compositor reads from, kept between frames so each one costs
-    /// a copy rather than an allocation.
-    struct Surface {
-        dc: HDC,
-        bitmap: HBITMAP,
-        previous: HGDIOBJ,
-        bits: *mut u8,
-    }
-
-    impl Surface {
-        unsafe fn new(width: i32, height: i32) -> Option<Self> {
-            let mut info: BITMAPINFO = std::mem::zeroed();
-            info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
-            info.bmiHeader.biWidth = width;
-            // Negative: our buffer starts at the top row, GDI defaults to bottom-up.
-            info.bmiHeader.biHeight = -height;
-            info.bmiHeader.biPlanes = 1;
-            info.bmiHeader.biBitCount = 32;
-            info.bmiHeader.biCompression = BI_RGB;
-
-            let screen = GetDC(std::ptr::null_mut());
-            let dc = CreateCompatibleDC(screen);
-            ReleaseDC(std::ptr::null_mut(), screen);
-            let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
-            let bitmap =
-                CreateDIBSection(dc, &info, DIB_RGB_COLORS, &mut bits, std::ptr::null_mut(), 0);
-            if bitmap.is_null() || bits.is_null() {
-                DeleteDC(dc);
-                return None;
-            }
-            let previous = SelectObject(dc, bitmap);
-            Some(Self { dc, bitmap, previous, bits: bits.cast() })
-        }
-
-        unsafe fn blit(&mut self, hwnd: HWND, rgba: &[u8], width: i32, height: i32) {
-            let dst = std::slice::from_raw_parts_mut(self.bits, rgba.len());
-            // Both sides are premultiplied; only the channel order differs.
-            for (out, px) in dst.chunks_exact_mut(4).zip(rgba.chunks_exact(4)) {
-                out[0] = px[2];
-                out[1] = px[1];
-                out[2] = px[0];
-                out[3] = px[3];
-            }
-            let size = SIZE { cx: width, cy: height };
-            let origin = POINT { x: 0, y: 0 };
-            let blend = BLENDFUNCTION {
-                BlendOp: AC_SRC_OVER as u8,
-                BlendFlags: 0,
-                SourceConstantAlpha: 255,
-                AlphaFormat: AC_SRC_ALPHA as u8,
-            };
-            UpdateLayeredWindow(
-                hwnd,
-                std::ptr::null_mut(),
-                std::ptr::null(),
-                &size,
-                self.dc,
-                &origin,
-                0,
-                &blend,
-                ULW_ALPHA,
-            );
-        }
-    }
-
-    impl Drop for Surface {
-        fn drop(&mut self) {
-            unsafe {
-                SelectObject(self.dc, self.previous);
-                DeleteObject(self.bitmap);
-                DeleteDC(self.dc);
-            }
+            overlay.present(&render_frame(&frame, scale), width, height, x, y);
         }
     }
 }
