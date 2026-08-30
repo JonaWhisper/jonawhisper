@@ -187,10 +187,10 @@ fn backend_close(_app: &AppHandle) {}
 fn backend_open(_app: &AppHandle, generation: u32) {
     win::open(generation);
 }
+/// The window tears itself down once `tick` reports the pill is gone, so
+/// closing needs nothing from the calling thread.
 #[cfg(target_os = "windows")]
-fn backend_close(_app: &AppHandle) {
-    win::close();
-}
+fn backend_close(_app: &AppHandle) {}
 
 // -- macOS native implementation --
 
@@ -635,10 +635,6 @@ mod win {
     pub fn open(generation: u32) {
         std::thread::spawn(move || unsafe { run(generation) });
     }
-
-    /// The window tears itself down once `tick` reports the pill is gone, so
-    /// closing needs nothing from the calling thread.
-    pub fn close() {}
 
     unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
         DefWindowProcW(hwnd, msg, w, l)
