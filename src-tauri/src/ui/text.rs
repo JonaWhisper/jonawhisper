@@ -96,7 +96,13 @@ impl FontSet {
 
 /// Lay out and rasterise `text`, wrapping at `width`. The image is exactly
 /// `width` wide and as tall as the wrapped text turned out to need.
-pub(crate) fn render(text: &str, px: f32, width: usize, line_height: f32) -> TextImage {
+pub(crate) fn render(
+    text: &str,
+    px: f32,
+    width: usize,
+    line_height: f32,
+    max_lines: usize,
+) -> TextImage {
     let mut set = FONTS.lock().unwrap();
     let mut layout: Layout = Layout::new(CoordinateSystem::PositiveYDown);
     layout.reset(&LayoutSettings {
@@ -123,13 +129,26 @@ pub(crate) fn render(text: &str, px: f32, width: usize, line_height: f32) -> Tex
         layout.append(&set.fonts, &TextStyle::new(&run, px, run_font));
     }
 
-    let lines = layout.lines().map_or(0, |l| l.len());
+    let all = layout.lines().map_or(0, |l| l.len());
+    let lines = all.min(max_lines.max(1));
+    // Drop the oldest lines rather than the newest: on a live transcript the
+    // words being checked are the last ones. The offset comes from the line's
+    // own position, not from a multiple of line_height — fontdue lays lines out
+    // on its own metrics, and the difference is what pushed the first visible
+    // line hard against the top padding.
+    let skip = all - lines;
+    let top = layout
+        .lines()
+        .and_then(|l| l.get(skip))
+        .map_or(0.0, |line| line.baseline_y - line.max_ascent);
+
     // Descenders on the last line reach below its line box — a cedilla or a "p"
     // loses its tail if the canvas stops at lines * line_height.
     let deepest = layout
         .glyphs()
         .iter()
-        .map(|g| g.y + g.height as f32)
+        .filter(|g| g.y >= top)
+        .map(|g| g.y + g.height as f32 - top)
         .fold(0.0f32, f32::max);
     let height = (lines as f32 * line_height).max(deepest).ceil().max(line_height) as usize;
     let mut alpha = vec![0.0f32; width * height];
@@ -140,7 +159,7 @@ pub(crate) fn render(text: &str, px: f32, width: usize, line_height: f32) -> Tex
         }
         let (_, coverage) = set.fonts[glyph.font_index].rasterize_config(glyph.key);
         for row in 0..glyph.height {
-            let y = glyph.y as isize + row as isize;
+            let y = (glyph.y - top) as isize + row as isize;
             if y < 0 || y as usize >= height {
                 continue;
             }
@@ -165,7 +184,7 @@ mod tests {
 
     #[test]
     fn renders_latin_text_into_the_requested_width() {
-        let img = render("Bonjour", 15.0, 200, 19.0);
+        let img = render("Bonjour", 15.0, 200, 19.0, usize::MAX);
         assert_eq!(img.width, 200);
         assert_eq!(img.lines, 1);
         assert_eq!(img.alpha.len(), img.width * img.height);
@@ -174,8 +193,8 @@ mod tests {
 
     #[test]
     fn wraps_onto_several_lines_when_the_width_runs_out() {
-        let narrow = render("Bonjour ceci est une phrase de test", 15.0, 90, 19.0);
-        let wide = render("Bonjour ceci est une phrase de test", 15.0, 600, 19.0);
+        let narrow = render("Bonjour ceci est une phrase de test", 15.0, 90, 19.0, usize::MAX);
+        let wide = render("Bonjour ceci est une phrase de test", 15.0, 600, 19.0, usize::MAX);
         assert!(narrow.lines > wide.lines);
         assert!(narrow.height > wide.height);
     }
@@ -184,7 +203,7 @@ mod tests {
     fn the_canvas_makes_room_for_a_descender_on_the_last_line() {
         // Retina scale, where the strip actually draws: 15pt text, 19pt lines.
         let wrapped = "Bonjour ceci est un apercu de la bande de sous-titres avec un \u{e7}";
-        let img = render(wrapped, 30.0, 500, 38.0);
+        let img = render(wrapped, 30.0, 500, 38.0, usize::MAX);
         assert!(img.lines > 1, "le texte doit passer a la ligne");
         assert!(
             img.height > (img.lines as f32 * 38.0) as usize,
@@ -196,7 +215,7 @@ mod tests {
 
     #[test]
     fn empty_text_still_yields_one_line_of_canvas() {
-        let img = render("", 15.0, 200, 19.0);
+        let img = render("", 15.0, 200, 19.0, usize::MAX);
         assert_eq!(img.height, 19);
         assert!(img.alpha.iter().all(|&a| a == 0.0));
     }
