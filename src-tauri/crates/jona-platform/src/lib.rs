@@ -37,6 +37,11 @@ pub mod audio_ducking;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+#[cfg(target_os = "windows")]
+pub mod audio_ducking_windows;
+#[cfg(target_os = "windows")]
+pub use audio_ducking_windows as audio_ducking;
+
 pub mod hotkey;
 pub mod paste;
 
@@ -135,7 +140,7 @@ pub mod audio_devices {
     pub fn start_device_change_listener(_callback: impl Fn() + Send + 'static) {}
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub mod audio_ducking {
     pub fn duck_volume(_ratio: f32) {}
     pub fn restore_volume() {}
