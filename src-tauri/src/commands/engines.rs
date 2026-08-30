@@ -42,7 +42,9 @@ pub async fn download_model_cmd(
         .model_by_id(&id)
         .ok_or_else(|| AppError::Other(format!("Model not found: {}", id)))?;
 
-    let result = downloader::download_model(app.clone(), Arc::clone(&state.download), model).await;
+    let verify = state.settings.lock().unwrap().verify_after_download;
+    let result =
+        downloader::download_model(app.clone(), Arc::clone(&state.download), model, verify).await;
     let _ = app.emit(events::MODELS_CHANGED, ());
     Ok(result)
 }
@@ -63,6 +65,16 @@ pub fn pause_download(id: String, state: tauri::State<'_, Arc<AppState>>) {
     let dl = state.download.lock().unwrap();
     if let Some(entry) = dl.active.get(&id) {
         entry.cancel_requested.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Give up on the post-download hash. The file is complete and stays; only the
+/// version.json that would let us spot a later update is skipped.
+#[tauri::command]
+pub fn cancel_verification(id: String, state: tauri::State<'_, Arc<AppState>>) {
+    let dl = state.download.lock().unwrap();
+    if let Some(entry) = dl.active.get(&id) {
+        entry.verify_cancel.store(true, Ordering::Relaxed);
     }
 }
 

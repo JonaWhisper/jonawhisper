@@ -76,6 +76,12 @@ export const useDownloadStore = defineStore('downloads', () => {
     } catch (e) { console.error('cancelDownload failed:', e) }
   }
 
+  /// Abandonne le hachage post-telechargement. Le modele reste utilisable ;
+  /// seule la detection d'une mise a jour ulterieure est perdue.
+  async function cancelVerification(id: string) {
+    await invoke('cancel_verification', { id })
+  }
+
   async function deleteModel(id: string) {
     deletingModels.value = { ...deletingModels.value, [id]: true }
     try {
@@ -128,7 +134,7 @@ export const useDownloadStore = defineStore('downloads', () => {
 
   return {
     activeDownloads, deletingModels,
-    downloadModel, pauseDownload, cancelDownload, deleteModel,
+    downloadModel, pauseDownload, cancelDownload, cancelVerification, deleteModel,
     hydrateFromBackend, setupListeners, cleanup,
   }
 })

@@ -53,7 +53,21 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
           {{ isVerifying ? t('modelManager.verifying') : speedText }}
         </div>
       </div>
-      <template v-if="isVerifying || isStopping">
+      <!-- Verification : rien a mettre en pause, mais on peut s'en passer -->
+      <template v-if="isVerifying">
+        <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+        <TooltipProvider :delay-duration="300">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="icon-sm" :aria-label="t('aria.cancel')" @click="downloads.cancelVerification(model.id)">
+                <X class="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.skipVerification') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </template>
+      <template v-else-if="isStopping">
         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
       </template>
       <TooltipProvider v-else :delay-duration="300">

@@ -240,6 +240,7 @@ pub fn run() {
             commands::engines::delete_model_cmd,
             commands::engines::pause_download,
             commands::engines::cancel_download,
+            commands::engines::cancel_verification,
             commands::engines::get_languages,
             commands::history::get_history,
             commands::history::set_history_rating,
