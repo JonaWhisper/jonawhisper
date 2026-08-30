@@ -13,9 +13,21 @@ use tauri::AppHandle;
 const PILL_WIDTH: f64 = 80.0;
 const PILL_HEIGHT: f64 = 32.0;
 const PILL_TOP_OFFSET: f64 = 40.0;
-const DPR: f32 = 2.0; // Retina
+/// Backing-store scale. Fixed on macOS, where the overlay lives on a Retina
+/// screen; read from the monitor on Windows, where it follows the display
+/// setting. Everything downstream derives its minimum sizes from the frame
+/// height, so the drawing itself is resolution-independent.
+#[cfg(target_os = "macos")]
+const DPR: f32 = 2.0;
+#[cfg(target_os = "macos")]
 const PX_W: usize = (PILL_WIDTH as f32 * DPR) as usize; // 160
+#[cfg(target_os = "macos")]
 const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
+
+/// Scale a frame of this height was drawn at.
+fn frame_scale(ch: f32) -> f32 {
+    (ch / PILL_HEIGHT as f32).max(1.0)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PillMode {
@@ -55,6 +67,18 @@ struct PillInner {
 }
 
 #[cfg(target_os = "macos")]
+impl PillInner {
+    fn frame(&self) -> PillFrame {
+        PillFrame {
+            mode: self.mode,
+            smoothed: self.smoothed,
+            dot_phase: self.dot_phase,
+            pending_count: self.pending_count,
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
 static PILL: Mutex<Option<PillInner>> = Mutex::new(None);
 
 // -- Public API --
@@ -80,7 +104,7 @@ pub fn open(app: &AppHandle, initial_mode: PillMode) {
                 pending_count: 0,
             };
             // Render first frame, then show — no flash possible
-            let rgba = render_frame(&inner);
+            let rgba = render_frame(&inner.frame(), DPR);
             unsafe { update_image_view(iv, &rgba) };
             unsafe {
                 let _: () = msg_send![ns_win, orderFrontRegardless];
@@ -213,7 +237,7 @@ fn animation_loop(app: AppHandle) {
                     }
                 }
             }
-            let rgba = render_frame(p);
+            let rgba = render_frame(&p.frame(), DPR);
             let iv = p.image_view.0;
             drop(pill); // unlock before AppKit call
             unsafe { update_image_view(iv, &rgba) };
@@ -312,10 +336,18 @@ unsafe fn update_image_view(iv: *mut AnyObject, rgba: &[u8]) {
 
 // -- Rendering --
 
-#[cfg(target_os = "macos")]
-fn render_frame(p: &PillInner) -> Vec<u8> {
-    let w = PX_W;
-    let h = PX_H;
+/// Everything a frame needs, with no platform handles: the drawing is shared by
+/// every backend, only the blitting differs.
+pub(crate) struct PillFrame {
+    pub mode: PillMode,
+    pub smoothed: [f32; 12],
+    pub dot_phase: f32,
+    pub pending_count: u32,
+}
+
+fn render_frame(p: &PillFrame, scale: f32) -> Vec<u8> {
+    let w = (PILL_WIDTH as f32 * scale).round() as usize;
+    let h = (PILL_HEIGHT as f32 * scale).round() as usize;
     let cw = w as f32;
     let ch = h as f32;
     let mut rgba = vec![0u8; w * h * 4];
@@ -426,8 +458,9 @@ fn over(dr: &mut f32, dg: &mut f32, db: &mut f32, da: &mut f32, sr: f32, sg: f32
 // -- Drawing helpers --
 
 fn spectrum_alpha(px: f32, py: f32, spectrum: &[f32; 12], cw: f32, ch: f32) -> f32 {
-    let bar_w = (cw * 0.035).max(2.0 * DPR);
-    let gap = (cw * 0.025).max(1.0 * DPR);
+    let scale = frame_scale(ch);
+    let bar_w = (cw * 0.035).max(2.0 * scale);
+    let gap = (cw * 0.025).max(1.0 * scale);
     let total = 12.0 * bar_w + 11.0 * gap;
     let start_x = (cw - total) / 2.0;
     let max_h = ch * 0.6;
@@ -435,7 +468,7 @@ fn spectrum_alpha(px: f32, py: f32, spectrum: &[f32; 12], cw: f32, ch: f32) -> f
 
     let mut a = 0.0f32;
     for (i, &val) in spectrum.iter().enumerate().take(12) {
-        let bh = (val * max_h).max(2.0 * DPR);
+        let bh = (val * max_h).max(2.0 * scale);
         let cx = start_x + i as f32 * (bar_w + gap) + bar_w / 2.0;
         let d = sdf_rrect(px, py, cx, cy, bar_w / 2.0, bh / 2.0, bar_w / 2.0);
         a = a.max(sdf_aa(d));
@@ -455,8 +488,9 @@ fn pause_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
 }
 
 fn dots_pixel(px: f32, py: f32, phase: f32, cw: f32, ch: f32) -> (f32, f32, f32, f32) {
-    let dot_r = (ch * 0.12).max(3.0 * DPR) / 2.0;
-    let gap = (cw * 0.08).max(4.0 * DPR);
+    let scale = frame_scale(ch);
+    let dot_r = (ch * 0.12).max(3.0 * scale) / 2.0;
+    let gap = (cw * 0.08).max(4.0 * scale);
     let total = 3.0 * dot_r * 2.0 + 2.0 * gap;
     let start_x = (cw - total) / 2.0;
     let cy = ch / 2.0;
@@ -478,10 +512,11 @@ fn dots_pixel(px: f32, py: f32, phase: f32, cw: f32, ch: f32) -> (f32, f32, f32,
 }
 
 fn success_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
+    let scale = frame_scale(ch);
     let size = (ch * 0.45).round();
     let cx = cw / 2.0;
     let cy = ch / 2.0;
-    let lw = (ch * 0.07).max(1.5 * DPR);
+    let lw = (ch * 0.07).max(1.5 * scale);
 
     // Checkmark: short stroke down-right, then long stroke up-right
     let x0 = cx - size * 0.4;
@@ -497,10 +532,11 @@ fn success_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
 }
 
 fn error_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
+    let scale = frame_scale(ch);
     let size = (ch * 0.45).round();
     let cx = cw / 2.0;
     let cy = ch / 2.0;
-    let lw = (ch * 0.07).max(1.5 * DPR);
+    let lw = (ch * 0.07).max(1.5 * scale);
 
     let d1 = sdf_segment(px, py, cx - size / 2.0, cy - size / 2.0, cx + size / 2.0, cy + size / 2.0) - lw / 2.0;
     let d2 = sdf_segment(px, py, cx + size / 2.0, cy - size / 2.0, cx - size / 2.0, cy + size / 2.0) - lw / 2.0;
@@ -508,9 +544,10 @@ fn error_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
 }
 
 fn badge_pixel(px: f32, py: f32, count: u32, cw: f32, ch: f32) -> (f32, f32, f32, f32) {
+    let scale = frame_scale(ch);
     let badge_r = (ch * 0.4 / 2.0).round();
-    let bx = cw - badge_r - 2.0 * DPR;
-    let by = badge_r + 2.0 * DPR;
+    let bx = cw - badge_r - 2.0 * scale;
+    let by = badge_r + 2.0 * scale;
 
     let circle_a = sdf_aa(sdf_circle(px, py, bx, by, badge_r));
     if circle_a <= 0.0 {
@@ -743,60 +780,37 @@ mod tests {
 
     // -- Full frame render --
 
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn render_frame_produces_correct_buffer_size() {
-        let p = PillInner {
-            ns_window: MainThreadPtr(std::ptr::null_mut()),
-            image_view: MainThreadPtr(std::ptr::null_mut()),
-            mode: PillMode::Recording,
-            spectrum: [0.5; 12],
-            smoothed: [0.5; 12],
-            dot_phase: 0.0,
-            pending_count: 0,
-        };
-        let rgba = render_frame(&p);
-        assert_eq!(rgba.len(), PX_W * PX_H * 4, "RGBA buffer should be width*height*4");
+    fn frame(mode: PillMode) -> PillFrame {
+        PillFrame { mode, smoothed: [0.5; 12], dot_phase: 0.0, pending_count: 0 }
     }
 
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn render_frame_has_transparent_corners() {
-        let p = PillInner {
-            ns_window: MainThreadPtr(std::ptr::null_mut()),
-            image_view: MainThreadPtr(std::ptr::null_mut()),
-            mode: PillMode::Recording,
-            spectrum: [0.5; 12],
-            smoothed: [0.5; 12],
-            dot_phase: 0.0,
-            pending_count: 0,
-        };
-        let rgba = render_frame(&p);
-        // Top-left corner (0,0) should be transparent (pill is a capsule shape)
-        let a = rgba[3];
-        assert_eq!(a, 0, "Corner pixels should be transparent (capsule shape)");
+    fn px(rgba: &[u8], x: usize, y: usize, scale: f32) -> &[u8] {
+        let w = (PILL_WIDTH as f32 * scale).round() as usize;
+        &rgba[(y * w + x) * 4..][..4]
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn render_frame_has_opaque_center() {
-        let p = PillInner {
-            ns_window: MainThreadPtr(std::ptr::null_mut()),
-            image_view: MainThreadPtr(std::ptr::null_mut()),
-            mode: PillMode::Idle,
-            spectrum: [0.0; 12],
-            smoothed: [0.0; 12],
-            dot_phase: 0.0,
-            pending_count: 0,
-        };
-        let rgba = render_frame(&p);
-        // Center pixel should be opaque (pill background)
-        let center = (PX_H / 2 * PX_W + PX_W / 2) * 4;
-        let a = rgba[center + 3];
-        assert!(a > 200, "Center pixel should be nearly opaque: {a}");
+    fn render_frame_sizes_the_buffer_from_the_scale() {
+        for scale in [1.0, 1.5, 2.0, 3.0] {
+            let w = (PILL_WIDTH as f32 * scale).round() as usize;
+            let h = (PILL_HEIGHT as f32 * scale).round() as usize;
+            let rgba = render_frame(&frame(PillMode::Recording), scale);
+            assert_eq!(rgba.len(), w * h * 4, "buffer at scale {scale}");
+        }
     }
 
-    #[cfg(target_os = "macos")]
+    #[test]
+    fn render_frame_keeps_the_capsule_shape_at_every_scale() {
+        for scale in [1.0, 1.5, 2.0, 3.0] {
+            let h = (PILL_HEIGHT as f32 * scale).round() as usize;
+            let w = (PILL_WIDTH as f32 * scale).round() as usize;
+            let rgba = render_frame(&frame(PillMode::Idle), scale);
+            assert_eq!(px(&rgba, 0, 0, scale)[3], 0, "corner at scale {scale}");
+            let a = px(&rgba, w / 2, h / 2, scale)[3];
+            assert!(a > 200, "center at scale {scale}: {a}");
+        }
+    }
+
     #[test]
     fn each_pill_mode_renders_different_content() {
         let modes = [
@@ -805,20 +819,10 @@ mod tests {
             PillMode::Success,
             PillMode::Error,
         ];
-        let mut frames: Vec<Vec<u8>> = Vec::new();
-        for mode in modes {
-            let p = PillInner {
-                ns_window: MainThreadPtr(std::ptr::null_mut()),
-                image_view: MainThreadPtr(std::ptr::null_mut()),
-                mode,
-                spectrum: [0.5; 12],
-                smoothed: [0.5; 12],
-                dot_phase: 1.0,
-                pending_count: 0,
-            };
-            frames.push(render_frame(&p));
-        }
-        // Each mode should produce a visually distinct frame
+        let frames: Vec<Vec<u8>> = modes
+            .iter()
+            .map(|&mode| render_frame(&frame(mode), 2.0))
+            .collect();
         for i in 0..frames.len() {
             for j in (i + 1)..frames.len() {
                 assert_ne!(frames[i], frames[j],
