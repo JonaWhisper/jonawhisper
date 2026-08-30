@@ -32,6 +32,9 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         rt.transcription_cancelled = false;
     }
     rec.key_down_time = Some(std::time::Instant::now());
+    // A pause must never outlive the dictation that set it.
+    rec.toggle_press_time = None;
+    rec.paused.store(false, Ordering::Relaxed);
     PILL_CLOSE_GENERATION.fetch_add(1, Ordering::Relaxed);
 
     // Show pill immediately in Preparing mode (before stream starts)
@@ -99,11 +102,42 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     });
 }
 
+/// Toggle mode, key pressed while already recording: note when, and decide on
+/// release. Nothing happens here — the choice needs the press duration.
+pub fn toggle_key_down(rec: &mut RecordingState) {
+    rec.toggle_press_time = Some(std::time::Instant::now());
+}
+
+/// Toggle mode, key released while recording: a brief press stops and
+/// transcribes, a longer one pauses or resumes.
+pub fn toggle_key_up(app: &AppHandle, state: &Arc<AppState>, rec: &mut RecordingState) {
+    let held = rec.toggle_press_time.take().map(|t| t.elapsed());
+    let is_short = held
+        .map(|d| d < Duration::from_millis(SHORT_TAP_MS))
+        .unwrap_or(true);
+
+    if is_short {
+        stop_recording_and_enqueue(app, state, rec);
+        return;
+    }
+
+    let now_paused = !rec.paused.load(Ordering::Relaxed);
+    rec.paused.store(now_paused, Ordering::Relaxed);
+    crate::ui::pill::set_mode(if now_paused {
+        crate::ui::pill::PillMode::Paused
+    } else {
+        crate::ui::pill::PillMode::Recording
+    });
+    log::info!("Recording {}", if now_paused { "paused" } else { "resumed" });
+}
+
 pub fn stop_recording_and_enqueue(
     app: &AppHandle,
     state: &Arc<AppState>,
     rec: &mut RecordingState,
 ) {
+    rec.toggle_press_time = None;
+    rec.paused.store(false, Ordering::Relaxed);
     {
         let mut rt = state.runtime.lock().unwrap();
         if !rt.is_recording {

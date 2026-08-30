@@ -22,16 +22,20 @@ pub fn spawn_hotkey_handler(
                 let is_recording = state.runtime.lock().unwrap().is_recording;
                 let mut rec = rec_state.lock().unwrap();
                 if mode == crate::state::RecordingMode::Toggle && is_recording {
-                    super::lifecycle::stop_recording_and_enqueue(&app, &state, &mut rec);
+                    // Decided on release: a brief press stops, a long one pauses.
+                    super::lifecycle::toggle_key_down(&mut rec);
                 } else {
                     super::lifecycle::start_recording(&app, &state, &mut rec);
                 }
             }
             Ok(hotkey::HotkeyEvent::KeyUp) => {
                 let mode = state.settings.lock().unwrap().recording_mode;
+                let is_recording = state.runtime.lock().unwrap().is_recording;
+                let mut rec = rec_state.lock().unwrap();
                 if mode != crate::state::RecordingMode::Toggle {
-                    let mut rec = rec_state.lock().unwrap();
                     super::lifecycle::stop_recording_and_enqueue(&app, &state, &mut rec);
+                } else if is_recording {
+                    super::lifecycle::toggle_key_up(&app, &state, &mut rec);
                 }
             }
             Ok(hotkey::HotkeyEvent::CancelPressed) => {

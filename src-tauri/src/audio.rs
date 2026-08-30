@@ -118,11 +118,16 @@ pub struct AudioRecorder {
     fft_buffer: Arc<Mutex<Vec<f32>>>,
     stream_error: Arc<AtomicBool>,
     samples_received: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
     preview: Arc<PreviewBuffer>,
 }
 
 impl AudioRecorder {
-    pub fn new(stream_error: Arc<AtomicBool>, samples_received: Arc<AtomicBool>) -> Self {
+    pub fn new(
+        stream_error: Arc<AtomicBool>,
+        samples_received: Arc<AtomicBool>,
+        paused: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             stream: None,
             writer: Arc::new(Mutex::new(None)),
@@ -131,6 +136,7 @@ impl AudioRecorder {
             fft_buffer: Arc::new(Mutex::new(Vec::with_capacity(FFT_SIZE))),
             stream_error,
             samples_received,
+            paused,
             preview: Arc::new(PreviewBuffer::default()),
         }
     }
@@ -246,6 +252,7 @@ impl AudioRecorder {
 
         let writer_clone = Arc::clone(&self.writer);
         let preview_clone = Arc::clone(&self.preview);
+        let paused_clone = Arc::clone(&self.paused);
         let fft_buffer_clone = Arc::clone(&self.fft_buffer);
         let spectrum_clone = Arc::clone(&self.spectrum);  // AtomicSpectrum — lock-free
 
@@ -266,7 +273,7 @@ impl AudioRecorder {
                         received_flag.store(true, Ordering::Relaxed);
                         let mono = mix_to_mono(data, channels);
                         let resampled = resample(&mono, rate, SAMPLE_RATE);
-                        process_samples(&resampled, &writer_clone, &fft_buffer_clone, &spectrum_clone, &preview_clone);
+                        process_samples(&resampled, &writer_clone, &fft_buffer_clone, &spectrum_clone, &preview_clone, &paused_clone);
                     },
                     move |err| {
                         log::error!("Audio stream error: {}", err);
@@ -278,6 +285,7 @@ impl AudioRecorder {
             SampleFormat::I16 => {
                 let writer_clone2 = Arc::clone(&self.writer);
                 let preview_clone2 = Arc::clone(&self.preview);
+                let paused_clone2 = Arc::clone(&self.paused);
                 let fft_buffer_clone2 = Arc::clone(&self.fft_buffer);
                 let spectrum_clone2 = Arc::clone(&self.spectrum);
                 let error_flag = Arc::clone(&self.stream_error);
@@ -289,7 +297,7 @@ impl AudioRecorder {
                         let float_data: Vec<f32> = data.iter().map(|&s| s as f32 / 32768.0).collect();
                         let mono = mix_to_mono(&float_data, channels);
                         let resampled = resample(&mono, rate, SAMPLE_RATE);
-                        process_samples(&resampled, &writer_clone2, &fft_buffer_clone2, &spectrum_clone2, &preview_clone2);
+                        process_samples(&resampled, &writer_clone2, &fft_buffer_clone2, &spectrum_clone2, &preview_clone2, &paused_clone2);
                     },
                     move |err| {
                         log::error!("Audio stream error: {}", err);
@@ -377,7 +385,15 @@ fn process_samples(
     fft_buffer: &Mutex<Vec<f32>>,
     spectrum: &AtomicSpectrum,
     preview: &PreviewBuffer,
+    paused: &AtomicBool,
 ) {
+    // Paused: drop the samples entirely rather than writing silence, so the
+    // transcriber sees one continuous utterance instead of a gap it has to
+    // interpret. The spectrum is zeroed so the pill stops moving.
+    if paused.load(Ordering::Relaxed) {
+        spectrum.reset();
+        return;
+    }
     preview.push(data);
     // Write to WAV — use try_lock to avoid blocking the realtime audio thread
     if let Ok(mut guard) = writer.try_lock() {
