@@ -287,7 +287,17 @@ pub async fn download_model(
     }
 
     if success {
-        write_version_json(&model);
+        // Hashing a multi-gigabyte model and fetching its ETags takes real time
+        // — 16s for Voxtral — during which the bar sat at 100% with nothing
+        // said. Announce the step, and run it off the async runtime it would
+        // otherwise block.
+        let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
+            "model_id": model.id,
+            "progress": 1.0,
+            "verifying": true,
+        }));
+        let m = model.clone();
+        let _ = tokio::task::spawn_blocking(move || write_version_json(&m)).await;
     }
 
     clear_pending_state(&model);
