@@ -66,16 +66,16 @@ pub fn list_usable_devices() -> Vec<crate::platform::audio_devices::AudioDevice>
         .collect()
 }
 
-/// Rolling window of recent audio for the live preview, in samples at 16 kHz.
-/// Bounded so the cost of a preview pass stays flat however long the dictation
-/// runs — measured: 15 s costs 0.83 s to transcribe, and matches the full-audio
-/// text; below 10 s the model starts losing context and mistranscribes.
-pub const PREVIEW_WINDOW_SAMPLES: usize = 15 * 16_000;
+/// Hard ceiling on what the preview keeps, so a forgotten recording cannot grow
+/// without bound. 10 minutes of f32 at 16 kHz is ~38 MB.
+pub const PREVIEW_MAX_SAMPLES: usize = 10 * 60 * 16_000;
 
-/// Last PREVIEW_WINDOW_SAMPLES samples, fed from the realtime audio thread.
+/// The dictation's audio, kept for the preview. The whole recording rather than
+/// a rolling window: consolidation needs the beginning to give the model the
+/// context a bounded tail cannot.
 #[derive(Default)]
 pub struct PreviewBuffer {
-    samples: Mutex<std::collections::VecDeque<f32>>,
+    samples: Mutex<Vec<f32>>,
 }
 
 impl PreviewBuffer {
@@ -84,18 +84,22 @@ impl PreviewBuffer {
         let Ok(mut buf) = self.samples.try_lock() else {
             return;
         };
-        buf.extend(data.iter().copied());
-        let overflow = buf.len().saturating_sub(PREVIEW_WINDOW_SAMPLES);
-        buf.drain(..overflow);
+        if buf.len() >= PREVIEW_MAX_SAMPLES {
+            return;
+        }
+        buf.extend_from_slice(data);
     }
 
-    pub fn snapshot(&self) -> Vec<f32> {
-        self.samples
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .iter()
-            .copied()
-            .collect()
+    pub fn len(&self) -> usize {
+        self.samples.lock().unwrap_or_else(|e| e.into_inner()).len()
+    }
+
+    /// Samples in `from..to`, clamped to what has been recorded.
+    pub fn slice(&self, from: usize, to: usize) -> Vec<f32> {
+        let buf = self.samples.lock().unwrap_or_else(|e| e.into_inner());
+        let to = to.min(buf.len());
+        let from = from.min(to);
+        buf[from..to].to_vec()
     }
 
     pub fn clear(&self) {
