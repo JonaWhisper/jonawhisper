@@ -376,6 +376,7 @@ impl CaptureControl {
         log::info!("Exiting shortcut capture mode");
     }
 
+    #[cfg(target_os = "macos")]
     pub(super) fn reset(&self) {
         self.peak_modifiers.store(0, Ordering::SeqCst);
         self.keys_packed.store(0, Ordering::SeqCst);

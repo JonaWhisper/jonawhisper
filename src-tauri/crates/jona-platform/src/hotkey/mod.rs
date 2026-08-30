@@ -17,9 +17,12 @@ mod slot;
 
 pub use shortcut::{CaptureControl, HotkeyEvent, HotkeyUpdate, Shortcut, ShortcutKind};
 use shortcut::{
-    is_modifier_key_code, modifier_flag_for_key_code, pack_keys, packed_add, packed_contains_all,
-    packed_remove, unpack_keys,
+    is_modifier_key_code, modifier_flag_for_key_code, packed_add, packed_remove, unpack_keys,
 };
+/// Only the CGEvent tap compares a shortcut against every pressed key at once;
+/// the Windows hook tracks them one event at a time.
+#[cfg(target_os = "macos")]
+use shortcut::{pack_keys, packed_contains_all};
 use slot::{ShortcutSlot, modifier_shortcut_matches, shortcut_matches};
 
 // -- CGEventFlags masks --
@@ -73,6 +76,7 @@ const MASK_COMMAND: u64 = CG_MASK_COMMAND;
 const MASK_SHIFT: u64 = CG_MASK_SHIFT;
 const MASK_ALTERNATE: u64 = CG_MASK_ALTERNATE;
 const MASK_CONTROL: u64 = CG_MASK_CONTROL;
+#[cfg(target_os = "macos")]
 const CG_MASK_ALL_MODIFIERS: u64 =
     CG_MASK_COMMAND | CG_MASK_SHIFT | CG_MASK_ALTERNATE | CG_MASK_CONTROL;
 
