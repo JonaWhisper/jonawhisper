@@ -77,6 +77,12 @@ jobs:
         working-directory: src-tauri
         run: cargo check -p jona-whisper
 
+      # The macOS job cannot reach these: everything under cfg(windows) is
+      # invisible to it, tests included.
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test -p jona-platform
+
   # ── Rust (clippy + tests) ──────────────────────────────
   rust:
     name: Rust
