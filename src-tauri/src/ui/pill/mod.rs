@@ -161,17 +161,3 @@ pub fn is_open() -> bool {
     PILL.is_open()
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_open(_app: &AppHandle, _generation: u32) {}
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_close(_app: &AppHandle) {}
-
-#[cfg(target_os = "windows")]
-fn backend_open(_app: &AppHandle, generation: u32) {
-    win::open(generation);
-}
-/// The window tears itself down once `tick` reports the pill is gone, so
-/// closing needs nothing from the calling thread.
-#[cfg(target_os = "windows")]
-fn backend_close(_app: &AppHandle) {}
-
