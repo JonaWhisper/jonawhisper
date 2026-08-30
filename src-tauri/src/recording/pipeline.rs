@@ -735,7 +735,7 @@ fn format_rss() -> String {
     }
 }
 
-fn write_wav_f32(path: &std::path::Path, samples: &[f32]) -> Result<(), String> {
+pub(super) fn write_wav_f32(path: &std::path::Path, samples: &[f32]) -> Result<(), String> {
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: 16_000,

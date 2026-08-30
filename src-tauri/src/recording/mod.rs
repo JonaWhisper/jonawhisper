@@ -1,5 +1,6 @@
 mod lifecycle;
 mod pipeline;
+mod preview;
 mod threads;
 
 use std::sync::atomic::{AtomicU64, Ordering};
