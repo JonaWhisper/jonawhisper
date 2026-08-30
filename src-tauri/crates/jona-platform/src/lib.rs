@@ -38,6 +38,9 @@ pub mod audio_ducking;
 pub mod windows;
 
 #[cfg(target_os = "windows")]
+mod device_watcher;
+
+#[cfg(target_os = "windows")]
 pub mod audio_ducking_windows;
 #[cfg(target_os = "windows")]
 pub use audio_ducking_windows as audio_ducking;
@@ -133,10 +136,14 @@ pub mod audio_devices {
             .collect()
     }
 
-    /// No device-change notification: WASAPI exposes one through
-    /// IMMNotificationClient, which needs COM plumbing this does not have yet.
-    /// The list is rebuilt whenever the panel opens, so a change is picked up
-    /// the next time the user looks.
+    #[cfg(target_os = "windows")]
+    pub fn start_device_change_listener(callback: impl Fn() + Send + 'static) {
+        crate::device_watcher::start(Box::new(callback));
+    }
+
+    /// Every other platform rebuilds the list when the panel opens, so a change
+    /// is picked up the next time the user looks.
+    #[cfg(not(target_os = "windows"))]
     pub fn start_device_change_listener(_callback: impl Fn() + Send + 'static) {}
 }
 
