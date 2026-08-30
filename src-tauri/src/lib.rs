@@ -299,7 +299,7 @@ pub fn run() {
             ui::tray::setup_tray(app.handle())?;
 
             let recording::AudioHandles {
-                recorder, spectrum_data, stream_error, samples_received,
+                recorder, spectrum_data, stream_error, samples_received, paused,
             } = recording::create_recorder();
 
             app.manage(recording::SharedRecorder::clone(&recorder));
@@ -311,6 +311,7 @@ pub fn run() {
             let rec_state = Arc::new(std::sync::Mutex::new(recording::new_recording_state(
                 recorder,
                 samples_received,
+                paused,
             )));
 
             // Deferred monitoring flag — hotkey thread waits for this

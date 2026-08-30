@@ -21,6 +21,7 @@ const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
 pub enum PillMode {
     Preparing,
     Recording,
+    Paused,
     Transcribing,
     Success,
     Error,
@@ -356,6 +357,16 @@ fn render_frame(p: &PillInner) -> Vec<u8> {
                         over(&mut r, &mut g, &mut b, &mut a, sa, sa, sa, sa);
                     }
                 }
+                PillMode::Paused => {
+                    let pa = pause_alpha(px, py, cw, ch);
+                    if pa > 0.0 {
+                        // Amber: stopped, but not finished and not an error.
+                        let pr = 0xfb as f32 / 255.0 * pa;
+                        let pg = 0xbf as f32 / 255.0 * pa;
+                        let pb = 0x24 as f32 / 255.0 * pa;
+                        over(&mut r, &mut g, &mut b, &mut a, pr, pg, pb, pa);
+                    }
+                }
                 PillMode::Transcribing => {
                     let (dr, dg, db, da) = dots_pixel(px, py, p.dot_phase, cw, ch);
                     if da > 0.0 {
@@ -430,6 +441,17 @@ fn spectrum_alpha(px: f32, py: f32, spectrum: &[f32; 12], cw: f32, ch: f32) -> f
         a = a.max(sdf_aa(d));
     }
     a
+}
+
+/// Two vertical bars — the pause glyph, centred in the pill.
+fn pause_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
+    const BAR_W: f32 = 3.0;
+    const BAR_H: f32 = 11.0;
+    const GAP: f32 = 3.5;
+    let cy = ch / 2.0;
+    let left = sdf_rrect(px, py, cw / 2.0 - GAP - BAR_W / 2.0, cy, BAR_W / 2.0, BAR_H / 2.0, 1.0);
+    let right = sdf_rrect(px, py, cw / 2.0 + GAP + BAR_W / 2.0, cy, BAR_W / 2.0, BAR_H / 2.0, 1.0);
+    sdf_aa(left.min(right))
 }
 
 fn dots_pixel(px: f32, py: f32, phase: f32, cw: f32, ch: f32) -> (f32, f32, f32, f32) {
@@ -627,6 +649,18 @@ mod tests {
         let bar6_cx = (cw - total) / 2.0 + 6.0 * (bar_w + gap) + bar_w / 2.0;
         let a = spectrum_alpha(bar6_cx, ch * 0.25, &loud, cw, ch);
         assert!(a > 0.0, "Loud spectrum should have bars reaching top quarter");
+    }
+
+    #[test]
+    fn pause_glyph_is_two_bars_at_centre() {
+        let (cw, ch) = (super::PILL_WIDTH as f32, super::PILL_HEIGHT as f32);
+        // Between the bars there is a gap, so the exact centre stays empty.
+        assert!(super::pause_alpha(cw / 2.0, ch / 2.0, cw, ch) < 0.01);
+        // Each bar is filled.
+        assert!(super::pause_alpha(cw / 2.0 - 5.0, ch / 2.0, cw, ch) > 0.9);
+        assert!(super::pause_alpha(cw / 2.0 + 5.0, ch / 2.0, cw, ch) > 0.9);
+        // Nothing outside them.
+        assert!(super::pause_alpha(cw / 2.0, 2.0, cw, ch) < 0.01);
     }
 
     #[test]

@@ -25,8 +25,12 @@ const ORPHAN_CLEANUP_SECS: u64 = 300;
 pub struct RecordingState {
     key_down_time: Option<Instant>,
     last_short_tap_time: Option<Instant>,
+    /// When the toggle key went down, to tell a short press (stop) from a long
+    /// one (pause). Separate from key_down_time, which push-to-talk owns.
+    toggle_press_time: Option<Instant>,
     pub(crate) recorder: SharedRecorder,
     pub(crate) samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) paused: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// The recorder, shared with the spectrum monitor and the mic-test commands.
@@ -40,6 +44,7 @@ pub struct AudioHandles {
     pub spectrum_data: std::sync::Arc<crate::audio::AtomicSpectrum>,
     pub stream_error: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub paused: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 pub fn create_recorder() -> AudioHandles {
@@ -48,8 +53,12 @@ pub fn create_recorder() -> AudioHandles {
 
     let stream_error = Arc::new(AtomicBool::new(false));
     let samples_received = Arc::new(AtomicBool::new(false));
-    let recorder =
-        crate::audio::AudioRecorder::new(Arc::clone(&stream_error), Arc::clone(&samples_received));
+    let paused = Arc::new(AtomicBool::new(false));
+    let recorder = crate::audio::AudioRecorder::new(
+        Arc::clone(&stream_error),
+        Arc::clone(&samples_received),
+        Arc::clone(&paused),
+    );
     let spectrum_data = recorder.spectrum_handle();
 
     AudioHandles {
@@ -57,18 +66,22 @@ pub fn create_recorder() -> AudioHandles {
         spectrum_data,
         stream_error,
         samples_received,
+        paused,
     }
 }
 
 pub fn new_recording_state(
     recorder: SharedRecorder,
     samples_received: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    paused: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> RecordingState {
     RecordingState {
         key_down_time: None,
         last_short_tap_time: None,
+        toggle_press_time: None,
         recorder,
         samples_received,
+        paused,
     }
 }
 
