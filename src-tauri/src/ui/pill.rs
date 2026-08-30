@@ -1,4 +1,5 @@
-//! Native pill overlay window — no WebView, pure AppKit + RGBA bitmap.
+//! Native pill overlay window — no WebView, just an RGBA bitmap handed to each
+//! platform's compositor: an NSImageView on macOS, a layered window on Windows.
 //! Eliminates the WKWebView white flash entirely.
 
 use super::menu_icons::{sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
@@ -7,15 +8,30 @@ use objc2::msg_send;
 #[cfg(target_os = "macos")]
 use objc2::runtime::{AnyClass, AnyObject};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tauri::AppHandle;
 
 const PILL_WIDTH: f64 = 80.0;
 const PILL_HEIGHT: f64 = 32.0;
 const PILL_TOP_OFFSET: f64 = 40.0;
-const DPR: f32 = 2.0; // Retina
+/// Both backends animate at this rate.
+const FRAME_INTERVAL: Duration = Duration::from_millis(33);
+/// Backing-store scale. Fixed on macOS, where the overlay lives on a Retina
+/// screen; read from the monitor on Windows, where it follows the display
+/// setting. Everything downstream derives its minimum sizes from the frame
+/// height, so the drawing itself is resolution-independent.
+#[cfg(target_os = "macos")]
+const DPR: f32 = 2.0;
+#[cfg(target_os = "macos")]
 const PX_W: usize = (PILL_WIDTH as f32 * DPR) as usize; // 160
+#[cfg(target_os = "macos")]
 const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
+
+/// Scale a frame of this height was drawn at.
+fn frame_scale(ch: f32) -> f32 {
+    (ch / PILL_HEIGHT as f32).max(1.0)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PillMode {
@@ -29,24 +45,11 @@ pub enum PillMode {
     Idle,
 }
 
-/// Wrapper for raw AppKit pointers that are created on the main thread and
-/// accessed exclusively through `run_on_main_thread`.
-///
-/// # Safety
-/// These pointers are only dereferenced inside closures dispatched to the main
-/// thread via `AppHandle::run_on_main_thread`. The `Mutex<Option<PillInner>>`
-/// ensures no concurrent access. Sending the wrapper across threads is safe
-/// because it is never dereferenced off the main thread.
-#[cfg(target_os = "macos")]
-struct MainThreadPtr(*mut AnyObject);
+// -- Shared state --
 
-#[cfg(target_os = "macos")]
-unsafe impl Send for MainThreadPtr {}
-
-#[cfg(target_os = "macos")]
-struct PillInner {
-    ns_window: MainThreadPtr,
-    image_view: MainThreadPtr,
+/// Carries no window handle: each backend keeps its own, so the state the app
+/// mutates — and the animation driven from it — is the same on every platform.
+struct PillState {
     mode: PillMode,
     spectrum: [f32; 12],
     smoothed: [f32; 12],
@@ -54,170 +57,200 @@ struct PillInner {
     pending_count: u32,
 }
 
-#[cfg(target_os = "macos")]
-static PILL: Mutex<Option<PillInner>> = Mutex::new(None);
+impl PillState {
+    fn new(mode: PillMode) -> Self {
+        Self { mode, spectrum: [0.0; 12], smoothed: [0.0; 12], dot_phase: 0.0, pending_count: 0 }
+    }
+
+    fn frame(&self) -> PillFrame {
+        PillFrame {
+            mode: self.mode,
+            smoothed: self.smoothed,
+            dot_phase: self.dot_phase,
+            pending_count: self.pending_count,
+        }
+    }
+}
+
+static PILL: Mutex<Option<PillState>> = Mutex::new(None);
+
+/// Bumped by every open(). A close/open pair inside one frame interval would
+/// otherwise leave the previous loop running against the new state, animating
+/// everything at twice the rate.
+static GENERATION: AtomicU32 = AtomicU32::new(0);
+
+/// Advance one animation step. `None` once the pill is closed or superseded,
+/// which is how both backends learn to tear their window down.
+fn tick(generation: u32) -> Option<PillFrame> {
+    static FRAMES: AtomicU32 = AtomicU32::new(0);
+    static FLAT: AtomicU32 = AtomicU32::new(0);
+
+    if GENERATION.load(Ordering::Relaxed) != generation {
+        return None;
+    }
+    let mut guard = PILL.lock().unwrap();
+    let p = guard.as_mut()?;
+    p.dot_phase += 0.05;
+    for i in 0..12 {
+        p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
+    }
+
+    let fc = FRAMES.fetch_add(1, Ordering::Relaxed) + 1;
+    if p.mode == PillMode::Recording && fc.is_multiple_of(30) {
+        let spec_max = p.spectrum.iter().cloned().fold(0.0f32, f32::max);
+        let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
+        if smooth_max < 0.12 {
+            let count = FLAT.fetch_add(30, Ordering::Relaxed) + 30;
+            // Only warn after ~3s of sustained flat, then every ~3s
+            if count >= 90 && count.is_multiple_of(90) {
+                log::warn!("Pill render flat ({:.1}s): spec_max={:.4}, smooth_max={:.4}, spectrum={:.3?}",
+                    count as f32 / 30.0, spec_max, smooth_max, p.spectrum);
+            }
+        } else {
+            let prev = FLAT.swap(0, Ordering::Relaxed);
+            if prev >= 90 {
+                log::info!("Pill render recovered after {:.1}s flat", prev as f32 / 30.0);
+            }
+        }
+    }
+    Some(p.frame())
+}
 
 // -- Public API --
 
 pub fn open(app: &AppHandle, initial_mode: PillMode) {
-    #[cfg(target_os = "macos")]
     {
-        if PILL.lock().unwrap().is_some() {
+        let mut guard = PILL.lock().unwrap();
+        if guard.is_some() {
             log::debug!("Pill: open() called but already open, skipping");
             return;
         }
-        log::debug!("Pill: opening with mode {:?}", initial_mode);
-        let handle = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            let (ns_win, iv) = unsafe { create_pill_window() };
-            let mut inner = PillInner {
-                ns_window: MainThreadPtr(ns_win),
-                image_view: MainThreadPtr(iv),
-                mode: initial_mode,
-                spectrum: [0.0; 12],
-                smoothed: [0.0; 12],
-                dot_phase: 0.0,
-                pending_count: 0,
-            };
-            // Render first frame, then show — no flash possible
-            let rgba = render_frame(&inner);
-            unsafe { update_image_view(iv, &rgba) };
-            unsafe {
-                let _: () = msg_send![ns_win, orderFrontRegardless];
-            }
-            // Store state (animation thread will take over)
-            inner.dot_phase = 0.0;
-            *PILL.lock().unwrap() = Some(inner);
-        });
-        // Start animation thread
-        let anim_handle = handle.clone();
-        std::thread::spawn(move || animation_loop(anim_handle));
+        // Published before the window exists so a set_mode() racing right
+        // behind open() lands on the state instead of warning into the void.
+        *guard = Some(PillState::new(initial_mode));
     }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = app;
-        let _ = initial_mode;
-    }
+    log::debug!("Pill: opening with mode {:?}", initial_mode);
+    backend_open(app, GENERATION.fetch_add(1, Ordering::Relaxed) + 1);
 }
 
 pub fn close(app: &AppHandle) {
-    #[cfg(target_os = "macos")]
-    {
-        log::debug!("Pill: closing");
-        let ns_win_addr = {
-            let mut pill = PILL.lock().unwrap();
-            pill.take().map(|p| p.ns_window.0 as usize)
-        };
-        if let Some(addr) = ns_win_addr {
-            let _ = app.run_on_main_thread(move || unsafe {
-                let ns_win = addr as *mut AnyObject;
-                let _: () = msg_send![ns_win, close];
-            });
-        }
+    if PILL.lock().unwrap().take().is_none() {
+        return;
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    log::debug!("Pill: closing");
+    backend_close(app);
 }
 
 pub fn set_mode(mode: PillMode) {
-    #[cfg(target_os = "macos")]
-    {
-        let mut guard = PILL.lock().unwrap();
-        if let Some(ref mut p) = *guard {
-            log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
-            // Reset spectrum state when entering Recording to avoid stale smoothed values
-            if mode == PillMode::Recording {
-                let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
-                if smooth_max > 0.001 {
-                    log::debug!("Pill: resetting smoothed (was max={:.4})", smooth_max);
-                }
-                p.smoothed = [0.0; 12];
-                p.spectrum = [0.0; 12];
-            }
-            p.mode = mode;
-        } else {
-            log::warn!("Pill: set_mode({:?}) called but pill is not open", mode);
+    let mut guard = PILL.lock().unwrap();
+    let Some(ref mut p) = *guard else {
+        log::warn!("Pill: set_mode({:?}) called but pill is not open", mode);
+        return;
+    };
+    log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
+    // Reset spectrum state when entering Recording to avoid stale smoothed values
+    if mode == PillMode::Recording {
+        let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
+        if smooth_max > 0.001 {
+            log::debug!("Pill: resetting smoothed (was max={:.4})", smooth_max);
         }
+        p.smoothed = [0.0; 12];
+        p.spectrum = [0.0; 12];
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = mode;
+    p.mode = mode;
 }
 
 pub fn set_spectrum(data: &[f32]) {
-    #[cfg(target_os = "macos")]
     if let Some(ref mut p) = *PILL.lock().unwrap() {
         let n = data.len().min(12);
         p.spectrum[..n].copy_from_slice(&data[..n]);
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = data;
 }
 
 pub fn set_pending(count: u32) {
-    #[cfg(target_os = "macos")]
     if let Some(ref mut p) = *PILL.lock().unwrap() {
         p.pending_count = count;
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = count;
 }
 
 #[allow(dead_code)]
 pub fn is_open() -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        PILL.lock().unwrap().is_some()
-    }
-    #[cfg(not(target_os = "macos"))]
-    false
+    PILL.lock().unwrap().is_some()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn backend_open(_app: &AppHandle, _generation: u32) {}
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn backend_close(_app: &AppHandle) {}
+
+#[cfg(target_os = "windows")]
+fn backend_open(_app: &AppHandle, generation: u32) {
+    win::open(generation);
+}
+#[cfg(target_os = "windows")]
+fn backend_close(_app: &AppHandle) {
+    win::close();
 }
 
 // -- macOS native implementation --
 
+/// Wrapper for raw AppKit pointers that are created on the main thread and
+/// accessed exclusively through `run_on_main_thread`.
+///
+/// # Safety
+/// These pointers are only dereferenced inside closures dispatched to the main
+/// thread via `AppHandle::run_on_main_thread`. The `Mutex<Option<..>>` ensures
+/// no concurrent access. Sending the wrapper across threads is safe because it
+/// is never dereferenced off the main thread.
 #[cfg(target_os = "macos")]
-fn animation_loop(app: AppHandle) {
-    use std::sync::atomic::{AtomicU32, Ordering};
-    let frame_count = std::sync::Arc::new(AtomicU32::new(0));
-    let flat_frames = std::sync::Arc::new(AtomicU32::new(0));
-    loop {
-        std::thread::sleep(Duration::from_millis(33));
-        if PILL.lock().unwrap().is_none() {
-            break;
-        }
-        let fc = frame_count.fetch_add(1, Ordering::Relaxed) + 1;
-        let h = app.clone();
-        let ff = flat_frames.clone();
-        let _ = app.run_on_main_thread(move || {
-            let mut pill = PILL.lock().unwrap();
-            let Some(ref mut p) = *pill else { return };
-            // Advance animation state
-            p.dot_phase += 0.05;
-            for i in 0..12 {
-                p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
-            }
-            // Diagnostic: log pill state every ~1s during Recording
-            if p.mode == PillMode::Recording && fc.is_multiple_of(30) {
-                let spec_max = p.spectrum.iter().cloned().fold(0.0f32, f32::max);
-                let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
-                if smooth_max < 0.12 {
-                    let count = ff.fetch_add(30, Ordering::Relaxed) + 30;
-                    // Only warn after ~3s of sustained flat, then every ~3s
-                    if count >= 90 && count.is_multiple_of(90) {
-                        log::warn!("Pill render flat ({:.1}s): spec_max={:.4}, smooth_max={:.4}, spectrum={:.3?}",
-                            count as f32 / 30.0, spec_max, smooth_max, p.spectrum);
-                    }
-                } else {
-                    let prev = ff.swap(0, Ordering::Relaxed);
-                    if prev >= 90 {
-                        log::info!("Pill render recovered after {:.1}s flat", prev as f32 / 30.0);
-                    }
-                }
-            }
-            let rgba = render_frame(p);
-            let iv = p.image_view.0;
-            drop(pill); // unlock before AppKit call
+struct MainThreadPtr(*mut AnyObject);
+
+#[cfg(target_os = "macos")]
+unsafe impl Send for MainThreadPtr {}
+
+#[cfg(target_os = "macos")]
+static MAC_WINDOW: Mutex<Option<(MainThreadPtr, MainThreadPtr)>> = Mutex::new(None);
+
+#[cfg(target_os = "macos")]
+fn backend_open(app: &AppHandle, generation: u32) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let (ns_win, iv) = unsafe { create_pill_window() };
+        // Render first frame, then show — no flash possible
+        if let Some(ref p) = *PILL.lock().unwrap() {
+            let rgba = render_frame(&p.frame(), DPR);
             unsafe { update_image_view(iv, &rgba) };
-            let _ = h; // keep handle alive
+        }
+        unsafe {
+            let _: () = msg_send![ns_win, orderFrontRegardless];
+        }
+        *MAC_WINDOW.lock().unwrap() = Some((MainThreadPtr(ns_win), MainThreadPtr(iv)));
+    });
+    std::thread::spawn(move || animation_loop(handle, generation));
+}
+
+#[cfg(target_os = "macos")]
+fn backend_close(app: &AppHandle) {
+    let addr = MAC_WINDOW.lock().unwrap().take().map(|(w, _)| w.0 as usize);
+    if let Some(addr) = addr {
+        let _ = app.run_on_main_thread(move || unsafe {
+            let ns_win = addr as *mut AnyObject;
+            let _: () = msg_send![ns_win, close];
+        });
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn animation_loop(app: AppHandle, generation: u32) {
+    loop {
+        std::thread::sleep(FRAME_INTERVAL);
+        let Some(frame) = tick(generation) else { break };
+        let rgba = render_frame(&frame, DPR);
+        let Some(iv) = MAC_WINDOW.lock().unwrap().as_ref().map(|(_, v)| v.0 as usize) else {
+            continue;
+        };
+        let _ = app.run_on_main_thread(move || unsafe {
+            update_image_view(iv as *mut AnyObject, &rgba);
         });
     }
 }
@@ -312,10 +345,18 @@ unsafe fn update_image_view(iv: *mut AnyObject, rgba: &[u8]) {
 
 // -- Rendering --
 
-#[cfg(target_os = "macos")]
-fn render_frame(p: &PillInner) -> Vec<u8> {
-    let w = PX_W;
-    let h = PX_H;
+/// Everything a frame needs, with no platform handles: the drawing is shared by
+/// every backend, only the blitting differs.
+pub(crate) struct PillFrame {
+    pub mode: PillMode,
+    pub smoothed: [f32; 12],
+    pub dot_phase: f32,
+    pub pending_count: u32,
+}
+
+fn render_frame(p: &PillFrame, scale: f32) -> Vec<u8> {
+    let w = (PILL_WIDTH as f32 * scale).round() as usize;
+    let h = (PILL_HEIGHT as f32 * scale).round() as usize;
     let cw = w as f32;
     let ch = h as f32;
     let mut rgba = vec![0u8; w * h * 4];
@@ -426,8 +467,9 @@ fn over(dr: &mut f32, dg: &mut f32, db: &mut f32, da: &mut f32, sr: f32, sg: f32
 // -- Drawing helpers --
 
 fn spectrum_alpha(px: f32, py: f32, spectrum: &[f32; 12], cw: f32, ch: f32) -> f32 {
-    let bar_w = (cw * 0.035).max(2.0 * DPR);
-    let gap = (cw * 0.025).max(1.0 * DPR);
+    let scale = frame_scale(ch);
+    let bar_w = (cw * 0.035).max(2.0 * scale);
+    let gap = (cw * 0.025).max(1.0 * scale);
     let total = 12.0 * bar_w + 11.0 * gap;
     let start_x = (cw - total) / 2.0;
     let max_h = ch * 0.6;
@@ -435,7 +477,7 @@ fn spectrum_alpha(px: f32, py: f32, spectrum: &[f32; 12], cw: f32, ch: f32) -> f
 
     let mut a = 0.0f32;
     for (i, &val) in spectrum.iter().enumerate().take(12) {
-        let bh = (val * max_h).max(2.0 * DPR);
+        let bh = (val * max_h).max(2.0 * scale);
         let cx = start_x + i as f32 * (bar_w + gap) + bar_w / 2.0;
         let d = sdf_rrect(px, py, cx, cy, bar_w / 2.0, bh / 2.0, bar_w / 2.0);
         a = a.max(sdf_aa(d));
@@ -455,8 +497,9 @@ fn pause_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
 }
 
 fn dots_pixel(px: f32, py: f32, phase: f32, cw: f32, ch: f32) -> (f32, f32, f32, f32) {
-    let dot_r = (ch * 0.12).max(3.0 * DPR) / 2.0;
-    let gap = (cw * 0.08).max(4.0 * DPR);
+    let scale = frame_scale(ch);
+    let dot_r = (ch * 0.12).max(3.0 * scale) / 2.0;
+    let gap = (cw * 0.08).max(4.0 * scale);
     let total = 3.0 * dot_r * 2.0 + 2.0 * gap;
     let start_x = (cw - total) / 2.0;
     let cy = ch / 2.0;
@@ -478,10 +521,11 @@ fn dots_pixel(px: f32, py: f32, phase: f32, cw: f32, ch: f32) -> (f32, f32, f32,
 }
 
 fn success_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
+    let scale = frame_scale(ch);
     let size = (ch * 0.45).round();
     let cx = cw / 2.0;
     let cy = ch / 2.0;
-    let lw = (ch * 0.07).max(1.5 * DPR);
+    let lw = (ch * 0.07).max(1.5 * scale);
 
     // Checkmark: short stroke down-right, then long stroke up-right
     let x0 = cx - size * 0.4;
@@ -497,10 +541,11 @@ fn success_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
 }
 
 fn error_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
+    let scale = frame_scale(ch);
     let size = (ch * 0.45).round();
     let cx = cw / 2.0;
     let cy = ch / 2.0;
-    let lw = (ch * 0.07).max(1.5 * DPR);
+    let lw = (ch * 0.07).max(1.5 * scale);
 
     let d1 = sdf_segment(px, py, cx - size / 2.0, cy - size / 2.0, cx + size / 2.0, cy + size / 2.0) - lw / 2.0;
     let d2 = sdf_segment(px, py, cx + size / 2.0, cy - size / 2.0, cx - size / 2.0, cy + size / 2.0) - lw / 2.0;
@@ -508,9 +553,10 @@ fn error_alpha(px: f32, py: f32, cw: f32, ch: f32) -> f32 {
 }
 
 fn badge_pixel(px: f32, py: f32, count: u32, cw: f32, ch: f32) -> (f32, f32, f32, f32) {
+    let scale = frame_scale(ch);
     let badge_r = (ch * 0.4 / 2.0).round();
-    let bx = cw - badge_r - 2.0 * DPR;
-    let by = badge_r + 2.0 * DPR;
+    let bx = cw - badge_r - 2.0 * scale;
+    let by = badge_r + 2.0 * scale;
 
     let circle_a = sdf_aa(sdf_circle(px, py, bx, by, badge_r));
     if circle_a <= 0.0 {
@@ -554,6 +600,205 @@ const DIGITS: [[u8; 15]; 10] = [
     [1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1], // 8
     [1,1,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1], // 9
 ];
+
+// -- Windows native implementation --
+
+/// Layered window: the compositor blends our premultiplied buffer directly, so
+/// the pill keeps the rounded, translucent look it has on macOS with no HWND
+/// background to flash through. Everything runs on one thread because a window
+/// may only be destroyed by the thread that created it.
+#[cfg(target_os = "windows")]
+mod win {
+    use super::{
+        FRAME_INTERVAL, PILL, PILL_HEIGHT, PILL_TOP_OFFSET, PILL_WIDTH, render_frame, tick,
+    };
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, SIZE, WPARAM};
+    use windows_sys::Win32::Graphics::Gdi::{
+        AC_SRC_ALPHA, AC_SRC_OVER, BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BLENDFUNCTION,
+        CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC,
+        GetMonitorInfoW, HBITMAP, HDC, HGDIOBJ, MONITOR_DEFAULTTONEAREST, MONITORINFO,
+        MonitorFromPoint, ReleaseDC, SelectObject,
+    };
+    use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+    use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetCursorPos, MSG,
+        PM_REMOVE, PeekMessageW, RegisterClassW, SW_SHOWNOACTIVATE, ShowWindow, ULW_ALPHA,
+        UpdateLayeredWindow, WNDCLASSW, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    };
+    use windows_sys::core::w;
+
+    /// Windows reports DPI against this baseline; the ratio is our render scale.
+    const BASELINE_DPI: f32 = 96.0;
+
+    pub fn open(generation: u32) {
+        std::thread::spawn(move || unsafe { run(generation) });
+    }
+
+    /// The window tears itself down once `tick` reports the pill is gone, so
+    /// closing needs nothing from the calling thread.
+    pub fn close() {}
+
+    unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
+        DefWindowProcW(hwnd, msg, w, l)
+    }
+
+    /// Scale and physical top-centre placement on the display holding the
+    /// cursor — the same "where the user is working" rule as the macOS side.
+    unsafe fn placement() -> (f32, i32, i32, i32, i32) {
+        let mut cursor = POINT { x: 0, y: 0 };
+        GetCursorPos(&mut cursor);
+        let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
+
+        let mut dpi_x = BASELINE_DPI as u32;
+        let mut dpi_y = 0u32;
+        GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
+        let scale = dpi_x as f32 / BASELINE_DPI;
+
+        let mut info: MONITORINFO = std::mem::zeroed();
+        info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        GetMonitorInfoW(monitor, &mut info);
+
+        let width = (PILL_WIDTH as f32 * scale).round() as i32;
+        let height = (PILL_HEIGHT as f32 * scale).round() as i32;
+        let rc = info.rcMonitor;
+        let x = rc.left + (rc.right - rc.left - width) / 2;
+        let y = rc.top + (PILL_TOP_OFFSET as f32 * scale).round() as i32;
+        (scale, x, y, width, height)
+    }
+
+    unsafe fn run(generation: u32) {
+        let hinstance = GetModuleHandleW(std::ptr::null());
+        let mut class: WNDCLASSW = std::mem::zeroed();
+        class.lpfnWndProc = Some(wnd_proc);
+        class.hInstance = hinstance;
+        class.lpszClassName = w!("JonaWhisperPill");
+        // A second open() re-registers the same class; the duplicate is refused
+        // and the original registration stays valid, which is all we need.
+        RegisterClassW(&class);
+
+        let (scale, x, y, width, height) = placement();
+        let hwnd = CreateWindowExW(
+            WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
+            class.lpszClassName,
+            w!("JonaWhisper"),
+            WS_POPUP,
+            x,
+            y,
+            width,
+            height,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            hinstance,
+            std::ptr::null(),
+        );
+        if hwnd.is_null() {
+            log::error!("Pill: CreateWindowExW failed, overlay unavailable");
+            return;
+        }
+
+        let Some(mut surface) = Surface::new(width, height) else {
+            log::error!("Pill: CreateDIBSection failed, overlay unavailable");
+            DestroyWindow(hwnd);
+            return;
+        };
+
+        // First frame before the window is shown — no flash possible.
+        let first = PILL.lock().unwrap().as_ref().map(|p| render_frame(&p.frame(), scale));
+        if let Some(rgba) = first {
+            surface.blit(hwnd, &rgba, width, height);
+        }
+        ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+
+        loop {
+            let mut msg: MSG = std::mem::zeroed();
+            while PeekMessageW(&mut msg, hwnd, 0, 0, PM_REMOVE) != 0 {
+                DispatchMessageW(&msg);
+            }
+            std::thread::sleep(FRAME_INTERVAL);
+            let Some(frame) = tick(generation) else { break };
+            surface.blit(hwnd, &render_frame(&frame, scale), width, height);
+        }
+
+        DestroyWindow(hwnd);
+    }
+
+    /// The DIB the compositor reads from, kept between frames so each one costs
+    /// a copy rather than an allocation.
+    struct Surface {
+        dc: HDC,
+        bitmap: HBITMAP,
+        previous: HGDIOBJ,
+        bits: *mut u8,
+    }
+
+    impl Surface {
+        unsafe fn new(width: i32, height: i32) -> Option<Self> {
+            let mut info: BITMAPINFO = std::mem::zeroed();
+            info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+            info.bmiHeader.biWidth = width;
+            // Negative: our buffer starts at the top row, GDI defaults to bottom-up.
+            info.bmiHeader.biHeight = -height;
+            info.bmiHeader.biPlanes = 1;
+            info.bmiHeader.biBitCount = 32;
+            info.bmiHeader.biCompression = BI_RGB;
+
+            let screen = GetDC(std::ptr::null_mut());
+            let dc = CreateCompatibleDC(screen);
+            ReleaseDC(std::ptr::null_mut(), screen);
+            let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
+            let bitmap =
+                CreateDIBSection(dc, &info, DIB_RGB_COLORS, &mut bits, std::ptr::null_mut(), 0);
+            if bitmap.is_null() || bits.is_null() {
+                DeleteDC(dc);
+                return None;
+            }
+            let previous = SelectObject(dc, bitmap);
+            Some(Self { dc, bitmap, previous, bits: bits.cast() })
+        }
+
+        unsafe fn blit(&mut self, hwnd: HWND, rgba: &[u8], width: i32, height: i32) {
+            let dst = std::slice::from_raw_parts_mut(self.bits, rgba.len());
+            // Both sides are premultiplied; only the channel order differs.
+            for (out, px) in dst.chunks_exact_mut(4).zip(rgba.chunks_exact(4)) {
+                out[0] = px[2];
+                out[1] = px[1];
+                out[2] = px[0];
+                out[3] = px[3];
+            }
+            let size = SIZE { cx: width, cy: height };
+            let origin = POINT { x: 0, y: 0 };
+            let blend = BLENDFUNCTION {
+                BlendOp: AC_SRC_OVER as u8,
+                BlendFlags: 0,
+                SourceConstantAlpha: 255,
+                AlphaFormat: AC_SRC_ALPHA as u8,
+            };
+            UpdateLayeredWindow(
+                hwnd,
+                std::ptr::null_mut(),
+                std::ptr::null(),
+                &size,
+                self.dc,
+                &origin,
+                0,
+                &blend,
+                ULW_ALPHA,
+            );
+        }
+    }
+
+    impl Drop for Surface {
+        fn drop(&mut self) {
+            unsafe {
+                SelectObject(self.dc, self.previous);
+                DeleteObject(self.bitmap);
+                DeleteDC(self.dc);
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -743,60 +988,37 @@ mod tests {
 
     // -- Full frame render --
 
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn render_frame_produces_correct_buffer_size() {
-        let p = PillInner {
-            ns_window: MainThreadPtr(std::ptr::null_mut()),
-            image_view: MainThreadPtr(std::ptr::null_mut()),
-            mode: PillMode::Recording,
-            spectrum: [0.5; 12],
-            smoothed: [0.5; 12],
-            dot_phase: 0.0,
-            pending_count: 0,
-        };
-        let rgba = render_frame(&p);
-        assert_eq!(rgba.len(), PX_W * PX_H * 4, "RGBA buffer should be width*height*4");
+    fn frame(mode: PillMode) -> PillFrame {
+        PillFrame { mode, smoothed: [0.5; 12], dot_phase: 0.0, pending_count: 0 }
     }
 
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn render_frame_has_transparent_corners() {
-        let p = PillInner {
-            ns_window: MainThreadPtr(std::ptr::null_mut()),
-            image_view: MainThreadPtr(std::ptr::null_mut()),
-            mode: PillMode::Recording,
-            spectrum: [0.5; 12],
-            smoothed: [0.5; 12],
-            dot_phase: 0.0,
-            pending_count: 0,
-        };
-        let rgba = render_frame(&p);
-        // Top-left corner (0,0) should be transparent (pill is a capsule shape)
-        let a = rgba[3];
-        assert_eq!(a, 0, "Corner pixels should be transparent (capsule shape)");
+    fn px(rgba: &[u8], x: usize, y: usize, scale: f32) -> &[u8] {
+        let w = (PILL_WIDTH as f32 * scale).round() as usize;
+        &rgba[(y * w + x) * 4..][..4]
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn render_frame_has_opaque_center() {
-        let p = PillInner {
-            ns_window: MainThreadPtr(std::ptr::null_mut()),
-            image_view: MainThreadPtr(std::ptr::null_mut()),
-            mode: PillMode::Idle,
-            spectrum: [0.0; 12],
-            smoothed: [0.0; 12],
-            dot_phase: 0.0,
-            pending_count: 0,
-        };
-        let rgba = render_frame(&p);
-        // Center pixel should be opaque (pill background)
-        let center = (PX_H / 2 * PX_W + PX_W / 2) * 4;
-        let a = rgba[center + 3];
-        assert!(a > 200, "Center pixel should be nearly opaque: {a}");
+    fn render_frame_sizes_the_buffer_from_the_scale() {
+        for scale in [1.0, 1.5, 2.0, 3.0] {
+            let w = (PILL_WIDTH as f32 * scale).round() as usize;
+            let h = (PILL_HEIGHT as f32 * scale).round() as usize;
+            let rgba = render_frame(&frame(PillMode::Recording), scale);
+            assert_eq!(rgba.len(), w * h * 4, "buffer at scale {scale}");
+        }
     }
 
-    #[cfg(target_os = "macos")]
+    #[test]
+    fn render_frame_keeps_the_capsule_shape_at_every_scale() {
+        for scale in [1.0, 1.5, 2.0, 3.0] {
+            let h = (PILL_HEIGHT as f32 * scale).round() as usize;
+            let w = (PILL_WIDTH as f32 * scale).round() as usize;
+            let rgba = render_frame(&frame(PillMode::Idle), scale);
+            assert_eq!(px(&rgba, 0, 0, scale)[3], 0, "corner at scale {scale}");
+            let a = px(&rgba, w / 2, h / 2, scale)[3];
+            assert!(a > 200, "center at scale {scale}: {a}");
+        }
+    }
+
     #[test]
     fn each_pill_mode_renders_different_content() {
         let modes = [
@@ -805,20 +1027,10 @@ mod tests {
             PillMode::Success,
             PillMode::Error,
         ];
-        let mut frames: Vec<Vec<u8>> = Vec::new();
-        for mode in modes {
-            let p = PillInner {
-                ns_window: MainThreadPtr(std::ptr::null_mut()),
-                image_view: MainThreadPtr(std::ptr::null_mut()),
-                mode,
-                spectrum: [0.5; 12],
-                smoothed: [0.5; 12],
-                dot_phase: 1.0,
-                pending_count: 0,
-            };
-            frames.push(render_frame(&p));
-        }
-        // Each mode should produce a visually distinct frame
+        let frames: Vec<Vec<u8>> = modes
+            .iter()
+            .map(|&mode| render_frame(&frame(mode), 2.0))
+            .collect();
         for i in 0..frames.len() {
             for j in (i + 1)..frames.len() {
                 assert_ne!(frames[i], frames[j],
