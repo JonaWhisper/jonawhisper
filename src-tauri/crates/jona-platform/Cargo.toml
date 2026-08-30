@@ -12,6 +12,10 @@ log.workspace = true
 tauri = { version = "2" }
 tauri-plugin-clipboard-manager = "2"
 
+# Off macOS the audio device list comes from cpal instead of CoreAudio.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+cpal = "0.18"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.25"
 core-foundation = "0.10"

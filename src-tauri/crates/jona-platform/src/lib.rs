@@ -68,7 +68,45 @@ pub mod audio_devices {
         pub is_default: bool,
     }
 
-    pub fn list_input_devices() -> Vec<AudioDevice> { vec![] }
+    /// Enumerate inputs through cpal rather than a native API. cpal already
+    /// talks to WASAPI here, and CoreAudio's extras — a numeric id, a stable
+    /// uid, a transport type — have no equivalent worth the FFI: the device name
+    /// is what Windows itself shows the user.
+    pub fn list_input_devices() -> Vec<AudioDevice> {
+        use cpal::traits::{DeviceTrait, HostTrait};
+
+        let host = cpal::default_host();
+        let default_name = host
+            .default_input_device()
+            .and_then(|d| d.description().ok())
+            .map(|desc| desc.name().to_string());
+
+        let Ok(devices) = host.input_devices() else {
+            log::warn!("Audio devices: cpal could not enumerate inputs");
+            return vec![];
+        };
+
+        devices
+            .enumerate()
+            .filter_map(|(i, d)| {
+                let name = d.description().ok()?.name().to_string();
+                Some(AudioDevice {
+                    id: i as u32,
+                    is_default: Some(&name) == default_name.as_ref(),
+                    // No stable identifier here: the name is what the picker
+                    // stores and matches on later.
+                    uid: name.clone(),
+                    name,
+                    transport_type: AudioTransportType::Unknown,
+                })
+            })
+            .collect()
+    }
+
+    /// No device-change notification: WASAPI exposes one through
+    /// IMMNotificationClient, which needs COM plumbing this does not have yet.
+    /// The list is rebuilt whenever the panel opens, so a change is picked up
+    /// the next time the user looks.
     pub fn start_device_change_listener(_callback: impl Fn() + Send + 'static) {}
 }
 
