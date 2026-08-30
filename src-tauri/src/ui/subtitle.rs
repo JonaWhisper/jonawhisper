@@ -7,10 +7,12 @@
 
 use super::menu_icons::{sdf_aa, sdf_rrect};
 use super::text;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicU32, AtomicU8, Ordering};
+use super::overlay::Shared;
+use std::sync::atomic::{AtomicU8, Ordering};
 use tauri::AppHandle;
 
+#[cfg(target_os = "macos")]
+use super::appkit::{DPR, MainThreadPtr};
 #[cfg(target_os = "macos")]
 use objc2::msg_send;
 #[cfg(target_os = "macos")]
@@ -26,9 +28,6 @@ const CORNER_RADIUS: f64 = 12.0;
 /// The pill's own background, so the two overlays match.
 const GREY: f32 = 30.0 / 255.0;
 const BACKDROP_ALPHA: f32 = 0.9;
-#[cfg(target_os = "macos")]
-const DPR: f32 = 2.0;
-
 /// Set from preferences when the strip opens: how tall it may get before it
 /// stops growing, whatever the text.
 static MAX_LINES: AtomicU8 = AtomicU8::new(5);
@@ -124,43 +123,35 @@ struct StripState {
     revision: u64,
 }
 
-static STRIP: Mutex<Option<StripState>> = Mutex::new(None);
-
-/// Bumped by every open(), retiring a backend left over from a close/open pair
-/// too quick for it to notice.
-static GENERATION: AtomicU32 = AtomicU32::new(0);
+static STRIP: Shared<StripState> = Shared::new();
 
 // -- Public API --
 
 pub fn open(app: &AppHandle, max_lines: u8) {
     MAX_LINES.store(max_lines.clamp(1, 10), Ordering::Relaxed);
-    {
-        let mut guard = STRIP.lock().unwrap();
-        if guard.is_some() {
-            return;
-        }
-        *guard = Some(StripState { text: String::new(), revision: 0 });
-    }
-    backend_open(app, GENERATION.fetch_add(1, Ordering::Relaxed) + 1);
+    let state = StripState { text: String::new(), revision: 0 };
+    let Some(generation) = STRIP.open(state) else { return };
+    backend_open(app, generation);
 }
 
 /// Replace the displayed text. No-op when the overlay is closed.
 pub fn set_text(app: &AppHandle, text: &str) {
-    {
-        let mut guard = STRIP.lock().unwrap();
-        let Some(state) = guard.as_mut() else { return };
+    let changed = STRIP.write(|state| {
         if state.text == text {
-            return;
+            return false;
         }
         state.text.clear();
         state.text.push_str(text);
         state.revision += 1;
+        true
+    });
+    if changed == Some(true) {
+        backend_set_text(app);
     }
-    backend_set_text(app);
 }
 
 pub fn close(app: &AppHandle) {
-    if STRIP.lock().unwrap().take().is_none() {
+    if !STRIP.close() {
         return;
     }
     backend_close(app);
@@ -187,19 +178,13 @@ fn backend_close(_app: &AppHandle) {}
 // -- macOS native implementation --
 
 #[cfg(target_os = "macos")]
-struct MainThreadPtr(*mut AnyObject);
-
-#[cfg(target_os = "macos")]
-unsafe impl Send for MainThreadPtr {}
-
-#[cfg(target_os = "macos")]
 struct SubtitleInner {
     ns_window: MainThreadPtr,
     image_view: MainThreadPtr,
 }
 
 #[cfg(target_os = "macos")]
-static WINDOW: Mutex<Option<SubtitleInner>> = Mutex::new(None);
+static WINDOW: std::sync::Mutex<Option<SubtitleInner>> = std::sync::Mutex::new(None);
 
 #[cfg(target_os = "macos")]
 fn backend_open(app: &AppHandle, _generation: u32) {
@@ -215,10 +200,7 @@ fn backend_open(app: &AppHandle, _generation: u32) {
 
 #[cfg(target_os = "macos")]
 fn backend_set_text(app: &AppHandle) {
-    let Some((text, _)) = STRIP.lock().unwrap().as_ref().map(|s| (s.text.clone(), s.revision))
-    else {
-        return;
-    };
+    let Some(text) = STRIP.read(|s| s.text.clone()) else { return };
     let handles = {
         let guard = WINDOW.lock().unwrap();
         match guard.as_ref() {
@@ -302,9 +284,8 @@ unsafe fn position_under_pill(ns_win: *mut AnyObject, height: f64) {
 
 #[cfg(target_os = "windows")]
 mod win {
-    use super::{GENERATION, STRIP, TOP_OFFSET, line_cap, render_strip};
+    use super::{STRIP, TOP_OFFSET, line_cap, render_strip};
     use crate::ui::layered::{Overlay, cursor_display};
-    use std::sync::atomic::Ordering;
     use std::time::Duration;
     use windows_sys::core::w;
 
@@ -319,12 +300,7 @@ mod win {
     /// What to show. `None` once the strip is closed or superseded, which is
     /// how the thread learns to tear its window down.
     fn current(generation: u32) -> Option<(String, u64)> {
-        if GENERATION.load(Ordering::Relaxed) != generation {
-            return None;
-        }
-        let guard = STRIP.lock().unwrap();
-        let state = guard.as_ref()?;
-        Some((state.text.clone(), state.revision))
+        STRIP.update(generation, |s| (s.text.clone(), s.revision))
     }
 
     unsafe fn run(generation: u32) {
