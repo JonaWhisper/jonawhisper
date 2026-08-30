@@ -1,260 +1,13 @@
-//! Native pill overlay window — no WebView, just an RGBA bitmap handed to each
-//! platform's compositor: an NSImageView on macOS, a layered window on Windows.
-//! Eliminates the WKWebView white flash entirely.
+//! Drawing the pill into an RGBA buffer. No platform call anywhere: the same
+//! pixels land on every backend, only the blitting differs.
 
-use super::menu_icons::{sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
-#[cfg(target_os = "macos")]
-use super::appkit::MainThreadPtr;
-#[cfg(target_os = "macos")]
-use objc2::msg_send;
-#[cfg(target_os = "macos")]
-use objc2::runtime::{AnyClass, AnyObject};
-use super::overlay::Shared;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::Duration;
-use tauri::AppHandle;
-
-const PILL_WIDTH: f64 = 80.0;
-const PILL_HEIGHT: f64 = 32.0;
-const PILL_TOP_OFFSET: f64 = 40.0;
-/// Both backends animate at this rate.
-const FRAME_INTERVAL: Duration = Duration::from_millis(33);
-#[cfg(target_os = "macos")]
-use super::appkit::DPR;
-#[cfg(target_os = "macos")]
-const PX_W: usize = (PILL_WIDTH as f32 * DPR) as usize; // 160
-#[cfg(target_os = "macos")]
-const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize; // 64
+use super::super::menu_icons::{sdf_aa, sdf_circle, sdf_rrect, sdf_segment};
+use super::{PILL_HEIGHT, PILL_WIDTH, PillMode};
 
 /// Scale a frame of this height was drawn at.
 fn frame_scale(ch: f32) -> f32 {
     (ch / PILL_HEIGHT as f32).max(1.0)
 }
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum PillMode {
-    Preparing,
-    Recording,
-    Paused,
-    Transcribing,
-    Success,
-    Error,
-    #[allow(dead_code)]
-    Idle,
-}
-
-// -- Shared state --
-
-/// Carries no window handle: each backend keeps its own, so the state the app
-/// mutates — and the animation driven from it — is the same on every platform.
-struct PillState {
-    mode: PillMode,
-    spectrum: [f32; 12],
-    smoothed: [f32; 12],
-    dot_phase: f32,
-    pending_count: u32,
-}
-
-impl PillState {
-    fn new(mode: PillMode) -> Self {
-        Self { mode, spectrum: [0.0; 12], smoothed: [0.0; 12], dot_phase: 0.0, pending_count: 0 }
-    }
-
-    fn frame(&self) -> PillFrame {
-        PillFrame {
-            mode: self.mode,
-            smoothed: self.smoothed,
-            dot_phase: self.dot_phase,
-            pending_count: self.pending_count,
-        }
-    }
-}
-
-static PILL: Shared<PillState> = Shared::new();
-
-/// Advance one animation step. `None` once the pill is closed or superseded,
-/// which is how both backends learn to tear their window down.
-fn tick(generation: u32) -> Option<PillFrame> {
-    static FRAMES: AtomicU32 = AtomicU32::new(0);
-    static FLAT: AtomicU32 = AtomicU32::new(0);
-
-    PILL.update(generation, |p| {
-    p.dot_phase += 0.05;
-    for i in 0..12 {
-        p.smoothed[i] = p.smoothed[i] * 0.45 + p.spectrum[i] * 0.55;
-    }
-
-    let fc = FRAMES.fetch_add(1, Ordering::Relaxed) + 1;
-    if p.mode == PillMode::Recording && fc.is_multiple_of(30) {
-        let spec_max = p.spectrum.iter().cloned().fold(0.0f32, f32::max);
-        let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
-        if smooth_max < 0.12 {
-            let count = FLAT.fetch_add(30, Ordering::Relaxed) + 30;
-            // Only warn after ~3s of sustained flat, then every ~3s
-            if count >= 90 && count.is_multiple_of(90) {
-                log::warn!("Pill render flat ({:.1}s): spec_max={:.4}, smooth_max={:.4}, spectrum={:.3?}",
-                    count as f32 / 30.0, spec_max, smooth_max, p.spectrum);
-            }
-        } else {
-            let prev = FLAT.swap(0, Ordering::Relaxed);
-            if prev >= 90 {
-                log::info!("Pill render recovered after {:.1}s flat", prev as f32 / 30.0);
-            }
-        }
-    }
-    p.frame()
-    })
-}
-
-// -- Public API --
-
-pub fn open(app: &AppHandle, initial_mode: PillMode) {
-    let Some(generation) = PILL.open(PillState::new(initial_mode)) else {
-        log::debug!("Pill: open() called but already open, skipping");
-        return;
-    };
-    log::debug!("Pill: opening with mode {:?}", initial_mode);
-    backend_open(app, generation);
-}
-
-pub fn close(app: &AppHandle) {
-    if !PILL.close() {
-        return;
-    }
-    log::debug!("Pill: closing");
-    backend_close(app);
-}
-
-pub fn set_mode(mode: PillMode) {
-    let applied = PILL.write(|p| {
-        log::debug!("Pill: mode {:?} → {:?}", p.mode, mode);
-    // Reset spectrum state when entering Recording to avoid stale smoothed values
-    if mode == PillMode::Recording {
-        let smooth_max = p.smoothed.iter().cloned().fold(0.0f32, f32::max);
-        if smooth_max > 0.001 {
-            log::debug!("Pill: resetting smoothed (was max={:.4})", smooth_max);
-        }
-            p.smoothed = [0.0; 12];
-            p.spectrum = [0.0; 12];
-        }
-        p.mode = mode;
-    });
-    if applied.is_none() {
-        log::warn!("Pill: set_mode({mode:?}) called but pill is not open");
-    }
-}
-
-pub fn set_spectrum(data: &[f32]) {
-    PILL.write(|p| {
-        let n = data.len().min(12);
-        p.spectrum[..n].copy_from_slice(&data[..n]);
-    });
-}
-
-pub fn set_pending(count: u32) {
-    PILL.write(|p| p.pending_count = count);
-}
-
-#[allow(dead_code)]
-pub fn is_open() -> bool {
-    PILL.is_open()
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_open(_app: &AppHandle, _generation: u32) {}
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-fn backend_close(_app: &AppHandle) {}
-
-#[cfg(target_os = "windows")]
-fn backend_open(_app: &AppHandle, generation: u32) {
-    win::open(generation);
-}
-/// The window tears itself down once `tick` reports the pill is gone, so
-/// closing needs nothing from the calling thread.
-#[cfg(target_os = "windows")]
-fn backend_close(_app: &AppHandle) {}
-
-// -- macOS native implementation --
-
-#[cfg(target_os = "macos")]
-static MAC_WINDOW: std::sync::Mutex<Option<(MainThreadPtr, MainThreadPtr)>> =
-    std::sync::Mutex::new(None);
-
-#[cfg(target_os = "macos")]
-fn backend_open(app: &AppHandle, generation: u32) {
-    let handle = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        let (ns_win, iv) = unsafe { create_pill_window() };
-        // Render first frame, then show — no flash possible
-        if let Some(rgba) = PILL.read(|p| render_frame(&p.frame(), DPR)) {
-            unsafe { update_image_view(iv, &rgba) };
-        }
-        unsafe {
-            let _: () = msg_send![ns_win, orderFrontRegardless];
-        }
-        *MAC_WINDOW.lock().unwrap() = Some((MainThreadPtr(ns_win), MainThreadPtr(iv)));
-    });
-    std::thread::spawn(move || animation_loop(handle, generation));
-}
-
-#[cfg(target_os = "macos")]
-fn backend_close(app: &AppHandle) {
-    let addr = MAC_WINDOW.lock().unwrap().take().map(|(w, _)| w.0 as usize);
-    if let Some(addr) = addr {
-        let _ = app.run_on_main_thread(move || unsafe {
-            let ns_win = addr as *mut AnyObject;
-            let _: () = msg_send![ns_win, close];
-        });
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn animation_loop(app: AppHandle, generation: u32) {
-    loop {
-        std::thread::sleep(FRAME_INTERVAL);
-        let Some(frame) = tick(generation) else { break };
-        let rgba = render_frame(&frame, DPR);
-        let Some(iv) = MAC_WINDOW.lock().unwrap().as_ref().map(|(_, v)| v.0 as usize) else {
-            continue;
-        };
-        let _ = app.run_on_main_thread(move || unsafe {
-            update_image_view(iv as *mut AnyObject, &rgba);
-        });
-    }
-}
-
-#[cfg(target_os = "macos")]
-unsafe fn create_pill_window() -> (*mut AnyObject, *mut AnyObject) {
-    use objc2_foundation::{NSPoint, NSRect, NSSize};
-
-    let rect = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(PILL_WIDTH, PILL_HEIGHT));
-    let ns_win = super::appkit::overlay_window(rect);
-
-    if let Some(frame) = super::appkit::screen_under_cursor() {
-        let x = frame.origin.x + (frame.size.width - PILL_WIDTH) / 2.0;
-        let y = frame.origin.y + frame.size.height - PILL_HEIGHT - PILL_TOP_OFFSET;
-        let _: () = msg_send![ns_win, setFrameOrigin: NSPoint::new(x, y)];
-    }
-
-    let iv: *mut AnyObject = msg_send![AnyClass::get(c"NSImageView").unwrap(), alloc];
-    let iv: *mut AnyObject = msg_send![iv, initWithFrame: rect];
-    let _: () = msg_send![ns_win, setContentView: iv];
-
-    (ns_win, iv)
-}
-
-#[cfg(target_os = "macos")]
-unsafe fn update_image_view(iv: *mut AnyObject, rgba: &[u8]) {
-    super::appkit::set_view_image(
-        iv,
-        rgba,
-        PX_W,
-        PX_H,
-        objc2_foundation::NSSize::new(PILL_WIDTH, PILL_HEIGHT),
-    );
-}
-
-// -- Rendering --
 
 /// Everything a frame needs, with no platform handles: the drawing is shared by
 /// every backend, only the blitting differs.
@@ -265,7 +18,7 @@ pub(crate) struct PillFrame {
     pub pending_count: u32,
 }
 
-fn render_frame(p: &PillFrame, scale: f32) -> Vec<u8> {
+pub(super) fn render_frame(p: &PillFrame, scale: f32) -> Vec<u8> {
     let w = (PILL_WIDTH as f32 * scale).round() as usize;
     let h = (PILL_HEIGHT as f32 * scale).round() as usize;
     let cw = w as f32;
@@ -512,48 +265,15 @@ const DIGITS: [[u8; 15]; 10] = [
     [1,1,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1], // 9
 ];
 
-// -- Windows native implementation --
-
-#[cfg(target_os = "windows")]
-mod win {
-    use super::{FRAME_INTERVAL, PILL, PILL_HEIGHT, PILL_TOP_OFFSET, PILL_WIDTH, render_frame, tick};
-    use crate::ui::layered::{Overlay, cursor_display};
-    use windows_sys::core::w;
-
-    pub fn open(generation: u32) {
-        std::thread::spawn(move || unsafe { run(generation) });
-    }
-
-    unsafe fn run(generation: u32) {
-        let (scale, screen) = cursor_display();
-        let width = (PILL_WIDTH as f32 * scale).round() as i32;
-        let height = (PILL_HEIGHT as f32 * scale).round() as i32;
-        let x = screen.left + (screen.right - screen.left - width) / 2;
-        let y = screen.top + (PILL_TOP_OFFSET as f32 * scale).round() as i32;
-
-        let Some(mut overlay) = Overlay::new(w!("JonaWhisperPill"), x, y, width, height) else {
-            return;
-        };
-
-        // First frame before the window is shown — no flash possible.
-        let first = PILL.read(|p| render_frame(&p.frame(), scale));
-        if let Some(rgba) = first {
-            overlay.present(&rgba, width, height, x, y);
-        }
-        overlay.show();
-
-        loop {
-            overlay.pump();
-            std::thread::sleep(FRAME_INTERVAL);
-            let Some(frame) = tick(generation) else { break };
-            overlay.present(&render_frame(&frame, scale), width, height, x, y);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Retina case, which is what the drawing was tuned against. The
+    /// backends read their own scale; these tests are platform-free.
+    const DPR: f32 = 2.0;
+    const PX_W: usize = (PILL_WIDTH as f32 * DPR) as usize;
+    const PX_H: usize = (PILL_HEIGHT as f32 * DPR) as usize;
 
     // -- Alpha compositing --
 
