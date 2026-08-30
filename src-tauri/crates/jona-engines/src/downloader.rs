@@ -126,14 +126,19 @@ pub fn delete_partial(model: &ASRModel) {
 }
 
 /// Compute the SHA256 hash of a file.
-fn sha256_file(path: &Path) -> Option<String> {
+/// Hashing a multi-gigabyte model takes long enough to need a progress bar of
+/// its own: `read` is called back with the bytes consumed so far.
+fn sha256_file_reporting(path: &Path, read: &mut dyn FnMut(u64)) -> Option<String> {
     let mut file = fs::File::open(path).ok()?;
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 8192];
+    let mut total = 0u64;
     loop {
         let n = file.read(&mut buf).ok()?;
         if n == 0 { break; }
         hasher.update(&buf[..n]);
+        total += n as u64;
+        read(total);
     }
     Some(format!("{:x}", hasher.finalize()))
 }
@@ -168,7 +173,27 @@ fn fetch_etag(url: &str) -> Option<String> {
 
 /// Write a `version.json` alongside the model after successful download.
 /// Includes URL, ETag (from HTTP HEAD), and SHA256 (computed locally) for each file.
-fn write_version_json(model: &ASRModel) {
+fn write_version_json(model: &ASRModel, app: Option<&AppHandle>) {
+    // Bytes hashed across every file of the model, throttled like the download
+    // itself so the bar moves without flooding the webview.
+    let total_size = model.size.max(1);
+    let done_before = std::cell::Cell::new(0u64);
+    let mut last = std::time::Instant::now();
+    let mut report = |in_file: u64| {
+        if last.elapsed() < std::time::Duration::from_millis(250) {
+            return;
+        }
+        last = std::time::Instant::now();
+        if let Some(app) = app {
+            let _ = app.emit(DOWNLOAD_PROGRESS_EVENT, serde_json::json!({
+                "model_id": model.id,
+                "progress": 1.0,
+                "verifying": true,
+                "verify_progress": (done_before.get() + in_file) as f64 / total_size as f64,
+            }));
+        }
+    };
+
     let model_path = model.local_path();
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -188,7 +213,8 @@ fn write_version_json(model: &ASRModel) {
             let mut file_entries = serde_json::Map::new();
             for f in files {
                 let fpath = model_path.join(&f.filename);
-                let sha256 = sha256_file(&fpath);
+                let sha256 = sha256_file_reporting(&fpath, &mut report);
+                done_before.set(done_before.get() + fs::metadata(&fpath).map(|m| m.len()).unwrap_or(0));
                 let etag = fetch_etag(&f.url);
                 let mut entry = serde_json::Map::new();
                 entry.insert("url".into(), serde_json::Value::String(f.url.clone()));
@@ -207,7 +233,7 @@ fn write_version_json(model: &ASRModel) {
             })
         }
         _ => {
-            let sha256 = sha256_file(&model_path).unwrap_or_default();
+            let sha256 = sha256_file_reporting(&model_path, &mut report).unwrap_or_default();
             let etag = fetch_etag(&model.url);
             let mut json = serde_json::json!({
                 "model_id": model.id,
@@ -297,7 +323,8 @@ pub async fn download_model(
             "verifying": true,
         }));
         let m = model.clone();
-        let _ = tokio::task::spawn_blocking(move || write_version_json(&m)).await;
+        let a = app.clone();
+        let _ = tokio::task::spawn_blocking(move || write_version_json(&m, Some(&a))).await;
     }
 
     clear_pending_state(&model);

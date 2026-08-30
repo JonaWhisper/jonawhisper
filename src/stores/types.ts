@@ -161,6 +161,7 @@ export interface DownloadProgressPayload {
   total_size?: number
   speed?: number
   verifying?: boolean
+  verify_progress?: number
 }
 
 export interface AppStatePayload {

@@ -9,7 +9,7 @@ export const useDownloadStore = defineStore('downloads', () => {
   const enginesStore = useEnginesStore()
 
   // State
-  const activeDownloads = ref<Record<string, { progress: number; stopping: boolean; verifying: boolean; downloaded: number; totalSize: number; speed: number }>>({})
+  const activeDownloads = ref<Record<string, { progress: number; stopping: boolean; verifying?: boolean; verifyProgress?: number; downloaded: number; totalSize: number; speed: number }>>({})
   const deletingModels = ref<Record<string, boolean>>({})
 
   // Actions
@@ -17,7 +17,7 @@ export const useDownloadStore = defineStore('downloads', () => {
     if (activeDownloads.value[id]) return false
     const model = enginesStore.models.find(m => m.id === id)
     const initialProgress = model?.partial_progress ?? 0
-    activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false, verifying: false, downloaded: 0, totalSize: model?.size ?? 0, speed: 0 } }
+    activeDownloads.value = { ...activeDownloads.value, [id]: { progress: initialProgress, stopping: false, verifying: false, verifyProgress: 0, downloaded: 0, totalSize: model?.size ?? 0, speed: 0 } }
     try {
       const success = await invoke<boolean>('download_model_cmd', { id })
       return success
@@ -106,10 +106,11 @@ export const useDownloadStore = defineStore('downloads', () => {
 
   function setupListeners() {
     listen<DownloadProgressPayload>('download-progress', (event: Event<DownloadProgressPayload>) => {
-      const { model_id, progress, downloaded, total_size, speed, verifying } = event.payload ?? {}
+      const { model_id, progress, downloaded, total_size, speed, verifying, verify_progress } = event.payload ?? {}
       if (model_id && progress !== undefined && activeDownloads.value[model_id]) {
         const entry = activeDownloads.value[model_id]
         if (verifying) entry.verifying = true
+        if (verify_progress !== undefined) entry.verifyProgress = verify_progress
         if (progress >= entry.progress) {
           entry.progress = progress
           if (downloaded !== undefined) entry.downloaded = downloaded

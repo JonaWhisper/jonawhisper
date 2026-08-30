@@ -30,6 +30,7 @@ const isStopping = computed(() => dl.value?.stopping ?? false)
 // Le fichier est complet : la suite est un calcul local, que rien ne sert de
 // mettre en pause ou d'interrompre.
 const isVerifying = computed(() => dl.value?.verifying ?? false)
+const verifyProgress = computed(() => dl.value?.verifyProgress ?? 0)
 const isDownloaded = computed(() => isModelAvailable(props.model))
 
 const isPaused = computed(() => {
@@ -47,7 +48,7 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
   <template v-if="isDownloading">
     <div class="flex items-center gap-2">
       <div :class="barWidth">
-        <Progress :model-value="progress * 100" />
+        <Progress :model-value="(isVerifying ? verifyProgress : progress) * 100" />
         <div :class="[textSize, 'text-muted-foreground mt-0.5']">
           {{ isVerifying ? t('modelManager.verifying') : speedText }}
         </div>
