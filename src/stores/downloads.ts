@@ -50,7 +50,7 @@ export const useDownloadStore = defineStore('downloads', () => {
     const entry = activeDownloads.value[id]
     if (!entry) return
     // Mark as stopping so UI shows spinner instead of controls
-    activeDownloads.value = { ...activeDownloads.value, [id]: { ...entry, stopping: true } }
+    activeDownloads.value = { ...activeDownloads.value, [id]: { ...entry, verifying: false, stopping: true } }
     try { await invoke('pause_download', { id }) }
     catch (e) { console.error('pauseDownload failed:', e) }
     // Save partial progress and remove from active downloads after backend confirms
@@ -65,7 +65,7 @@ export const useDownloadStore = defineStore('downloads', () => {
 
   async function cancelDownload(id: string) {
     if (activeDownloads.value[id]) {
-      activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], stopping: true } }
+      activeDownloads.value = { ...activeDownloads.value, [id]: { ...activeDownloads.value[id], verifying: false, stopping: true } }
     } else {
       const m = enginesStore.models.find(m => m.id === id)
       if (m) m.partial_progress = null
@@ -96,7 +96,7 @@ export const useDownloadStore = defineStore('downloads', () => {
   function hydrateFromBackend(downloads: Record<string, number>) {
     const hydrated: typeof activeDownloads.value = {}
     for (const [id, progress] of Object.entries(downloads ?? {})) {
-      hydrated[id] = { progress, stopping: activeDownloads.value[id]?.stopping ?? false, downloaded: 0, totalSize: 0, speed: 0 }
+      hydrated[id] = { progress, verifying: false, stopping: activeDownloads.value[id]?.stopping ?? false, downloaded: 0, totalSize: 0, speed: 0 }
     }
     activeDownloads.value = hydrated
   }

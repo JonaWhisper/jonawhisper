@@ -46,7 +46,7 @@ describe('app store', () => {
     it('is true when activeDownloads is non-empty', () => {
       const store = useAppStore()
       const downloads = useDownloadStore()
-      downloads.activeDownloads = { 'model-a': { progress: 0.5, stopping: false, downloaded: 0, totalSize: 0, speed: 0 } }
+      downloads.activeDownloads = { 'model-a': { progress: 0.5, verifying: false, stopping: false, downloaded: 0, totalSize: 0, speed: 0 } }
       expect(store.isBusy).toBe(true)
     })
 

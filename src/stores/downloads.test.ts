@@ -167,7 +167,7 @@ describe('downloads store', () => {
       })
 
       // Manually set up active download
-      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.5, stopping: false, downloaded: 50_000_000, totalSize: 100_000_000, speed: 1_000_000 } }
+      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.5, verifying: false, stopping: false, downloaded: 50_000_000, totalSize: 100_000_000, speed: 1_000_000 } }
 
       await downloads.pauseDownload('whisper:tiny')
 
@@ -181,7 +181,7 @@ describe('downloads store', () => {
 
       mockInvoke.mockResolvedValue(undefined)
 
-      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.5, stopping: false, downloaded: 50_000_000, totalSize: 100_000_000, speed: 1_000_000 } }
+      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.5, verifying: false, stopping: false, downloaded: 50_000_000, totalSize: 100_000_000, speed: 1_000_000 } }
 
       await downloads.pauseDownload('whisper:tiny')
 
@@ -214,7 +214,7 @@ describe('downloads store', () => {
         return undefined
       })
 
-      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.3, stopping: false, downloaded: 30_000_000, totalSize: 100_000_000, speed: 500_000 } }
+      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.3, verifying: false, stopping: false, downloaded: 30_000_000, totalSize: 100_000_000, speed: 500_000 } }
 
       const promise = downloads.cancelDownload('whisper:tiny')
 
@@ -278,7 +278,7 @@ describe('downloads store', () => {
     it('preserves stopping state from existing entries', () => {
       const downloads = useDownloadStore()
 
-      downloads.activeDownloads = { 'model-a': { progress: 0.2, stopping: true, downloaded: 0, totalSize: 0, speed: 0 } }
+      downloads.activeDownloads = { 'model-a': { progress: 0.2, verifying: false, stopping: true, downloaded: 0, totalSize: 0, speed: 0 } }
       downloads.hydrateFromBackend({ 'model-a': 0.5 })
 
       expect(downloads.activeDownloads['model-a']!.stopping).toBe(true)
@@ -291,7 +291,7 @@ describe('downloads store', () => {
       const downloads = useDownloadStore()
       downloads.setupListeners()
 
-      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.2, stopping: false, downloaded: 20_000_000, totalSize: 100_000_000, speed: 0 } }
+      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.2, verifying: false, stopping: false, downloaded: 20_000_000, totalSize: 100_000_000, speed: 0 } }
 
       // Simulate event
       listeners['download-progress']?.({
@@ -307,7 +307,7 @@ describe('downloads store', () => {
       const downloads = useDownloadStore()
       downloads.setupListeners()
 
-      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.8, stopping: false, downloaded: 80_000_000, totalSize: 100_000_000, speed: 1_000_000 } }
+      downloads.activeDownloads = { 'whisper:tiny': { progress: 0.8, verifying: false, stopping: false, downloaded: 80_000_000, totalSize: 100_000_000, speed: 1_000_000 } }
 
       listeners['download-progress']?.({
         payload: { model_id: 'whisper:tiny', progress: 0.5, downloaded: 50_000_000, total_size: 100_000_000, speed: 500_000 },
