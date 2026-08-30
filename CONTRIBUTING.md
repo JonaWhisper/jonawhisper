@@ -2,10 +2,60 @@
 
 ## Prerequisites
 
-- macOS 14.0+ (Apple Silicon)
+Everywhere:
+
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - [Node.js](https://nodejs.org/) 24+
+
+### macOS (14.0+, Apple Silicon)
+
 - Xcode Command Line Tools: `xcode-select --install`
+
+### Windows x64
+
+- **Visual Studio Build Tools** with the *Desktop development with C++* workload —
+  needed even for `cargo check`, which compiles and runs the build scripts
+- **CMake** — `whisper-rs-sys` and `llama-cpp-sys-2` build ggml and llama.cpp with it
+
+```powershell
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --source winget `
+  --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+winget install --id Kitware.CMake -e --source winget
+```
+
+### Windows on ARM (Copilot+ PC, Surface, a VM on Apple Silicon)
+
+Everything above, plus two tools that x64 does not need. They are not optional:
+the errors they raise name them.
+
+- **LLVM/clang-cl** — `ring` and `aws-lc-sys` refuse to build on
+  `aarch64-pc-windows-msvc` without it (*"Windows ARM64 requires clang-cl"*)
+- **Ninja** — ggml rejects MSVC on ARM (*"MSVC is not supported for ARM, use
+  clang"*), and the Visual Studio generator ignores `CC`/`CXX`, so the build must
+  go through a generator that honours them
+
+```powershell
+winget install --id LLVM.LLVM -e --source winget
+winget install --id Ninja-build.Ninja -e --source winget
+```
+
+Build from a shell where the MSVC environment is loaded — `clang-cl` compiles
+but does not know where the Windows SDK headers and libraries are, and CMake
+fails on its `project()` line without them:
+
+```bat
+call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat" -arch=arm64 -host_arch=arm64
+set CMAKE_GENERATOR=Ninja
+set CC=clang-cl
+set CXX=clang-cl
+cargo check -p jona-platform
+```
+
+**Known limit:** `jona-platform` and its tests build on Windows ARM, verified.
+The full binary does not yet: `llama-cpp-sys-2` fails on `cannot use 'try' with
+exceptions disabled`, and `whisper-rs-sys` fails during its CMake build. Neither
+is a project issue — CI builds both on x64 — but neither has been worked around
+here either. Releases are x64.
 
 ## Development setup
 
