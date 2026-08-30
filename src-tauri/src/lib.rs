@@ -271,6 +271,7 @@ pub fn run() {
             commands::permissions::start_monitoring,
             commands::permissions::enable_monitoring,
             commands::app::get_app_state,
+            commands::app::get_key_labels,
             commands::app::start_shortcut_capture,
             commands::app::stop_shortcut_capture,
             #[cfg(debug_assertions)]
