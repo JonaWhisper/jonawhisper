@@ -36,6 +36,11 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
 
     // Show pill immediately in Preparing mode (before stream starts)
     crate::ui::pill::open(app, crate::ui::pill::PillMode::Preparing);
+    if state.settings.lock().unwrap().live_preview_enabled {
+        crate::ui::subtitle::open(app);
+        // Placeholder until the recogniser feeds it: an empty strip reads as a bug.
+        crate::ui::subtitle::set_text(app, "…");
+    }
     crate::ui::tray::set_tray_state(app, "recording");
 
     let (device_uid, ducking_enabled, ducking_level) = {
