@@ -1,5 +1,7 @@
 #[cfg(target_os = "macos")]
 pub mod appkit;
+#[cfg(target_os = "windows")]
+pub mod layered;
 pub mod menu_icons;
 pub mod pill;
 pub mod subtitle;
