@@ -13,7 +13,7 @@ use windows::Win32::Media::Audio::{
 use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
 };
-use windows::core::{PCWSTR, Result, implement};
+use windows_core::{PCWSTR, Result, implement};
 
 static CALLBACK: Mutex<Option<Box<dyn Fn() + Send>>> = Mutex::new(None);
 
