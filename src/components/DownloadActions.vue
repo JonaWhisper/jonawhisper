@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Progress } from '@/components/ui/progress'
-import { Pause, Play, X, Loader2, Trash2 } from 'lucide-vue-next'
+import { Pause, Play, X, Loader2 } from 'lucide-vue-next'
 import { formatSize, formatSpeed } from '@/utils/format'
 
 const { t } = useI18n()
@@ -53,17 +53,17 @@ const textSize = computed(() => props.compact ? 'text-[9px]' : 'text-[10px]')
           {{ isVerifying ? t('modelManager.verifying') : speedText }}
         </div>
       </div>
-      <!-- Verification : rien a mettre en pause, mais renoncer reste possible -->
+      <!-- Verification : rien a mettre en pause, mais on peut s'en passer -->
       <template v-if="isVerifying">
         <Loader2 class="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         <TooltipProvider :delay-duration="300">
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon-sm" :aria-label="t('aria.delete')" @click="downloads.deleteModel(model.id)">
-                <Trash2 class="w-3.5 h-3.5" />
+              <Button variant="ghost" size="icon-sm" :aria-label="t('aria.cancel')" @click="downloads.cancelVerification(model.id)">
+                <X class="w-3.5 h-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.delete') }}</TooltipContent>
+            <TooltipContent side="bottom" :side-offset="4">{{ t('modelManager.skipVerification') }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </template>

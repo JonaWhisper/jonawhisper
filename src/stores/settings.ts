@@ -21,6 +21,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const cancelShortcut = ref('escape')
   const recordingMode = ref('push_to_talk')
   const vadEnabled = ref(true)
+  const verifyAfterDownload = ref(true)
   const livePreviewEnabled = ref(false)
   const livePreviewModelId = ref('')
   const livePreviewMaxLines = ref(5)
@@ -55,6 +56,7 @@ export const useSettingsStore = defineStore('settings', () => {
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
       vadEnabled.value = s.vad_enabled ?? true
+      verifyAfterDownload.value = s.verify_after_download ?? true
       livePreviewEnabled.value = s.live_preview_enabled ?? false
       livePreviewModelId.value = s.live_preview_model_id ?? ''
       livePreviewMaxLines.value = s.live_preview_max_lines ?? 5
@@ -88,6 +90,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
       case 'audio_ducking_level': return String(audioDuckingLevel.value)
       case 'vad_enabled': return String(vadEnabled.value)
+      case 'verify_after_download': return String(verifyAfterDownload.value)
       case 'live_preview_enabled': return String(livePreviewEnabled.value)
       case 'live_preview_model_id': return livePreviewModelId.value
       case 'live_preview_max_lines': return String(livePreviewMaxLines.value)
@@ -122,6 +125,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
+      case 'verify_after_download': verifyAfterDownload.value = value === 'true'; break
       case 'live_preview_enabled': livePreviewEnabled.value = value === 'true'; break
       case 'live_preview_model_id': livePreviewModelId.value = value; break
       case 'live_preview_max_lines': livePreviewMaxLines.value = Number(value) || 5; break
@@ -156,7 +160,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     selectedModelId, selectedLanguage, asrCloudModel,
     textCleanupEnabled, punctuationModelId, cleanupModelId, llmModel, llmMaxTokens,
-    hallucinationFilterEnabled, vadEnabled, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
+    hallucinationFilterEnabled, vadEnabled, verifyAfterDownload, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
     audioDuckingEnabled, audioDuckingLevel, gpuMode,
     autoReleaseMemory,
     livePreviewEnabled, livePreviewModelId, livePreviewMaxLines,

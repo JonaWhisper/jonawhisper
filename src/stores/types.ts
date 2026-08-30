@@ -206,6 +206,7 @@ export interface SettingsPayload {
   auto_release_memory?: boolean
   audio_ducking_enabled: boolean
   audio_ducking_level: number
+  verify_after_download?: boolean
   vad_enabled: boolean
   live_preview_enabled: boolean
   live_preview_model_id: string

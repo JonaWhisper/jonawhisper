@@ -292,6 +292,9 @@ pub struct ActiveDownload {
     pub progress: f64,
     pub cancel_requested: Arc<AtomicBool>,
     pub delete_partial: Arc<AtomicBool>,
+    /// Set to abandon the post-download hash. Separate from `cancel_requested`,
+    /// which stops the transfer: here the file is complete and stays.
+    pub verify_cancel: Arc<AtomicBool>,
 }
 
 /// All active model downloads (keyed by model ID).
@@ -575,6 +578,10 @@ pub struct Preferences {
     pub audio_ducking_level: f32,
     #[serde(default = "default_true")]
     pub vad_enabled: bool,
+    /// Hash a model after downloading it, to detect later updates. Costs one
+    /// full read of the file — a quarter-minute for the largest models.
+    #[serde(default = "default_true")]
+    pub verify_after_download: bool,
     #[serde(default = "default_true")]
     pub disfluency_removal_enabled: bool,
     #[serde(default = "default_true")]

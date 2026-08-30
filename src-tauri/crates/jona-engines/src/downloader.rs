@@ -127,8 +127,9 @@ pub fn delete_partial(model: &ASRModel) {
 
 /// Compute the SHA256 hash of a file.
 /// Hashing a multi-gigabyte model takes long enough to need a progress bar of
-/// its own: `read` is called back with the bytes consumed so far.
-fn sha256_file_reporting(path: &Path, read: &mut dyn FnMut(u64)) -> Option<String> {
+/// its own: `read` is called back with the bytes consumed so far, and it
+/// returns false to give up — the file stays, only the hash is abandoned.
+fn sha256_file_reporting(path: &Path, read: &mut dyn FnMut(u64) -> bool) -> Option<String> {
     let mut file = fs::File::open(path).ok()?;
     let mut hasher = Sha256::new();
     let mut buf = [0u8; 8192];
@@ -138,7 +139,9 @@ fn sha256_file_reporting(path: &Path, read: &mut dyn FnMut(u64)) -> Option<Strin
         if n == 0 { break; }
         hasher.update(&buf[..n]);
         total += n as u64;
-        read(total);
+        if !read(total) {
+            return None;
+        }
     }
     Some(format!("{:x}", hasher.finalize()))
 }
@@ -173,15 +176,18 @@ fn fetch_etag(url: &str) -> Option<String> {
 
 /// Write a `version.json` alongside the model after successful download.
 /// Includes URL, ETag (from HTTP HEAD), and SHA256 (computed locally) for each file.
-fn write_version_json(model: &ASRModel, app: Option<&AppHandle>) {
+fn write_version_json(model: &ASRModel, app: Option<&AppHandle>, cancel: &AtomicBool) {
     // Bytes hashed across every file of the model, throttled like the download
     // itself so the bar moves without flooding the webview.
     let total_size = model.size.max(1);
     let done_before = std::cell::Cell::new(0u64);
     let mut last = std::time::Instant::now();
     let mut report = |in_file: u64| {
+        if cancel.load(Ordering::SeqCst) {
+            return false;
+        }
         if last.elapsed() < std::time::Duration::from_millis(250) {
-            return;
+            return true;
         }
         last = std::time::Instant::now();
         if let Some(app) = app {
@@ -192,6 +198,7 @@ fn write_version_json(model: &ASRModel, app: Option<&AppHandle>) {
                 "verify_progress": (done_before.get() + in_file) as f64 / total_size as f64,
             }));
         }
+        true
     };
 
     let model_path = model.local_path();
@@ -258,6 +265,7 @@ pub async fn download_model(
     app: AppHandle,
     download_state: Arc<Mutex<DownloadState>>,
     model: ASRModel,
+    verify: bool,
 ) -> bool {
     // Write pending state
     let pending = pending_download_path();
@@ -271,6 +279,7 @@ pub async fn download_model(
 
     // Register this download in the per-model HashMap
     let cancel_flag = Arc::new(AtomicBool::new(false));
+    let verify_flag = Arc::new(AtomicBool::new(false));
     let delete_flag = Arc::new(AtomicBool::new(false));
     {
         let mut dl = download_state.lock().unwrap();
@@ -278,6 +287,7 @@ pub async fn download_model(
             progress: initial_progress,
             cancel_requested: cancel_flag.clone(),
             delete_partial: delete_flag.clone(),
+            verify_cancel: verify_flag.clone(),
         });
     }
 
@@ -312,7 +322,7 @@ pub async fn download_model(
         log::info!("Stopped download for {} — partial file kept for resume", model.id);
     }
 
-    if success {
+    if success && verify {
         // Hashing a multi-gigabyte model and fetching its ETags takes real time
         // — 16s for Voxtral — during which the bar sat at 100% with nothing
         // said. Announce the step, and run it off the async runtime it would
@@ -324,7 +334,8 @@ pub async fn download_model(
         }));
         let m = model.clone();
         let a = app.clone();
-        let _ = tokio::task::spawn_blocking(move || write_version_json(&m, Some(&a))).await;
+        let v = verify_flag.clone();
+        let _ = tokio::task::spawn_blocking(move || write_version_json(&m, Some(&a), &v)).await;
     }
 
     clear_pending_state(&model);

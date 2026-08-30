@@ -39,6 +39,7 @@
   "modelManager.download": "Download",
   "modelManager.downloaded": "Downloaded",
   "modelManager.verifying": "Verifying\u2026",
+  "modelManager.skipVerification": "Skip verification",
   "modelManager.delete": "Delete",
   "modelManager.deleteConfirm": "Are you sure you want to delete this model?",
   "modelManager.deleteConfirmDesc": "The model \"{0}\" will be removed from disk. You can re-download it later.",
