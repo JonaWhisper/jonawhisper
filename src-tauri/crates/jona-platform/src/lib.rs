@@ -68,10 +68,30 @@ pub mod audio_devices {
         pub is_default: bool,
     }
 
-    /// Enumerate inputs through cpal rather than a native API. cpal already
-    /// talks to WASAPI here, and CoreAudio's extras — a numeric id, a stable
-    /// uid, a transport type — have no equivalent worth the FFI: the device name
-    /// is what Windows itself shows the user.
+    /// cpal's WASAPI backend already reads the endpoint properties a native
+    /// implementation would go after — PKEY_AudioEndpoint_FormFactor,
+    /// JackSubType, EnumeratorName — so the transport comes from it rather than
+    /// from COM plumbing of our own.
+    fn transport_from(interface: cpal::InterfaceType) -> AudioTransportType {
+        use cpal::InterfaceType as I;
+        match interface {
+            I::BuiltIn => AudioTransportType::BuiltIn,
+            I::Usb => AudioTransportType::USB,
+            I::Bluetooth => AudioTransportType::Bluetooth,
+            I::Thunderbolt => AudioTransportType::Thunderbolt,
+            I::Hdmi | I::DisplayPort => AudioTransportType::HDMI,
+            I::Virtual => AudioTransportType::Virtual,
+            I::Aggregate => AudioTransportType::Aggregate,
+            // Pci, FireWire, Line, Spdif and Network have no counterpart in the
+            // macOS-derived enum the shared UI matches on.
+            _ => AudioTransportType::Unknown,
+        }
+    }
+
+    /// Enumerate inputs through cpal rather than a native API: it already talks
+    /// to WASAPI, including the endpoint metadata. The one thing it does not
+    /// surface here is a stable identifier — `address()` stays empty on this
+    /// backend — so the name doubles as the uid the picker stores.
     pub fn list_input_devices() -> Vec<AudioDevice> {
         use cpal::traits::{DeviceTrait, HostTrait};
 
@@ -89,15 +109,14 @@ pub mod audio_devices {
         devices
             .enumerate()
             .filter_map(|(i, d)| {
-                let name = d.description().ok()?.name().to_string();
+                let desc = d.description().ok()?;
+                let name = desc.name().to_string();
                 Some(AudioDevice {
                     id: i as u32,
                     is_default: Some(&name) == default_name.as_ref(),
-                    // No stable identifier here: the name is what the picker
-                    // stores and matches on later.
                     uid: name.clone(),
                     name,
-                    transport_type: AudioTransportType::Unknown,
+                    transport_type: transport_from(desc.interface_type()),
                 })
             })
             .collect()
