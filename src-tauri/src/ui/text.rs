@@ -124,7 +124,14 @@ pub(crate) fn render(text: &str, px: f32, width: usize, line_height: f32) -> Tex
     }
 
     let lines = layout.lines().map_or(0, |l| l.len());
-    let height = (lines as f32 * line_height).ceil().max(line_height) as usize;
+    // Descenders on the last line reach below its line box — a cedilla or a "p"
+    // loses its tail if the canvas stops at lines * line_height.
+    let deepest = layout
+        .glyphs()
+        .iter()
+        .map(|g| g.y + g.height as f32)
+        .fold(0.0f32, f32::max);
+    let height = (lines as f32 * line_height).max(deepest).ceil().max(line_height) as usize;
     let mut alpha = vec![0.0f32; width * height];
 
     for glyph in layout.glyphs() {
@@ -171,6 +178,20 @@ mod tests {
         let wide = render("Bonjour ceci est une phrase de test", 15.0, 600, 19.0);
         assert!(narrow.lines > wide.lines);
         assert!(narrow.height > wide.height);
+    }
+
+    #[test]
+    fn the_canvas_makes_room_for_a_descender_on_the_last_line() {
+        // Retina scale, where the strip actually draws: 15pt text, 19pt lines.
+        let wrapped = "Bonjour ceci est un apercu de la bande de sous-titres avec un \u{e7}";
+        let img = render(wrapped, 30.0, 500, 38.0);
+        assert!(img.lines > 1, "le texte doit passer a la ligne");
+        assert!(
+            img.height > (img.lines as f32 * 38.0) as usize,
+            "la cedille de la derniere ligne deborde de sa boite: {} px pour {} lignes",
+            img.height,
+            img.lines
+        );
     }
 
     #[test]

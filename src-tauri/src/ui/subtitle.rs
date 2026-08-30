@@ -283,3 +283,4 @@ mod tests {
         assert!(brightest > 100, "de l'encre blanche est visible: {brightest}");
     }
 }
+
