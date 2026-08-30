@@ -243,6 +243,8 @@ fn run_event_tap(
         const KEY_UP: u32 = 11;
         const FLAGS_CHANGED: u32 = 12;
 
+        log::info!("CAPTURE-DIAG: tap saw type={event_type} key=0x{key_code:02X} flags=0x{mod_flags:X}");
+
         let cap = &state.capture;
 
         match event_type {
@@ -651,6 +653,7 @@ mod win {
     }
 
     fn on_key(state: &HookState, vk: u16, down: bool) {
+        log::debug!("CAPTURE-DIAG: on_key vk=0x{vk:02X} down={down} capture={}", state.capture.mode.load(Ordering::SeqCst));
         if down {
             packed_add(&state.pressed_packed, &state.pressed_count, vk);
         } else {
@@ -661,6 +664,7 @@ mod win {
         let pressed_c = state.pressed_count.load(Ordering::SeqCst);
 
         if state.capture.mode.load(Ordering::SeqCst) {
+            log::info!("CAPTURE-DIAG: hook saw vk=0x{vk:02X} down={down}");
             if down {
                 capture_key(&state.capture, vk);
                 let _ = state.event_tx.send(HotkeyEvent::CaptureUpdate {
