@@ -16,10 +16,40 @@ const MAX_SHORTCUT_KEYS: usize = 4;
 
 // -- CGEventFlags masks --
 
+/// Key codes for the shortcut names stored in preferences. The names are
+/// portable, the codes are not: macOS uses CGEvent codes, Windows virtual-key
+/// codes, and 0x36 means Right Command on one and the digit 6 on the other.
+#[cfg(target_os = "macos")]
+mod keys {
+    pub const RIGHT_COMMAND: u16 = 0x36;
+    pub const RIGHT_OPTION: u16 = 0x3D;
+    pub const RIGHT_CONTROL: u16 = 0x3E;
+    pub const RIGHT_SHIFT: u16 = 0x3C;
+    pub const ESCAPE: u16 = 0x35;
+}
+
+/// Windows virtual-key codes. Right Command maps to the right Windows key: it
+/// sits in the same place and carries the same role as a system modifier.
+#[cfg(not(target_os = "macos"))]
+mod keys {
+    pub const RIGHT_COMMAND: u16 = 0x5C; // VK_RWIN
+    pub const RIGHT_OPTION: u16 = 0xA5; // VK_RMENU (right Alt)
+    pub const RIGHT_CONTROL: u16 = 0xA3; // VK_RCONTROL
+    pub const RIGHT_SHIFT: u16 = 0xA1; // VK_RSHIFT
+    pub const ESCAPE: u16 = 0x1B; // VK_ESCAPE
+}
+
 const CG_MASK_COMMAND: u64 = 1 << 20;
 const CG_MASK_SHIFT: u64 = 1 << 17;
 const CG_MASK_ALTERNATE: u64 = 1 << 19;
 const CG_MASK_CONTROL: u64 = 1 << 18;
+
+// Modifier masks are CGEvent's today. A Windows backend will report its own
+// flags; these aliases mark the values that will have to follow.
+const MASK_COMMAND: u64 = CG_MASK_COMMAND;
+const MASK_SHIFT: u64 = CG_MASK_SHIFT;
+const MASK_ALTERNATE: u64 = CG_MASK_ALTERNATE;
+const MASK_CONTROL: u64 = CG_MASK_CONTROL;
 const CG_MASK_ALL_MODIFIERS: u64 =
     CG_MASK_COMMAND | CG_MASK_SHIFT | CG_MASK_ALTERNATE | CG_MASK_CONTROL;
 
@@ -80,37 +110,25 @@ impl Shortcut {
         }
         // Legacy string format
         match s {
-            "right_command" => Self {
-                key_codes: vec![0x36],
-                modifiers: CG_MASK_COMMAND,
-                kind: ShortcutKind::ModifierOnly,
-            },
-            "right_option" => Self {
-                key_codes: vec![0x3D],
-                modifiers: CG_MASK_ALTERNATE,
-                kind: ShortcutKind::ModifierOnly,
-            },
-            "right_control" => Self {
-                key_codes: vec![0x3E],
-                modifiers: CG_MASK_CONTROL,
-                kind: ShortcutKind::ModifierOnly,
-            },
-            "right_shift" => Self {
-                key_codes: vec![0x3C],
-                modifiers: CG_MASK_SHIFT,
-                kind: ShortcutKind::ModifierOnly,
-            },
+            "right_command" => Self::modifier(keys::RIGHT_COMMAND, MASK_COMMAND),
+            "right_option" => Self::modifier(keys::RIGHT_OPTION, MASK_ALTERNATE),
+            "right_control" => Self::modifier(keys::RIGHT_CONTROL, MASK_CONTROL),
+            "right_shift" => Self::modifier(keys::RIGHT_SHIFT, MASK_SHIFT),
             "escape" => Self {
-                key_codes: vec![0x35],
+                key_codes: vec![keys::ESCAPE],
                 modifiers: 0,
                 kind: ShortcutKind::Key,
             },
             "none" | "" => Self::disabled(),
-            _ => Self {
-                key_codes: vec![0x36],
-                modifiers: CG_MASK_COMMAND,
-                kind: ShortcutKind::ModifierOnly,
-            },
+            _ => Self::modifier(keys::RIGHT_COMMAND, MASK_COMMAND),
+        }
+    }
+
+    fn modifier(key_code: u16, modifiers: u64) -> Self {
+        Self {
+            key_codes: vec![key_code],
+            modifiers,
+            kind: ShortcutKind::ModifierOnly,
         }
     }
 
@@ -1073,6 +1091,54 @@ pub fn start_monitor(
     let (update_tx, _update_rx) = crossbeam_channel::unbounded();
     log::warn!("Hotkey monitoring not implemented on this platform");
     (event_rx, update_tx)
+}
+
+#[cfg(test)]
+mod key_name_tests {
+    use super::*;
+
+    /// The stored name is portable; the code it resolves to is not. On Windows,
+    /// macOS's 0x36 is the digit 6, so a shared table would bind the default
+    /// shortcut to a character key.
+    #[test]
+    fn names_resolve_to_this_platform_codes() {
+        let cmd = Shortcut::parse("right_command");
+        assert_eq!(cmd.kind, ShortcutKind::ModifierOnly);
+        assert_eq!(cmd.key_codes, vec![keys::RIGHT_COMMAND]);
+
+        let esc = Shortcut::parse("escape");
+        assert_eq!(esc.kind, ShortcutKind::Key);
+        assert_eq!(esc.key_codes, vec![keys::ESCAPE]);
+    }
+
+    #[test]
+    fn every_modifier_name_is_distinct() {
+        let codes = [
+            keys::RIGHT_COMMAND,
+            keys::RIGHT_OPTION,
+            keys::RIGHT_CONTROL,
+            keys::RIGHT_SHIFT,
+            keys::ESCAPE,
+        ];
+        let mut seen = codes.to_vec();
+        seen.sort_unstable();
+        seen.dedup();
+        assert_eq!(seen.len(), codes.len(), "deux noms partagent un code");
+    }
+
+    #[test]
+    fn unknown_names_fall_back_to_the_default_shortcut() {
+        assert_eq!(
+            Shortcut::parse("this-is-not-a-shortcut").key_codes,
+            Shortcut::parse("right_command").key_codes
+        );
+    }
+
+    #[test]
+    fn none_and_empty_are_disabled() {
+        assert!(Shortcut::parse("none").is_disabled());
+        assert!(Shortcut::parse("").is_disabled());
+    }
 }
 
 #[cfg(all(test, target_os = "macos"))]
