@@ -27,6 +27,12 @@ fn height_for_lines(lines: f64) -> f64 {
 const TOP_OFFSET: f64 = 80.0;
 #[cfg(target_os = "macos")]
 const PADDING: f64 = 12.0;
+/// Mirrors the pill's own background, kept in sync by hand: it draws itself into
+/// an RGBA buffer, so there is no shared constant to reach for.
+#[cfg(target_os = "macos")]
+const PILL_GREY: f64 = 30.0 / 255.0;
+#[cfg(target_os = "macos")]
+const PILL_ALPHA: f64 = 0.9;
 
 #[cfg(target_os = "macos")]
 struct MainThreadPtr(*mut AnyObject);
@@ -153,9 +159,12 @@ unsafe fn create_window() -> (*mut AnyObject, *mut AnyObject) {
     let backdrop: *mut AnyObject = msg_send![backdrop, initWithFrame: rect];
     let _: () = msg_send![backdrop, setWantsLayer: true];
     let layer: *mut AnyObject = msg_send![backdrop, layer];
+    // Same fill as the pill (rgba(30,30,30,0.9), pill.rs) so the two read as one
+    // overlay. It is also more opaque than plain black at 0.78 was, so the text
+    // gains contrast rather than losing it.
     let bg: *mut AnyObject = msg_send![
         AnyClass::get(c"NSColor").unwrap(),
-        colorWithCalibratedRed: 0.0f64, green: 0.0f64, blue: 0.0f64, alpha: 0.78f64
+        colorWithCalibratedRed: PILL_GREY, green: PILL_GREY, blue: PILL_GREY, alpha: PILL_ALPHA
     ];
     let cg: *mut AnyObject = msg_send![bg, CGColor];
     let _: () = msg_send![layer, setBackgroundColor: cg];
