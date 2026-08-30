@@ -159,12 +159,12 @@ unsafe fn create_window() -> (*mut AnyObject, *mut AnyObject) {
     let backdrop: *mut AnyObject = msg_send![backdrop, initWithFrame: rect];
     let _: () = msg_send![backdrop, setWantsLayer: true];
     let layer: *mut AnyObject = msg_send![backdrop, layer];
-    // Same fill as the pill (rgba(30,30,30,0.9), pill.rs) so the two read as one
-    // overlay. It is also more opaque than plain black at 0.78 was, so the text
-    // gains contrast rather than losing it.
+    // Device, not calibrated: the pill writes these bytes straight into an
+    // NSDeviceRGBColorSpace bitmap, so a calibrated colour of the same value goes
+    // through a conversion the pill never sees and lands visibly lighter.
     let bg: *mut AnyObject = msg_send![
         AnyClass::get(c"NSColor").unwrap(),
-        colorWithCalibratedRed: PILL_GREY, green: PILL_GREY, blue: PILL_GREY, alpha: PILL_ALPHA
+        colorWithDeviceRed: PILL_GREY, green: PILL_GREY, blue: PILL_GREY, alpha: PILL_ALPHA
     ];
     let cg: *mut AnyObject = msg_send![bg, CGColor];
     let _: () = msg_send![layer, setBackgroundColor: cg];
