@@ -38,8 +38,10 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
     crate::ui::pill::open(app, crate::ui::pill::PillMode::Preparing);
     if state.settings.lock().unwrap().live_preview_enabled {
         crate::ui::subtitle::open(app);
-        // Placeholder until the recogniser feeds it: an empty strip reads as a bug.
-        crate::ui::subtitle::set_text(app, "…");
+        // Placeholder until the first pass lands: an empty strip reads as a bug.
+        super::preview::reset(app);
+        let buffer = rec.recorder.lock().unwrap().preview_buffer();
+        super::preview::spawn(app.clone(), Arc::clone(state), buffer);
     }
     crate::ui::tray::set_tray_state(app, "recording");
 
