@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
+  applyKeyLabels,
   parseShortcut,
   formatShortcut,
   formatShortcutParts,
@@ -8,6 +9,25 @@ import {
   isDisabled,
   type ShortcutDef,
 } from './shortcut'
+
+// Les tables viennent du backend, seul a connaitre la plateforme. Ces tests
+// portent sur la mise en forme, pas sur leur contenu : on injecte celles de
+// macOS, dont les cas ci-dessous sont tires.
+beforeEach(() => {
+  applyKeyLabels({
+    keys: {
+      0x00: 'A', 0x35: 'Escape',
+      0x36: 'Right \u2318', 0x37: 'Left \u2318',
+      0x3C: 'Right \u21e7', 0x38: 'Left \u21e7',
+      0x3D: 'Right \u2325', 0x3E: 'Right \u2303',
+    },
+    modifier_join: '',
+    control: '\u2303',
+    alternate: '\u2325',
+    shift: '\u21e7',
+    command: '\u2318',
+  })
+})
 
 describe('parseShortcut', () => {
   it('returns null for empty string', () => {

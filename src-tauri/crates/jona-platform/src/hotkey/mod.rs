@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::Arc;
 
 
-mod labels;
+pub mod labels;
 mod shortcut;
 mod slot;
 

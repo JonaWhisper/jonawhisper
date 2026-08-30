@@ -6,6 +6,7 @@ import { useSettingsStore } from './settings'
 import { useHistoryStore } from './history'
 import { useEnginesStore } from './engines'
 import { useDownloadStore } from './downloads'
+import { applyKeyLabels, type KeyLabels } from '@/utils/shortcut'
 
 import type {
   RecordingStoppedPayload, TranscriptionStartedPayload,
@@ -149,6 +150,13 @@ export const useAppStore = defineStore('app', () => {
     if (initialized) return
     initialized = true
     setupListeners()
+    // Avant tout affichage de raccourci : sans ces tables, le selecteur rend
+    // les libelles d'une autre plateforme.
+    try {
+      applyKeyLabels(await invoke<KeyLabels>('get_key_labels'))
+    } catch (e) {
+      console.error('key labels unavailable', e)
+    }
     await Promise.all([
       fetchState(),
       settingsStore.fetchSettings(),

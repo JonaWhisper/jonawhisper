@@ -8,6 +8,13 @@ pub fn get_app_state(state: tauri::State<'_, Arc<AppState>>) -> serde_json::Valu
     state.to_frontend_json()
 }
 
+/// Key labels for this platform. The frontend used to hold its own copy of
+/// Apple's tables, which rendered nonsense anywhere else.
+#[tauri::command]
+pub fn get_key_labels() -> crate::platform::hotkey::labels::KeyLabels {
+    crate::platform::hotkey::labels::table()
+}
+
 #[tauri::command]
 pub fn start_shortcut_capture(capture: tauri::State<'_, Arc<crate::platform::hotkey::CaptureControl>>) {
     capture.enter();

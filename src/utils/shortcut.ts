@@ -12,51 +12,44 @@ const CG_MASK_ALTERNATE = 1 << 19
 const CG_MASK_COMMAND = 1 << 20
 const CG_MASK_SHIFT = 1 << 17
 
-const KEY_CODE_LABELS: Record<number, string> = {
-  // Letters
-  0x00: 'A', 0x0B: 'B', 0x08: 'C', 0x02: 'D',
-  0x0E: 'E', 0x03: 'F', 0x05: 'G', 0x04: 'H',
-  0x22: 'I', 0x26: 'J', 0x28: 'K', 0x25: 'L',
-  0x2E: 'M', 0x2D: 'N', 0x1F: 'O', 0x23: 'P',
-  0x0C: 'Q', 0x0F: 'R', 0x01: 'S', 0x11: 'T',
-  0x20: 'U', 0x09: 'V', 0x0D: 'W', 0x07: 'X',
-  0x10: 'Y', 0x06: 'Z',
-  // Numbers
-  0x12: '1', 0x13: '2', 0x14: '3', 0x15: '4',
-  0x17: '5', 0x16: '6', 0x1A: '7', 0x1C: '8',
-  0x19: '9', 0x1D: '0',
-  // F-keys
-  0x7A: 'F1', 0x78: 'F2', 0x63: 'F3', 0x76: 'F4',
-  0x60: 'F5', 0x61: 'F6', 0x62: 'F7', 0x64: 'F8',
-  0x65: 'F9', 0x6D: 'F10', 0x67: 'F11', 0x6F: 'F12',
-  0x69: 'F13', 0x6B: 'F14', 0x71: 'F15', 0x6A: 'F16',
-  0x40: 'F17', 0x4F: 'F18', 0x50: 'F19', 0x5A: 'F20',
-  // Special
-  0x31: 'Space', 0x24: 'Return', 0x30: 'Tab',
-  0x33: 'Delete', 0x75: 'Fwd Delete', 0x35: 'Escape',
-  // Arrows
-  0x7B: '←', 0x7C: '→', 0x7E: '↑', 0x7D: '↓',
-  // Navigation
-  0x73: 'Home', 0x77: 'End', 0x74: 'Page Up', 0x79: 'Page Down',
-  // Punctuation
-  0x1B: '-', 0x18: '=', 0x21: '[', 0x1E: ']',
-  0x2A: '\\', 0x29: ';', 0x27: "'", 0x2B: ',',
-  0x2F: '.', 0x2C: '/', 0x32: '`',
-  // Modifiers (for ModifierOnly display)
-  0x36: 'Right ⌘', 0x37: 'Left ⌘',
-  0x3D: 'Right ⌥', 0x3A: 'Left ⌥',
-  0x3E: 'Right ⌃', 0x3B: 'Left ⌃',
-  0x3C: 'Right ⇧', 0x38: 'Left ⇧',
-  0x3F: 'Fn',
+// Rempli au demarrage depuis le backend, seul a connaitre la plateforme : les
+// codes et les libelles different entierement entre CGEvent et les codes
+// virtuels Windows, et une table cote Vue serait celle d'Apple partout.
+let KEY_CODE_LABELS: Record<number, string> = {}
+let MODIFIER_LABELS = { control: '\u2303', alternate: '\u2325', shift: '\u21e7', command: '\u2318' }
+let MODIFIER_JOIN = ''
+
+export interface KeyLabels {
+  keys: Record<number, string>
+  modifier_join: string
+  control: string
+  alternate: string
+  shift: string
+  command: string
+}
+
+export function applyKeyLabels(labels: KeyLabels): void {
+  KEY_CODE_LABELS = labels.keys
+  MODIFIER_JOIN = labels.modifier_join
+  MODIFIER_LABELS = {
+    control: labels.control,
+    alternate: labels.alternate,
+    shift: labels.shift,
+    command: labels.command,
+  }
+}
+
+function modifierParts(flags: number): string[] {
+  const parts: string[] = []
+  if (flags & CG_MASK_CONTROL) parts.push(MODIFIER_LABELS.control)
+  if (flags & CG_MASK_ALTERNATE) parts.push(MODIFIER_LABELS.alternate)
+  if (flags & CG_MASK_SHIFT) parts.push(MODIFIER_LABELS.shift)
+  if (flags & CG_MASK_COMMAND) parts.push(MODIFIER_LABELS.command)
+  return parts
 }
 
 function modifierSymbols(flags: number): string {
-  let s = ''
-  if (flags & CG_MASK_CONTROL) s += '⌃'
-  if (flags & CG_MASK_ALTERNATE) s += '⌥'
-  if (flags & CG_MASK_SHIFT) s += '⇧'
-  if (flags & CG_MASK_COMMAND) s += '⌘'
-  return s
+  return modifierParts(flags).join(MODIFIER_JOIN)
 }
 
 export function parseShortcut(s: string): ShortcutDef | null {
@@ -93,7 +86,7 @@ export function formatShortcut(s: ShortcutDef): string {
   if (isDisabled(s)) return ''
   switch (s.kind) {
     case 'ModifierOnly':
-      return s.key_codes.map(kc => KEY_CODE_LABELS[kc] ?? '⌘').join('+')
+      return s.key_codes.map(kc => KEY_CODE_LABELS[kc] ?? '?').join('+')
     case 'Combo':
       return modifierSymbols(s.modifiers) + s.key_codes.map(kc => KEY_CODE_LABELS[kc] ?? '?').join('')
     case 'Key':
@@ -132,7 +125,7 @@ export function formatShortcutParts(s: ShortcutDef): KeyCapPart[] {
   switch (s.kind) {
     case 'ModifierOnly': {
       return s.key_codes.map(kc => {
-        const full = KEY_CODE_LABELS[kc] ?? '⌘'
+        const full = KEY_CODE_LABELS[kc] ?? '?'
         const spaceIdx = full.lastIndexOf(' ')
         if (spaceIdx > 0) {
           return { symbol: full.slice(spaceIdx + 1), side: full.slice(0, spaceIdx) }
@@ -141,9 +134,8 @@ export function formatShortcutParts(s: ShortcutDef): KeyCapPart[] {
       })
     }
     case 'Combo': {
-      const mods = modifierSymbols(s.modifiers)
       const parts: KeyCapPart[] = []
-      for (const ch of mods) parts.push({ symbol: ch })
+      for (const m of modifierParts(s.modifiers)) parts.push({ symbol: m })
       for (const kc of s.key_codes) {
         parts.push({ symbol: SYMBOL_MAP[kc] ?? KEY_CODE_LABELS[kc] ?? '?' })
       }
