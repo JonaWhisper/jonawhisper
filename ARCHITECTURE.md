@@ -132,7 +132,7 @@ Defines the `ASREngine` trait, `ASRModel`, `EngineError`, `Preferences`, `Provid
 
 #### `jona-platform` — OS-specific code
 
-macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future Windows support. Hotkey (CGEvent tap), permissions, paste, audio devices, audio ducking, sound playback, launch-at-login.
+Every OS-specific service, macOS and Windows alike, behind one API per module: hotkey, paste, audio devices, audio ducking, permissions, system cues, launch-at-login. Callers never branch on the platform — the module picks its implementation from the target and re-exports it under a single name.
 
 #### `jona-provider` + `jona-provider-*` (13 crates) — Cloud backends
 
@@ -156,18 +156,19 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-lm` | KenLM language models | Vendored KenLM C++ (query-only), mmap-backed, trigram scoring |
 | `jona-engine-llama` | Local LLM (llama.cpp) | llama-cpp-2, Metal GPU offload, GGUF Q4 models |
 
-### Platform (`platform/`)
+### Platform (`jona-platform`)
 
-macOS-specific code behind `#[cfg(target_os = "macos")]`, with stubs for future Windows support.
+One API per service; the implementation is chosen from the target and re-exported under a single name, so no caller writes `cfg(target_os)`.
 
-| File | Role |
-|------|------|
-| `platform/hotkey.rs` | Global shortcut via CGEvent tap on its own CFRunLoop thread. Multi-key support: accumulates up to 4 keys during capture, finalizes on first key release. Three shortcut kinds: **ModifierOnly** (e.g. Right ⌘), **Combo** (e.g. ⌘+A), **Key** (e.g. F13). Lock-free packed atomics (`4×u16` in `AtomicU64`) for capture state. Also implements capture mode for the shortcut picker. |
-| `platform/macos.rs` | Permission checks and requests (microphone via objc2/AVFoundation, input monitoring via CGEventTap probe, accessibility via AXIsProcessTrusted) |
-| `platform/ffi.rs` | Raw C declarations for CoreGraphics and CoreFoundation |
-| `platform/paste.rs` | Writes to clipboard (tauri-plugin-clipboard-manager) then simulates Cmd+V via CGEvent |
-| `platform/audio_devices.rs` | CoreAudio device enumeration and transport type detection |
-| `platform/audio_ducking.rs` | CoreAudio volume ducking — saves/reduces system volume during recording, restores on stop |
+| Module | Role |
+|--------|------|
+| `hotkey.rs` | Global shortcut. macOS: CGEvent tap on its own CFRunLoop thread. Windows: `WH_KEYBOARD_LL`. Multi-key support: accumulates up to 4 keys during capture, finalizes on first key release. Three shortcut kinds: **ModifierOnly** (e.g. Right ⌘), **Combo** (e.g. ⌘+A), **Key** (e.g. F13). Lock-free packed atomics (`4×u16` in `AtomicU64`) for capture state. |
+| `paste.rs` | Writes to the clipboard, then simulates the paste keystroke — CGEvent on macOS, `SendInput` on Windows |
+| `audio_devices/` | `mod.rs` holds the device types, shared; `macos.rs` enumerates through CoreAudio, `portable.rs` through cpal (which reads the WASAPI endpoint properties a native implementation would go after) |
+| `audio_ducking/` | Lowers the system output volume while dictating. `macos.rs` moves CoreAudio's VirtualMainVolume, `windows.rs` the default render endpoint's master volume. Both refuse to restore a volume the user has moved since |
+| `macos.rs` / `windows.rs` / `fallback.rs` | Permissions, system cues, launch at login. Private behind a re-export |
+| `device_watcher.rs` | Windows only: `IMMNotificationClient`, so the device list rebuilds when one is plugged in |
+| `ffi.rs` | macOS only: raw C declarations for CoreGraphics and CoreFoundation |
 
 ### SDF icon rendering
 
