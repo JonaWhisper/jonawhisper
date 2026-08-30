@@ -380,3 +380,20 @@ mod key_name_tests {
         assert!(Shortcut::parse("").is_disabled());
     }
 }
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod windows_display_tests {
+    use super::super::{CG_MASK_CONTROL, CG_MASK_SHIFT};
+    use super::*;
+
+    #[test]
+    fn modifiers_join_with_a_plus() {
+        assert_eq!(modifier_symbols(CG_MASK_CONTROL | CG_MASK_SHIFT), "Ctrl+Maj");
+        assert_eq!(modifier_symbols(0), "");
+    }
+
+    #[test]
+    fn the_default_shortcut_reads_correctly() {
+        assert_eq!(Shortcut::parse("right_command").display_string(), "Right Win");
+    }
+}

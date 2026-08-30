@@ -79,7 +79,6 @@ pub(crate) fn key_code_label(key_code: u16) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::Shortcut;
 
     #[test]
     fn letters_use_virtual_key_codes() {
@@ -107,16 +106,9 @@ mod tests {
     }
 
     #[test]
-    fn modifiers_are_spelled_out_and_joined_with_plus() {
-        let both = modifier_symbols(CG_MASK_CONTROL | CG_MASK_SHIFT);
-        assert_eq!(both, "Ctrl+Maj");
-        assert_eq!(modifier_symbols(CG_MASK_COMMAND), "Win");
-        assert_eq!(modifier_symbols(0), "");
-    }
-
-    #[test]
-    fn the_default_shortcut_reads_correctly() {
-        let s = Shortcut::parse("right_command");
-        assert_eq!(s.display_string(), "Right Win");
+    fn modifiers_are_spelled_out() {
+        assert_eq!(modifier_labels(CG_MASK_CONTROL), vec!["Ctrl"]);
+        assert_eq!(modifier_labels(CG_MASK_COMMAND), vec!["Win"]);
+        assert_eq!(MODIFIER_JOIN, "+");
     }
 }
