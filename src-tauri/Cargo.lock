@@ -3884,6 +3884,7 @@ dependencies = [
  "smappservice-rs",
  "tauri",
  "tauri-plugin-clipboard-manager",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
