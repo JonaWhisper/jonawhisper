@@ -3829,7 +3829,6 @@ dependencies = [
  "jona-types",
  "log",
  "ort",
- "prost",
  "tokenizers 0.23.1",
 ]
 
@@ -3888,6 +3887,7 @@ dependencies = [
  "jona-types",
  "log",
  "ort",
+ "prost",
  "reqwest",
  "rustfft",
  "serde",

@@ -21,6 +21,7 @@ rustfft = "6"
 tauri = { version = "2" }
 sha2 = "0.10"
 chrono = { version = "0.4", features = ["serde"] }
+prost = "0.14"
 
 # CoreML is the shared ort execution provider; enabling it here reaches every
 # crate through Cargo feature unification.

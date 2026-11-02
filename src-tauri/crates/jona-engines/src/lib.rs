@@ -4,6 +4,7 @@ pub mod mel;
 pub mod audio;
 pub mod common;
 pub mod llm_prompt;
+pub mod sentencepiece;
 
 // Re-export engine types from jona-types for backward compatibility
 pub use jona_types::{

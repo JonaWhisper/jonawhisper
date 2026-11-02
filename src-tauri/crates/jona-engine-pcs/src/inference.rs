@@ -9,22 +9,6 @@ use jona_engines::common;
 /// (pre_punctuation, post_punctuation, capitalization) predictions per token.
 type WindowPredictions = (Vec<usize>, Vec<usize>, Vec<Vec<bool>>);
 
-// -- SentencePiece protobuf parsing (prost) --
-
-#[derive(prost::Message)]
-struct ModelProto {
-    #[prost(message, repeated, tag = "1")]
-    pieces: Vec<SentencePieceProto>,
-}
-
-#[derive(prost::Message)]
-struct SentencePieceProto {
-    #[prost(string, optional, tag = "1")]
-    piece: Option<String>,
-    #[prost(float, optional, tag = "2")]
-    score: Option<f32>,
-}
-
 // -- Constants --
 
 const SPE_MODEL_FILENAME: &str = "spe_unigram_64k_lowercase_47lang.model";
@@ -282,10 +266,7 @@ fn build_tokenizer_from_spe(model_dir: &Path) -> Result<Tokenizer, String> {
         common::download_file(SPE_MODEL_URL, &spe_path)?;
     }
 
-    let data = std::fs::read(&spe_path)
-        .map_err(|e| format!("Failed to read SentencePiece model: {e}"))?;
-    let model: ModelProto = prost::Message::decode(data.as_slice())
-        .map_err(|e| format!("Failed to parse SentencePiece protobuf: {e}"))?;
+    let model = jona_engines::sentencepiece::read_model(&spe_path)?;
 
     log::info!("SentencePiece model: {} pieces", model.pieces.len());
 
