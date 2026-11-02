@@ -17,6 +17,8 @@ members = [
     "crates/jona-detector-claude-code",
     "crates/jona-detector-env",
 ]
+# Third-party code: `cargo clippy --workspace -D warnings` in CI must not lint it.
+exclude = ["vendor/moshi"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
