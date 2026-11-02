@@ -1,0 +1,65 @@
+# Vendored from crates.io moshi 0.6.4. Only change: Candle requirements from 0.9.1 to 0.11.
+# Upstream pins ^0.9.1, which would link a second Candle next to the one jona-engine-bert uses.
+
+[package]
+edition = "2021"
+name = "moshi"
+version = "0.6.4"
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+description = "moshi, a real-time voice AI"
+readme = "README.md"
+keywords = [
+    "machine-learning",
+    "audio",
+]
+categories = ["science"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/kyutai-labs/moshi"
+
+[features]
+cuda = [
+    "candle/cuda",
+    "candle-nn/cuda",
+]
+default = []
+flash-attn = [
+    "cuda",
+    "dep:candle-flash-attn",
+]
+metal = [
+    "candle/metal",
+    "candle-nn/metal",
+]
+
+[lib]
+name = "moshi"
+path = "src/lib.rs"
+
+[dependencies.candle]
+version = "0.11"
+package = "candle-core"
+
+[dependencies.candle-flash-attn]
+version = "0.11"
+optional = true
+
+[dependencies.candle-nn]
+version = "0.11"
+
+[dependencies.candle-transformers]
+version = "0.11"
+
+[dependencies.rayon]
+version = "1.8.1"
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.tracing]
+version = "0.1.40"

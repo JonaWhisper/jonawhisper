@@ -3786,6 +3786,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jona-engine-kyutai"
+version = "0.1.0"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "inventory",
+ "jona-engines",
+ "jona-types",
+ "moshi",
+ "rubato",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "jona-engine-llama"
 version = "0.1.0"
 dependencies = [
@@ -3829,7 +3844,6 @@ dependencies = [
  "jona-types",
  "log",
  "ort",
- "prost",
  "tokenizers 0.23.1",
 ]
 
@@ -3888,6 +3902,7 @@ dependencies = [
  "jona-types",
  "log",
  "ort",
+ "prost",
  "reqwest",
  "rustfft",
  "serde",
@@ -4158,6 +4173,7 @@ dependencies = [
  "jona-engine-bert",
  "jona-engine-canary",
  "jona-engine-correction",
+ "jona-engine-kyutai",
  "jona-engine-llama",
  "jona-engine-lm",
  "jona-engine-parakeet",
@@ -4630,6 +4646,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "moshi"
+version = "0.6.4"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
+ "rayon",
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -6021,6 +6049,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "realfft"
+version = "3.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "538895ccf2006b473aafbe8d72770e21038961ab67aae34f3c577485fc703a7d"
+dependencies = [
+ "rustfft",
+]
+
+[[package]]
 name = "reborrow"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6194,6 +6231,18 @@ checksum = "c51c9ae4df8a7fba42103df5c621fa3c37eccf3a3c650879e90fc48b11cc192c"
 dependencies = [
  "hashbrown 0.16.1",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "rubato"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5d18b486e7d29a408ef3f825bc1327d8f87af091c987ca2f5b734625940e234"
+dependencies = [
+ "num-complex",
+ "num-integer",
+ "num-traits",
+ "realfft",
 ]
 
 [[package]]
