@@ -14,6 +14,7 @@ members = [
     "crates/jona-engine-bert", "crates/jona-engine-pcs", "crates/jona-engine-correction",
     "crates/jona-engine-spellcheck",
     "crates/jona-engine-lm",
+    "crates/jona-engine-kyutai",
     "crates/jona-detector-claude-code",
     "crates/jona-detector-env",
 ]
@@ -67,6 +68,7 @@ jona-provider-aws-transcribe = { path = "crates/jona-provider-aws-transcribe" }
 jona-engine-whisper = { path = "crates/jona-engine-whisper" }
 jona-engine-canary = { path = "crates/jona-engine-canary" }
 jona-engine-parakeet = { path = "crates/jona-engine-parakeet" }
+jona-engine-kyutai = { path = "crates/jona-engine-kyutai" }
 jona-engine-voxtral = { path = "crates/jona-engine-voxtral" }
 jona-engine-llama = { path = "crates/jona-engine-llama" }
 jona-engine-bert = { path = "crates/jona-engine-bert" }
