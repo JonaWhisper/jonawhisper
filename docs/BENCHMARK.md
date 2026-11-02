@@ -49,6 +49,22 @@ Modèles GGML téléchargeables depuis le Model Manager, exécutés en local via
 | **Qwen3-ASR 0.6B** | 600M | 30 langues | Safetensors | 1.88 GB | 2 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:0.6b`) |
 | **Qwen3-ASR 1.7B** | 1.7B | 30 langues | Safetensors (2 shards) | 4.70 GB | 5 GB | Qwen encoder-decoder | Oui (crate) | qwen-asr (Accelerate/AMX) | **Intégré** (`qwen-asr:1.7b`) |
 | **Voxtral Realtime 4B** | 4.4B | 13 langues | Safetensors BF16 | 8.9 GB | ~10 GB | Mimi encoder + LLM decoder | Oui (voxtral.c) | voxtral.c vendoré (Metal) | **Intégré** (`voxtral:mini-4b-realtime`) |
+| **Kyutai STT 1B** | ~1B | FR/EN | Safetensors BF16 | 2.36 GB | 2.7 GB | Mimi encoder + décodeur transformer (DSM) | Possible, non exploité | moshi vendoré + Candle (Metal) | **Intégré** (`kyutai:stt-1b-en_fr`) |
+
+#### Kyutai STT — Mesures sur corpus français
+
+Kyutai ne publie aucun WER français pour ce modèle. Mesuré le 2026-11-02 sur 40 clips du split test de Multilingual LibriSpeech français (9,8 min, 2 lecteurs, texte littéraire), moteurs appelés directement, sans VAD ni nettoyage. WER sur texte normalisé (minuscules, sans ponctuation) ; un nombre écrit en chiffres compte comme une erreur.
+
+| Moteur | WER | Vitesse | Chargement |
+|---|---|---|---|
+| Whisper Large V3 French | 4,94 % | 25,7× temps réel | 5,4 s |
+| Parakeet-TDT 0.6B v3 | 12,41 % | 20,2× temps réel | 4,3 s |
+| Kyutai STT 1B (intégré, Candle 0.11) | 13,10 % | 5,8× temps réel | ~8 s |
+| Kyutai STT 1B (référence, Candle 0.9.1) | 13,85 % | 4,0× temps réel | — |
+
+- **Sortie instable** : le WER varie de 13,1 à 17,5 % selon le rééchantillonneur et le silence ajouté au début, et un rééchantillonneur différent a fait sortir un clip français en alphabet persan. Un écart de 1 ou 2 points sur ce corpus n'est donc pas significatif. L'app reproduit exactement le rééchantillonnage de référence (`rubato`) : 40 transcriptions sur 40 identiques.
+- **Candle** : entre 0.9.1 et 0.11.0, 32 transcriptions sur 40 restent identiques, sans perte de précision.
+- **Streaming** : le modèle transcrit au fil de l'audio avec 0,5 s de délai, mais l'app lui donne l'enregistrement complet. C'est le seul avantage qu'il pourrait faire valoir sur Whisper, et il reste à exploiter.
 
 #### Voxtral — Benchmarks (WER moyen FLEURS + MCV + MLS)
 

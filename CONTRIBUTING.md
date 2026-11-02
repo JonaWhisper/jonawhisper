@@ -90,7 +90,7 @@ Key directories:
 | Directory | Contents |
 |-----------|----------|
 | `src/` | Vue 3 frontend (views, sections, components, stores) |
-| `crates/jona-engine-*/` | ASR & cleanup engines (whisper, canary, parakeet, qwen, voxtral, bert, pcs, correction, llama, spellcheck, lm) |
+| `crates/jona-engine-*/` | ASR & cleanup engines (whisper, canary, parakeet, qwen, voxtral, kyutai, bert, pcs, correction, llama, spellcheck, lm) |
 | `crates/jona-engines/` | Engine catalog, model downloads, shared inference utilities |
 | `crates/jona-types/` | Shared types (ASREngine trait, ASRModel, Preferences, etc.) |
 | `crates/jona-platform/` | macOS-specific code (hotkeys, permissions, paste) |
@@ -153,7 +153,7 @@ Use a scope to indicate the area affected:
 
 | Scope | Area |
 |-------|------|
-| `asr` | ASR engines (whisper, canary, parakeet, qwen, voxtral) |
+| `asr` | ASR engines (whisper, canary, parakeet, qwen, voxtral, kyutai) |
 | `cleanup` | Text cleanup pipeline (punctuation, correction, VAD, LLM) |
 | `ui` | Frontend Vue components, CSS, layout |
 | `tray` | Tray menu, pill overlay, native UI |

@@ -31,7 +31,7 @@ The main Tauri crate (`src-tauri/src/`) is a **thin orchestrator**. It contains 
 │                   │  trait     │                              │
 │                   └─────┬──────┘                             │
 │         ┌───────┬───────┼───────┬───────┐                    │
-│     whisper  canary  parakeet  qwen  voxtral  (+ 4 cleanup)  │
+│   whisper canary parakeet qwen voxtral kyutai (+ 4 cleanup)  │
 │     (independent crates, auto-registered via inventory)      │
 │                         │                                    │
 │                   platform/paste ──▶ Cmd+V                   │
@@ -149,6 +149,7 @@ Each crate implements `ASREngine`, registers itself via `inventory::submit!`, an
 | `jona-engine-parakeet` | NVIDIA Parakeet-TDT 0.6B | ort + CoreML, vendored TDT decoder |
 | `jona-engine-qwen` | Alibaba Qwen3-ASR 0.6B / 1.7B | qwen-asr crate (Accelerate/AMX) |
 | `jona-engine-voxtral` | Mistral Voxtral 4B | vendored voxtral.c (Metal GPU) |
+| `jona-engine-kyutai` | Kyutai STT 1B (FR/EN) | vendored moshi on Candle (Metal GPU) |
 | `jona-engine-bert` | BERT punctuation | ort (ONNX + CoreML) or Candle (safetensors + Metal GPU) |
 | `jona-engine-pcs` | PCS punctuation (47 lang) | ort (ONNX + CoreML), SentencePiece tokenizer |
 | `jona-engine-correction` | T5 grammar correction | ort (ONNX + CoreML), autoregressive decoding, repeat penalty 1.5, n-gram blocking, live loop detection |

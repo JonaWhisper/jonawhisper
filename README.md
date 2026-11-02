@@ -10,7 +10,7 @@ All processing happens on your machine — no data leaves your computer unless y
 
 - **Menu bar app** — lives in the system tray, no dock icon
 - **Global hotkey** — push-to-talk or toggle mode, any key combination (modifier, combo, or standalone key)
-- **6 ASR engines** — Whisper, Canary, Parakeet-TDT, Qwen3-ASR, Voxtral (all local, GPU-accelerated), plus any OpenAI-compatible cloud API
+- **7 ASR engines** — Whisper, Canary, Parakeet-TDT, Qwen3-ASR, Voxtral, Kyutai STT (all local, GPU-accelerated), plus any OpenAI-compatible cloud API
 - **24 cloud presets** — OpenAI, Groq, Cerebras, Gemini, Mistral, Fireworks, Together, DeepSeek, OpenRouter, xAI, SambaNova, Nebius, Anthropic, Deepgram, GitHub Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere, Gladia, Speechmatics, Azure Speech, Google Speech
 - **Text cleanup pipeline** — VAD silence trimming, hallucination filter, dictation commands, punctuation (BERT/PCS), grammar correction (T5), or full LLM cleanup (local/cloud)
 - **Floating pill** — real-time spectrum visualization, recording/transcribing states, cancel support
@@ -29,6 +29,7 @@ All processing happens on your machine — no data leaves your computer unless y
 | [Parakeet-TDT](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/parakeet-tdt-0.6b-v2) | 600M | 703 MB | 25 European | CoreML | 1.5% | 0.10 |
 | [Qwen3-ASR](https://github.com/huanglizhuo/QwenASR) | 600M–1.7B | 1.88–4.70 GB | 30 | Accelerate/AMX | 1.63% | 0.10–1.0 |
 | [Voxtral](https://github.com/antirez/voxtral.c) | 4.4B | 8.9 GB | 13 | Metal | 8.7% | 0.40 |
+| [Kyutai STT](https://huggingface.co/kyutai/stt-1b-en_fr) | 1B | 2.36 GB | 2 (FR/EN) | Metal | — | 0.17 |
 | Cloud (OpenAI API) | — | — | depends on provider | — | — | — |
 
 **Recommendations**: Parakeet-TDT for best accuracy (1.5% WER, 25 languages). Whisper V3 Turbo for best balance (2.1% WER, 99 languages, 0.25 RTF). Whisper Tiny for speed (75 MB, 0.05 RTF).
@@ -166,7 +167,7 @@ Models are downloaded and managed from within the app. All models are stored in 
 | Backend | [Rust](https://www.rust-lang.org/) |
 | Frontend | [Vue 3](https://vuejs.org/), [TypeScript](https://www.typescriptlang.org/), [Pinia](https://pinia.vuejs.org/), [Tailwind CSS](https://tailwindcss.com/), [shadcn-vue](https://www.shadcn-vue.com/) |
 | Audio | [cpal](https://github.com/RustAudio/cpal) + [hound](https://github.com/ruuda/hound) (recording), [rustfft](https://github.com/ejmahler/RustFFT) (spectrum), CoreAudio FFI (ducking) |
-| ASR | [whisper-rs](https://github.com/tazz4843/whisper-rs) (Metal), [ort](https://github.com/pykeIO/ort) + CoreML (Canary, Parakeet), [qwen-asr](https://github.com/huanglizhuo/QwenASR) (AMX), [voxtral.c](https://github.com/antirez/voxtral.c) (Metal) |
+| ASR | [whisper-rs](https://github.com/tazz4843/whisper-rs) (Metal), [ort](https://github.com/pykeIO/ort) + CoreML (Canary, Parakeet), [qwen-asr](https://github.com/huanglizhuo/QwenASR) (AMX), [voxtral.c](https://github.com/antirez/voxtral.c) (Metal), [moshi](https://github.com/kyutai-labs/moshi) + candle (Kyutai STT, Metal) |
 | Text cleanup | [ort](https://github.com/pykeIO/ort) + CoreML (BERT, PCS, T5 correction), [candle](https://github.com/huggingface/candle) (BERT Metal), [llama-cpp-2](https://github.com/utilityai/llama-cpp-rs) (local LLM Metal) |
 | Icons | SDF (Signed Distance Field) in Rust, RGBA bitmaps — zero image dependencies |
 | Hotkey | Raw [CGEvent](https://developer.apple.com/documentation/coregraphics/cgevent) tap (CoreGraphics FFI) |
@@ -187,7 +188,7 @@ JonaWhisper follows a **thin orchestrator** design. The main Tauri crate (`src-t
 | `jona-engines` | Infrastructure: `EngineCatalog`, downloader, ort session builder, mel features |
 | `jona-platform` | OS-specific code: hotkey (CGEvent tap), permissions, paste, audio devices, ducking |
 | `jona-provider` + `jona-provider-*` (13) | Cloud provider backends (OpenAI-compatible, Anthropic, Deepgram, Copilot, Gemini ASR, Rev.ai, AssemblyAI, ElevenLabs, Cohere, Gladia, Speechmatics, Azure Speech, Google Speech) |
-| `jona-engine-*` (11) | One crate per engine: whisper, canary, parakeet, qwen, voxtral, llama, bert, pcs, correction, spellcheck, lm |
+| `jona-engine-*` (12) | One crate per engine: whisper, canary, parakeet, qwen, voxtral, kyutai, llama, bert, pcs, correction, spellcheck, lm |
 
 **Plug-and-play engines**: each engine crate registers itself via `inventory::submit!` at link time. The main crate calls `EngineCatalog::init_auto()` at startup — no hardcoded engine list, no re-exports. Adding an engine = add a crate + `cargo` dependency, zero changes to the orchestrator.
 
@@ -214,7 +215,8 @@ src-tauri/                 Rust backend (thin orchestrator)
     platform/              macOS-specific (hotkey, permissions, paste, audio devices)
     ui/                    Native UI (tray, pill overlay, SDF icons)
   voxtral-c/               Vendored voxtral.c sources (C + Metal)
-crates/                    Workspace crates (types, engines, platform, 13 provider crates, 11 engine crates)
+  vendor/moshi/            Vendored moshi crate (Kyutai STT), on the workspace's Candle
+crates/                    Workspace crates (types, engines, platform, 13 provider crates, 12 engine crates)
 docs/                      Technical documentation
   AUDIO-PIPELINE.md        Audio preprocessing architecture & roadmap
   TEXT-PIPELINE.md         Text postprocessing architecture & roadmap

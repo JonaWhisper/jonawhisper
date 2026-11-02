@@ -33,12 +33,13 @@ Every dependency has a reason. This document explains **what** each one does and
 | [`ort`](https://github.com/pykeIO/ort) 2.0.0-rc | ONNX Runtime + CoreML EP | Shared runtime for 5 models: Canary ASR, Parakeet ASR, Silero VAD, BERT punctuation, PCS punctuation. CoreML EP = automatic Metal/ANE dispatch |
 | [`qwen-asr`](https://github.com/huanglizhuo/QwenASR) | Qwen3-ASR inference | Pure Rust, zero C dependencies, Apple Accelerate/AMX on Silicon. Only option for Qwen3-ASR |
 | voxtral.c (vendored C) | Voxtral Realtime 4B | [antirez/voxtral.c](https://github.com/antirez/voxtral.c) — pure C + Metal GPU. No Rust crate exists yet. Compiled via `cc` in build.rs |
+| moshi (vendored crate) | Kyutai STT inference | [kyutai-labs/moshi](https://github.com/kyutai-labs/moshi) 0.6.4, MIT/Apache-2.0, in `src-tauri/vendor/moshi`. Identical to the crates.io source except for its Candle requirement: upstream pins `^0.9.1`, which would link a second Candle. The [model weights](https://huggingface.co/kyutai/stt-1b-en_fr) are CC-BY 4.0 (Kyutai) |
 
 ### Text Cleanup / ML
 
 | Crate | Role | Why this one |
 |-------|------|--------------|
-| [`candle-core`](https://github.com/huggingface/candle) / `candle-nn` / `candle-transformers` | ML framework (Metal GPU) | Used for BERT punctuation (safetensors + Metal GPU). Chosen over `tch` (libtorch 2 GB dependency) and `tract` (no Metal). T5 correction migrated to ONNX Runtime for better CoreML support. |
+| [`candle-core`](https://github.com/huggingface/candle) / `candle-nn` / `candle-transformers` | ML framework (Metal GPU) | Used for BERT punctuation (safetensors + Metal GPU) and Kyutai STT (through moshi). Chosen over `tch` (libtorch 2 GB dependency) and `tract` (no Metal). T5 correction migrated to ONNX Runtime for better CoreML support. |
 | [`llama-cpp-2`](https://github.com/utilityai/llama-cpp-rs) | Local LLM inference (GGUF) | llama.cpp bindings with Metal GPU offload. GGUF Q4 quantization = small models (400 MB–2.5 GB). Alternatives: `mistralrs` (heavier), `llm` crate (abandoned) |
 | [`ndarray`](https://github.com/rust-ndarray/ndarray) | Tensors for VAD | LSTM state and ONNX inputs/outputs for Silero VAD. Required by ort's tensor API |
 | [`tokenizers`](https://github.com/huggingface/tokenizers) | HuggingFace tokenizer library | Used for PCS punctuation (SentencePiece Unigram). Built programmatically from protobuf model, cached as tokenizer.json |
