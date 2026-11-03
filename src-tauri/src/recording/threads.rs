@@ -1,7 +1,6 @@
 use super::{RecordingState, show_error_then_close, SPECTRUM_INTERVAL_MS};
 use crate::audio;
 use crate::events;
-use crate::platform;
 use crate::platform::hotkey;
 use crate::state::AppState;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -134,7 +133,7 @@ pub fn spawn_spectrum_emitter(
                     let _ = r.stop_recording();
                 }
 
-                platform::play_sound("Basso");
+                state.play_sound("Basso");
                 let _ = app.emit(events::RECORDING_STOPPED, ());
                 show_error_then_close(&app);
                 continue;

@@ -252,8 +252,8 @@ fn register_system_sound(name: &str) -> Option<u32> {
     }
 
     // Defaults to 1, which would mute the cues whenever "Play user interface sound
-    // effects" is off in System Settings. afplay never honoured that checkbox and the
-    // app exposes no sound toggle of its own, so opting out keeps the shipped behaviour.
+    // effects" is off in System Settings. afplay never honoured that checkbox, so opting
+    // out keeps the shipped behaviour; the app's own Sounds setting is what silences them.
     let off: u32 = 0;
     unsafe {
         AudioServicesSetProperty(

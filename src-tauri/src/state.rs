@@ -197,6 +197,13 @@ impl AppState {
         self.runtime.lock().unwrap().queue.len()
     }
 
+    /// The only way to play a cue: `platform::play_sound` ignores the user's Sounds setting.
+    pub fn play_sound(&self, name: &str) {
+        if self.settings.lock().unwrap().sound_effects_enabled {
+            crate::platform::play_sound(name);
+        }
+    }
+
     /// Runtime state only — no user settings (those come from get_settings).
     pub fn to_frontend_json(&self) -> serde_json::Value {
         let rt = self.runtime.lock().unwrap();
