@@ -205,7 +205,7 @@ Transport icons are cached in a `LazyLock` and composited onto colored bubbles (
 | `DictionarySection.vue` | User dictionary for protected words and replacement mappings |
 | `PermissionsSection.vue` | Permission status (microphone, accessibility, input monitoring) with grant buttons |
 | `DiagnosticSection.vue` | Real-time process memory (RSS), loaded engine contexts in ContextMap, auto-release toggle (`auto_release_memory`) |
-| `GeneralSection.vue` | Appearance (theme), interface language, About card (version, GPL-3.0 license) |
+| `GeneralSection.vue` | Appearance (theme), interface language, sounds, About card (version, GPL-3.0 license) |
 
 ### Key components
 
