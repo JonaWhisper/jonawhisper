@@ -94,7 +94,7 @@ pub fn start_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut Recordi
         }
 
         // Stream has data — transition to Recording mode + audible cue
-        platform::play_sound("Tink");
+        state_clone.play_sound("Tink");
         crate::ui::pill::set_mode(crate::ui::pill::PillMode::Recording);
         let _ = app_clone.emit(events::RECORDING_STARTED, ());
     });
@@ -182,7 +182,7 @@ pub fn stop_recording_and_enqueue(
         }
     };
 
-    platform::play_sound("Pop");
+    state.play_sound("Pop");
 
     let count = state.enqueue(audio_path);
     let _ = app.emit(
@@ -254,7 +254,7 @@ pub(super) fn cancel_recording(app: &AppHandle, state: &Arc<AppState>, rec: &mut
     rec.key_down_time = None;
     rec.last_short_tap_time = None;
 
-    platform::play_sound("Funk");
+    state.play_sound("Funk");
     let _ = app.emit(events::RECORDING_STOPPED, ());
     show_error_then_close(app);
 }
@@ -269,7 +269,7 @@ pub(super) fn cancel_transcription(app: &AppHandle, state: &Arc<AppState>) {
         rt.last_paste_had_content = false;
     }
     crate::ui::pill::set_pending(0);
-    platform::play_sound("Funk");
+    state.play_sound("Funk");
     let _ = app.emit(events::TRANSCRIPTION_CANCELLED, ());
     show_error_then_close(app);
 }

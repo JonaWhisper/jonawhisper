@@ -1,7 +1,6 @@
 use super::{show_error_then_close, PILL_CLOSE_GENERATION};
 use crate::cleanup;
 use crate::events;
-use crate::platform;
 use crate::platform::paste;
 use crate::state::AppState;
 use jona_types::HistoryEntry;
@@ -66,7 +65,7 @@ pub async fn process_next_in_queue(app: &AppHandle, state: &Arc<AppState>) {
             match vad_result {
                 Ok(VadResult::NoSpeech) => {
                     log::info!("VAD: no speech detected, discarding");
-                    platform::play_sound("Basso");
+                    state.play_sound("Basso");
                     let _ = std::fs::remove_file(&audio_path);
                     // If queue still has items, continue processing them
                     if state.queue_count() > 0 {
@@ -182,7 +181,7 @@ async fn run_transcription(
         Ok(Ok(Err(e))) => {
             maybe_auto_release(state, elapsed);
             log::error!("Transcription error: {}", e);
-            platform::play_sound("Basso");
+            state.play_sound("Basso");
             let _ = app.emit(
                 events::TRANSCRIPTION_ERROR,
                 serde_json::json!({ "error": e.to_string() }),
@@ -192,7 +191,7 @@ async fn run_transcription(
         Ok(Err(e)) => {
             maybe_auto_release(state, elapsed);
             log::error!("Transcription task panicked: {}", e);
-            platform::play_sound("Basso");
+            state.play_sound("Basso");
             let _ = app.emit(
                 events::TRANSCRIPTION_ERROR,
                 serde_json::json!({ "error": "Internal error" }),
@@ -202,7 +201,7 @@ async fn run_transcription(
         Err(_) => {
             // Timeout: spawn_blocking task may still be running — do NOT release context
             log::error!("Transcription timed out after 120s");
-            platform::play_sound("Basso");
+            state.play_sound("Basso");
             let _ = app.emit(
                 events::TRANSCRIPTION_ERROR,
                 serde_json::json!({ "error": "Transcription timed out" }),
@@ -215,7 +214,7 @@ async fn run_transcription(
 async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, text: &str, word_confidences: &[WordConfidence], vad_trimmed: bool) {
     let trimmed = text.trim();
     if trimmed.is_empty() {
-        platform::play_sound("Basso");
+        state.play_sound("Basso");
         let _ = app.emit(events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": "" }));
         return;
     }
@@ -283,7 +282,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
     }
 
     if processed.trim().is_empty() {
-        platform::play_sound("Basso");
+        state.play_sound("Basso");
         let _ = app.emit(events::TRANSCRIPTION_COMPLETE, serde_json::json!({ "text": "" }));
         return;
     }
@@ -498,7 +497,7 @@ async fn handle_transcription_result(app: &AppHandle, state: &Arc<AppState>, tex
         word_scores: word_scores_json.clone(),
         rating: 0,
     });
-    platform::play_sound("Glass");
+    state.play_sound("Glass");
 
     let _ = app.emit(
         events::TRANSCRIPTION_COMPLETE,

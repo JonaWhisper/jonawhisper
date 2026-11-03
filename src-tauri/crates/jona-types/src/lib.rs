@@ -577,6 +577,8 @@ pub struct Preferences {
     #[serde(default = "default_ducking_level")]
     pub audio_ducking_level: f32,
     #[serde(default = "default_true")]
+    pub sound_effects_enabled: bool,
+    #[serde(default = "default_true")]
     pub vad_enabled: bool,
     /// Hash a model after downloading it, to detect later updates. Costs one
     /// full read of the file — a quarter-minute for the largest models.
@@ -902,6 +904,7 @@ mod tests {
         assert_eq!(prefs.asr_cloud_model, "whisper-1");
         assert_eq!(prefs.llm_max_tokens, 4096);
         assert_eq!(prefs.audio_ducking_level, 0.8);
+        assert!(prefs.sound_effects_enabled);
         assert!(prefs.vad_enabled);
         assert!(prefs.disfluency_removal_enabled);
         assert!(prefs.itn_enabled);

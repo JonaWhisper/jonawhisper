@@ -16,6 +16,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const selectedInputDeviceUid = ref<string | null>(null)
   const audioDuckingEnabled = ref(false)
   const audioDuckingLevel = ref(0.8)
+  const soundEffectsEnabled = ref(true)
   const gpuMode = ref('auto')
   const hotkey = ref('right_command')
   const cancelShortcut = ref('escape')
@@ -55,6 +56,7 @@ export const useSettingsStore = defineStore('settings', () => {
       autoReleaseMemory.value = s.auto_release_memory ?? true
       audioDuckingEnabled.value = s.audio_ducking_enabled ?? false
       audioDuckingLevel.value = s.audio_ducking_level ?? 0.2
+      soundEffectsEnabled.value = s.sound_effects_enabled ?? true
       vadEnabled.value = s.vad_enabled ?? true
       verifyAfterDownload.value = s.verify_after_download ?? true
       livePreviewEnabled.value = s.live_preview_enabled ?? false
@@ -89,6 +91,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'auto_release_memory': return String(autoReleaseMemory.value)
       case 'audio_ducking_enabled': return String(audioDuckingEnabled.value)
       case 'audio_ducking_level': return String(audioDuckingLevel.value)
+      case 'sound_effects_enabled': return String(soundEffectsEnabled.value)
       case 'vad_enabled': return String(vadEnabled.value)
       case 'verify_after_download': return String(verifyAfterDownload.value)
       case 'live_preview_enabled': return String(livePreviewEnabled.value)
@@ -124,6 +127,7 @@ export const useSettingsStore = defineStore('settings', () => {
       case 'auto_release_memory': autoReleaseMemory.value = value === 'true'; break
       case 'audio_ducking_enabled': audioDuckingEnabled.value = value === 'true'; break
       case 'audio_ducking_level': audioDuckingLevel.value = parseFloat(value) || 0.8; break
+      case 'sound_effects_enabled': soundEffectsEnabled.value = value === 'true'; break
       case 'vad_enabled': vadEnabled.value = value === 'true'; break
       case 'verify_after_download': verifyAfterDownload.value = value === 'true'; break
       case 'live_preview_enabled': livePreviewEnabled.value = value === 'true'; break
@@ -161,7 +165,7 @@ export const useSettingsStore = defineStore('settings', () => {
     selectedModelId, selectedLanguage, asrCloudModel,
     textCleanupEnabled, punctuationModelId, cleanupModelId, llmModel, llmMaxTokens,
     hallucinationFilterEnabled, vadEnabled, verifyAfterDownload, disfluencyRemovalEnabled, itnEnabled, spellcheckEnabled, selectedInputDeviceUid,
-    audioDuckingEnabled, audioDuckingLevel, gpuMode,
+    audioDuckingEnabled, audioDuckingLevel, soundEffectsEnabled, gpuMode,
     autoReleaseMemory,
     livePreviewEnabled, livePreviewModelId, livePreviewMaxLines,
     hotkey, cancelShortcut, recordingMode, appLocale, theme, logLevel, logRetention,

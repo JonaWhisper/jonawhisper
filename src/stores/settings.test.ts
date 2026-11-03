@@ -31,6 +31,7 @@ function makePayload(overrides: Partial<SettingsPayload> = {}): SettingsPayload 
     llm_max_tokens: 4096,
     audio_ducking_enabled: false,
     audio_ducking_level: 0.2,
+    sound_effects_enabled: true,
     vad_enabled: true,
     live_preview_enabled: false,
     live_preview_model_id: '',
@@ -135,6 +136,30 @@ describe('settings store', () => {
       mockInvoke.mockResolvedValueOnce(undefined)
       await store.setSetting('live_preview_model_id', 'parakeet:tdt-0.6b-v3-int8')
       expect(store.livePreviewModelId).toBe('parakeet:tdt-0.6b-v3-int8')
+    })
+  })
+
+  describe('sound effects', () => {
+    it('reads the state saved by the backend', async () => {
+      const store = useSettingsStore()
+      mockInvoke.mockResolvedValueOnce(makePayload({ sound_effects_enabled: false }))
+      await store.fetchSettings()
+      expect(store.soundEffectsEnabled).toBe(false)
+    })
+
+    it('sends the choice to the backend', async () => {
+      const store = useSettingsStore()
+      mockInvoke.mockResolvedValueOnce(undefined)
+      await store.setSetting('sound_effects_enabled', 'false')
+      expect(store.soundEffectsEnabled).toBe(false)
+      expect(mockInvoke).toHaveBeenCalledWith('set_setting', { key: 'sound_effects_enabled', value: 'false' })
+    })
+
+    it('rolls back when the backend refuses', async () => {
+      const store = useSettingsStore()
+      mockInvoke.mockRejectedValueOnce(new Error('backend error'))
+      await store.setSetting('sound_effects_enabled', 'false')
+      expect(store.soundEffectsEnabled).toBe(true)
     })
   })
 

@@ -217,6 +217,8 @@
   "general.theme.light": "Clair",
   "general.theme.dark": "Sombre",
   "general.interfaceLanguage": "Langue de l'interface",
+  "general.sounds": "Sons",
+  "general.sounds.desc": "Jouer un son quand la dict\u00e9e d\u00e9marre, s\u2019arr\u00eate, aboutit ou \u00e9choue",
   "general.logging": "Journalisation",
   "general.logLevel": "Niveau de log",
   "general.openLogs": "Ouvrir le dossier des logs",
