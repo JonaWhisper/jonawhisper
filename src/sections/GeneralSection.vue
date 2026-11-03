@@ -126,6 +126,20 @@ async function onLocaleChange(value: string | number | bigint | Record<string, u
       </div>
     </div>
 
+    <!-- Sounds card -->
+    <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.sounds') }}</div>
+      <div class="flex items-center justify-between py-2 gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="text-[13px] text-foreground">{{ t('general.sounds.desc') }}</div>
+        </div>
+        <Switch
+          :model-value="settings.soundEffectsEnabled"
+          @update:model-value="(v) => settings.setSetting('sound_effects_enabled', String(v))"
+        />
+      </div>
+    </div>
+
     <!-- Log level card -->
     <div class="bg-panel-card-bg backdrop-blur-sm border-[0.5px] border-panel-card-border rounded-xl shadow-panel-card p-[14px_16px] mb-2.5">
       <div class="text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground mb-2.5">{{ t('general.logging') }}</div>
